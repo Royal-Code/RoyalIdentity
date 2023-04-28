@@ -1,0 +1,44 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Users", "RoyalIdentity.Users\RoyalIdentity.Users.csproj", "{149FB382-36BC-4B0B-A2DC-A0922093EC47}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{722691C4-EF38-489C-B03E-B53D3C941470}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{1F6EFB69-0F39-4B4B-B529-B583B801C845}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".items", ".items", "{D067ACD1-856A-43B9-85DC-5ACDE6F09AA7}"
+	ProjectSection(SolutionItems) = preProject
+		Directory.Build.props = Directory.Build.props
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Endpoins", "RoyalIdentity.Endpoins\RoyalIdentity.Endpoins.csproj", "{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{149FB382-36BC-4B0B-A2DC-A0922093EC47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{149FB382-36BC-4B0B-A2DC-A0922093EC47}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{149FB382-36BC-4B0B-A2DC-A0922093EC47}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{149FB382-36BC-4B0B-A2DC-A0922093EC47}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{149FB382-36BC-4B0B-A2DC-A0922093EC47} = {722691C4-EF38-489C-B03E-B53D3C941470}
+		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697} = {722691C4-EF38-489C-B03E-B53D3C941470}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A22735B7-0B63-4698-8CF5-359FC47E98DD}
+	EndGlobalSection
+EndGlobal
