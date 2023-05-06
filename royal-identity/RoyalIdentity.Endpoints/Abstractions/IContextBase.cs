@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.AspNetCore.Http;
 
-namespace RoyalIdentity.Endpoins.Abstractions;
+namespace RoyalIdentity.Endpoints.Abstractions;
 
 /// <summary>
 /// Base interface for all contexts

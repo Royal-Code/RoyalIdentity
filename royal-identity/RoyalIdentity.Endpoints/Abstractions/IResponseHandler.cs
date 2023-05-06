@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.AspNetCore.Http;
 
-namespace RoyalIdentity.Endpoins.Abstractions;
+namespace RoyalIdentity.Endpoints.Abstractions;
 
 public interface IResponseHandler
 {

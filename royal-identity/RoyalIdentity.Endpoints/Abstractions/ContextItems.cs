@@ -1,4 +1,4 @@
-﻿namespace RoyalIdentity.Endpoins.Abstractions;
+﻿namespace RoyalIdentity.Endpoints.Abstractions;
 
 public sealed class ContextItems
 {

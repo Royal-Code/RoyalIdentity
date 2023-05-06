@@ -1,9 +1,9 @@
 ﻿
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using RoyalIdentity.Endpoins.Abstractions;
+using RoyalIdentity.Endpoints.Abstractions;
 
-namespace RoyalIdentity.Endpoins.Mapping;
+namespace RoyalIdentity.Endpoints.Mapping;
 
 public static class ServerEndpoint<TEndpoint, TContext>
     where TEndpoint : IEndpointHandler<TContext>

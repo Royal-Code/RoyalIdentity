@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Users", "RoyalIdentity.Users\RoyalIdentity.Users.csproj", "{149FB382-36BC-4B0B-A2DC-A0922093EC47}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity.Users", "RoyalIdentity.Users\RoyalIdentity.Users.csproj", "{149FB382-36BC-4B0B-A2DC-A0922093EC47}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{722691C4-EF38-489C-B03E-B53D3C941470}"
 EndProject
@@ -14,7 +14,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".items", ".items", "{D067AC
 		Directory.Build.props = Directory.Build.props
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Endpoins", "RoyalIdentity.Endpoins\RoyalIdentity.Endpoins.csproj", "{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity.Endpoints", "RoyalIdentity.Endpoints\RoyalIdentity.Endpoints.csproj", "{F0540AEC-DBE1-4C1C-B9FA-77ACD5CB423F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,17 +26,17 @@ Global
 		{149FB382-36BC-4B0B-A2DC-A0922093EC47}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{149FB382-36BC-4B0B-A2DC-A0922093EC47}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{149FB382-36BC-4B0B-A2DC-A0922093EC47}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0540AEC-DBE1-4C1C-B9FA-77ACD5CB423F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0540AEC-DBE1-4C1C-B9FA-77ACD5CB423F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0540AEC-DBE1-4C1C-B9FA-77ACD5CB423F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0540AEC-DBE1-4C1C-B9FA-77ACD5CB423F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{149FB382-36BC-4B0B-A2DC-A0922093EC47} = {722691C4-EF38-489C-B03E-B53D3C941470}
-		{DEAD6C17-5F5E-44A4-ABD7-A1BDFC691697} = {722691C4-EF38-489C-B03E-B53D3C941470}
+		{F0540AEC-DBE1-4C1C-B9FA-77ACD5CB423F} = {722691C4-EF38-489C-B03E-B53D3C941470}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A22735B7-0B63-4698-8CF5-359FC47E98DD}
