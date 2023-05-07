@@ -1,4 +1,5 @@
 ﻿
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using RoyalIdentity.Endpoints.Abstractions;
@@ -57,7 +58,12 @@ public static class ServerEndpoint<TEndpoint, TContext>
     }
 }
 
-public class DefaultServerEndpoint
+public static class DefaultServerEndpoints
 {
-
+    public static RouteHandlerBuilder MapServerEndpoint<TEndpoint, TContext>(this WebApplication app, string pattern)
+    where TEndpoint : IEndpointHandler<TContext>
+    where TContext : class, IContextBase
+    {
+        return app.Map(pattern, ServerEndpoint<TEndpoint, TContext>.EndpointHandler);
+    }
 }
