@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<Import Project="../tests.targets" />
+
+	<ItemGroup>
+	  <ProjectReference Include="..\RoyalIdentity.Endpoints\RoyalIdentity.Endpoints.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -10,7 +10,6 @@ public static class ServerEndpoint<TEndpoint, TContext>
     where TEndpoint : IEndpointHandler<TContext>
     where TContext : class, IContextBase
 {
-
     public static async Task<IResult> EndpointHandler(
         HttpContext httpContext,
         TEndpoint endpointHandler,
