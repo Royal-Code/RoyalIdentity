@@ -11,25 +11,40 @@ public class ServerEndpointTests
         // arrange
         var httpContext = new DefaultHttpContext();
         var endpointHandler = new TestEndpointHandler();
-        var contextPipeline = new TestContextPipeline();
+        var pipelineDispatcher = new TestPipelineDispatcher();
 
         // act
-        var result = await ServerEndpoint<TestEndpointHandler, TestContext>.EndpointHandler(
+        var result = await ServerEndpoint<TestEndpointHandler>.EndpointHandler(
             httpContext,
             endpointHandler,
-            contextPipeline);
+            pipelineDispatcher);
 
         // assert
         Assert.IsType<Ok<TestContext>>(result);
     }
 }
 
-file class TestEndpointHandler : IEndpointHandler<TestContext>
+file class TestPipelineDispatcher : IPipelineDispatcher
+{
+    public Task SendAsync(IContextBase context, CancellationToken ct)
+    {
+        var contextPipeline = new TestContextPipeline();
+        return contextPipeline.SendAsync((TestContext)context, ct);
+    }
+}
+
+file class TestEndpointHandler : IEndpointHandler
 {
     public ValueTask<bool> TryCreateContextAsync(HttpContext httpContext, out TestContext context)
     {
         context = new TestContext(httpContext);
         return new ValueTask<bool>(true);
+    }
+
+    public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
+    {
+        var context = new TestContext(httpContext);
+        return ValueTask.FromResult(new EndpointCreationResult(context));
     }
 }
 
@@ -40,7 +55,7 @@ file class TestContext : AbstractContextBase
 
 file class TestContextPipeline : IContextPipeline<TestContext>
 {
-    public async Task SendAsync(TestContext context)
+    public async Task SendAsync(TestContext context, CancellationToken ct)
     {
         context.Response = new TestResponseHandler(context);
         await Task.CompletedTask;
@@ -54,10 +69,9 @@ file class TestContextPipeline : IContextPipeline<TestContext>
         {
             this.context = context;
         }
-
-        public Task<IResult> CreateResponseAsync()
+        public ValueTask<IResult> CreateResponseAsync(CancellationToken ct)
         {
-            return Task.FromResult(Results.Ok(context));
+            return ValueTask.FromResult(Results.Ok(context));
         }
     }
 }

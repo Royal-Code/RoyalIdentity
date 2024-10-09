@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Endpoints.Mapping;
 using RoyalIdentity.Pipelines.Abstractions;
@@ -17,6 +18,9 @@ public static class Pipe
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configureAction);
+
+        services.TryAddTransient<IPipelineDispatcher, PipelineDispatcher>();
+        services.TryAddTransient(typeof(PipelineDispatcher<>));
 
         var builder = new DefaultPipelineConfigurationBuilder(services);
         configureAction(builder);
