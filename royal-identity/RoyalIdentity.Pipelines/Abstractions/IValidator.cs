@@ -1,10 +1,6 @@
-﻿
-using RoyalIdentity.Endpoints.Abstractions;
+﻿namespace RoyalIdentity.Pipelines.Abstractions;
 
-namespace RoyalIdentity.Pipelines.Abstractions;
-
-public interface IValidator<TContext>
-    where TContext : IContextBase
+public interface IValidator<in TContext>
 {
     ValueTask Validate(TContext context, CancellationToken cancellationToken);
 }

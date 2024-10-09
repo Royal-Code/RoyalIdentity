@@ -21,5 +21,5 @@ public interface IContextBase
     /// <summary>
     /// The handler that will generate the response to the request.
     /// </summary>
-    IResponseHandler? Response { get; }
+    IResponseHandler? Response { get; set; }
 }
