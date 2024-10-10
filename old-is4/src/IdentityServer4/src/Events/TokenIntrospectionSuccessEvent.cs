@@ -6,6 +6,7 @@ using IdentityServer4.Extensions;
 using IdentityServer4.Validation;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.IdentityModel.Tokens;
 
 namespace IdentityServer4.Events
 {

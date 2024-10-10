@@ -15,6 +15,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityServer.UnitTests", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityServer.IntegrationTests", "test\IdentityServer.IntegrationTests\IdentityServer.IntegrationTests.csproj", "{94501373-478A-478D-8C17-6AC52E3438CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer4.EntityFramework.Storage", "..\EntityFramework.Storage\src\IdentityServer4.EntityFramework.Storage.csproj", "{8677956A-0738-4038-B541-C714B3ADCA1A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".items", ".items", "{AEA375FA-6414-40EE-9676-A5CE064C1E6C}"
+	ProjectSection(SolutionItems) = preProject
+		..\Directory.Build.targets = ..\Directory.Build.targets
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer4.Storage", "..\Storage\src\IdentityServer4.Storage.csproj", "{DA96D1D7-265B-41EE-9121-672B55C8F112}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer4.EntityFramework", "..\EntityFramework\src\IdentityServer4.EntityFramework.csproj", "{5D658EB5-3805-4CE4-AB9A-7C48DC621745}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -37,6 +48,18 @@ Global
 		{94501373-478A-478D-8C17-6AC52E3438CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{94501373-478A-478D-8C17-6AC52E3438CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{94501373-478A-478D-8C17-6AC52E3438CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8677956A-0738-4038-B541-C714B3ADCA1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8677956A-0738-4038-B541-C714B3ADCA1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8677956A-0738-4038-B541-C714B3ADCA1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8677956A-0738-4038-B541-C714B3ADCA1A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA96D1D7-265B-41EE-9121-672B55C8F112}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA96D1D7-265B-41EE-9121-672B55C8F112}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA96D1D7-265B-41EE-9121-672B55C8F112}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA96D1D7-265B-41EE-9121-672B55C8F112}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D658EB5-3805-4CE4-AB9A-7C48DC621745}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D658EB5-3805-4CE4-AB9A-7C48DC621745}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D658EB5-3805-4CE4-AB9A-7C48DC621745}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D658EB5-3805-4CE4-AB9A-7C48DC621745}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -46,6 +69,9 @@ Global
 		{784B3C88-30FA-415D-B99E-584063064508} = {5461C61B-B06E-46BA-B206-925B660BE727}
 		{4291820C-735F-4776-8BC4-6527433BC683} = {45C22EDD-91B1-4AEF-8620-77F4E3E7C544}
 		{94501373-478A-478D-8C17-6AC52E3438CF} = {45C22EDD-91B1-4AEF-8620-77F4E3E7C544}
+		{8677956A-0738-4038-B541-C714B3ADCA1A} = {5461C61B-B06E-46BA-B206-925B660BE727}
+		{DA96D1D7-265B-41EE-9121-672B55C8F112} = {5461C61B-B06E-46BA-B206-925B660BE727}
+		{5D658EB5-3805-4CE4-AB9A-7C48DC621745} = {5461C61B-B06E-46BA-B206-925B660BE727}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {176723F7-4A9B-4F05-A9F3-3BA715E4BDC3}
