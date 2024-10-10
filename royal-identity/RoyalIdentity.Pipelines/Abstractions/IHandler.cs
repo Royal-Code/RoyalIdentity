@@ -1,7 +1,6 @@
-﻿
-namespace RoyalIdentity.Pipelines.Abstractions;
+﻿namespace RoyalIdentity.Pipelines.Abstractions;
 
-public interface IHandler<TContext>
+public interface IHandler<in TContext>
 {
     ValueTask Handle(TContext context, CancellationToken cancellationToken);
 }

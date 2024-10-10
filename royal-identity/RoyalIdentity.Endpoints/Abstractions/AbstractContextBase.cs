@@ -28,5 +28,4 @@ public abstract class AbstractContextBase : IContextBase
 
     /// <inheritdoc/>
     public IResponseHandler? Response { get; set; }
-    
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net8</TargetFramework>
@@ -21,13 +21,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="../../../icon.jpg" Pack="true" Visible="false" PackagePath=""/>
+        <None Include="../../../icon.jpg" Pack="true" Visible="false" PackagePath="" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="IdentityModel"/>
-        <PackageReference Include="Newtonsoft.Json"/>
-        <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect"/>
+        <PackageReference Include="Newtonsoft.Json" />
+        <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\IdentityModel\IdentityModel.csproj" />
     </ItemGroup>
 
 </Project>

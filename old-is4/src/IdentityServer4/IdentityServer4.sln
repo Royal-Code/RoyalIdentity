@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.28803.352
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35222.181
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{5461C61B-B06E-46BA-B206-925B660BE727}"
 EndProject
@@ -15,16 +15,18 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityServer.UnitTests", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityServer.IntegrationTests", "test\IdentityServer.IntegrationTests\IdentityServer.IntegrationTests.csproj", "{94501373-478A-478D-8C17-6AC52E3438CF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer4.EntityFramework.Storage", "..\EntityFramework.Storage\src\IdentityServer4.EntityFramework.Storage.csproj", "{8677956A-0738-4038-B541-C714B3ADCA1A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityServer4.EntityFramework.Storage", "..\EntityFramework.Storage\src\IdentityServer4.EntityFramework.Storage.csproj", "{8677956A-0738-4038-B541-C714B3ADCA1A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".items", ".items", "{AEA375FA-6414-40EE-9676-A5CE064C1E6C}"
 	ProjectSection(SolutionItems) = preProject
 		..\Directory.Build.targets = ..\Directory.Build.targets
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer4.Storage", "..\Storage\src\IdentityServer4.Storage.csproj", "{DA96D1D7-265B-41EE-9121-672B55C8F112}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityServer4.Storage", "..\Storage\src\IdentityServer4.Storage.csproj", "{DA96D1D7-265B-41EE-9121-672B55C8F112}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer4.EntityFramework", "..\EntityFramework\src\IdentityServer4.EntityFramework.csproj", "{5D658EB5-3805-4CE4-AB9A-7C48DC621745}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityServer4.EntityFramework", "..\EntityFramework\src\IdentityServer4.EntityFramework.csproj", "{5D658EB5-3805-4CE4-AB9A-7C48DC621745}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentityModel", "..\IdentityModel\IdentityModel.csproj", "{E86E8141-5CE3-4333-AE52-8D182946EDF7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -60,6 +62,10 @@ Global
 		{5D658EB5-3805-4CE4-AB9A-7C48DC621745}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D658EB5-3805-4CE4-AB9A-7C48DC621745}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5D658EB5-3805-4CE4-AB9A-7C48DC621745}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E86E8141-5CE3-4333-AE52-8D182946EDF7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E86E8141-5CE3-4333-AE52-8D182946EDF7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E86E8141-5CE3-4333-AE52-8D182946EDF7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E86E8141-5CE3-4333-AE52-8D182946EDF7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -72,6 +78,7 @@ Global
 		{8677956A-0738-4038-B541-C714B3ADCA1A} = {5461C61B-B06E-46BA-B206-925B660BE727}
 		{DA96D1D7-265B-41EE-9121-672B55C8F112} = {5461C61B-B06E-46BA-B206-925B660BE727}
 		{5D658EB5-3805-4CE4-AB9A-7C48DC621745} = {5461C61B-B06E-46BA-B206-925B660BE727}
+		{E86E8141-5CE3-4333-AE52-8D182946EDF7} = {5461C61B-B06E-46BA-B206-925B660BE727}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {176723F7-4A9B-4F05-A9F3-3BA715E4BDC3}

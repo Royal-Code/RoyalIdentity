@@ -9,6 +9,13 @@ public sealed class ContextItems
 {
     private readonly Dictionary<Type, object> items;
 
+    public static ContextItems From<T>(T value)
+        where T : notnull
+    { 
+        return new ContextItems(new() { { typeof(T), value } });
+    }
+        
+
     /// <summary>
     /// Create a new context for items.
     /// </summary>
@@ -70,5 +77,23 @@ public sealed class ContextItems
             throw new ArgumentNullException(nameof(value));
 
         items[typeof(T)] = value;
+    }
+
+    /// <summary>
+    /// Get or create the item for a specific type.
+    /// </summary>
+    /// <typeparam name="T">The item type.</typeparam>
+    /// <returns>The object of the type.</returns>
+    public T GetOrCreate<T>()
+        where T : class, new()
+    {
+        var item = Get<T>();
+        if (item is null)
+        {
+            item = new T();
+            Set(item);
+        }
+
+        return item;
     }
 }

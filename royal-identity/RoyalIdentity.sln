@@ -11,19 +11,20 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{1F6EFB69-0
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".items", ".items", "{D067ACD1-856A-43B9-85DC-5ACDE6F09AA7}"
 	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
 		Directory.Build.props = Directory.Build.props
 		tests.targets = tests.targets
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity.Endpoints", "RoyalIdentity.Endpoints\RoyalIdentity.Endpoints.csproj", "{F0540AEC-DBE1-4C1C-B9FA-77ACD5CB423F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Pipelines", "RoyalIdentity.Pipelines\RoyalIdentity.Pipelines.csproj", "{3C14DFE1-F43F-4983-A629-CF416B24CED4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity.Pipelines", "RoyalIdentity.Pipelines\RoyalIdentity.Pipelines.csproj", "{3C14DFE1-F43F-4983-A629-CF416B24CED4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.Endpoints", "Tests.Endpoints\Tests.Endpoints.csproj", "{7E10B637-9E82-4C45-A920-7603A25CA34A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.Endpoints", "Tests.Endpoints\Tests.Endpoints.csproj", "{7E10B637-9E82-4C45-A920-7603A25CA34A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.Pipelines", "Tests.Pipelines\Tests.Pipelines.csproj", "{D5DE8A1E-065C-4022-B1FB-A843E6184F8F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.Pipelines", "Tests.Pipelines\Tests.Pipelines.csproj", "{D5DE8A1E-065C-4022-B1FB-A843E6184F8F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalCode.Endpoints.OAuth", "RoyalCode.Endpoints.OAuth\RoyalCode.Endpoints.OAuth.csproj", "{B8072DB8-A1E0-4B7E-8AE7-F695613C9A48}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity", "RoyalCode.Endpoints.OAuth\RoyalIdentity.csproj", "{B8072DB8-A1E0-4B7E-8AE7-F695613C9A48}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

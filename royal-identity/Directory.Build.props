@@ -8,4 +8,9 @@
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
+	<PropertyGroup>
+		<AspVer>8.0.0</AspVer>
+		<ExtVer>8.0.0</ExtVer>
+		<IdVer>7.2.0</IdVer>
+	</PropertyGroup>
 </Project>

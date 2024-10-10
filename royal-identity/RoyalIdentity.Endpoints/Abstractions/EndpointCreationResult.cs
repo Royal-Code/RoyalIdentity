@@ -13,9 +13,33 @@ public readonly struct EndpointCreationResult
 {
     public readonly IContextBase? context;
 
+    /// <summary>
+    /// Create a new <see cref="EndpointCreationResult"/>.
+    /// </summary>
+    /// <param name="context">The context.</param>
     public EndpointCreationResult(IContextBase context)
     {
         this.context = context;
+    }
+
+    /// <summary>
+    /// Create a new <see cref="EndpointCreationResult"/> for failure with the response.
+    /// </summary>
+    /// <param name="httpContext">The HttpContext.</param>
+    /// <param name="responseHandler">The <see cref="IResponseHandler"/> for the request.</param>
+    public EndpointCreationResult(HttpContext httpContext, IResponseHandler responseHandler)
+    {
+        context = new ResponseContext(httpContext, responseHandler);
+    }
+
+    /// <summary>
+    /// Create a new <see cref="EndpointCreationResult"/> for failure with the result.
+    /// </summary>
+    /// <param name="httpContext">The HttpContext.</param>
+    /// <param name="result">The <see cref="IResult"/> for the request.</param>
+    public EndpointCreationResult(HttpContext httpContext, IResult result)
+    {
+        context = new ResponseContext(httpContext, result);
     }
 
     /// <summary>
