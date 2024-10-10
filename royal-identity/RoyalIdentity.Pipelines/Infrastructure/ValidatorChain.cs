@@ -21,7 +21,7 @@ internal sealed class ValidatorChain<TContext, TValidator, TChain> : IContextPip
     {
         await validator.Validate(context, ct);
 
-        if (context.Response is not null)
+        if (context.Response is null)
             await next.SendAsync(context, ct);
     }
 }

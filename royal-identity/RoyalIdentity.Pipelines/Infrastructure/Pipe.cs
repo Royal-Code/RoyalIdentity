@@ -21,6 +21,9 @@ public static class Pipe
 
         services.TryAddTransient<IPipelineDispatcher, PipelineDispatcher>();
         services.TryAddTransient(typeof(PipelineDispatcher<>));
+        services.TryAddTransient(typeof(HandlerChain<,>));
+        services.TryAddTransient(typeof(DecoratorChain<,,>));
+        services.TryAddTransient(typeof(ValidatorChain<,,>));
 
         var builder = new DefaultPipelineConfigurationBuilder(services);
         configureAction(builder);
@@ -64,55 +67,5 @@ public static class Pipe
         where TEndpoint : class, IEndpointHandler
     {
         return builder.MapPost(pattern, DefaultServerEndpoints.MapServerEndpoint<TEndpoint>);
-    }
-
-    public static void Demo(IServiceCollection services)
-    {
-        services.AddPipelines(b =>
-        {
-            b.For<CodeTokenEndpointContext>()
-                .UseValidator<CodeTokenEndpointParametersValidator>()
-                .UseDecorator<ClientIdentifierDecorator>()
-                .UseHandler<CodeTokenEndpointHandler>();
-
-        });
-    }
-}
-
-file class TokenEndpointContextBase : AbstractContextBase
-{
-    public TokenEndpointContextBase(HttpContext httpContext, ContextItems? items = null)
-        : base(httpContext, items)
-    { }
-}
-
-file class CodeTokenEndpointContext : TokenEndpointContextBase
-{
-    public CodeTokenEndpointContext(HttpContext httpContext, ContextItems? items = null) 
-        : base(httpContext, items)
-    { }
-}
-
-file class CodeTokenEndpointParametersValidator : IValidator<CodeTokenEndpointContext>
-{
-    public ValueTask Validate(CodeTokenEndpointContext context, CancellationToken cancellationToken)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-file class ClientIdentifierDecorator : IDecorator<TokenEndpointContextBase>
-{
-    public ValueTask Decorate(TokenEndpointContextBase context, Func<ValueTask> next, CancellationToken cancellationToken)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-file class CodeTokenEndpointHandler : IHandler<CodeTokenEndpointContext>
-{
-    public ValueTask Handle(CodeTokenEndpointContext context, CancellationToken cancellationToken)
-    {
-        throw new NotImplementedException();
     }
 }
