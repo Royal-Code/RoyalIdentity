@@ -85,10 +85,10 @@ file class TestContext : AbstractContextBase, IContextWithClient
 
 file class TestHandler : IHandler<TestContext>
 {
-    public ValueTask Handle(TestContext context, CancellationToken cancellationToken)
+    public Task Handle(TestContext context, CancellationToken cancellationToken)
     {
         context.Response = new TestResponse();
-        return ValueTask.CompletedTask;
+        return Task.CompletedTask;
     }
 }
 

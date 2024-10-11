@@ -2,6 +2,7 @@
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;
@@ -10,13 +11,11 @@ using System.Security.Claims;
 
 namespace RoyalIdentity.Contexts;
 
-public class AuthorizeContext : EndpointContextBase, IWithClient, IWithRedirectUri
+public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
 {
-    public AuthorizeContext(HttpContext httpContext, ClaimsPrincipal subject, NameValueCollection raw, ContextItems? items = null) 
+    public AuthorizeContext(HttpContext httpContext, NameValueCollection raw, ContextItems? items = null) 
         : base(httpContext, raw, items)
-    { 
-        Subject = subject;
-    }
+    { }
 
     /// <summary>
     /// Gets or sets the subject.
@@ -24,7 +23,9 @@ public class AuthorizeContext : EndpointContextBase, IWithClient, IWithRedirectU
     /// <value>
     /// The subject.
     /// </value>
-    public ClaimsPrincipal Subject { get; set; }
+    public ClaimsPrincipal Subject => HttpContext.User;
+
+    public ClaimsIdentity? Identity => HttpContext.User?.Identity as ClaimsIdentity;
 
     /// <summary>
     /// Gets or sets the client model.
@@ -138,7 +139,7 @@ public class AuthorizeContext : EndpointContextBase, IWithClient, IWithRedirectU
     /// <value>
     /// The collection of prompt modes.
     /// </value>
-    public IEnumerable<string> PromptModes { get; set; } = [];
+    public ICollection<string> PromptModes { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the maximum age.
@@ -194,6 +195,47 @@ public class AuthorizeContext : EndpointContextBase, IWithClient, IWithRedirectU
     /// The resources of the result.
     /// </summary>
     public Resources Resources { get; set; } = new();
+
+    /// <summary>
+    /// Gets the session id from the current user.
+    /// </summary>
+    public string? SessionId => Identity?.FindFirst(c => c.Type == JwtClaimTypes.SessionId)?.Value;
+
+    public string? GetPrefixedAcrValue(string prefix)
+    {
+        var value = AuthenticationContextReferenceClasses.Find(x => x.StartsWith(prefix));
+
+        if (value != null)
+        {
+            value = value.Substring(prefix.Length);
+        }
+
+        return value;
+    }
+
+    public void RemovePrefixedAcrValue(string prefix)
+    {
+        AuthenticationContextReferenceClasses.RemoveAll(acr => acr.StartsWith(prefix, StringComparison.Ordinal));
+        var acr_values = AuthenticationContextReferenceClasses.ToSpaceSeparatedString();
+        if (acr_values.IsPresent())
+        {
+            Raw[OidcConstants.AuthorizeRequest.AcrValues] = acr_values;
+        }
+        else
+        {
+            Raw.Remove(OidcConstants.AuthorizeRequest.AcrValues);
+        }
+    }
+
+    public string? GetIdP()
+    {
+        return GetPrefixedAcrValue(Constants.KnownAcrValues.HomeRealm);
+    }
+
+    public void RemoveIdP()
+    {
+        RemovePrefixedAcrValue(Constants.KnownAcrValues.HomeRealm);
+    }
 
 #pragma warning disable CS8774
 

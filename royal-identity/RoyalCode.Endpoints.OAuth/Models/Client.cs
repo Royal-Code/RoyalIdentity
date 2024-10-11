@@ -58,4 +58,52 @@ public class Client
     /// Specifies the api scopes that the client is allowed to request. If empty, the client can't access any scope
     /// </summary>
     public ICollection<string> AllowedScopes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the local login is allowed for this client. Defaults to <c>true</c>.
+    /// </summary>
+    /// <value>
+    ///   <c>true</c> if local logins are enabled; otherwise, <c>false</c>.
+    /// </value>
+    public bool EnableLocalLogin { get; set; } = true;
+
+    /// <summary>
+    /// Specifies which external IdPs can be used with this client (if list is empty all IdPs are allowed). Defaults to empty.
+    /// </summary>
+    public ICollection<string> IdentityProviderRestrictions { get; set; } = [];
+
+    /// <summary>
+    /// The maximum duration (in seconds) since the last time the user authenticated.
+    /// </summary>
+    public int? UserSsoLifetime { get; set; }
+
+    /// <summary>
+    /// Signing algorithm for identity token. If empty, will use the server default signing algorithm.
+    /// </summary>
+    public ICollection<string> AllowedIdentityTokenSigningAlgorithms { get; set; } = [];
+
+    /// <summary>
+    /// Lifetime of access token in seconds (defaults to 3600 seconds / 1 hour)
+    /// </summary>
+    public int AccessTokenLifetime { get; set; } = 3600;
+
+    /// <summary>
+    /// Lifetime of authorization code in seconds (defaults to 300 seconds / 5 minutes)
+    /// </summary>
+    public int AuthorizationCodeLifetime { get; set; } = 300;
+
+    /// <summary>
+    /// Maximum lifetime of a refresh token in seconds. Defaults to 2592000 seconds / 30 days
+    /// </summary>
+    public int AbsoluteRefreshTokenLifetime { get; set; } = 2592000;
+
+    /// <summary>
+    /// Sliding lifetime of a refresh token in seconds. Defaults to 1296000 seconds / 15 days
+    /// </summary>
+    public int SlidingRefreshTokenLifetime { get; set; } = 1296000;
+
+    /// <summary>
+    /// Lifetime of a user consent in seconds. Defaults to null (no expiration)
+    /// </summary>
+    public int? ConsentLifetime { get; set; } = null;
 }

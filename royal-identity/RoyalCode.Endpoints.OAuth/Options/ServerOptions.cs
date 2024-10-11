@@ -25,5 +25,13 @@ public class ServerOptions
     /// Gets or sets the logging options
     /// </summary>
     public LoggingOptions Logging { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the endpoint configuration.
+    /// </summary>
+    /// <value>
+    /// The endpoints configuration.
+    /// </value>
+    public EndpointsOptions Endpoints { get; set; } = new EndpointsOptions();
 }
 

@@ -2,5 +2,5 @@
 
 public interface IHandler<in TContext>
 {
-    ValueTask Handle(TContext context, CancellationToken cancellationToken);
+    Task Handle(TContext context, CancellationToken ct);
 }

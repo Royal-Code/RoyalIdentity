@@ -17,9 +17,11 @@ public static class Pipes
             builder.For<AuthorizeContext>()
                 .UseDecorator<LoadClient>()
                 .UseValidator<RedirectUriValidator>()
-                .UseValidator<AuthorizeValidator>()
+                .UseValidator<AuthorizeMainValidator>()
                 .UseValidator<PkceValidator>()
                 .UseValidator<RequestedResourcesValidator>()
+                .UseDecorator<PromptLoginDecorator>()
+                .UseDecorator<ConsentDecorator>()
                 .UseHandler<AuthorizeContextHandler>();
 
 

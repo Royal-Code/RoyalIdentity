@@ -50,7 +50,7 @@ public class AuthorizeEndpoint : IEndpointHandler
 
                 return ValueTask.FromResult(
                     new EndpointCreationResult(
-                        httpContext, 
+                        httpContext,
                         ResponseHandler.Problem(problemDetails)));
             }
 
@@ -73,13 +73,8 @@ public class AuthorizeEndpoint : IEndpointHandler
                     ResponseHandler.Problem(problemDetails)));
         }
 
-        if (httpContext.User?.Identity?.IsAuthenticated is false)
-        {
-            // request sign-in
-        }
-
         var items = ContextItems.From(options);
-        var context = new AuthorizeContext(httpContext, httpContext.User, values, items);
+        var context = new AuthorizeContext(httpContext, values, items);
 
         Load(context, values);
 
@@ -130,7 +125,7 @@ public class AuthorizeEndpoint : IEndpointHandler
         {
             if (int.TryParse(maxAge, out var seconds) && seconds >= 0)
             {
-                    context.MaxAge = seconds;
+                context.MaxAge = seconds;
             }
             else
             {

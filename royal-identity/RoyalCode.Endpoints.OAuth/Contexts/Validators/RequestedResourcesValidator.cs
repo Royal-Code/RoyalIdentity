@@ -131,7 +131,7 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
                     return false;
                 }
             }
-            else if (resourcesFromStore.TryFindApiScopeByName(requestedScope, out var apiScope)
+            else if (resourcesFromStore.TryFindApiScopeByName(requestedScope, out var apiScope))
             {
                 if (client.AllowedScopes.Contains(apiScope.Name))
                 {

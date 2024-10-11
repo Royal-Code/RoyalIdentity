@@ -4,16 +4,17 @@ using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Users;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class AuthorizeValidator : IValidator<AuthorizeContext>
+public class AuthorizeMainValidator : IValidator<AuthorizeContext>
 {
     private readonly ServerOptions options;
     private readonly ILogger logger;
 
-    public AuthorizeValidator(IOptions<ServerOptions> options, ILogger<AuthorizeValidator> logger)
+    public AuthorizeMainValidator(IOptions<ServerOptions> options, ILogger<AuthorizeMainValidator> logger)
     {
         this.options = options.Value;
         this.logger = logger;
@@ -22,6 +23,7 @@ public class AuthorizeValidator : IValidator<AuthorizeContext>
     public async ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
     {
         context.AssertHasClient();
+
 
         //////////////////////////////////////////////////////////
         // response_type must be present and supported
@@ -64,6 +66,7 @@ public class AuthorizeValidator : IValidator<AuthorizeContext>
         context.GrantType = grantType;
         context.Items.GetOrCreate<Asserts>().HasGrantType = true;
 
+
         //////////////////////////////////////////////////////////
         // check if flow is allowed at authorize endpoint
         //////////////////////////////////////////////////////////
@@ -73,6 +76,7 @@ public class AuthorizeValidator : IValidator<AuthorizeContext>
             context.InvalidRequest("Invalid response_type");
             return;
         }
+
 
         //////////////////////////////////////////////////////////
         // check response_mode parameter and set response_mode
@@ -109,6 +113,7 @@ public class AuthorizeValidator : IValidator<AuthorizeContext>
             context.InvalidRequest(AuthorizeErrors.UnauthorizedClient, "Invalid grant type for client");
             return;
         }
+
 
         //////////////////////////////////////////////////////////
         // check if response type contains an access token,
@@ -151,5 +156,96 @@ public class AuthorizeValidator : IValidator<AuthorizeContext>
         {
             context.IsOpenIdRequest = true;
         }
+
+
+        //////////////////////////////////////////////////////////
+        // check nonce
+        //////////////////////////////////////////////////////////
+        if (context.Nonce.IsPresent())
+        {
+            if (context.Nonce.Length > options.InputLengthRestrictions.Nonce)
+            {
+                logger.LogError(options, "Nonce too long", context);
+                context.InvalidRequest("Invalid nonce", "too long");
+            }
+        }
+        else if ((context.GrantType == GrantType.Implicit || context.GrantType == GrantType.Hybrid)
+                && context.IsOpenIdRequest)
+        {
+            logger.LogError(options, "Nonce required for implicit and hybrid flow with openid scope", context);
+            context.InvalidRequest("Invalid nonce", "required");
+        }
+
+
+        //////////////////////////////////////////////////////////
+        // check prompt
+        //////////////////////////////////////////////////////////
+        if (context.PromptModes.Count > 1 && context.PromptModes.Contains(PromptModes.None))
+        {
+            logger.LogError(options, "The property prompt contains 'none' and other values. 'none' should be used by itself.", context);
+            context.InvalidRequest("Invalid prompt");
+        }
+
+
+        //////////////////////////////////////////////////////////
+        // check ui locales
+        //////////////////////////////////////////////////////////
+        if (context.UiLocales.IsPresent() && context.UiLocales.Length > options.InputLengthRestrictions.UiLocale)
+        {
+            logger.LogError(options, "UI locale too long", context);
+            context.InvalidRequest("Invalid ui_locales");
+        }
+
+
+        //////////////////////////////////////////////////////////
+        // check login_hint
+        //////////////////////////////////////////////////////////
+        if (context.LoginHint.IsPresent() && context.LoginHint.Length > options.InputLengthRestrictions.LoginHint)
+        {
+            logger.LogError(options, "Login hint too long", context);
+            context.InvalidRequest("Invalid login_hint", "too long");
+        }
+
+        //////////////////////////////////////////////////////////
+        // check acr_values
+        //////////////////////////////////////////////////////////
+        ////////////////////////////////////////.AcrValues//////////////////
+        if (context.AuthenticationContextReferenceClasses.Count > 0)
+        {
+            var acrValues = context.Raw.Get(AuthorizeRequest.AcrValues)!;
+            if (acrValues.Length > options.InputLengthRestrictions.AcrValues)
+            {
+                logger.LogError(options, "Acr values too long", context);
+                context.InvalidRequest("Invalid acr_values", "too long");
+            }
+        }
+
+        //////////////////////////////////////////////////////////
+        // check custom acr_values: idp
+        //////////////////////////////////////////////////////////
+        var idp = context.GetIdP();
+        if (idp.IsPresent()
+            && context.Client.IdentityProviderRestrictions.Count is not 0
+            && !context.Client.IdentityProviderRestrictions.Contains(idp))
+        {
+            logger.LogError(options, "The parameter idp requested is not in client restriction list", idp, context);
+            context.RemoveIdP();
+        }
+
+        //////////////////////////////////////////////////////////////
+        ////// check session cookie
+        //////////////////////////////////////////////////////////////
+        ////if (options.Endpoints.EnableCheckSessionEndpoint)
+        ////{
+        ////    var sessionId = await userSession.GetSessionIdAsync();
+        ////    if (sessionId.IsPresent())
+        ////    {
+        ////        context.SessionId = sessionId;
+        ////    }
+        ////    else
+        ////    {
+        ////        LogError("Check session endpoint enabled, but SessionId is missing", request);
+        ////    }
+        ////}
     }
 }

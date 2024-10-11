@@ -44,8 +44,6 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
             return;
         }
 
-        context.Items.GetOrCreate<Asserts>().HasRedirectUri = true;
-
         //////////////////////////////////////////////////////////
         // check if client protocol type is oidc
         //////////////////////////////////////////////////////////
@@ -64,6 +62,10 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         {
             logger.LogError(options, "Invalid redirect_uri", context.RedirectUri, context);
             context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidRequest, "Invalid redirect_uri");
+
+            return;
         }
+
+        context.Items.GetOrCreate<Asserts>().HasRedirectUri = true;
     }
 }
