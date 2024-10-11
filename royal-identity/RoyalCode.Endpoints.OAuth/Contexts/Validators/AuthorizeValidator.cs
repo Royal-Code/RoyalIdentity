@@ -127,6 +127,8 @@ public class AuthorizeValidator : IValidator<AuthorizeContext>
             return;
         }
 
+        context.Items.GetOrCreate<Asserts>().HasResponseType = true;
+
 
         //////////////////////////////////////////////////////////
         // scope must be present
@@ -149,79 +151,5 @@ public class AuthorizeValidator : IValidator<AuthorizeContext>
         {
             context.IsOpenIdRequest = true;
         }
-
-        //////////////////////////////////////////////////////////
-        // check scope vs response_type plausability
-        //////////////////////////////////////////////////////////
-        var requirement = Constants.ResponseTypeToScopeRequirement[context.ResponseType];
-        var requireOpenId = requirement == Constants.ScopeRequirement.Identity
-            || requirement == Constants.ScopeRequirement.IdentityOnly;
-        if (requireOpenId && !context.IsOpenIdRequest)
-        {
-            logger.LogError(options, "The parameter response_type requires the openid scope", context);
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing openid scope");
-            return;
-        }
-
-        //////////////////////////////////////////////////////////
-        // check if scopes are valid/supported and check for resource scopes
-        //////////////////////////////////////////////////////////
-        //var validatedResources = await _resourceValidator.ValidateRequestedResourcesAsync(new ResourceValidationRequest
-        //{
-        //    Client = request.Client,
-        //    Scopes = request.RequestedScopes
-        //});
-
-        //if (!validatedResources.Succeeded)
-        //{
-        //    return Invalid(request, OidcConstants.AuthorizeErrors.InvalidScope, "Invalid scope");
-        //}
-
-        //if (validatedResources.Resources.IdentityResources.Any() && !request.IsOpenIdRequest)
-        //{
-        //    LogError("Identity related scope requests, but no openid scope", request);
-        //    return Invalid(request, OidcConstants.AuthorizeErrors.InvalidScope, "Identity scopes requested, but openid scope is missing");
-        //}
-
-        //if (validatedResources.Resources.ApiScopes.Any())
-        //{
-        //    request.IsApiResourceRequest = true;
-        //}
-
-        //////////////////////////////////////////////////////////
-        // check id vs resource scopes and response types plausability
-        //////////////////////////////////////////////////////////
-        var responseTypeValidationCheck = true;
-        switch (requirement)
-        {
-            case Constants.ScopeRequirement.Identity:
-                if (!validatedResources.Resources.IdentityResources.Any())
-                {
-                    _logger.LogError("Requests for id_token response type must include identity scopes");
-                    responseTypeValidationCheck = false;
-                }
-                break;
-            case Constants.ScopeRequirement.IdentityOnly:
-                if (!validatedResources.Resources.IdentityResources.Any() || validatedResources.Resources.ApiScopes.Any())
-                {
-                    _logger.LogError("Requests for id_token response type only must not include resource scopes");
-                    responseTypeValidationCheck = false;
-                }
-                break;
-            case Constants.ScopeRequirement.ResourceOnly:
-                if (validatedResources.Resources.IdentityResources.Any() || !validatedResources.Resources.ApiScopes.Any())
-                {
-                    _logger.LogError("Requests for token response type only must include resource scopes, but no identity scopes.");
-                    responseTypeValidationCheck = false;
-                }
-                break;
-        }
-
-        if (!responseTypeValidationCheck)
-        {
-            return Invalid(request, AuthorizeErrors.InvalidScope, "Invalid scope for response type");
-        }
-
-        request.ValidatedResources = validatedResources;
     }
 }

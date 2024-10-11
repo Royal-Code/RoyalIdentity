@@ -19,6 +19,7 @@ public static class Pipes
                 .UseValidator<RedirectUriValidator>()
                 .UseValidator<AuthorizeValidator>()
                 .UseValidator<PkceValidator>()
+                .UseValidator<RequestedResourcesValidator>()
                 .UseHandler<AuthorizeContextHandler>();
 
 

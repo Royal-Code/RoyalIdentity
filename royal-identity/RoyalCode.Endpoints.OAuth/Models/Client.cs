@@ -48,4 +48,14 @@ public class Client
     /// <c>true</c> if access tokens can be transmitted via the browser; otherwise, <c>false</c>.
     /// </value>
     public bool AllowAccessTokensViaBrowser { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether [allow offline access]. Defaults to <c>false</c>.
+    /// </summary>
+    public bool AllowOfflineAccess { get; set; } = false;
+
+    /// <summary>
+    /// Specifies the api scopes that the client is allowed to request. If empty, the client can't access any scope
+    /// </summary>
+    public ICollection<string> AllowedScopes { get; set; } = [];
 }

@@ -12,40 +12,40 @@ internal static class Constants
     public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(10);
     public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(60);
 
-    public static readonly List<string> SupportedResponseTypes = new List<string>
-        {
-            OidcConstants.ResponseTypes.Code,
-            OidcConstants.ResponseTypes.Token,
-            OidcConstants.ResponseTypes.IdToken,
-            OidcConstants.ResponseTypes.IdTokenToken,
-            OidcConstants.ResponseTypes.CodeIdToken,
-            OidcConstants.ResponseTypes.CodeToken,
-            OidcConstants.ResponseTypes.CodeIdTokenToken
-        };
+    public static readonly List<string> SupportedResponseTypes =
+    [
+        OidcConstants.ResponseTypes.Code,
+        OidcConstants.ResponseTypes.Token,
+        OidcConstants.ResponseTypes.IdToken,
+        OidcConstants.ResponseTypes.IdTokenToken,
+        OidcConstants.ResponseTypes.CodeIdToken,
+        OidcConstants.ResponseTypes.CodeToken,
+        OidcConstants.ResponseTypes.CodeIdTokenToken
+    ];
 
-    public static readonly Dictionary<string, string> ResponseTypeToGrantTypeMapping = new Dictionary<string, string>
-        {
-            { OidcConstants.ResponseTypes.Code, OidcConstants.GrantType.AuthorizationCode },
-            { OidcConstants.ResponseTypes.Token, OidcConstants.GrantType.Implicit },
-            { OidcConstants.ResponseTypes.IdToken, OidcConstants.GrantType.Implicit },
-            { OidcConstants.ResponseTypes.IdTokenToken, OidcConstants.GrantType.Implicit },
-            { OidcConstants.ResponseTypes.CodeIdToken, OidcConstants.GrantType.Hybrid },
-            { OidcConstants.ResponseTypes.CodeToken, OidcConstants.GrantType.Hybrid },
-            { OidcConstants.ResponseTypes.CodeIdTokenToken, OidcConstants.GrantType.Hybrid }
-        };
+    public static readonly Dictionary<string, string> ResponseTypeToGrantTypeMapping = new()
+    {
+        { OidcConstants.ResponseTypes.Code, OidcConstants.GrantType.AuthorizationCode },
+        { OidcConstants.ResponseTypes.Token, OidcConstants.GrantType.Implicit },
+        { OidcConstants.ResponseTypes.IdToken, OidcConstants.GrantType.Implicit },
+        { OidcConstants.ResponseTypes.IdTokenToken, OidcConstants.GrantType.Implicit },
+        { OidcConstants.ResponseTypes.CodeIdToken, OidcConstants.GrantType.Hybrid },
+        { OidcConstants.ResponseTypes.CodeToken, OidcConstants.GrantType.Hybrid },
+        { OidcConstants.ResponseTypes.CodeIdTokenToken, OidcConstants.GrantType.Hybrid }
+    };
 
-    public static readonly List<string> AllowedGrantTypesForAuthorizeEndpoint = new List<string>
-        {
-            OidcConstants.GrantType.AuthorizationCode,
-            OidcConstants.GrantType.Implicit,
-            OidcConstants.GrantType.Hybrid
-        };
+    public static readonly List<string> AllowedGrantTypesForAuthorizeEndpoint = new()
+    {
+        OidcConstants.GrantType.AuthorizationCode,
+        OidcConstants.GrantType.Implicit,
+        OidcConstants.GrantType.Hybrid
+    };
 
-    public static readonly List<string> SupportedCodeChallengeMethods = new List<string>
-        {
-            OidcConstants.CodeChallengeMethods.Plain,
-            OidcConstants.CodeChallengeMethods.Sha256
-        };
+    public static readonly List<string> SupportedCodeChallengeMethods = new()
+    {
+        OidcConstants.CodeChallengeMethods.Plain,
+        OidcConstants.CodeChallengeMethods.Sha256
+    };
 
     public enum ScopeRequirement
     {
@@ -55,110 +55,129 @@ internal static class Constants
         Identity
     }
 
-    public static readonly Dictionary<string, ScopeRequirement> ResponseTypeToScopeRequirement = new Dictionary<string, ScopeRequirement>
+    public static readonly Dictionary<string, ScopeRequirement> ResponseTypeToScopeRequirement = new()
+    {
+        { OidcConstants.ResponseTypes.Code, ScopeRequirement.None },
+        { OidcConstants.ResponseTypes.Token, ScopeRequirement.ResourceOnly },
+        { OidcConstants.ResponseTypes.IdToken, ScopeRequirement.IdentityOnly },
+        { OidcConstants.ResponseTypes.IdTokenToken, ScopeRequirement.Identity },
+        { OidcConstants.ResponseTypes.CodeIdToken, ScopeRequirement.Identity },
+        { OidcConstants.ResponseTypes.CodeToken, ScopeRequirement.Identity },
+        { OidcConstants.ResponseTypes.CodeIdTokenToken, ScopeRequirement.Identity }
+    };
+
+    public static readonly Dictionary<string, IEnumerable<string>> AllowedResponseModesForGrantType =
+        new()
         {
-            { OidcConstants.ResponseTypes.Code, ScopeRequirement.None },
-            { OidcConstants.ResponseTypes.Token, ScopeRequirement.ResourceOnly },
-            { OidcConstants.ResponseTypes.IdToken, ScopeRequirement.IdentityOnly },
-            { OidcConstants.ResponseTypes.IdTokenToken, ScopeRequirement.Identity },
-            { OidcConstants.ResponseTypes.CodeIdToken, ScopeRequirement.Identity },
-            { OidcConstants.ResponseTypes.CodeToken, ScopeRequirement.Identity },
-            { OidcConstants.ResponseTypes.CodeIdTokenToken, ScopeRequirement.Identity }
+            {
+                OidcConstants.GrantType.AuthorizationCode,
+                [
+                    OidcConstants.ResponseModes.Query, OidcConstants.ResponseModes.FormPost,
+                    OidcConstants.ResponseModes.Fragment
+                ]
+            },
+            {
+                OidcConstants.GrantType.Hybrid,
+                [OidcConstants.ResponseModes.Fragment, OidcConstants.ResponseModes.FormPost]
+            },
+            {
+                OidcConstants.GrantType.Implicit,
+                [OidcConstants.ResponseModes.Fragment, OidcConstants.ResponseModes.FormPost]
+            }
         };
 
-    public static readonly Dictionary<string, IEnumerable<string>> AllowedResponseModesForGrantType = new Dictionary<string, IEnumerable<string>>
-        {
-            { OidcConstants.GrantType.AuthorizationCode, new[] { OidcConstants.ResponseModes.Query, OidcConstants.ResponseModes.FormPost, OidcConstants.ResponseModes.Fragment } },
-            { OidcConstants.GrantType.Hybrid, new[] { OidcConstants.ResponseModes.Fragment, OidcConstants.ResponseModes.FormPost }},
-            { OidcConstants.GrantType.Implicit, new[] { OidcConstants.ResponseModes.Fragment, OidcConstants.ResponseModes.FormPost }}
-        };
-
-    public static readonly List<string> SupportedResponseModes = new List<string>
-        {
-            OidcConstants.ResponseModes.FormPost,
-            OidcConstants.ResponseModes.Query,
-            OidcConstants.ResponseModes.Fragment
-        };
+    public static readonly List<string> SupportedResponseModes = new()
+    {
+        OidcConstants.ResponseModes.FormPost,
+        OidcConstants.ResponseModes.Query,
+        OidcConstants.ResponseModes.Fragment
+    };
 
     public static string[] SupportedSubjectTypes =
     {
-            "pairwise", "public"
-        };
+        "pairwise", "public"
+    };
 
     public static class SigningAlgorithms
     {
         public const string RSA_SHA_256 = "RS256";
     }
 
-    public static readonly List<string> SupportedDisplayModes = new List<string>
-        {
-            OidcConstants.DisplayModes.Page,
-            OidcConstants.DisplayModes.Popup,
-            OidcConstants.DisplayModes.Touch,
-            OidcConstants.DisplayModes.Wap
-        };
+    public static readonly List<string> SupportedDisplayModes =
+    [
+        OidcConstants.DisplayModes.Page,
+        OidcConstants.DisplayModes.Popup,
+        OidcConstants.DisplayModes.Touch,
+        OidcConstants.DisplayModes.Wap
+    ];
 
-    public static readonly List<string> SupportedPromptModes = new List<string>
-        {
-            OidcConstants.PromptModes.None,
-            OidcConstants.PromptModes.Login,
-            OidcConstants.PromptModes.Consent,
-            OidcConstants.PromptModes.SelectAccount
-        };
+    public static readonly List<string> SupportedPromptModes =
+    [
+        OidcConstants.PromptModes.None,
+        OidcConstants.PromptModes.Login,
+        OidcConstants.PromptModes.Consent,
+        OidcConstants.PromptModes.SelectAccount
+    ];
 
     public static class KnownAcrValues
     {
         public const string HomeRealm = "idp:";
         public const string Tenant = "tenant:";
 
-        public static readonly string[] All = { HomeRealm, Tenant };
+        public static readonly string[] All = [HomeRealm, Tenant];
     }
 
-    public static Dictionary<string, int> ProtectedResourceErrorStatusCodes = new Dictionary<string, int>
-        {
-            { OidcConstants.ProtectedResourceErrors.InvalidToken,      401 },
-            { OidcConstants.ProtectedResourceErrors.ExpiredToken,      401 },
-            { OidcConstants.ProtectedResourceErrors.InvalidRequest,    400 },
-            { OidcConstants.ProtectedResourceErrors.InsufficientScope, 403 }
-        };
+    public static Dictionary<string, int> ProtectedResourceErrorStatusCodes = new()
+    {
+        { OidcConstants.ProtectedResourceErrors.InvalidToken, 401 },
+        { OidcConstants.ProtectedResourceErrors.ExpiredToken, 401 },
+        { OidcConstants.ProtectedResourceErrors.InvalidRequest, 400 },
+        { OidcConstants.ProtectedResourceErrors.InsufficientScope, 403 }
+    };
 
-    public static readonly Dictionary<string, IEnumerable<string>> ScopeToClaimsMapping = new Dictionary<string, IEnumerable<string>>
+    public static readonly Dictionary<string, IEnumerable<string>> ScopeToClaimsMapping =
+        new()
         {
-            { ServerConstants.StandardScopes.Profile, new[]
-                            {
-                                JwtClaimTypes.Name,
-                                JwtClaimTypes.FamilyName,
-                                JwtClaimTypes.GivenName,
-                                JwtClaimTypes.MiddleName,
-                                JwtClaimTypes.NickName,
-                                JwtClaimTypes.PreferredUserName,
-                                JwtClaimTypes.Profile,
-                                JwtClaimTypes.Picture,
-                                JwtClaimTypes.WebSite,
-                                JwtClaimTypes.Gender,
-                                JwtClaimTypes.BirthDate,
-                                JwtClaimTypes.ZoneInfo,
-                                JwtClaimTypes.Locale,
-                                JwtClaimTypes.UpdatedAt
-                            }},
-            { ServerConstants.StandardScopes.Email, new[]
-                            {
-                                JwtClaimTypes.Email,
-                                JwtClaimTypes.EmailVerified
-                            }},
-            { ServerConstants.StandardScopes.Address, new[]
-                            {
-                                JwtClaimTypes.Address
-                            }},
-            { ServerConstants.StandardScopes.Phone, new[]
-                            {
-                                JwtClaimTypes.PhoneNumber,
-                                JwtClaimTypes.PhoneNumberVerified
-                            }},
-            { ServerConstants.StandardScopes.OpenId, new[]
-                            {
-                                JwtClaimTypes.Subject
-                            }}
+            {
+                ServerConstants.StandardScopes.Profile, [
+                    JwtClaimTypes.Name,
+                    JwtClaimTypes.FamilyName,
+                    JwtClaimTypes.GivenName,
+                    JwtClaimTypes.MiddleName,
+                    JwtClaimTypes.NickName,
+                    JwtClaimTypes.PreferredUserName,
+                    JwtClaimTypes.Profile,
+                    JwtClaimTypes.Picture,
+                    JwtClaimTypes.WebSite,
+                    JwtClaimTypes.Gender,
+                    JwtClaimTypes.BirthDate,
+                    JwtClaimTypes.ZoneInfo,
+                    JwtClaimTypes.Locale,
+                    JwtClaimTypes.UpdatedAt
+                ]
+            },
+            {
+                ServerConstants.StandardScopes.Email, [
+                    JwtClaimTypes.Email,
+                    JwtClaimTypes.EmailVerified
+                ]
+            },
+            {
+                ServerConstants.StandardScopes.Address, [
+                    JwtClaimTypes.Address
+                ]
+            },
+            {
+                ServerConstants.StandardScopes.Phone, [
+                    JwtClaimTypes.PhoneNumber,
+                    JwtClaimTypes.PhoneNumberVerified
+                ]
+            },
+            {
+                ServerConstants.StandardScopes.OpenId, [
+                    JwtClaimTypes.Subject
+                ]
+            }
         };
 
     public static class UIConstants
@@ -224,13 +243,13 @@ internal static class Constants
         public const string MtlsDeviceAuthorization = MtlsPathPrefix + "/deviceauthorization";
 
         public static readonly string[] CorsPaths =
-        {
-                DiscoveryConfiguration,
-                DiscoveryWebKeys,
-                Token,
-                UserInfo,
-                Revocation
-            };
+        [
+            DiscoveryConfiguration,
+            DiscoveryWebKeys,
+            Token,
+            UserInfo,
+            Revocation
+        ];
     }
 
     public static class EnvironmentKeys
@@ -245,11 +264,11 @@ internal static class Constants
         public const string AccessToken = "access_token";
     }
 
-    public static List<string> SupportedTokenTypeHints = new List<string>
-        {
-            TokenTypeHints.RefreshToken,
-            TokenTypeHints.AccessToken
-        };
+    public static List<string> SupportedTokenTypeHints =
+    [
+        TokenTypeHints.RefreshToken,
+        TokenTypeHints.AccessToken
+    ];
 
     public static class RevocationErrors
     {
@@ -259,55 +278,58 @@ internal static class Constants
     public class Filters
     {
         // filter for claims from an incoming access token (e.g. used at the user profile endpoint)
-        public static readonly string[] ProtocolClaimsFilter = {
-                JwtClaimTypes.AccessTokenHash,
-                JwtClaimTypes.Audience,
-                JwtClaimTypes.AuthorizedParty,
-                JwtClaimTypes.AuthorizationCodeHash,
-                JwtClaimTypes.ClientId,
-                JwtClaimTypes.Expiration,
-                JwtClaimTypes.IssuedAt,
-                JwtClaimTypes.Issuer,
-                JwtClaimTypes.JwtId,
-                JwtClaimTypes.Nonce,
-                JwtClaimTypes.NotBefore,
-                JwtClaimTypes.ReferenceTokenId,
-                JwtClaimTypes.SessionId,
-                JwtClaimTypes.Scope
-            };
+        public static readonly string[] ProtocolClaimsFilter =
+        [
+            JwtClaimTypes.AccessTokenHash,
+            JwtClaimTypes.Audience,
+            JwtClaimTypes.AuthorizedParty,
+            JwtClaimTypes.AuthorizationCodeHash,
+            JwtClaimTypes.ClientId,
+            JwtClaimTypes.Expiration,
+            JwtClaimTypes.IssuedAt,
+            JwtClaimTypes.Issuer,
+            JwtClaimTypes.JwtId,
+            JwtClaimTypes.Nonce,
+            JwtClaimTypes.NotBefore,
+            JwtClaimTypes.ReferenceTokenId,
+            JwtClaimTypes.SessionId,
+            JwtClaimTypes.Scope
+        ];
 
         // filter list for claims returned from profile service prior to creating tokens
-        public static readonly string[] ClaimsServiceFilterClaimTypes = {
-                // TODO: consider JwtClaimTypes.AuthenticationContextClassReference,
-                JwtClaimTypes.AccessTokenHash,
-                JwtClaimTypes.Audience,
-                JwtClaimTypes.AuthenticationMethod,
-                JwtClaimTypes.AuthenticationTime,
-                JwtClaimTypes.AuthorizedParty,
-                JwtClaimTypes.AuthorizationCodeHash,
-                JwtClaimTypes.ClientId,
-                JwtClaimTypes.Expiration,
-                JwtClaimTypes.IdentityProvider,
-                JwtClaimTypes.IssuedAt,
-                JwtClaimTypes.Issuer,
-                JwtClaimTypes.JwtId,
-                JwtClaimTypes.Nonce,
-                JwtClaimTypes.NotBefore,
-                JwtClaimTypes.ReferenceTokenId,
-                JwtClaimTypes.SessionId,
-                JwtClaimTypes.Subject,
-                JwtClaimTypes.Scope,
-                JwtClaimTypes.Confirmation
-            };
+        public static readonly string[] ClaimsServiceFilterClaimTypes =
+        [
+            // TODO: consider JwtClaimTypes.AuthenticationContextClassReference,
+            JwtClaimTypes.AccessTokenHash,
+            JwtClaimTypes.Audience,
+            JwtClaimTypes.AuthenticationMethod,
+            JwtClaimTypes.AuthenticationTime,
+            JwtClaimTypes.AuthorizedParty,
+            JwtClaimTypes.AuthorizationCodeHash,
+            JwtClaimTypes.ClientId,
+            JwtClaimTypes.Expiration,
+            JwtClaimTypes.IdentityProvider,
+            JwtClaimTypes.IssuedAt,
+            JwtClaimTypes.Issuer,
+            JwtClaimTypes.JwtId,
+            JwtClaimTypes.Nonce,
+            JwtClaimTypes.NotBefore,
+            JwtClaimTypes.ReferenceTokenId,
+            JwtClaimTypes.SessionId,
+            JwtClaimTypes.Subject,
+            JwtClaimTypes.Scope,
+            JwtClaimTypes.Confirmation
+        ];
 
-        public static readonly string[] JwtRequestClaimTypesFilter = {
-                JwtClaimTypes.Audience,
-                JwtClaimTypes.Expiration,
-                JwtClaimTypes.IssuedAt,
-                JwtClaimTypes.Issuer,
-                JwtClaimTypes.NotBefore,
-                JwtClaimTypes.JwtId
-            };
+        public static readonly string[] JwtRequestClaimTypesFilter =
+        [
+            JwtClaimTypes.Audience,
+            JwtClaimTypes.Expiration,
+            JwtClaimTypes.IssuedAt,
+            JwtClaimTypes.Issuer,
+            JwtClaimTypes.NotBefore,
+            JwtClaimTypes.JwtId
+        ];
     }
 
     public static class WsFedSignOut
@@ -766,7 +788,6 @@ public static class OidcConstants
             public const string PS256 = "PS256";
             public const string PS384 = "PS384";
             public const string PS512 = "PS512";
-
         }
     }
 
@@ -814,26 +835,40 @@ public static class OidcConstants
         public const string IdTokenSigningAlgorithmsSupported = "id_token_signing_alg_values_supported";
         public const string OpPolicyUri = "op_policy_uri";
         public const string OpTosUri = "op_tos_uri";
-        public const string RequestObjectEncryptionAlgorithmsSupported = "request_object_encryption_alg_values_supported";
-        public const string RequestObjectEncryptionEncValuesSupported = "request_object_encryption_enc_values_supported";
+
+        public const string RequestObjectEncryptionAlgorithmsSupported =
+            "request_object_encryption_alg_values_supported";
+
+        public const string RequestObjectEncryptionEncValuesSupported =
+            "request_object_encryption_enc_values_supported";
+
         public const string RequestObjectSigningAlgorithmsSupported = "request_object_signing_alg_values_supported";
         public const string RequestParameterSupported = "request_parameter_supported";
         public const string RequestUriParameterSupported = "request_uri_parameter_supported";
         public const string RequireRequestUriRegistration = "require_request_uri_registration";
         public const string ServiceDocumentation = "service_documentation";
-        public const string TokenEndpointAuthSigningAlgorithmsSupported = "token_endpoint_auth_signing_alg_values_supported";
+
+        public const string TokenEndpointAuthSigningAlgorithmsSupported =
+            "token_endpoint_auth_signing_alg_values_supported";
+
         public const string UILocalesSupported = "ui_locales_supported";
         public const string UserInfoEncryptionAlgorithmsSupported = "userinfo_encryption_alg_values_supported";
         public const string UserInfoEncryptionEncValuesSupported = "userinfo_encryption_enc_values_supported";
         public const string UserInfoSigningAlgorithmsSupported = "userinfo_signing_alg_values_supported";
         public const string TlsClientCertificateBoundAccessTokens = "tls_client_certificate_bound_access_tokens";
-        public const string AuthorizationResponseIssParameterSupported = "authorization_response_iss_parameter_supported";
+
+        public const string AuthorizationResponseIssParameterSupported =
+            "authorization_response_iss_parameter_supported";
+
         public const string PromptValuesSupported = "prompt_values_supported";
 
         // CIBA
         public const string BackchannelTokenDeliveryModesSupported = "backchannel_token_delivery_modes_supported";
         public const string BackchannelAuthenticationEndpoint = "backchannel_authentication_endpoint";
-        public const string BackchannelAuthenticationRequestSigningAlgValuesSupported = "backchannel_authentication_request_signing_alg_values_supported";
+
+        public const string BackchannelAuthenticationRequestSigningAlgValuesSupported =
+            "backchannel_authentication_request_signing_alg_values_supported";
+
         public const string BackchannelUserCodeParameterSupported = "backchannel_user_code_parameter_supported";
 
         // DPoP
@@ -864,14 +899,19 @@ public static class OidcConstants
     {
         /// <summary>REQUIRED. Informs the Authorization Server that the Client is making an OpenID Connect request. If the <c>openid</c> scope value is not present, the behavior is entirely unspecified.</summary>
         public const string OpenId = "openid";
+
         /// <summary>OPTIONAL. This scope value requests access to the End-User's default profile Claims, which are: <c>name</c>, <c>family_name</c>, <c>given_name</c>, <c>middle_name</c>, <c>nickname</c>, <c>preferred_username</c>, <c>profile</c>, <c>picture</c>, <c>website</c>, <c>gender</c>, <c>birthdate</c>, <c>zoneinfo</c>, <c>locale</c>, and <c>updated_at</c>.</summary>
         public const string Profile = "profile";
+
         /// <summary>OPTIONAL. This scope value requests access to the <c>email</c> and <c>email_verified</c> Claims.</summary>
         public const string Email = "email";
+
         /// <summary>OPTIONAL. This scope value requests access to the <c>address</c> Claim.</summary>
         public const string Address = "address";
+
         /// <summary>OPTIONAL. This scope value requests access to the <c>phone_number</c> and <c>phone_number_verified</c> Claims.</summary>
         public const string Phone = "phone";
+
         /// <summary>This scope value MUST NOT be used with the OpenID Connect Implicit Client Implementer's Guide 1.0. See the OpenID Connect Basic Client Implementer's Guide 1.0 (http://openid.net/specs/openid-connect-implicit-1_0.html#OpenID.Basic) for its usage in that subset of OpenID Connect.</summary>
         public const string OfflineAccess = "offline_access";
     }
@@ -974,13 +1014,13 @@ public static class JwtClaimTypes
     public const string SessionId = "sid";
 
     /// <summary>
-    /// Authentication Context Class Reference. String specifying an Authentication Context Class Reference value that identifies the Authentication Context Class that the authentication performed satisfied. 
-    /// The value "0" indicates the End-User authentication did not meet the requirements of ISO/IEC 29115 level 1. 
-    /// Authentication using a long-lived browser cookie, for instance, is one example where the use of "level 0" is appropriate. 
+    /// Authentication Context Class Reference. String specifying an Authentication Context Class Reference value that identifies the Authentication Context Class that the authentication performed satisfied.
+    /// The value "0" indicates the End-User authentication did not meet the requirements of ISO/IEC 29115 level 1.
+    /// Authentication using a long-lived browser cookie, for instance, is one example where the use of "level 0" is appropriate.
     /// Authentications with level 0 SHOULD NOT be used to authorize access to any resource of any monetary value.
-    ///  (This corresponds to the OpenID 2.0 PAPE nist_auth_level 0.) 
-    /// An absolute URI or an RFC 6711 registered name SHOULD be used as the acr value; registered names MUST NOT be used with a different meaning than that which is registered. 
-    /// Parties using this claim will need to agree upon the meanings of the values used, which may be context-specific. 
+    ///  (This corresponds to the OpenID 2.0 PAPE nist_auth_level 0.)
+    /// An absolute URI or an RFC 6711 registered name SHOULD be used as the acr value; registered names MUST NOT be used with a different meaning than that which is registered.
+    /// Parties using this claim will need to agree upon the meanings of the values used, which may be context-specific.
     /// The acr value is a case sensitive string.
     /// </summary>
     public const string AuthenticationContextClassReference = "acr";
@@ -1212,19 +1252,19 @@ public static class ServerConstants
     }
 
     public static IEnumerable<string> SupportedSigningAlgorithms = new List<string>
-        {
-            SecurityAlgorithms.RsaSha256,
-            SecurityAlgorithms.RsaSha384,
-            SecurityAlgorithms.RsaSha512,
+    {
+        SecurityAlgorithms.RsaSha256,
+        SecurityAlgorithms.RsaSha384,
+        SecurityAlgorithms.RsaSha512,
 
-            SecurityAlgorithms.RsaSsaPssSha256,
-            SecurityAlgorithms.RsaSsaPssSha384,
-            SecurityAlgorithms.RsaSsaPssSha512,
+        SecurityAlgorithms.RsaSsaPssSha256,
+        SecurityAlgorithms.RsaSsaPssSha384,
+        SecurityAlgorithms.RsaSsaPssSha512,
 
-            SecurityAlgorithms.EcdsaSha256,
-            SecurityAlgorithms.EcdsaSha384,
-            SecurityAlgorithms.EcdsaSha512
-        };
+        SecurityAlgorithms.EcdsaSha256,
+        SecurityAlgorithms.EcdsaSha384,
+        SecurityAlgorithms.EcdsaSha512
+    };
 
     public enum RsaSigningAlgorithm
     {
@@ -1248,14 +1288,19 @@ public static class ServerConstants
     {
         /// <summary>REQUIRED. Informs the Authorization Server that the Client is making an OpenID Connect request. If the <c>openid</c> scope value is not present, the behavior is entirely unspecified.</summary>
         public const string OpenId = "openid";
+
         /// <summary>OPTIONAL. This scope value requests access to the End-User's default profile Claims, which are: <c>name</c>, <c>family_name</c>, <c>given_name</c>, <c>middle_name</c>, <c>nickname</c>, <c>preferred_username</c>, <c>profile</c>, <c>picture</c>, <c>website</c>, <c>gender</c>, <c>birthdate</c>, <c>zoneinfo</c>, <c>locale</c>, and <c>updated_at</c>.</summary>
         public const string Profile = "profile";
+
         /// <summary>OPTIONAL. This scope value requests access to the <c>email</c> and <c>email_verified</c> Claims.</summary>
         public const string Email = "email";
+
         /// <summary>OPTIONAL. This scope value requests access to the <c>address</c> Claim.</summary>
         public const string Address = "address";
+
         /// <summary>OPTIONAL. This scope value requests access to the <c>phone_number</c> and <c>phone_number_verified</c> Claims.</summary>
         public const string Phone = "phone";
+
         /// <summary>This scope value MUST NOT be used with the OpenID Connect Implicit Client Implementer's Guide 1.0. See the OpenID Connect Basic Client Implementer's Guide 1.0 (http://openid.net/specs/openid-connect-implicit-1_0.html#OpenID.Basic) for its usage in that subset of OpenID Connect.</summary>
         public const string OfflineAccess = "offline_access";
     }

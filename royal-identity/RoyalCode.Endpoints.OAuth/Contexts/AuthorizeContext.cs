@@ -190,6 +190,11 @@ public class AuthorizeContext : EndpointContextBase, IWithClient, IWithRedirectU
         ResponseType == OidcConstants.ResponseTypes.CodeToken ||
         ResponseType == OidcConstants.ResponseTypes.CodeIdTokenToken;
 
+    /// <summary>
+    /// The resources of the result.
+    /// </summary>
+    public Resources Resources { get; set; } = new();
+
 #pragma warning disable CS8774
 
     [MemberNotNull(nameof(Client), nameof(ClientId))]
@@ -214,5 +219,13 @@ public class AuthorizeContext : EndpointContextBase, IWithClient, IWithRedirectU
         var has = Items.Get<Asserts>()?.HasGrantType ?? false;
         if (!has)
             throw new InvalidOperationException("GrantType was required, but is missing");
+    }
+
+    [MemberNotNull(nameof(ResponseType))]
+    public void AssertHasResponseType()
+    {
+        var has = Items.Get<Asserts>()?.HasResponseType ?? false;
+        if (!has)
+            throw new InvalidOperationException("ResponseType was required, but is missing");
     }
 }
