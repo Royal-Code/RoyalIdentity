@@ -4,7 +4,6 @@ using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using RoyalIdentity.Users;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
@@ -63,10 +62,8 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         // match response_type to grant type
         //////////////////////////////////////////////////////////
         var grantType = Constants.ResponseTypeToGrantTypeMapping[context.ResponseType];
-        context.GrantType = grantType;
-        context.Items.GetOrCreate<Asserts>().HasGrantType = true;
-
-
+        
+        
         //////////////////////////////////////////////////////////
         // check if flow is allowed at authorize endpoint
         //////////////////////////////////////////////////////////
@@ -76,6 +73,9 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
             context.InvalidRequest("Invalid response_type");
             return;
         }
+
+        context.GrantType = grantType;
+        context.Items.GetOrCreate<Asserts>().HasGrantType = true;
 
 
         //////////////////////////////////////////////////////////
@@ -169,8 +169,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
                 context.InvalidRequest("Invalid nonce", "too long");
             }
         }
-        else if ((context.GrantType == GrantType.Implicit || context.GrantType == GrantType.Hybrid)
-                && context.IsOpenIdRequest)
+        else if (context.GrantType == GrantType.Hybrid && context.IsOpenIdRequest)
         {
             logger.LogError(options, "Nonce required for implicit and hybrid flow with openid scope", context);
             context.InvalidRequest("Invalid nonce", "required");

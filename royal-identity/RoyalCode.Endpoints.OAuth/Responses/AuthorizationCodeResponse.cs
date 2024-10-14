@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
+using RoyalIdentity.Responses.HttpResults;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Responses;
 
@@ -32,26 +33,36 @@ public class AuthorizationCodeResponse : IResponseHandler
 
     public ValueTask<IResult> CreateResponseAsync(CancellationToken ct)
     {
-        throw new NotImplementedException();
-    }
+        IResult result;
+        var redirectUri = Context.RedirectUri!;
+        var values = ToNameValueCollection();
 
-    private string BuildRedirectUri()
-    {
-        var uri = Context.RedirectUri!;
-        var query = ToNameValueCollection().ToQueryString();
+        if (Context.ResponseMode == ResponseModes.Query)
+        {
+            result = new CodeResponseToQueryResult(redirectUri, values);
+        }
+        else if (Context.ResponseMode == ResponseModes.Fragment)
+        {
+            result = new CodeResponseToFragmentResult(redirectUri, values);
+        }
+        else if (Context.ResponseMode == ResponseModes.FormPost)
+        {
+            result = new CodeResponseToFormPostResult(redirectUri, values);
+        }
+        else
+        {
+            throw new InvalidOperationException("Unsupported response mode");
+        }
 
-        uri = Context.ResponseMode == OidcConstants.ResponseModes.Query
-            ? uri.AddQueryString(query)
-            : uri.AddHashFragment(query);
-
-        return uri;
+        return ValueTask.FromResult(result);
     }
 
     private NameValueCollection ToNameValueCollection()
     {
-        var collection = new NameValueCollection();
-        collection.Add("code", Code);
-
+        var collection = new NameValueCollection
+        {
+            { "code", Code }
+        };
 
         if (IdentityToken.IsPresent())
         {

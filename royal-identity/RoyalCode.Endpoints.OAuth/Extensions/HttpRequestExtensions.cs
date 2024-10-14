@@ -5,9 +5,9 @@ namespace RoyalIdentity.Extensions;
 
 internal static class HttpRequestExtensions
 {
-    public static string GetCorsOrigin(this HttpRequest request)
+    public static string? GetCorsOrigin(this HttpRequest request)
     {
-        var origin = request.Headers["Origin"].FirstOrDefault();
+        var origin = request.Headers.Origin.FirstOrDefault();
         var thisOrigin = request.Scheme + "://" + request.Host;
 
         // see if the Origin is different than this server's origin. if so

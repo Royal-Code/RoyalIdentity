@@ -1,12 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Options;
-using System.Collections.Specialized;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using RoyalIdentity.Contexts;
-using Microsoft.AspNetCore.CookiePolicy;
 using RoyalIdentity.Contexts.Withs;
-using RoyalIdentity.Models;
 
 namespace RoyalIdentity.Extensions;
 

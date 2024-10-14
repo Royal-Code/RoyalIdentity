@@ -33,5 +33,10 @@ public class ServerOptions
     /// The endpoints configuration.
     /// </value>
     public EndpointsOptions Endpoints { get; set; } = new EndpointsOptions();
+
+    /// <summary>
+    /// Gets or sets the Content Security Policy options.
+    /// </summary>
+    public CspOptions Csp { get; set; } = new();
 }
 

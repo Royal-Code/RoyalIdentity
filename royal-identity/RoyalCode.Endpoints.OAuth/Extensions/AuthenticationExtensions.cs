@@ -4,63 +4,62 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Options;
 
-namespace RoyalIdentity.Extensions
+namespace RoyalIdentity.Extensions;
+
+/// <summary>
+/// Extension methods for signin/out using the IdentityServer authentication scheme.
+/// </summary>
+public static class AuthenticationExtensions
 {
-    /// <summary>
-    /// Extension methods for signin/out using the IdentityServer authentication scheme.
-    /// </summary>
-    public static class AuthenticationExtensions
+    // /// <summary>
+    // /// Signs the user in.
+    // /// </summary>
+    // /// <param name="context">The manager.</param>
+    // /// <param name="user">The IdentityServer user.</param>
+    // /// <returns></returns>
+    // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user)
+    // {
+    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal());
+    // }
+
+    // /// <summary>
+    // /// Signs the user in.
+    // /// </summary>
+    // /// <param name="context">The manager.</param>
+    // /// <param name="user">The IdentityServer user.</param>
+    // /// <param name="properties">The authentication properties.</param>
+    // /// <returns></returns>
+    // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user,
+    //     AuthenticationProperties properties)
+    // {
+    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal(),
+    //         properties);
+    // }
+
+    internal static TimeProvider GetClock(this HttpContext context)
     {
-        // /// <summary>
-        // /// Signs the user in.
-        // /// </summary>
-        // /// <param name="context">The manager.</param>
-        // /// <param name="user">The IdentityServer user.</param>
-        // /// <returns></returns>
-        // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user)
-        // {
-        //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal());
-        // }
+        return context.RequestServices.GetRequiredService<TimeProvider>();
+    }
 
-        // /// <summary>
-        // /// Signs the user in.
-        // /// </summary>
-        // /// <param name="context">The manager.</param>
-        // /// <param name="user">The IdentityServer user.</param>
-        // /// <param name="properties">The authentication properties.</param>
-        // /// <returns></returns>
-        // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user,
-        //     AuthenticationProperties properties)
-        // {
-        //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal(),
-        //         properties);
-        // }
+    internal static ValueTask<string> GetCookieAuthenticationSchemeAsync(this HttpContext context)
+    {
+        var options = context.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value;
+        return context.GetCookieAuthenticationSchemeAsync(options);
+    }
 
-        internal static TimeProvider GetClock(this HttpContext context)
+    internal static async ValueTask<string> GetCookieAuthenticationSchemeAsync(this HttpContext context, ServerOptions options)
+    {
+        if (options.Authentication.CookieAuthenticationScheme is not null)
         {
-            return context.RequestServices.GetRequiredService<TimeProvider>();
+            return options.Authentication.CookieAuthenticationScheme;
         }
 
-        internal static ValueTask<string> GetCookieAuthenticationSchemeAsync(this HttpContext context)
-        {
-            var options = context.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value;
-            return context.GetCookieAuthenticationSchemeAsync(options);
-        }
+        var scheme = await context.RequestServices
+            .GetRequiredService<IAuthenticationSchemeProvider>()
+            .GetDefaultAuthenticateSchemeAsync()
+                ?? throw new InvalidOperationException(
+                    "No DefaultAuthenticateScheme found or no CookieAuthenticationScheme configured on ServerOptions.");
 
-        internal static async ValueTask<string> GetCookieAuthenticationSchemeAsync(this HttpContext context, ServerOptions options)
-        {
-            if (options.Authentication.CookieAuthenticationScheme is not null)
-            {
-                return options.Authentication.CookieAuthenticationScheme;
-            }
-
-            var scheme = await context.RequestServices
-                             .GetRequiredService<IAuthenticationSchemeProvider>()
-                             .GetDefaultAuthenticateSchemeAsync()
-                         ?? throw new InvalidOperationException(
-                             "No DefaultAuthenticateScheme found or no CookieAuthenticationScheme configured on ServerOptions.");
-
-            return scheme.Name;
-        }
+        return scheme.Name;
     }
 }

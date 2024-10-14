@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using RoyalIdentity.Utils;
 
@@ -10,13 +9,6 @@ namespace RoyalIdentity.Extensions;
 /// </summary>
 public static class AuthenticationPropertiesExtensions
 {
-    private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
-    {
-        IgnoreNullValues = true
-    };
-
-
-
     internal const string SessionIdKey = "session_id";
     internal const string ClientListKey = "client_list";
 
@@ -25,7 +17,7 @@ public static class AuthenticationPropertiesExtensions
     /// </summary>
     /// <param name="properties"></param>
     /// <returns></returns>
-    public static string GetSessionId(this AuthenticationProperties properties)
+    public static string? GetSessionId(this AuthenticationProperties properties)
     {
         if (properties?.Items.ContainsKey(SessionIdKey) == true)
         {
@@ -107,7 +99,7 @@ public static class AuthenticationPropertiesExtensions
 
         var bytes = Base64Url.Decode(value);
         value = Encoding.UTF8.GetString(bytes);
-        return Deserialize<List<string>>(value);
+        return Json.Deserialize<List<string>>(value);
     }
 
     private static string? EncodeList(IEnumerable<string>? list)
@@ -115,20 +107,12 @@ public static class AuthenticationPropertiesExtensions
         if (list is null || !list.Any())
             return null;
 
-        var value = Serialize(list);
+        var value = Json.Serialize(list);
         var bytes = Encoding.UTF8.GetBytes(value);
         value = Base64Url.Encode(bytes);
         return value;
 
     }
 
-    public static string Serialize(object o)
-    {
-        return JsonSerializer.Serialize(o, Options);
-    }
-
-    public static T Deserialize<T>(string value)
-    {
-        return JsonSerializer.Deserialize<T>(value, Options)!;
-    }
+    
 }

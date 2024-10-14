@@ -1,11 +1,14 @@
 ﻿using Microsoft.IdentityModel.Tokens;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Options;
 
+#pragma warning disable S3218 // 
+
 internal static class Constants
 {
-    public const string IdentityServerName = "IdentityServer4";
-    public const string IdentityServerAuthenticationType = IdentityServerName;
+    public const string ServerName = "RoyalIdentity";
+    public const string ServerAuthenticationType = ServerName;
     public const string ExternalAuthenticationMethod = "external";
     public const string DefaultHashAlgorithm = "SHA256";
 
@@ -14,37 +17,36 @@ internal static class Constants
 
     public static readonly List<string> SupportedResponseTypes =
     [
-        OidcConstants.ResponseTypes.Code,
-        OidcConstants.ResponseTypes.Token,
-        OidcConstants.ResponseTypes.IdToken,
-        OidcConstants.ResponseTypes.IdTokenToken,
-        OidcConstants.ResponseTypes.CodeIdToken,
-        OidcConstants.ResponseTypes.CodeToken,
-        OidcConstants.ResponseTypes.CodeIdTokenToken
+        ResponseTypes.Code,
+        ResponseTypes.Token,
+        ResponseTypes.IdToken,
+        ResponseTypes.IdTokenToken,
+        ResponseTypes.CodeIdToken,
+        ResponseTypes.CodeToken,
+        ResponseTypes.CodeIdTokenToken
     ];
 
     public static readonly Dictionary<string, string> ResponseTypeToGrantTypeMapping = new()
     {
-        { OidcConstants.ResponseTypes.Code, OidcConstants.GrantType.AuthorizationCode },
-        { OidcConstants.ResponseTypes.Token, OidcConstants.GrantType.Implicit },
-        { OidcConstants.ResponseTypes.IdToken, OidcConstants.GrantType.Implicit },
-        { OidcConstants.ResponseTypes.IdTokenToken, OidcConstants.GrantType.Implicit },
-        { OidcConstants.ResponseTypes.CodeIdToken, OidcConstants.GrantType.Hybrid },
-        { OidcConstants.ResponseTypes.CodeToken, OidcConstants.GrantType.Hybrid },
-        { OidcConstants.ResponseTypes.CodeIdTokenToken, OidcConstants.GrantType.Hybrid }
+        { ResponseTypes.Code, GrantType.AuthorizationCode },
+        { ResponseTypes.Token, GrantType.Implicit },
+        { ResponseTypes.IdToken, GrantType.Implicit },
+        { ResponseTypes.IdTokenToken, GrantType.Implicit },
+        { ResponseTypes.CodeIdToken, GrantType.Hybrid },
+        { ResponseTypes.CodeToken, GrantType.Hybrid },
+        { ResponseTypes.CodeIdTokenToken, GrantType.Hybrid }
     };
 
     public static readonly List<string> AllowedGrantTypesForAuthorizeEndpoint = new()
     {
-        OidcConstants.GrantType.AuthorizationCode,
-        OidcConstants.GrantType.Implicit,
-        OidcConstants.GrantType.Hybrid
+        GrantType.AuthorizationCode,
+        GrantType.Hybrid
     };
 
     public static readonly List<string> SupportedCodeChallengeMethods = new()
     {
-        OidcConstants.CodeChallengeMethods.Plain,
-        OidcConstants.CodeChallengeMethods.Sha256
+        CodeChallengeMethods.Plain,
+        CodeChallengeMethods.Sha256
     };
 
     public enum ScopeRequirement
@@ -57,43 +59,39 @@ internal static class Constants
 
     public static readonly Dictionary<string, ScopeRequirement> ResponseTypeToScopeRequirement = new()
     {
-        { OidcConstants.ResponseTypes.Code, ScopeRequirement.None },
-        { OidcConstants.ResponseTypes.Token, ScopeRequirement.ResourceOnly },
-        { OidcConstants.ResponseTypes.IdToken, ScopeRequirement.IdentityOnly },
-        { OidcConstants.ResponseTypes.IdTokenToken, ScopeRequirement.Identity },
-        { OidcConstants.ResponseTypes.CodeIdToken, ScopeRequirement.Identity },
-        { OidcConstants.ResponseTypes.CodeToken, ScopeRequirement.Identity },
-        { OidcConstants.ResponseTypes.CodeIdTokenToken, ScopeRequirement.Identity }
+        { ResponseTypes.Code, ScopeRequirement.None },
+        { ResponseTypes.Token, ScopeRequirement.ResourceOnly },
+        { ResponseTypes.IdToken, ScopeRequirement.IdentityOnly },
+        { ResponseTypes.IdTokenToken, ScopeRequirement.Identity },
+        { ResponseTypes.CodeIdToken, ScopeRequirement.Identity },
+        { ResponseTypes.CodeToken, ScopeRequirement.Identity },
+        { ResponseTypes.CodeIdTokenToken, ScopeRequirement.Identity }
     };
 
     public static readonly Dictionary<string, IEnumerable<string>> AllowedResponseModesForGrantType =
         new()
         {
             {
-                OidcConstants.GrantType.AuthorizationCode,
+                GrantType.AuthorizationCode,
                 [
-                    OidcConstants.ResponseModes.Query, OidcConstants.ResponseModes.FormPost,
-                    OidcConstants.ResponseModes.Fragment
+                    ResponseModes.Query, 
+                    ResponseModes.FormPost,
+                    ResponseModes.Fragment
                 ]
             },
             {
-                OidcConstants.GrantType.Hybrid,
-                [OidcConstants.ResponseModes.Fragment, OidcConstants.ResponseModes.FormPost]
-            },
-            {
-                OidcConstants.GrantType.Implicit,
-                [OidcConstants.ResponseModes.Fragment, OidcConstants.ResponseModes.FormPost]
+                GrantType.Hybrid, [ ResponseModes.FormPost]
             }
         };
 
     public static readonly List<string> SupportedResponseModes = new()
     {
-        OidcConstants.ResponseModes.FormPost,
-        OidcConstants.ResponseModes.Query,
-        OidcConstants.ResponseModes.Fragment
+        ResponseModes.FormPost,
+        ResponseModes.Query,
+        ResponseModes.Fragment
     };
 
-    public static string[] SupportedSubjectTypes =
+    public static readonly string[] SupportedSubjectTypes =
     {
         "pairwise", "public"
     };
@@ -105,18 +103,18 @@ internal static class Constants
 
     public static readonly List<string> SupportedDisplayModes =
     [
-        OidcConstants.DisplayModes.Page,
-        OidcConstants.DisplayModes.Popup,
-        OidcConstants.DisplayModes.Touch,
-        OidcConstants.DisplayModes.Wap
+        DisplayModes.Page,
+        DisplayModes.Popup,
+        DisplayModes.Touch,
+        DisplayModes.Wap
     ];
 
     public static readonly List<string> SupportedPromptModes =
     [
-        OidcConstants.PromptModes.None,
-        OidcConstants.PromptModes.Login,
-        OidcConstants.PromptModes.Consent,
-        OidcConstants.PromptModes.SelectAccount
+        PromptModes.None,
+        PromptModes.Login,
+        PromptModes.Consent,
+        PromptModes.SelectAccount
     ];
 
     public static class KnownAcrValues
@@ -127,19 +125,20 @@ internal static class Constants
         public static readonly string[] All = [HomeRealm, Tenant];
     }
 
-    public static Dictionary<string, int> ProtectedResourceErrorStatusCodes = new()
+    public static readonly Dictionary<string, int> ProtectedResourceErrorStatusCodes = new()
     {
-        { OidcConstants.ProtectedResourceErrors.InvalidToken, 401 },
-        { OidcConstants.ProtectedResourceErrors.ExpiredToken, 401 },
-        { OidcConstants.ProtectedResourceErrors.InvalidRequest, 400 },
-        { OidcConstants.ProtectedResourceErrors.InsufficientScope, 403 }
+        { ProtectedResourceErrors.InvalidToken, 401 },
+        { ProtectedResourceErrors.ExpiredToken, 401 },
+        { ProtectedResourceErrors.InvalidRequest, 400 },
+        { ProtectedResourceErrors.InsufficientScope, 403 }
     };
 
     public static readonly Dictionary<string, IEnumerable<string>> ScopeToClaimsMapping =
         new()
         {
             {
-                ServerConstants.StandardScopes.Profile, [
+                ServerConstants.StandardScopes.Profile,
+                [
                     JwtClaimTypes.Name,
                     JwtClaimTypes.FamilyName,
                     JwtClaimTypes.GivenName,
@@ -157,24 +156,28 @@ internal static class Constants
                 ]
             },
             {
-                ServerConstants.StandardScopes.Email, [
+                ServerConstants.StandardScopes.Email,
+                [
                     JwtClaimTypes.Email,
                     JwtClaimTypes.EmailVerified
                 ]
             },
             {
-                ServerConstants.StandardScopes.Address, [
+                ServerConstants.StandardScopes.Address, 
+                [
                     JwtClaimTypes.Address
                 ]
             },
             {
-                ServerConstants.StandardScopes.Phone, [
+                ServerConstants.StandardScopes.Phone, 
+                [
                     JwtClaimTypes.PhoneNumber,
                     JwtClaimTypes.PhoneNumberVerified
                 ]
             },
             {
-                ServerConstants.StandardScopes.OpenId, [
+                ServerConstants.StandardScopes.OpenId,
+                [
                     JwtClaimTypes.Subject
                 ]
             }
@@ -254,8 +257,8 @@ internal static class Constants
 
     public static class EnvironmentKeys
     {
-        public const string IdentityServerBasePath = "idsvr:IdentityServerBasePath";
-        public const string SignOutCalled = "idsvr:IdentityServerSignOutCalled";
+        public const string ServerBasePath = "idsvr:ServerBasePath";
+        public const string SignOutCalled = "idsvr:ServerSignOutCalled";
     }
 
     public static class TokenTypeHints
@@ -264,7 +267,7 @@ internal static class Constants
         public const string AccessToken = "access_token";
     }
 
-    public static List<string> SupportedTokenTypeHints =
+    public static readonly ICollection<string> SupportedTokenTypeHints =
     [
         TokenTypeHints.RefreshToken,
         TokenTypeHints.AccessToken
@@ -275,7 +278,7 @@ internal static class Constants
         public const string UnsupportedTokenType = "unsupported_token_type";
     }
 
-    public class Filters
+    public static class Filters
     {
         // filter for claims from an incoming access token (e.g. used at the user profile endpoint)
         public static readonly string[] ProtocolClaimsFilter =
@@ -355,11 +358,11 @@ public static class OidcConstants
 {
     public static class GrantType
     {
-        public const string Implicit = "implicit";
         public const string Hybrid = "hybrid";
         public const string AuthorizationCode = "authorization_code";
+        public const string Implicit = "implicit";
         public const string ClientCredentials = "client_credentials";
-        public const string ResourceOwnerPassword = "password";
+        //public const string ResourceOwnerPassword = "password" --- Removido --- não será mais usado
         public const string DeviceFlow = "urn:ietf:params:oauth:grant-type:device_code";
     }
 
@@ -663,11 +666,10 @@ public static class OidcConstants
 
     public static class GrantTypes
     {
-        public const string Password = "password";
+        //public const string Password = "password" --- removido ---
         public const string AuthorizationCode = "authorization_code";
         public const string ClientCredentials = "client_credentials";
         public const string RefreshToken = "refresh_token";
-        public const string Implicit = "implicit";
         public const string Saml2Bearer = "urn:ietf:params:oauth:grant-type:saml2-bearer";
         public const string JwtBearer = "urn:ietf:params:oauth:grant-type:jwt-bearer";
         public const string DeviceCode = "urn:ietf:params:oauth:grant-type:device_code";
@@ -1176,19 +1178,19 @@ public static class ServerConstants
     public const string JwtRequestClientKey = "idsrv.jwtrequesturi.client";
 
     /// <summary>
-    /// Constants for local IdentityServer access token authentication.
+    /// Constants for local RoyalIdentity access token authentication.
     /// </summary>
     public static class LocalApi
     {
         /// <summary>
         /// The authentication scheme when using the AddLocalApi helper.
         /// </summary>
-        public const string AuthenticationScheme = "IdentityServerAccessToken";
+        public const string AuthenticationScheme = "ServerAccessToken";
 
         /// <summary>
         /// The API scope name when using the AddLocalApiAuthentication helper.
         /// </summary>
-        public const string ScopeName = "IdentityServerApi";
+        public const string ScopeName = "RoyalServerApi";
 
         /// <summary>
         /// The authorization policy name when using the AddLocalApiAuthentication helper.
@@ -1251,8 +1253,8 @@ public static class ServerConstants
         public const string DeviceCodeValidation = "DeviceCodeValidation";
     }
 
-    public static IEnumerable<string> SupportedSigningAlgorithms = new List<string>
-    {
+    public static readonly ICollection<string> SupportedSigningAlgorithms =
+    [
         SecurityAlgorithms.RsaSha256,
         SecurityAlgorithms.RsaSha384,
         SecurityAlgorithms.RsaSha512,
@@ -1264,7 +1266,7 @@ public static class ServerConstants
         SecurityAlgorithms.EcdsaSha256,
         SecurityAlgorithms.EcdsaSha384,
         SecurityAlgorithms.EcdsaSha512
-    };
+    ];
 
     public enum RsaSigningAlgorithm
     {
@@ -1323,7 +1325,7 @@ public static class ServerConstants
     public static class HttpClients
     {
         public const int DefaultTimeoutSeconds = 10;
-        public const string JwtRequestUriHttpClient = "IdentityServer:JwtRequestUriClient";
-        public const string BackChannelLogoutHttpClient = "IdentityServer:BackChannelLogoutClient";
+        public const string JwtRequestUriHttpClient = "RoyalIdentity:JwtRequestUriClient";
+        public const string BackChannelLogoutHttpClient = "RoyalIdentity:BackChannelLogoutClient";
     }
 }

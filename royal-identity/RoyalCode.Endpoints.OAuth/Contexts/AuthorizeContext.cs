@@ -179,19 +179,6 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     public string? IdTokenHint { get; set; }
 
     /// <summary>
-    /// Gets a value indicating whether an access token was requested.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if an access token was requested; otherwise, <c>false</c>.
-    /// </value>
-    public bool AccessTokenRequested =>
-        ResponseType == OidcConstants.ResponseTypes.IdTokenToken ||
-        ResponseType == OidcConstants.ResponseTypes.Code ||
-        ResponseType == OidcConstants.ResponseTypes.CodeIdToken ||
-        ResponseType == OidcConstants.ResponseTypes.CodeToken ||
-        ResponseType == OidcConstants.ResponseTypes.CodeIdTokenToken;
-
-    /// <summary>
     /// The resources of the result.
     /// </summary>
     public Resources Resources { get; set; } = new();

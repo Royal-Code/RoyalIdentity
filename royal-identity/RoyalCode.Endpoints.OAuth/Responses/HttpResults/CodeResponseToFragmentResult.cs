@@ -1,22 +1,21 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Extensions;
 using System.Collections.Specialized;
 
 namespace RoyalIdentity.Responses.HttpResults;
 
-public class CodeResponseToQueryResult : IResult, IStatusCodeHttpResult
+public class CodeResponseToFragmentResult : IResult, IStatusCodeHttpResult
 {
     private readonly string redirectUri;
     private readonly NameValueCollection parameters;
 
-    public CodeResponseToQueryResult(string redirectUri, NameValueCollection parameters)
+    public CodeResponseToFragmentResult(string redirectUri, NameValueCollection parameters)
     {
         this.redirectUri = redirectUri;
         this.parameters = parameters;
     }
 
     public int? StatusCode => 200;
-
 
     public Task ExecuteAsync(HttpContext httpContext)
     {
@@ -27,6 +26,6 @@ public class CodeResponseToQueryResult : IResult, IStatusCodeHttpResult
 
     private string BuildRedirectUri()
     {
-        return redirectUri.AddQueryString(parameters.ToQueryString());
+        return redirectUri.AddHashFragment(parameters.ToQueryString());
     }
 }

@@ -120,7 +120,6 @@ namespace IdentityServer4.Endpoints.Results
             }
             else
             {
-                //_logger.LogError("Unsupported response mode.");
                 throw new InvalidOperationException("Unsupported response mode");
             }
         }

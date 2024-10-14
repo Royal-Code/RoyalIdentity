@@ -65,7 +65,7 @@ internal static class CollectionExtensions
     {
         if (collection.Count == 0)
         {
-            return String.Empty;
+            return string.Empty;
         }
 
         var builder = new StringBuilder(128);
@@ -75,7 +75,7 @@ internal static class CollectionExtensions
             string?[]? values = collection.GetValues(name);
             if (values == null || values.Length == 0)
             {
-                first = AppendNameValuePair(builder, first, true, name, String.Empty);
+                first = AppendNameValuePair(builder, first, true, name, string.Empty);
             }
             else
             {
@@ -108,7 +108,7 @@ internal static class CollectionExtensions
         }
 
         builder.Append(encodedName);
-        if (!String.IsNullOrEmpty(encodedValue))
+        if (encodedValue.IsPresent())
         {
             builder.Append('=');
             builder.Append(encodedValue);
@@ -116,7 +116,7 @@ internal static class CollectionExtensions
         return first;
     }
 
-    private static string ConvertFormUrlEncodedSpacesToUrlEncodedSpaces(string? str)
+    private static string? ConvertFormUrlEncodedSpacesToUrlEncodedSpaces(string? str)
     {
         if (str != null && str.IndexOf('+') >= 0)
         {
@@ -124,5 +124,24 @@ internal static class CollectionExtensions
         }
 
         return str;
+    }
+
+    public static string ToFormPost(this NameValueCollection collection)
+    {
+        var builder = new StringBuilder(128);
+        const string inputFieldFormat = "<input type='hidden' name='{0}' value='{1}' />\n";
+
+        foreach (string name in collection)
+        {
+            var values = collection.GetValues(name);
+            if (values is null || values.Length is 0)
+                continue;
+
+            var value = values[0];
+            value = HtmlEncoder.Default.Encode(value);
+            builder.AppendFormat(inputFieldFormat, name, value);
+        }
+
+        return builder.ToString();
     }
 }

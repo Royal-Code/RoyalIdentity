@@ -18,8 +18,8 @@ public class DefaultUserSession : IUserSession
     private AuthenticationProperties? properties;
 
     private HttpContext HttpContext => httpContextAccessor.HttpContext
-                                       ?? throw new InvalidOperationException(
-                                           "DefaultUserSession requires execution within a scope with the HttpContext provided by IHttpContextAccessor");
+        ?? throw new InvalidOperationException(
+            "DefaultUserSession requires execution within a scope with the HttpContext provided by IHttpContextAccessor");
 
     public DefaultUserSession(IHttpContextAccessor httpContextAccessor, IOptions<ServerOptions> options)
     {
