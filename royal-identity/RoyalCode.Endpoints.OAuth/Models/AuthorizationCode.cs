@@ -1,27 +1,28 @@
-﻿using System.Security.Claims;
+﻿using System.Collections;
+using System.Security.Claims;
 
 namespace RoyalIdentity.Models;
+
+#pragma warning disable S107 // Methods should not have too many parameters
 
 /// <summary>
 /// Models an authorization code.
 /// </summary>
 public class AuthorizationCode
 {
-    /// <summary>
-    /// Gets or sets the creation time.
-    /// </summary>
-    /// <value>
-    /// The creation time.
-    /// </value>
-    public DateTime CreationTime { get; set; }
-
-    /// <summary>
-    /// Gets or sets the life time in seconds.
-    /// </summary>
-    /// <value>
-    /// The life time.
-    /// </value>
-    public int Lifetime { get; set; }
+    public AuthorizationCode(string clientId, ClaimsPrincipal subject, string sessionState,
+        DateTime creationTime, int lifetime,
+        bool isOpenId, ICollection<string> requestedScopes, string redirectUri)
+    {
+        ClientId = clientId;
+        Subject = subject;
+        SessionState = sessionState;
+        CreationTime = creationTime;
+        Lifetime = lifetime;
+        IsOpenId = isOpenId;
+        RequestedScopes = requestedScopes;
+        RedirectUri = redirectUri;
+    }
 
     /// <summary>
     /// Gets or sets the ID of the client.
@@ -29,7 +30,7 @@ public class AuthorizationCode
     /// <value>
     /// The ID of the client.
     /// </value>
-    public string ClientId { get; set; }
+    public string ClientId { get; }
 
     /// <summary>
     /// Gets or sets the subject.
@@ -37,7 +38,28 @@ public class AuthorizationCode
     /// <value>
     /// The subject.
     /// </value>
-    public ClaimsPrincipal Subject { get; set; }
+    public ClaimsPrincipal Subject { get; }
+
+    /// <summary>
+    /// Gets or sets the session state.
+    /// </summary>
+    public string SessionState { get; }
+
+    /// <summary>
+    /// Gets or sets the creation time.
+    /// </summary>
+    /// <value>
+    /// The creation time.
+    /// </value>
+    public DateTime CreationTime { get; }
+
+    /// <summary>
+    /// Gets or sets the lifetime in seconds.
+    /// </summary>
+    /// <value>
+    /// The lifetime.
+    /// </value>
+    public int Lifetime { get; }
 
     /// <summary>
     /// Gets or sets a value indicating whether this code is an OpenID Connect code.
@@ -45,7 +67,7 @@ public class AuthorizationCode
     /// <value>
     /// <c>true</c> if this instance is open identifier; otherwise, <c>false</c>.
     /// </value>
-    public bool IsOpenId { get; set; }
+    public bool IsOpenId { get; }
 
     /// <summary>
     /// Gets or sets the requested scopes.
@@ -53,7 +75,7 @@ public class AuthorizationCode
     /// <value>
     /// The requested scopes.
     /// </value>
-    public IEnumerable<string> RequestedScopes { get; set; }
+    public ICollection<string> RequestedScopes { get; }
 
     /// <summary>
     /// Gets or sets the redirect URI.
@@ -61,7 +83,7 @@ public class AuthorizationCode
     /// <value>
     /// The redirect URI.
     /// </value>
-    public string RedirectUri { get; set; }
+    public string RedirectUri { get; }
 
     /// <summary>
     /// Gets or sets the nonce.
@@ -69,7 +91,7 @@ public class AuthorizationCode
     /// <value>
     /// The nonce.
     /// </value>
-    public string Nonce { get; set; }
+    public string? Nonce { get; set; }
 
     /// <summary>
     /// Gets or sets the hashed state (to output s_hash claim).
@@ -77,7 +99,7 @@ public class AuthorizationCode
     /// <value>
     /// The hashed state.
     /// </value>
-    public string StateHash { get; set; }
+    public string? StateHash { get; set; }
 
     /// <summary>
     /// Gets or sets the session identifier.
@@ -85,7 +107,7 @@ public class AuthorizationCode
     /// <value>
     /// The session identifier.
     /// </value>
-    public string SessionId { get; set; }
+    public string? SessionId { get; set; }
 
     /// <summary>
     /// Gets or sets the code challenge.
@@ -93,7 +115,7 @@ public class AuthorizationCode
     /// <value>
     /// The code challenge.
     /// </value>
-    public string CodeChallenge { get; set; }
+    public string? CodeChallenge { get; set; }
 
     /// <summary>
     /// Gets or sets the code challenge method.
@@ -101,7 +123,7 @@ public class AuthorizationCode
     /// <value>
     /// The code challenge method
     /// </value>
-    public string CodeChallengeMethod { get; set; }
+    public string? CodeChallengeMethod { get; set; }
 
     /// <summary>
     /// Gets or sets properties
@@ -109,5 +131,5 @@ public class AuthorizationCode
     /// <value>
     /// The properties
     /// </value>
-    public IDictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
+    public IDictionary<string, string>? Properties { get; set; }
 }

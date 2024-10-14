@@ -28,7 +28,7 @@ public static class LoggerExtensions
     /// </summary>
     /// <param name="logObject">The object.</param>
     /// <returns></returns>
-    private static string Serialize(object logObject)
+    public static string Serialize(object logObject)
     {
         return JsonSerializer.Serialize(logObject, Options);
     }

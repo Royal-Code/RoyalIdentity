@@ -12,7 +12,7 @@ public class DefaultSessionStateGenerator : ISessionStateGenerator
     [Redesign("Mas deve utilizar quase todos claims, removendo os que são de tempo e relativos ao protocolo")]
     public string? GenerateSessionStateValue(AuthorizeContext context)
     {
-        if (context == null || !context.IsOpenIdRequest || context.SessionId == null ||
+        if (!context.IsOpenIdRequest || context.SessionId.IsMissing() ||
             context.ClientId.IsMissing() || context.RedirectUri.IsMissing())
         {
             return null;

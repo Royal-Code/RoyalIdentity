@@ -1,10 +1,12 @@
 ﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
+using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contracts;
-using RoyalIdentity.Extensions;
-using RoyalIdentity.Models;
+using RoyalIdentity.Events;
+using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using System.Text;
+using RoyalIdentity.Responses;
+using RoyalIdentity.Users;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Handlers;
@@ -14,24 +16,29 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
     private readonly ILogger logger;
     private readonly ICodeFactory codeFactory;
     private readonly IAuthorizationCodeStore codeStore;
+    private readonly IEventDispatcher eventDispatcher;
+    private readonly IUserSession userSession;
 
     public async Task Handle(AuthorizeContext context, CancellationToken ct)
     {
-        if (context.GrantType == GrantType.AuthorizationCode)
+        switch (context.GrantType)
         {
-            await HandleCodeFlow(context, ct);
-        }
-        if (context.GrantType == GrantType.Implicit)
-        {
-            await HandleImplicitFlow(context, ct);
-        }
-        if (context.GrantType == GrantType.Hybrid)
-        {
-            await HandleHybridFlow(context, ct);
+            case GrantType.AuthorizationCode:
+                await HandleCodeFlow(context, ct);
+
+                break;
+            case GrantType.Implicit:
+                await HandleImplicitFlow(context, ct);
+                break;
+            case GrantType.Hybrid:
+                await HandleHybridFlow(context, ct);
+                break;
+            default:
+                logger.LogError("Unsupported grant type: {GrantType}", context.GrantType);
+                throw new InvalidOperationException("invalid grant type: " + context.GrantType);
         }
 
-        logger.LogError("Unsupported grant type: {GrantType}", context.GrantType);
-        throw new InvalidOperationException("invalid grant type: " + context.GrantType);
+
     }
 
     private async Task HandleHybridFlow(AuthorizeContext context, CancellationToken ct)
@@ -50,51 +57,16 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
 
         var code = await codeFactory.CreateCodeAsync(context, ct);
         var codeValue = await codeStore.StoreAuthorizationCodeAsync(code);
+        await userSession.AddClientIdAsync(context.ClientId!);
 
-        context.Response = new AuthorizationCodeResponse(context)
-        {
-            Code = codeValue,
-            SessionState = context.GenerateSessionStateValue()
-        };
-    }
+        logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, codeValue);
 
-    /// <summary>
-    /// Creates an authorization code
-    /// </summary>
-    /// <param name="request"></param>
-    /// <returns></returns>
-    protected virtual async Task<AuthorizationCode> CreateCodeAsync(AuthorizeContext request)
-    {
-        string? stateHash = null;
-        if (request.State.IsPresent())
-        {
-            var credential = await KeyMaterialService.GetSigningCredentialsAsync(request.Client.AllowedIdentityTokenSigningAlgorithms);
-            if (credential == null)
-            {
-                throw new InvalidOperationException("No signing credential is configured.");
-            }
+        context.Response = new AuthorizationCodeResponse(context, codeValue, code.SessionState);
 
-            var algorithm = credential.Algorithm;
-            stateHash = CryptoHelper.CreateHashClaimValue(request.State, algorithm);
-        }
+        var token = new Token(ResponseTypes.Code, codeValue);
+        context.Items.Set(token);
 
-        var code = new AuthorizationCode
-        {
-            CreationTime = Clock.UtcNow.UtcDateTime,
-            ClientId = request.Client.Id,
-            Lifetime = request.Client.AuthorizationCodeLifetime,
-            Subject = request.Subject,
-            SessionId = request.SessionId,
-            CodeChallenge = request.CodeChallenge.Sha256(),
-            CodeChallengeMethod = request.CodeChallengeMethod,
-
-            IsOpenId = request.IsOpenIdRequest,
-            RequestedScopes = request.RequestedScopes,
-            RedirectUri = request.RedirectUri,
-            Nonce = request.Nonce,
-            StateHash = stateHash,
-        };
-
-        return code;
+        var evt = new CodeIssuedEvent(context, token);
+        await eventDispatcher.DispatchAsync(evt);
     }
 }

@@ -128,14 +128,7 @@ namespace IdentityServer4.Extensions
             return dict;
         }
 
-        internal static string ConvertFormUrlEncodedSpacesToUrlEncodedSpaces(string str)
-        {
-            if ((str != null) && (str.IndexOf('+') >= 0))
-            {
-                str = str.Replace("+", "%20");
-            }
-            return str;
-        }
+        
 
         private static bool AppendNameValuePair(StringBuilder builder, bool first, bool urlEncode, string name, string value)
         {

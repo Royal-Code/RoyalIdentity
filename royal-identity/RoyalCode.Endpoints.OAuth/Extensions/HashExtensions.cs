@@ -13,7 +13,7 @@ public static class HashExtensions
     /// </summary>
     /// <param name="input">The input.</param>
     /// <returns>A hash</returns>
-    public static string Sha256(this string input)
+    public static string Sha256(this string? input)
     {
         if (input.IsMissing())
             return string.Empty;

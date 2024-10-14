@@ -11,7 +11,7 @@ public class AuthenticationOptions
     /// Sets the cookie authentication scheme configured by the host used for interactive users. If not set, the scheme will inferred from the host's default authentication scheme.
     /// This setting is typically used when AddPolicyScheme is used in the host as the default scheme.
     /// </summary>
-    public string CookieAuthenticationScheme { get; set; }
+    public string? CookieAuthenticationScheme { get; set; }
 
     /// <summary>
     /// Sets the cookie lifetime (only effective if the IdentityServer-provided cookie handler is used)

@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Primitives;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Text;
+using System.Text.Encodings.Web;
 
 namespace RoyalIdentity.Extensions;
 
@@ -38,7 +40,7 @@ internal static class CollectionExtensions
     {
         var dict = new Dictionary<string, string>();
 
-        if (collection == null || collection.Count == 0)
+        if (collection.Count is 0)
         {
             return dict;
         }
@@ -57,5 +59,70 @@ internal static class CollectionExtensions
         }
 
         return dict;
+    }
+
+    public static string ToQueryString(this NameValueCollection collection)
+    {
+        if (collection.Count == 0)
+        {
+            return String.Empty;
+        }
+
+        var builder = new StringBuilder(128);
+        var first = true;
+        foreach (string? name in collection)
+        {
+            string?[]? values = collection.GetValues(name);
+            if (values == null || values.Length == 0)
+            {
+                first = AppendNameValuePair(builder, first, true, name, String.Empty);
+            }
+            else
+            {
+                foreach (var value in values)
+                {
+                    first = AppendNameValuePair(builder, first, true, name, value);
+                }
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool AppendNameValuePair(StringBuilder builder, bool first, bool urlEncode, string? name, string? value)
+    {
+        var effectiveName = name ?? string.Empty;
+        var encodedName = urlEncode ? UrlEncoder.Default.Encode(effectiveName) : effectiveName;
+
+        var effectiveValue = value ?? string.Empty;
+        var encodedValue = urlEncode ? UrlEncoder.Default.Encode(effectiveValue) : effectiveValue;
+        encodedValue = ConvertFormUrlEncodedSpacesToUrlEncodedSpaces(encodedValue);
+
+        if (first)
+        {
+            first = false;
+        }
+        else
+        {
+            builder.Append('&');
+        }
+
+        builder.Append(encodedName);
+        if (!String.IsNullOrEmpty(encodedValue))
+        {
+            builder.Append('=');
+            builder.Append(encodedValue);
+        }
+        return first;
+    }
+
+    private static string ConvertFormUrlEncodedSpacesToUrlEncodedSpaces(string? str)
+    {
+        if (str != null && str.IndexOf('+') >= 0)
+        {
+            str = str.Replace("+", "%20");
+        }
+
+        return str;
     }
 }
