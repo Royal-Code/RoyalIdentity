@@ -8,24 +8,27 @@ using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Responses;
 
-public class AuthorizationCodeResponse : IResponseHandler
+public class AuthorizeResponse : IResponseHandler
 {
-    public AuthorizationCodeResponse(AuthorizeContext context, string code, string sessionState,
-        string? identityToken = null)
+    public AuthorizeResponse(AuthorizeContext context, string? code, string? sessionState,
+        string? identityToken = null, string? token = null)
     {
         Context = context;
         Code = code;
         SessionState = sessionState;
         IdentityToken = identityToken;
+        Token = token;
     }
 
     public AuthorizeContext Context { get; }
 
-    public string Code { get; }
+    public string? Code { get; }
 
-    public string SessionState { get; }
+    public string? SessionState { get; }
 
     public string? IdentityToken { get; }
+
+    public string? Token { get; }
 
     public string? Scope => Context.RequestedScopes.ToSpaceSeparatedString();
 
@@ -39,15 +42,15 @@ public class AuthorizationCodeResponse : IResponseHandler
 
         if (Context.ResponseMode == ResponseModes.Query)
         {
-            result = new CodeResponseToQueryResult(redirectUri, values);
+            result = new ResponseToQueryResult(redirectUri, values);
         }
         else if (Context.ResponseMode == ResponseModes.Fragment)
         {
-            result = new CodeResponseToFragmentResult(redirectUri, values);
+            result = new ResponseToFragmentResult(redirectUri, values);
         }
         else if (Context.ResponseMode == ResponseModes.FormPost)
         {
-            result = new CodeResponseToFormPostResult(redirectUri, values);
+            result = new ResponseToFormPostResult(redirectUri, values);
         }
         else
         {
@@ -59,27 +62,22 @@ public class AuthorizationCodeResponse : IResponseHandler
 
     private NameValueCollection ToNameValueCollection()
     {
-        var collection = new NameValueCollection
-        {
-            { "code", Code }
-        };
+        var collection = new NameValueCollection();
+
+        if (Code.IsPresent())
+            collection.Add("code", Code);
 
         if (IdentityToken.IsPresent())
-        {
             collection.Add("id_token", IdentityToken);
-        }
 
         if (Scope.IsPresent())
-        {
             collection.Add("scope", Scope);
-        }
 
         if (State.IsPresent())
-        {
             collection.Add("state", State);
-        }
 
-        collection.Add("session_state", SessionState);
+        if (SessionState.IsPresent())
+            collection.Add("session_state", SessionState);
 
         return collection;
     }

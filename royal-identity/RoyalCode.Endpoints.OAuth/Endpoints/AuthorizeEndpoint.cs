@@ -84,9 +84,10 @@ public class AuthorizeEndpoint : IEndpointHandler
     private void Load(AuthorizeContext context, NameValueCollection Raw)
     {
         var scope = Raw.Get(OidcConstants.AuthorizeRequest.Scope);
-        context.RequestedScopes = scope.FromSpaceSeparatedString().Distinct().ToList();
+        context.RequestedScopes.AddRange(scope.FromSpaceSeparatedString());
 
-        context.ResponseType = Raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
+        var responseType = Raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
+        context.ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
         context.ClientId = Raw.Get(OidcConstants.AuthorizeRequest.ClientId);
         context.RedirectUri = Raw.Get(OidcConstants.AuthorizeRequest.RedirectUri);
         context.State = Raw.Get(OidcConstants.AuthorizeRequest.State);
@@ -112,7 +113,7 @@ public class AuthorizeEndpoint : IEndpointHandler
             var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (prompts.All(Constants.SupportedPromptModes.Contains))
             {
-                context.PromptModes = prompts;
+                context.PromptModes = prompts.ToHashSet();
             }
             else
             {
@@ -138,7 +139,7 @@ public class AuthorizeEndpoint : IEndpointHandler
         context.LoginHint = Raw.Get(OidcConstants.AuthorizeRequest.LoginHint);
 
         var acrValues = Raw.Get(OidcConstants.AuthorizeRequest.AcrValues);
-        context.AuthenticationContextReferenceClasses = acrValues.FromSpaceSeparatedString().Distinct().ToList();
+        context.AuthenticationContextReferenceClasses.AddRange(acrValues.FromSpaceSeparatedString());
 
         context.CodeChallenge = Raw.Get(OidcConstants.AuthorizeRequest.CodeChallenge);
         context.CodeChallengeMethod = Raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);

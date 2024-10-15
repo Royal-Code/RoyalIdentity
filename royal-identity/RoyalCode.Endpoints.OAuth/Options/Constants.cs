@@ -15,16 +15,19 @@ internal static class Constants
     public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(10);
     public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(60);
 
-    public static readonly List<string> SupportedResponseTypes =
+    public static readonly HashSet<string> SupportedResponseTypes =
     [
         ResponseTypes.Code,
         ResponseTypes.Token,
-        ResponseTypes.IdToken,
-        ResponseTypes.IdTokenToken,
-        ResponseTypes.CodeIdToken,
-        ResponseTypes.CodeToken,
-        ResponseTypes.CodeIdTokenToken
+        ResponseTypes.IdToken
     ];
+
+    private static readonly Func<string, bool> ContainsSupportedResponseType = SupportedResponseTypes.Contains;
+
+    public static bool ResponseTypesIsSuported(ICollection<string> responseTypes)
+    {
+        return responseTypes.All(ContainsSupportedResponseType);
+    }
 
     public static readonly Dictionary<string, string> ResponseTypeToGrantTypeMapping = new()
     {
@@ -57,16 +60,29 @@ internal static class Constants
         Identity
     }
 
-    public static readonly Dictionary<string, ScopeRequirement> ResponseTypeToScopeRequirement = new()
+    public static ScopeRequirement GetResponseTypeScopeRequirement(IEnumerable<string> responseTypes)
     {
-        { ResponseTypes.Code, ScopeRequirement.None },
-        { ResponseTypes.Token, ScopeRequirement.ResourceOnly },
-        { ResponseTypes.IdToken, ScopeRequirement.IdentityOnly },
-        { ResponseTypes.IdTokenToken, ScopeRequirement.Identity },
-        { ResponseTypes.CodeIdToken, ScopeRequirement.Identity },
-        { ResponseTypes.CodeToken, ScopeRequirement.Identity },
-        { ResponseTypes.CodeIdTokenToken, ScopeRequirement.Identity }
-    };
+        var requeriment = ScopeRequirement.None;
+        foreach (var responseType in responseTypes)
+        {
+            switch (responseType)
+            {
+                case ResponseTypes.Token:
+                    requeriment = requeriment == ScopeRequirement.None 
+                        ? ScopeRequirement.ResourceOnly 
+                        : ScopeRequirement.Identity;
+                    break;
+                case ResponseTypes.IdToken:
+                    requeriment = requeriment == ScopeRequirement.None
+                        ? ScopeRequirement.IdentityOnly
+                        : ScopeRequirement.Identity;
+                    break;
+            }
+        }
+        return requeriment;
+    }
+
+
 
     public static readonly Dictionary<string, IEnumerable<string>> AllowedResponseModesForGrantType =
         new()
@@ -74,7 +90,7 @@ internal static class Constants
             {
                 GrantType.AuthorizationCode,
                 [
-                    ResponseModes.Query, 
+                    ResponseModes.Query,
                     ResponseModes.FormPost,
                     ResponseModes.Fragment
                 ]
@@ -163,13 +179,13 @@ internal static class Constants
                 ]
             },
             {
-                ServerConstants.StandardScopes.Address, 
+                ServerConstants.StandardScopes.Address,
                 [
                     JwtClaimTypes.Address
                 ]
             },
             {
-                ServerConstants.StandardScopes.Phone, 
+                ServerConstants.StandardScopes.Phone,
                 [
                     JwtClaimTypes.PhoneNumber,
                     JwtClaimTypes.PhoneNumberVerified
@@ -417,7 +433,7 @@ public static class OidcConstants
         public const string InvalidTarget = "invalid_target";
     }
 
-    public static class AuthorizeResponse
+    public static class AuthorizeResponseFields
     {
         public const string Scope = "scope";
         public const string Code = "code";
@@ -688,10 +704,11 @@ public static class OidcConstants
         public const string Code = "code";
         public const string Token = "token";
         public const string IdToken = "id_token";
-        public const string IdTokenToken = "id_token token";
-        public const string CodeIdToken = "code id_token";
-        public const string CodeToken = "code token";
-        public const string CodeIdTokenToken = "code id_token token";
+        // TODO: remove
+        //public const string IdTokenToken = "id_token token";
+        //public const string CodeIdToken = "code id_token";
+        //public const string CodeToken = "code token";
+        //public const string CodeIdTokenToken = "code id_token token";
     }
 
     public static class ResponseModes

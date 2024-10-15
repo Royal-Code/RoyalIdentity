@@ -264,14 +264,23 @@ internal static class StringExtensions
         return null;
     }
 
-    public static string Obfuscate(this string value)
+    public static string Obfuscate(this string? value)
     {
+        if (value is null)
+            return "****";
+
+        var first4Chars = "****";
+        if (value.IsPresent() && value.Length > 7)
+        {
+            first4Chars = value[..4];
+        }
+
         var last4Chars = "****";
-        if (value.IsPresent() && value.Length > 4)
+        if (value.IsPresent() && value.Length > 15)
         {
             last4Chars = value[^4..];
         }
 
-        return "****" + last4Chars;
+        return first4Chars + "****" + last4Chars;
     }
 }

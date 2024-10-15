@@ -26,7 +26,7 @@ public class PkceValidator : IValidator<AuthorizeContext>
         //////////////////////////////////////////////////////////
         // check if PKCE is required and validate parameters
         //////////////////////////////////////////////////////////
-        if (context.GrantType != GrantType.AuthorizationCode && context.GrantType != GrantType.Hybrid)
+        if (!context.ResponseTypes.Contains(ResponseTypes.Code))
         {
             return default;
         }
@@ -42,7 +42,12 @@ public class PkceValidator : IValidator<AuthorizeContext>
         {
             if (context.Client.RequirePkce)
             {
-                logger.LogError(options, "The parameter code_challenge is missing", context.ResponseType, context);
+                logger.LogError(
+                    options, 
+                    "The parameter code_challenge is missing", 
+                    context.ResponseTypes.ToSpaceSeparatedString(),
+                    context);
+
                 context.InvalidRequest("Code challenge required");
             }
             else
@@ -77,13 +82,10 @@ public class PkceValidator : IValidator<AuthorizeContext>
         }
 
         // check if plain method is allowed
-        if (codeChallengeMethod == CodeChallengeMethods.Plain)
+        if (codeChallengeMethod == CodeChallengeMethods.Plain && !context.Client.AllowPlainTextPkce)
         {
-            if (!context.Client.AllowPlainTextPkce)
-            {
-                logger.LogError(options, "The parameter code_challenge_method of plain is not allowed", codeChallengeMethod, context);
-                context.InvalidRequest("Transform algorithm not supported", "code_challenge_method of plain is not allowed");
-            }
+            logger.LogError(options, "The parameter code_challenge_method of plain is not allowed", codeChallengeMethod, context);
+            context.InvalidRequest("Transform algorithm not supported", "code_challenge_method of plain is not allowed");
         }
 
         return default;

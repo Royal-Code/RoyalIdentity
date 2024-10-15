@@ -30,7 +30,7 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// <summary>
     /// Gets or sets the client model.
     /// </summary>
-    public Client? Client { get; set; }
+    public Client? Client { get; private set; }
 
     /// <summary>
     /// Gets or sets the client id.
@@ -46,6 +46,12 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     public string? ClientSecret { get; set; }
 
     /// <summary>
+    /// Gets or sets the client claims for the current request.
+    /// This value is initally read from the client configuration but can be modified in the request pipeline
+    /// </summary>
+    public HashSet<Claim> ClientClaims { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets the redirect URI.
     /// </summary>
     /// <value>
@@ -59,7 +65,7 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// <value>
     /// The type of the response.
     /// </value>
-    public string? ResponseType { get; set; }
+    public HashSet<string> ResponseTypes { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the response mode.
@@ -83,7 +89,7 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// <value>
     /// The requested scopes.
     /// </value>
-    public List<string> RequestedScopes { get; set; } = [];
+    public HashSet<string> RequestedScopes { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the state.
@@ -92,6 +98,14 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// The state.
     /// </value>
     public string? State { get; set; }
+
+    /// <summary>
+    /// Gets or sets the state hash.
+    /// </summary>
+    /// <value>
+    /// The hash of the <see cref="State"/>.
+    /// </value>
+    public string? StateHash { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the request was an OpenID Connect request.
@@ -123,7 +137,7 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// <value>
     /// The authentication context reference classes.
     /// </value>
-    public List<string> AuthenticationContextReferenceClasses { get; set; } = [];
+    public HashSet<string> AuthenticationContextReferenceClasses { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the display mode.
@@ -139,7 +153,7 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// <value>
     /// The collection of prompt modes.
     /// </value>
-    public ICollection<string> PromptModes { get; set; } = [];
+    public HashSet<string> PromptModes { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the maximum age.
@@ -184,25 +198,44 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     public Resources Resources { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the value of the confirmation method (will become the cnf claim). Must be a JSON object.
+    /// </summary>
+    /// <value>
+    /// The confirmation.
+    /// </value>
+    public string? Confirmation { get; set; }
+
+    /// <summary>
     /// Gets the session id from the current user.
     /// </summary>
     public string? SessionId => Identity?.FindFirst(c => c.Type == JwtClaimTypes.SessionId)?.Value;
 
+    public void SetClient(Client client, string? secret = null, string? confirmation = null)
+    {
+        Client = client;
+        ClientSecret = secret;
+        Confirmation = confirmation;
+
+        ClientClaims.AddRange(client.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)));
+    }
+
     public string? GetPrefixedAcrValue(string prefix)
     {
-        var value = AuthenticationContextReferenceClasses.Find(x => x.StartsWith(prefix));
+        var value = AuthenticationContextReferenceClasses.FirstOrDefault(x => x.StartsWith(prefix));
 
-        if (value != null)
-        {
+        if (value is not null)
             value = value.Substring(prefix.Length);
-        }
+        
 
         return value;
     }
 
     public void RemovePrefixedAcrValue(string prefix)
     {
-        AuthenticationContextReferenceClasses.RemoveAll(acr => acr.StartsWith(prefix, StringComparison.Ordinal));
+        foreach(var acr in AuthenticationContextReferenceClasses.Where(acr => acr.StartsWith(prefix, StringComparison.Ordinal)))
+        {
+            AuthenticationContextReferenceClasses.Remove(acr);
+        }
         var acr_values = AuthenticationContextReferenceClasses.ToSpaceSeparatedString();
         if (acr_values.IsPresent())
         {
@@ -242,19 +275,11 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
             throw new InvalidOperationException("RedirectUri was required, but is missing");
     }
 
-    [MemberNotNull(nameof(GrantType), nameof(ResponseType))]
+    [MemberNotNull(nameof(GrantType))]
     public void AssertHasGrantType()
     {
         var has = Items.Get<Asserts>()?.HasGrantType ?? false;
         if (!has)
             throw new InvalidOperationException("GrantType was required, but is missing");
-    }
-
-    [MemberNotNull(nameof(ResponseType))]
-    public void AssertHasResponseType()
-    {
-        var has = Items.Get<Asserts>()?.HasResponseType ?? false;
-        if (!has)
-            throw new InvalidOperationException("ResponseType was required, but is missing");
     }
 }

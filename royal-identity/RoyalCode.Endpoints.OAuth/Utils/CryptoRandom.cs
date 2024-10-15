@@ -48,7 +48,7 @@ public class CryptoRandom : Random
     /// <param name="length">The length.</param>
     /// <param name="format">The output format</param>
     /// <returns></returns>
-    public static string CreateUniqueId(int length = 32, OutputFormat format = OutputFormat.Base64Url)
+    public static string CreateUniqueId(int length = 33, OutputFormat format = OutputFormat.Base64Url)
     {
         var bytes = CreateRandomKey(length);
 

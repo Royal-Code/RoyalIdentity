@@ -8,12 +8,12 @@ using System.Text.Encodings.Web;
 
 namespace RoyalIdentity.Responses.HttpResults;
 
-public class CodeResponseToFormPostResult : IResult, IStatusCodeHttpResult
+public class ResponseToFormPostResult : IResult, IStatusCodeHttpResult
 {
     private readonly string redirectUri;
     private readonly NameValueCollection parameters;
 
-    public CodeResponseToFormPostResult(string redirectUri, NameValueCollection parameters)
+    public ResponseToFormPostResult(string redirectUri, NameValueCollection parameters)
     {
         this.redirectUri = redirectUri;
         this.parameters = parameters;

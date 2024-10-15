@@ -38,9 +38,10 @@ public class LoadClient : IDecorator<IWithClient>
         {
             logger.LogError(options, "Unknown client or not enabled", clientId, context);
             context.InvalidRequest(OidcConstants.AuthorizeErrors.UnauthorizedClient, "Unknown client or client not enabled");
+            return;
         }
 
-        context.Client = client;
+        context.SetClient(client);
         context.Items.GetOrCreate<Asserts>().HasClient = true;
 
         await next();

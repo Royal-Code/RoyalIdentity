@@ -1,37 +1,39 @@
-﻿using RoyalIdentity.Contexts;
+﻿using Microsoft.Extensions.Logging;
+using RoyalIdentity.Contexts;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Models;
-using RoyalIdentity.Utils;
+using RoyalIdentity.Models.Tokens;
+using RoyalIdentity.Users;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultCodeFactory : ICodeFactory
 {
     private readonly TimeProvider time;
-    private readonly IKeyManager keyManager;
     private readonly ISessionStateGenerator sessionStateGenerator;
+    private readonly IAuthorizationCodeStore codeStore;
+    private readonly IUserSession userSession;
+    private readonly ILogger logger;
 
-    public DefaultCodeFactory(TimeProvider time, IKeyManager keyManager, ISessionStateGenerator sessionStateGenerator)
+    public DefaultCodeFactory(
+        TimeProvider time,
+        ISessionStateGenerator sessionStateGenerator,
+        IAuthorizationCodeStore codeStore,
+        IUserSession userSession,
+        ILogger<DefaultCodeFactory> logger)
     {
         this.time = time;
-        this.keyManager = keyManager;
         this.sessionStateGenerator = sessionStateGenerator;
+        this.codeStore = codeStore;
+        this.userSession = userSession;
+        this.logger = logger;
     }
 
     public async Task<AuthorizationCode> CreateCodeAsync(AuthorizeContext context, CancellationToken ct)
     {
+        logger.LogDebug("Creating Authorization Code.");
+
         context.AssertHasClient();
         context.AssertHasRedirectUri();
-
-        string? stateHash = null;
-        if (context.State.IsPresent())
-        {
-            var credential = await keyManager.GetSigningCredentialsAsync(context.Client.AllowedIdentityTokenSigningAlgorithms, ct)
-                    ?? throw new InvalidOperationException("No signing credential is configured.");
-
-            var algorithm = credential.Algorithm;
-            stateHash = CryptoHelper.CreateHashClaimValue(context.State, algorithm);
-        }
 
         var sessionState = sessionStateGenerator.GenerateSessionStateValue(context);
 
@@ -49,8 +51,13 @@ public class DefaultCodeFactory : ICodeFactory
             CodeChallenge = context.CodeChallenge.Sha256(),
             CodeChallengeMethod = context.CodeChallengeMethod,
             Nonce = context.Nonce,
-            StateHash = stateHash,
+            StateHash = context.StateHash,
         };
+
+        await codeStore.StoreAuthorizationCodeAsync(code);
+        await userSession.AddClientIdAsync(context.ClientId!);
+
+        logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, code.Code);
 
         return code;
     }

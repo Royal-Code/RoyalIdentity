@@ -22,6 +22,7 @@ public static class Pipes
                 .UseValidator<RequestedResourcesValidator>()
                 .UseDecorator<PromptLoginDecorator>()
                 .UseDecorator<ConsentDecorator>()
+                .UseDecorator<StateHashDecorator>()
                 .UseHandler<AuthorizeContextHandler>();
 
 

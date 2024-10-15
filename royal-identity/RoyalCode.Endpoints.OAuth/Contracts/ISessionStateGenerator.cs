@@ -4,5 +4,5 @@ namespace RoyalIdentity.Contracts;
 
 public interface ISessionStateGenerator
 {
-    public string GenerateSessionStateValue(AuthorizeContext context);
+    public string? GenerateSessionStateValue(AuthorizeContext context);
 }

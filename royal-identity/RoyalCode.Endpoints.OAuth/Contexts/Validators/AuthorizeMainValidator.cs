@@ -24,38 +24,34 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         context.AssertHasClient();
 
 
-        //////////////////////////////////////////////////////////
-        // response_type must be present and supported
-        //////////////////////////////////////////////////////////
-        var responseType = context.ResponseType;
-        if (responseType.IsMissing())
+        ////////////////////////////////////////////////////////////////////////////
+        // response_type must be present and supported and allowed for the client
+        ////////////////////////////////////////////////////////////////////////////
+        var responseTypes = context.ResponseTypes;
+        if (responseTypes.Count is 0)
         {
             logger.LogError(options, "Missing response_type", context);
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Missing response_type");
             return;
         }
 
-        // The responseType may come in in an unconventional order.
-        // Use an IEqualityComparer that doesn't care about the order of multiple values.
-        // Per https://tools.ietf.org/html/rfc6749#section-3.1.1 -
-        // 'Extension response types MAY contain a space-delimited (%x20) list of
-        // values, where the order of values does not matter (e.g., response
-        // type "a b" is the same as "b a").'
-        // http://openid.net/specs/oauth-v2-multiple-response-types-1_0-03.html#terminology -
-        // 'If a response type contains one of more space characters (%20), it is compared
-        // as a space-delimited list of values in which the order of values does not matter.'
-        if (!Constants.SupportedResponseTypes.Contains(responseType, ResponseTypeEqualityComparer.Instance))
+        if (!Constants.ResponseTypesIsSuported(responseTypes))
         {
-            logger.LogError(options, "Response type not supported", responseType, context);
+            logger.LogError(options, "Response type not supported", responseTypes.ToSpaceSeparatedString(), context);
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not supported");
             return;
         }
 
-        // Even though the responseType may have come in in an unconventional order,
-        // we still need the request's ResponseType property to be set to the
-        // conventional, supported response type.
-        context.ResponseType = Constants.SupportedResponseTypes.First(
-            supportedResponseType => ResponseTypeEqualityComparer.Instance.Equals(supportedResponseType, responseType));
+        if (!responseTypes.All(context.Client.AllowedResponseTypes.Contains))
+        {
+            logger.LogError(
+                options, 
+                "Response type not allowed for the client",
+                $"{responseTypes.ToSpaceSeparatedString()} - {context.Client.Id} - {context.Client.Name}",
+                context);
+            context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not allowed");
+            return;
+        }
 
 
         //////////////////////////////////////////////////////////
@@ -86,21 +82,26 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         var responseMode = context.ResponseMode;
         if (responseMode.IsPresent())
         {
-            if (Constants.SupportedResponseModes.Contains(responseMode))
-            {
-                if (!Constants.AllowedResponseModesForGrantType[grantType].Contains(responseMode))
-                {
-                    logger.LogError(options, "Invalid response_mode for response_type", responseMode, context);
-                    context.InvalidRequest(AuthorizeErrors.InvalidRequest, "Invalid response_mode for response_type");
-                    return;
-                }
-            }
-            else
+            if (!Constants.SupportedResponseModes.Contains(responseMode))
             {
                 logger.LogError(options, "Unsupported response_mode", responseMode, context);
                 context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType);
                 return;
             }
+
+            // when a token is required, the response mode should be form_post
+            if (responseMode != ResponseModes.FormPost && responseTypes.Any(t => t != ResponseTypes.Code))
+            {
+                logger.LogError(
+                    options,
+                    "Invalid response_mode for response_type",
+                    $"{responseMode} - {responseTypes.ToSpaceSeparatedString()}",
+                    context);
+
+                context.InvalidRequest(AuthorizeErrors.InvalidRequest, "Invalid response_mode for response_type");
+
+                return;
+            }            
         }
 
 
@@ -111,24 +112,6 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         {
             logger.LogError(options, "Invalid grant type for client", grantType, context);
             context.InvalidRequest(AuthorizeErrors.UnauthorizedClient, "Invalid grant type for client");
-            return;
-        }
-
-
-        //////////////////////////////////////////////////////////
-        // check if response type contains an access token,
-        // and if client is allowed to request access token via browser
-        //////////////////////////////////////////////////////////
-        var responseTypes = responseType.FromSpaceSeparatedString();
-        if (responseTypes.Contains(ResponseTypes.Token) && !context.Client.AllowAccessTokensViaBrowser)
-        {
-            logger.LogError(
-                options,
-                "Client requested access token - but client is not configured to receive access tokens via browser",
-                context);
-            context.InvalidRequest(
-                AuthorizeErrors.UnauthorizedClient,
-                "Client not configured to receive access tokens via browser");
             return;
         }
 

@@ -1,4 +1,6 @@
 ﻿using RoyalIdentity.Options;
+using System.Security.Claims;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Models;
 
@@ -15,7 +17,7 @@ public class Client
     /// <summary>
     /// The client name.
     /// </summary>
-    public string Name { get; internal set; }
+    public string Name { get; set; }
 
     /// <summary>
     /// Gets or sets the protocol type.
@@ -36,11 +38,6 @@ public class Client
     public bool AllowPlainTextPkce { get; set; } = false;
 
     /// <summary>
-    /// Specifies the allowed grant types (legal combinations of AuthorizationCode, Implicit, Hybrid, ResourceOwner, ClientCredentials).
-    /// </summary>
-    public ICollection<string> AllowedGrantTypes { get; set; } = [];
-
-    /// <summary>
     /// Controls whether access tokens are transmitted via the browser for this client (defaults to <c>false</c>).
     /// This can prevent accidental leakage of access tokens when multiple response types are allowed.
     /// </summary>
@@ -55,9 +52,37 @@ public class Client
     public bool AllowOfflineAccess { get; set; } = false;
 
     /// <summary>
+    /// Specifies the allowed grant types (legal combinations of AuthorizationCode, Implicit, Hybrid, ResourceOwner, ClientCredentials).
+    /// </summary>
+    public HashSet<string> AllowedGrantTypes { get; set; } = [];
+
+    /// <summary>
     /// Specifies the api scopes that the client is allowed to request. If empty, the client can't access any scope
     /// </summary>
-    public ICollection<string> AllowedScopes { get; set; } = [];
+    public HashSet<string> AllowedScopes { get; set; } = [];
+
+    /// <summary>
+    /// Specifies the response types that the client is allowed to request. If empty, the client can't access any scope
+    /// </summary>
+    public HashSet<string> AllowedResponseTypes { get; set; } = [ ResponseTypes.Code ];
+
+    /// <summary>
+    /// Signing algorithm for identity token. If empty, will use the server default signing algorithm.
+    /// </summary>
+    public HashSet<string> AllowedIdentityTokenSigningAlgorithms { get; set; } = [];
+
+    /// <summary>
+    /// Specifies which external IdPs can be used with this client (if list is empty all IdPs are allowed). Defaults to empty.
+    /// </summary>
+    public HashSet<string> IdentityProviderRestrictions { get; set; } = [];
+
+    /// <summary>
+    /// Allows settings claims for the client (will be included in the access token).
+    /// </summary>
+    /// <value>
+    /// The claims.
+    /// </value>
+    public HashSet<Claim> Claims { get; set; } = [];
 
     /// <summary>
     /// Gets or sets a value indicating whether the local login is allowed for this client. Defaults to <c>true</c>.
@@ -68,19 +93,9 @@ public class Client
     public bool EnableLocalLogin { get; set; } = true;
 
     /// <summary>
-    /// Specifies which external IdPs can be used with this client (if list is empty all IdPs are allowed). Defaults to empty.
-    /// </summary>
-    public ICollection<string> IdentityProviderRestrictions { get; set; } = [];
-
-    /// <summary>
     /// The maximum duration (in seconds) since the last time the user authenticated.
     /// </summary>
     public int? UserSsoLifetime { get; set; }
-
-    /// <summary>
-    /// Signing algorithm for identity token. If empty, will use the server default signing algorithm.
-    /// </summary>
-    public ICollection<string> AllowedIdentityTokenSigningAlgorithms { get; set; } = [];
 
     /// <summary>
     /// Lifetime of access token in seconds (defaults to 3600 seconds / 1 hour)

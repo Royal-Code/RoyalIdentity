@@ -13,9 +13,9 @@ namespace RoyalIdentity.Handlers;
 public class AuthorizeContextHandler : IHandler<AuthorizeContext>
 {
     private readonly ICodeFactory codeFactory;
-    private readonly IAuthorizationCodeStore codeStore;
+    private readonly ITokenFactory tokenFactory;
     private readonly IEventDispatcher eventDispatcher;
-    private readonly IUserSession userSession;
+    
     private readonly ILogger logger;
 
     public AuthorizeContextHandler(
@@ -26,14 +26,40 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
         ILogger<AuthorizeContextHandler> logger) 
     {
         this.codeFactory = codeFactory;
-        this.codeStore = codeStore;
         this.eventDispatcher = eventDispatcher;
-        this.userSession = userSession;
         this.logger = logger;
     }
 
     public async Task Handle(AuthorizeContext context, CancellationToken ct)
     {
+        string? codeValue = null;
+        string? sessionState = null;
+        CodeIssuedEvent? codeEvent = null;
+
+        if (context.ResponseTypes.Contains(ResponseTypes.Code))
+        {
+            var code = await codeFactory.CreateCodeAsync(context, ct);
+            
+            var token = new Token(ResponseTypes.Code, code.Code);
+            context.Items.AddToken(token);
+            codeEvent = new CodeIssuedEvent(context, token);
+        }
+
+        if (context.ResponseTypes.Contains(ResponseTypes.Token))
+        {
+
+        }
+
+        context.Response = new AuthorizeResponse(context, codeValue, sessionState);
+
+        // events should only be dispatched after AuthorizeResponse has been created
+
+        if (codeEvent is not null)
+            await eventDispatcher.DispatchAsync(codeEvent);
+
+
+
+
         switch (context.GrantType)
         {
             case GrantType.AuthorizationCode:
@@ -53,8 +79,6 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
 
     private async Task HandleHybridFlow(AuthorizeContext context, CancellationToken ct)
     {
-        if (context.ResponseType)
-
         throw new NotImplementedException();
     }
 
@@ -68,7 +92,7 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
 
         logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, codeValue);
 
-        context.Response = new AuthorizationCodeResponse(context, codeValue, code.SessionState);
+        context.Response = new Responses.AuthorizeResponse(context, codeValue, code.SessionState);
 
         var token = new Token(ResponseTypes.Code, codeValue);
         context.Items.AddToken(token);

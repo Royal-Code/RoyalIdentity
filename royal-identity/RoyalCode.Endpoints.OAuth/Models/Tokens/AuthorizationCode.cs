@@ -1,7 +1,7 @@
-﻿using System.Collections;
+﻿using RoyalIdentity.Utils;
 using System.Security.Claims;
 
-namespace RoyalIdentity.Models;
+namespace RoyalIdentity.Models.Tokens;
 
 #pragma warning disable S107 // Methods should not have too many parameters
 
@@ -14,6 +14,7 @@ public class AuthorizationCode
         DateTime creationTime, int lifetime,
         bool isOpenId, ICollection<string> requestedScopes, string redirectUri)
     {
+        Code = CryptoRandom.CreateUniqueId();
         ClientId = clientId;
         Subject = subject;
         SessionState = sessionState;
@@ -23,6 +24,14 @@ public class AuthorizationCode
         RequestedScopes = requestedScopes;
         RedirectUri = redirectUri;
     }
+
+    /// <summary>
+    /// Gets or sets the Code or Id of the code.
+    /// </summary>
+    /// <value>
+    /// The Code.
+    /// </value>
+    public string Code { get; }
 
     /// <summary>
     /// Gets or sets the ID of the client.

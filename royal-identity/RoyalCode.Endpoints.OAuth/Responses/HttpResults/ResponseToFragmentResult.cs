@@ -4,12 +4,12 @@ using System.Collections.Specialized;
 
 namespace RoyalIdentity.Responses.HttpResults;
 
-public class CodeResponseToFragmentResult : IResult, IStatusCodeHttpResult
+public class ResponseToFragmentResult : IResult, IStatusCodeHttpResult
 {
     private readonly string redirectUri;
     private readonly NameValueCollection parameters;
 
-    public CodeResponseToFragmentResult(string redirectUri, NameValueCollection parameters)
+    public ResponseToFragmentResult(string redirectUri, NameValueCollection parameters)
     {
         this.redirectUri = redirectUri;
         this.parameters = parameters;

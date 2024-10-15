@@ -28,7 +28,6 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
     public async ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
     {
         context.AssertHasClient();
-        context.AssertHasResponseType();
 
         //////////////////////////////////////////////////////////
         // check if scopes are valid/supported and check for resource scopes
@@ -56,7 +55,7 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
         //////////////////////////////////////////////////////////
         // check scope vs response_type plausibility
         //////////////////////////////////////////////////////////
-        var requirement = Constants.ResponseTypeToScopeRequirement[context.ResponseType];
+        var requirement = Constants.GetResponseTypeScopeRequirement(context.ResponseTypes);
         var requireOpenId = requirement == Constants.ScopeRequirement.Identity
             || requirement == Constants.ScopeRequirement.IdentityOnly;
         if (requireOpenId && !context.IsOpenIdRequest)
@@ -112,7 +111,7 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
             else
             {
                 logger.LogError(options, "Offline access is not allowed for this client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidScope, "Offline access is not allowed for this client");
+                context.InvalidRequest(AuthorizeErrors.InvalidScope, "Offline access is not allowed for this client");
                 return false;
             }
         }
@@ -127,7 +126,7 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
                 else
                 {
                     logger.LogError(options, "Identity Scope not allowed for the client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                    context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidScope);
+                    context.InvalidRequest(AuthorizeErrors.InvalidScope);
                     return false;
                 }
             }
@@ -146,14 +145,14 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
                 else
                 {
                     logger.LogError(options, "Api Scope not allowed for the client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                    context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidScope);
+                    context.InvalidRequest(AuthorizeErrors.InvalidScope);
                     return false;
                 }
             }
             else
             {
                 logger.LogError(options, "Scope not found in store", requestedScope, context);
-                context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidScope);
+                context.InvalidRequest(AuthorizeErrors.InvalidScope);
                 return false;
             }
         }
