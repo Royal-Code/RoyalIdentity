@@ -19,7 +19,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         this.logger = logger;
     }
 
-    public async ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
+    public ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
     {
         context.AssertHasClient();
 
@@ -32,14 +32,14 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         {
             logger.LogError(options, "Missing response_type", context);
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Missing response_type");
-            return;
+            return ValueTask.CompletedTask;
         }
 
         if (!Constants.ResponseTypesIsSuported(responseTypes))
         {
             logger.LogError(options, "Response type not supported", responseTypes.ToSpaceSeparatedString(), context);
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not supported");
-            return;
+            return ValueTask.CompletedTask;
         }
 
         if (!responseTypes.All(context.Client.AllowedResponseTypes.Contains))
@@ -50,28 +50,8 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
                 $"{responseTypes.ToSpaceSeparatedString()} - {context.Client.Id} - {context.Client.Name}",
                 context);
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not allowed");
-            return;
+            return ValueTask.CompletedTask;
         }
-
-
-        //////////////////////////////////////////////////////////
-        // match response_type to grant type
-        //////////////////////////////////////////////////////////
-        var grantType = Constants.ResponseTypeToGrantTypeMapping[context.ResponseType];
-        
-        
-        //////////////////////////////////////////////////////////
-        // check if flow is allowed at authorize endpoint
-        //////////////////////////////////////////////////////////
-        if (!Constants.AllowedGrantTypesForAuthorizeEndpoint.Contains(grantType))
-        {
-            logger.LogError(options, "Invalid grant type", responseType, context);
-            context.InvalidRequest("Invalid response_type");
-            return;
-        }
-
-        context.GrantType = grantType;
-        context.Items.GetOrCreate<Asserts>().HasGrantType = true;
 
 
         //////////////////////////////////////////////////////////
@@ -86,7 +66,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
             {
                 logger.LogError(options, "Unsupported response_mode", responseMode, context);
                 context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType);
-                return;
+                return ValueTask.CompletedTask;
             }
 
             // when a token is required, the response mode should be form_post
@@ -100,22 +80,9 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
 
                 context.InvalidRequest(AuthorizeErrors.InvalidRequest, "Invalid response_mode for response_type");
 
-                return;
+                return ValueTask.CompletedTask;
             }            
         }
-
-
-        //////////////////////////////////////////////////////////
-        // check if grant type is allowed for client
-        //////////////////////////////////////////////////////////
-        if (!context.Client.AllowedGrantTypes.Contains(grantType))
-        {
-            logger.LogError(options, "Invalid grant type for client", grantType, context);
-            context.InvalidRequest(AuthorizeErrors.UnauthorizedClient, "Invalid grant type for client");
-            return;
-        }
-
-        context.Items.GetOrCreate<Asserts>().HasResponseType = true;
 
 
         //////////////////////////////////////////////////////////
@@ -125,14 +92,14 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         {
             logger.LogError(options, "scope is missing", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope);
-            return;
+            return ValueTask.CompletedTask;
         }
 
         if (context.RequestedScopes.Count > options.InputLengthRestrictions.Scope)
         {
             logger.LogError(options, "Scopes too long", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "scopes too long");
-            return;
+            return ValueTask.CompletedTask;
         }
 
         if (context.RequestedScopes.Contains(ServerConstants.StandardScopes.OpenId))
@@ -150,12 +117,14 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
             {
                 logger.LogError(options, "Nonce too long", context);
                 context.InvalidRequest("Invalid nonce", "too long");
+                return ValueTask.CompletedTask;
             }
         }
-        else if (context.GrantType == GrantType.Hybrid && context.IsOpenIdRequest)
+        else if (context.IsOpenIdRequest)
         {
-            logger.LogError(options, "Nonce required for implicit and hybrid flow with openid scope", context);
+            logger.LogError(options, "Nonce required for implicit flow with openid scope", context);
             context.InvalidRequest("Invalid nonce", "required");
+            return ValueTask.CompletedTask;
         }
 
 
@@ -166,6 +135,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         {
             logger.LogError(options, "The property prompt contains 'none' and other values. 'none' should be used by itself.", context);
             context.InvalidRequest("Invalid prompt");
+            return ValueTask.CompletedTask;
         }
 
 
@@ -176,6 +146,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         {
             logger.LogError(options, "UI locale too long", context);
             context.InvalidRequest("Invalid ui_locales");
+            return ValueTask.CompletedTask;
         }
 
 
@@ -186,6 +157,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         {
             logger.LogError(options, "Login hint too long", context);
             context.InvalidRequest("Invalid login_hint", "too long");
+            return ValueTask.CompletedTask;
         }
 
         //////////////////////////////////////////////////////////
@@ -199,6 +171,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
             {
                 logger.LogError(options, "Acr values too long", context);
                 context.InvalidRequest("Invalid acr_values", "too long");
+                return ValueTask.CompletedTask;
             }
         }
 
@@ -214,20 +187,6 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
             context.RemoveIdP();
         }
 
-        //////////////////////////////////////////////////////////////
-        ////// check session cookie
-        //////////////////////////////////////////////////////////////
-        ////if (options.Endpoints.EnableCheckSessionEndpoint)
-        ////{
-        ////    var sessionId = await userSession.GetSessionIdAsync();
-        ////    if (sessionId.IsPresent())
-        ////    {
-        ////        context.SessionId = sessionId;
-        ////    }
-        ////    else
-        ////    {
-        ////        LogError("Check session endpoint enabled, but SessionId is missing", request);
-        ////    }
-        ////}
+        return ValueTask.CompletedTask;
     }
 }

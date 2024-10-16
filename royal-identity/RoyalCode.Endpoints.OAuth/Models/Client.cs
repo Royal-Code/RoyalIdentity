@@ -38,43 +38,29 @@ public class Client
     public bool AllowPlainTextPkce { get; set; } = false;
 
     /// <summary>
-    /// Controls whether access tokens are transmitted via the browser for this client (defaults to <c>false</c>).
-    /// This can prevent accidental leakage of access tokens when multiple response types are allowed.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if access tokens can be transmitted via the browser; otherwise, <c>false</c>.
-    /// </value>
-    public bool AllowAccessTokensViaBrowser { get; set; } = false;
-
-    /// <summary>
     /// Gets or sets a value indicating whether [allow offline access]. Defaults to <c>false</c>.
     /// </summary>
     public bool AllowOfflineAccess { get; set; } = false;
 
     /// <summary>
-    /// Specifies the allowed grant types (legal combinations of AuthorizationCode, Implicit, Hybrid, ResourceOwner, ClientCredentials).
-    /// </summary>
-    public HashSet<string> AllowedGrantTypes { get; set; } = [];
-
-    /// <summary>
     /// Specifies the api scopes that the client is allowed to request. If empty, the client can't access any scope
     /// </summary>
-    public HashSet<string> AllowedScopes { get; set; } = [];
+    public HashSet<string> AllowedScopes { get; } = [];
 
     /// <summary>
     /// Specifies the response types that the client is allowed to request. If empty, the client can't access any scope
     /// </summary>
-    public HashSet<string> AllowedResponseTypes { get; set; } = [ ResponseTypes.Code ];
+    public HashSet<string> AllowedResponseTypes { get; } = [ ResponseTypes.Code ];
 
     /// <summary>
     /// Signing algorithm for identity token. If empty, will use the server default signing algorithm.
     /// </summary>
-    public HashSet<string> AllowedIdentityTokenSigningAlgorithms { get; set; } = [];
+    public HashSet<string> AllowedIdentityTokenSigningAlgorithms { get; } = [];
 
     /// <summary>
     /// Specifies which external IdPs can be used with this client (if list is empty all IdPs are allowed). Defaults to empty.
     /// </summary>
-    public HashSet<string> IdentityProviderRestrictions { get; set; } = [];
+    public HashSet<string> IdentityProviderRestrictions { get; } = [];
 
     /// <summary>
     /// Allows settings claims for the client (will be included in the access token).
@@ -82,7 +68,24 @@ public class Client
     /// <value>
     /// The claims.
     /// </value>
-    public HashSet<Claim> Claims { get; set; } = [];
+    public HashSet<Claim> Claims { get; } = [];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether client claims should be always included in the access tokens - or only for client credentials flow.
+    /// Defaults to <c>true</c>
+    /// </summary>
+    /// <value>
+    /// <c>true</c> if claims should always be sent; otherwise, <c>false</c>.
+    /// </value>
+    public bool AlwaysSendClientClaims { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value to prefix it on client claim types. Defaults to <c>null</c>.
+    /// </summary>
+    /// <value>
+    /// Any non-empty string if claims should be prefixed with the value; otherwise, <c>null</c>.
+    /// </value>
+    public string? ClientClaimsPrefix { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the local login is allowed for this client. Defaults to <c>true</c>.

@@ -10,9 +10,7 @@ public class Resources
     /// <summary>
     /// Initializes a new instance of the <see cref="Resources"/> class.
     /// </summary>
-    public Resources()
-    {
-    }
+    public Resources() { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Resources"/> class.
@@ -35,18 +33,9 @@ public class Resources
         IEnumerable<ApiResource> apiResources,
         IEnumerable<ApiScope> apiScopes)
     {
-        if (identityResources?.Any() == true)
-        {
-            IdentityResources = new HashSet<IdentityResource>(identityResources.ToArray());
-        }
-        if (apiResources?.Any() == true)
-        {
-            ApiResources = new HashSet<ApiResource>(apiResources.ToArray());
-        }
-        if (apiScopes?.Any() == true)
-        {
-            ApiScopes = new HashSet<ApiScope>(apiScopes.ToArray());
-        }
+        IdentityResources = new HashSet<IdentityResource>(identityResources);
+        ApiResources = new HashSet<ApiResource>(apiResources);
+        ApiScopes = new HashSet<ApiScope>(apiScopes);
     }
 
     /// <summary>
@@ -58,19 +47,24 @@ public class Resources
     public bool OfflineAccess { get; set; }
 
     /// <summary>
+    /// Gets or sets the requested scopes.
+    /// </summary>
+    public HashSet<string> RequestedScopes { get; } = [];
+
+    /// <summary>
     /// Gets or sets the identity resources.
     /// </summary>
-    public ICollection<IdentityResource> IdentityResources { get; set; } = [];
+    public ICollection<IdentityResource> IdentityResources { get; } = [];
 
     /// <summary>
     /// Gets or sets the API scopes.
     /// </summary>
-    public ICollection<ApiScope> ApiScopes { get; set; } = [];
+    public ICollection<ApiScope> ApiScopes { get; } = [];
 
     /// <summary>
     /// Gets or sets the API resources.
     /// </summary>
-    public ICollection<ApiResource> ApiResources { get; set; } = [];
+    public ICollection<ApiResource> ApiResources { get; } = [];
 
     public bool TryFindIdentityResourceByName(string name, [NotNullWhen(true)] out IdentityResource? identityResource)
     {

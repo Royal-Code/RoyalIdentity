@@ -29,23 +29,6 @@ internal static class Constants
         return responseTypes.All(ContainsSupportedResponseType);
     }
 
-    public static readonly Dictionary<string, string> ResponseTypeToGrantTypeMapping = new()
-    {
-        { ResponseTypes.Code, GrantType.AuthorizationCode },
-        { ResponseTypes.Token, GrantType.Implicit },
-        { ResponseTypes.IdToken, GrantType.Implicit },
-        { ResponseTypes.IdTokenToken, GrantType.Implicit },
-        { ResponseTypes.CodeIdToken, GrantType.Hybrid },
-        { ResponseTypes.CodeToken, GrantType.Hybrid },
-        { ResponseTypes.CodeIdTokenToken, GrantType.Hybrid }
-    };
-
-    public static readonly List<string> AllowedGrantTypesForAuthorizeEndpoint = new()
-    {
-        GrantType.AuthorizationCode,
-        GrantType.Hybrid
-    };
-
     public static readonly List<string> SupportedCodeChallengeMethods = new()
     {
         CodeChallengeMethods.Plain,

@@ -76,20 +76,12 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     public string? ResponseMode { get; set; }
 
     /// <summary>
-    /// Gets or sets the grant type.
-    /// </summary>
-    /// <value>
-    /// The grant type.
-    /// </value>
-    public string? GrantType { get; set; }
-
-    /// <summary>
     /// Gets or sets the requested scopes.
     /// </summary>
     /// <value>
     /// The requested scopes.
     /// </value>
-    public HashSet<string> RequestedScopes { get; set; } = [];
+    public HashSet<string> RequestedScopes => Resources.RequestedScopes;
 
     /// <summary>
     /// Gets or sets the state.
@@ -137,7 +129,7 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// <value>
     /// The authentication context reference classes.
     /// </value>
-    public HashSet<string> AuthenticationContextReferenceClasses { get; set; } = [];
+    public HashSet<string> AuthenticationContextReferenceClasses { get; } = [];
 
     /// <summary>
     /// Gets or sets the display mode.
@@ -195,7 +187,7 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
     /// <summary>
     /// The resources of the result.
     /// </summary>
-    public Resources Resources { get; set; } = new();
+    public Resources Resources { get; } = new();
 
     /// <summary>
     /// Gets or sets the value of the confirmation method (will become the cnf claim). Must be a JSON object.
@@ -273,13 +265,5 @@ public class AuthorizeContext : EndpointContextBase, IWithRedirectUri
         var has = Items.Get<Asserts>()?.HasRedirectUri ?? false;
         if (!has)
             throw new InvalidOperationException("RedirectUri was required, but is missing");
-    }
-
-    [MemberNotNull(nameof(GrantType))]
-    public void AssertHasGrantType()
-    {
-        var has = Items.Get<Asserts>()?.HasGrantType ?? false;
-        if (!has)
-            throw new InvalidOperationException("GrantType was required, but is missing");
     }
 }

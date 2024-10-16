@@ -58,46 +58,5 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
             await eventDispatcher.DispatchAsync(codeEvent);
 
 
-
-
-        switch (context.GrantType)
-        {
-            case GrantType.AuthorizationCode:
-                await HandleCodeFlow(context, ct);
-
-                break;
-            case GrantType.Hybrid:
-                await HandleHybridFlow(context, ct);
-                break;
-            default:
-                logger.LogError("Unsupported grant type: {GrantType}", context.GrantType);
-                throw new InvalidOperationException("invalid grant type: " + context.GrantType);
-        }
-
-
-    }
-
-    private async Task HandleHybridFlow(AuthorizeContext context, CancellationToken ct)
-    {
-        throw new NotImplementedException();
-    }
-
-    private async Task HandleCodeFlow(AuthorizeContext context, CancellationToken ct)
-    {
-        logger.LogDebug("Creating Authorization Code Flow response.");
-
-        var code = await codeFactory.CreateCodeAsync(context, ct);
-        var codeValue = await codeStore.StoreAuthorizationCodeAsync(code);
-        await userSession.AddClientIdAsync(context.ClientId!);
-
-        logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, codeValue);
-
-        context.Response = new Responses.AuthorizeResponse(context, codeValue, code.SessionState);
-
-        var token = new Token(ResponseTypes.Code, codeValue);
-        context.Items.AddToken(token);
-
-        var evt = new CodeIssuedEvent(context, token);
-        await eventDispatcher.DispatchAsync(evt);
     }
 }

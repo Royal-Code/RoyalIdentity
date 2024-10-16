@@ -21,7 +21,6 @@ public class PkceValidator : IValidator<AuthorizeContext>
     public ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
     {
         context.AssertHasClient();
-        context.AssertHasGrantType();
 
         //////////////////////////////////////////////////////////
         // check if PKCE is required and validate parameters
