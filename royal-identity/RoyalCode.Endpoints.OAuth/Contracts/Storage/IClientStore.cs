@@ -1,6 +1,6 @@
 ﻿using RoyalIdentity.Models;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Storage;
 
 public interface IClientStore
 {

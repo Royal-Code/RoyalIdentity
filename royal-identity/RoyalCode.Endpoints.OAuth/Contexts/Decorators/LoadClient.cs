@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Withs;
-using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;

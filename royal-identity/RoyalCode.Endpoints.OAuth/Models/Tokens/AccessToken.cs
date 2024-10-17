@@ -9,14 +9,26 @@ public class AccessToken : TokenBase
         AccessTokenType accessTokenType,
         DateTime creationTime,
         int lifetime,
-        string token,
-        string tokenType) : base(clientId, issuer, accessTokenType, creationTime, lifetime)
+        string jti,
+        string tokenType) : base(clientId, issuer, creationTime, lifetime, jti)
     {
-        Token = token;
+        Id = jti;
         TokenType = tokenType;
+        AccessTokenType = accessTokenType;
     }
 
-    public string Token { get; set; }
+    /// <summary>
+    /// Token Identity or JTI.
+    /// </summary>
+    public string Id { get; }
+
+    /// <summary>
+    /// Gets or sets the type of access token of the client (JWT or Reference)
+    /// </summary>
+    /// <value>
+    /// The access token type specified by the client.
+    /// </value>
+    public AccessTokenType AccessTokenType { get; }
 
     public string TokenType { get; set; }
 }

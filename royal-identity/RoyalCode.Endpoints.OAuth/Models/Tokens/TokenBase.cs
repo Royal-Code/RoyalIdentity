@@ -9,16 +9,21 @@ public abstract class TokenBase
     protected TokenBase(
         string clientId,
         string issuer,
-        AccessTokenType accessTokenType,
         DateTime creationTime,
-        int lifetime)
+        int lifetime,
+        string? tokenItSelf = null)
     {
+        Token = tokenItSelf?? string.Empty;
         ClientId = clientId;
         Issuer = issuer;
-        AccessTokenType = accessTokenType;
         CreationTime = creationTime;
         Lifetime = lifetime;
     }
+
+    /// <summary>
+    /// The string representation of the token, the token itself.
+    /// </summary>
+    public string Token { get; set; }
 
     /// <summary>
     /// Gets or sets the ID of the client.
@@ -26,7 +31,7 @@ public abstract class TokenBase
     /// <value>
     /// The ID of the client.
     /// </value>
-    public string ClientId { get; set; }
+    public string ClientId { get; }
 
     /// <summary>
     /// Gets or sets the issuer.
@@ -34,15 +39,7 @@ public abstract class TokenBase
     /// <value>
     /// The issuer.
     /// </value>
-    public string Issuer { get; set; }
-
-    /// <summary>
-    /// Gets or sets the type of access token of the client (JWT or Reference)
-    /// </summary>
-    /// <value>
-    /// The access token type specified by the client.
-    /// </value>
-    public AccessTokenType AccessTokenType { get; set; }
+    public string Issuer { get; }
 
     /// <summary>
     /// Gets or sets the creation time.
@@ -50,7 +47,7 @@ public abstract class TokenBase
     /// <value>
     /// The creation time.
     /// </value>
-    public DateTime CreationTime { get; set; }
+    public DateTime CreationTime { get; }
 
     /// <summary>
     /// Gets or sets the lifetime.
@@ -58,7 +55,7 @@ public abstract class TokenBase
     /// <value>
     /// The lifetime.
     /// </value>
-    public int Lifetime { get; set; }
+    public int Lifetime { get; }
 
     /// <summary>
     /// Gets or sets the claims.

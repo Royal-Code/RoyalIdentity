@@ -1,24 +1,45 @@
 ﻿using Microsoft.Extensions.Logging;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Contracts.Storage;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultTokenFactory : ITokenFactory
 {
-    private readonly ILogger logger;
-    private readonly ITokenClaimsService tokenClaimsService;
-    private readonly TimeProvider clock;
     private readonly IOptions<ServerOptions> options;
+    private readonly ITokenClaimsService tokenClaimsService;
+    private readonly IJwtFactory jwtFactory;
+    private readonly IAccessTokenStore accessTokenStore;
+    private readonly IKeyManager keys;
+    private readonly TimeProvider clock;
+    private readonly ILogger logger;
+
+    public DefaultTokenFactory(
+        IOptions<ServerOptions> options,
+        ITokenClaimsService tokenClaimsService,
+        IJwtFactory jwtFactory,
+        IAccessTokenStore accessTokenStore,
+        IKeyManager keys,
+        TimeProvider clock,
+        ILogger<DefaultTokenFactory> logger)
+    {
+        this.options = options;
+        this.tokenClaimsService = tokenClaimsService;
+        this.jwtFactory = jwtFactory;
+        this.accessTokenStore = accessTokenStore;
+        this.keys = keys;
+        this.clock = clock;
+        this.logger = logger;
+    }
 
     public async Task<AccessToken> CreateAccessTokenAsync(AccessTokenRequest request, CancellationToken ct)
     {
-        logger.LogTrace("Creating access token");
+        logger.LogDebug("Creating access token");
 
         request.Context.AssertHasClient();
 
@@ -86,57 +107,90 @@ public class DefaultTokenFactory : ITokenFactory
             }
         }
 
-        await CreateAccessTokenAsync(token, ct);
+        if (token.AccessTokenType == AccessTokenType.Jwt)
+        {
+            logger.LogDebug("Creating JWT access token");
+
+            await jwtFactory.CreateTokenAsync(token, ct);
+        }
+
+        await accessTokenStore.StoreAsync(token, ct);
 
         return token;
     }
 
-    public Task<Token> CreateIdentityTokenAsync(IdentityTokenRequest request, CancellationToken ct)
+    public async Task<IdentityToken> CreateIdentityTokenAsync(IdentityTokenRequest request, CancellationToken ct)
     {
-        throw new NotImplementedException();
-    }
+        logger.LogDebug("Creating access token");
 
-    /// <summary>
-    /// Creates a serialized and protected security token.
-    /// </summary>
-    /// <param name="token">The token.</param>
-    /// <returns>
-    /// A security token in serialized form
-    /// </returns>
-    /// <exception cref="System.InvalidOperationException">Invalid token type.</exception>
-    public virtual async Task<string> CreateAccessTokenAsync(AccessToken token, CancellationToken ct)
-    {
-        string tokenResult;
+        request.Context.AssertHasClient();
 
+        var credential = await keys.GetSigningCredentialsAsync(
+            request.Context.Client.AllowedIdentityTokenSigningAlgorithms, 
+            ct)
+            ?? throw new InvalidOperationException("No signing credential is configured.");
+            
+        var signingAlgorithm = credential.Algorithm;
 
-        if (token.AccessTokenType == AccessTokenType.Jwt)
+        // host provided claims
+        var claims = new List<Claim>();
+
+        // if nonce was sent, must be mirrored in id token
+        if (request.Nonce.IsPresent())
         {
-            logger.LogTrace("Creating JWT access token");
-
-            tokenResult = await CreationService.CreateTokenAsync(token, ct);
-        }
-        else
-        {
-            logger.LogTrace("Creating reference access token");
-
-            var handle = await ReferenceTokenStore.StoreReferenceTokenAsync(token);
-
-            tokenResult = handle;
+            claims.Add(new Claim(JwtClaimTypes.Nonce, request.Nonce));
         }
 
+        // add iat claim
+        claims.Add(new Claim(
+            JwtClaimTypes.IssuedAt, 
+            clock.GetUtcNow().ToUnixTimeSeconds().ToString(), 
+            ClaimValueTypes.Integer64));
 
+        // add at_hash claim
+        if (request.AccessTokenToHash.IsPresent())
+        {
+            claims.Add(new Claim(
+                JwtClaimTypes.AccessTokenHash,
+                CryptoHelper.CreateHashClaimValue(request.AccessTokenToHash, signingAlgorithm)));
+        }
 
-        // else if (token.Type == OidcConstants.TokenTypes.IdentityToken)
-        // {
-        //     Logger.LogTrace("Creating JWT identity token");
-        //
-        //     tokenResult = await CreationService.CreateTokenAsync(token);
-        // }
-        // else
-        // {
-        //     throw new InvalidOperationException("Invalid token type.");
-        // }
+        // add c_hash claim
+        if (request.AuthorizationCodeToHash.IsPresent())
+        {
+            claims.Add(new Claim(
+                JwtClaimTypes.AuthorizationCodeHash, 
+                CryptoHelper.CreateHashClaimValue(request.AuthorizationCodeToHash, signingAlgorithm)));
+        }
 
-        return tokenResult;
+        // add s_hash claim
+        if (request.StateHash.IsPresent())
+        {
+            claims.Add(new Claim(JwtClaimTypes.StateHash, request.StateHash));
+        }
+
+        // add sid
+        var sid = request.Subject.GetSessionId();
+        claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
+
+        claims.AddRange(await tokenClaimsService.GetIdentityTokenClaimsAsync(
+            request.Subject,
+            request.Resources,
+            request.AccessTokenToHash.IsPresent(),
+            request.Context));
+
+        var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
+
+        var idToken = new IdentityToken(request.Context.Client.Id,
+            issuer,
+            clock.GetUtcNow().UtcDateTime,
+            request.Context.Client.IdentityTokenLifetime)
+        {
+            AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
+        };
+
+        await jwtFactory.CreateTokenAsync(idToken, ct);
+
+        return idToken;
     }
 }

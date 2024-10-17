@@ -1,6 +1,6 @@
 ﻿using RoyalIdentity.Models.Tokens;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Storage;
 
 /// <summary>
 /// Interface for the authorization code store

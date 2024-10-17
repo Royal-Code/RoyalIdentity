@@ -1,3 +1,5 @@
+namespace RoyalIdentity.Events;
+
 /// <summary>
 /// Categories for events
 /// </summary>

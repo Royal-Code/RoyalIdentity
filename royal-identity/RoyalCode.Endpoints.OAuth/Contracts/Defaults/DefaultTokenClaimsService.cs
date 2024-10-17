@@ -24,7 +24,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         ClaimsPrincipal subject,
         Resources resources,
         bool includeAllIdentityClaims,
-        IWithClient request)
+        IWithClient context)
     {
         throw new NotImplementedException();
     }
@@ -69,15 +69,8 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             }
         }
 
-        // add scopes (filter offline_access)
-        // we use the ScopeValues collection rather than the Resources.Scopes because we support dynamic scope values
-        // from the context, so this issues those in the token.
-        outputClaims.AddRange(resources.RequestedScopes
-            .Where(x => x != ServerConstants.StandardScopes.OfflineAccess)
-            .Select(scope => new Claim(JwtClaimTypes.Scope, scope)));
-
-        if (resources.OfflineAccess)
-            outputClaims.Add(new Claim(JwtClaimTypes.Scope, ServerConstants.StandardScopes.OfflineAccess));
+        // add scopes
+        outputClaims.AddRange(resources.RequestedScopes.Select(scope => new Claim(JwtClaimTypes.Scope, scope)));
 
         logger.LogDebug("Getting claims for access token for subject: {Subject}", subject.GetSubjectId());
 

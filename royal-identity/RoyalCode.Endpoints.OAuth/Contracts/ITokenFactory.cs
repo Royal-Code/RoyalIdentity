@@ -11,7 +11,7 @@ public interface ITokenFactory
     /// <param name="request">The id token creation request.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>An identity token</returns>
-    Task<Token> CreateIdentityTokenAsync(IdentityTokenRequest request, CancellationToken ct);
+    Task<IdentityToken> CreateIdentityTokenAsync(IdentityTokenRequest request, CancellationToken ct);
 
     /// <summary>
     /// Creates an access token.

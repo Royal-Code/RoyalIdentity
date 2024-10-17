@@ -109,24 +109,29 @@ public class Client
     public int? UserSsoLifetime { get; set; }
 
     /// <summary>
-    /// Lifetime of access token in seconds (defaults to 3600 seconds / 1 hour)
+    /// Lifetime of access token in seconds (defaults to 600 seconds / 10 minutes)
     /// </summary>
-    public int AccessTokenLifetime { get; set; } = 3600;
+    public int AccessTokenLifetime { get; set; } = 600;
 
     /// <summary>
-    /// Lifetime of authorization code in seconds (defaults to 300 seconds / 5 minutes)
+    /// Lifetime of identity token in seconds (defaults to 600 seconds / 10 minutes)
     /// </summary>
-    public int AuthorizationCodeLifetime { get; set; } = 300;
+    public int IdentityTokenLifetime { get; set; } = 600;
 
     /// <summary>
-    /// Maximum lifetime of a refresh token in seconds. Defaults to 2592000 seconds / 30 days
+    /// Lifetime of authorization code in seconds (defaults to 60 seconds / 1 minutes)
     /// </summary>
-    public int AbsoluteRefreshTokenLifetime { get; set; } = 2592000;
+    public int AuthorizationCodeLifetime { get; set; } = 60;
 
     /// <summary>
-    /// Sliding lifetime of a refresh token in seconds. Defaults to 1296000 seconds / 15 days
+    /// Maximum lifetime of a refresh token in seconds. Defaults to 2.592.000 seconds / 30 days
     /// </summary>
-    public int SlidingRefreshTokenLifetime { get; set; } = 1296000;
+    public int AbsoluteRefreshTokenLifetime { get; set; } = 2_592_000;
+
+    /// <summary>
+    /// Sliding lifetime of a refresh token in seconds. Defaults to 43.200 seconds / 12 hours
+    /// </summary>
+    public int SlidingRefreshTokenLifetime { get; set; } = 43_200;
 
     /// <summary>
     /// Lifetime of a user consent in seconds. Defaults to null (no expiration)
