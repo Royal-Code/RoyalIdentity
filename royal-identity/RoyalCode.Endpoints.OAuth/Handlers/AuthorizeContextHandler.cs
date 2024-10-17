@@ -3,6 +3,7 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Events;
+using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
 using RoyalIdentity.Users;
@@ -46,6 +47,23 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
         }
 
         if (context.ResponseTypes.Contains(ResponseTypes.Token))
+        {
+            var request = new AccessTokenRequest()
+            {
+                Context = context,
+                Subject = context.Subject,
+                Resources = context.Resources,
+                Raw = context.Raw,
+                Caller = ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken
+            };
+
+            var accessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);
+
+            var token = new Token(ResponseTypes.Token, accessToken.Token);
+            context.Items.AddToken(token);
+        }
+
+        if (context.ResponseTypes.Contains(ResponseTypes.IdToken))
         {
 
         }

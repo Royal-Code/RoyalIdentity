@@ -81,6 +81,37 @@ public static class PrincipalExtensions
     }
 
     /// <summary>
+    /// Gets the session identifier.
+    /// </summary>
+    /// <param name="principal">The principal.</param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException">sid claim is missing</exception>
+    [DebuggerStepThrough]
+    public static string GetSessionId(this IPrincipal principal)
+    {
+        return principal.Identity?.GetSessionId() ?? throw new InvalidOperationException("sid claim is missing");
+    }
+
+    /// <summary>
+    /// Gets the session identifier.
+    /// </summary>
+    /// <param name="identity">The identity.</param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException">sid claim is missing</exception>
+    [DebuggerStepThrough]
+    public static string GetSessionId(this IIdentity identity)
+    {
+        if (identity is ClaimsIdentity id)
+        {
+            var claim = id.FindFirst(JwtClaimTypes.SessionId);
+            if (claim is not null)
+                return claim.Value;
+        }
+
+        throw new InvalidOperationException("sid claim is missing");
+    }
+
+    /// <summary>
     /// Gets the name.
     /// </summary>
     /// <param name="principal">The principal.</param>

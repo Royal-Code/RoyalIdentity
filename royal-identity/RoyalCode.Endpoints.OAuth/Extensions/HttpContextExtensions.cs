@@ -35,25 +35,20 @@ public static class HttpContextExtensions
         context.Items[Constants.EnvironmentKeys.ServerBasePath] = value;
     }
 
-    //public static string GetIdentityServerOrigin(this HttpContext context)
-    //{
-    //    var options = context.RequestServices.GetRequiredService<ServerOptions>();
-    //    var request = context.Request;
+    public static string GetServerOrigin(this HttpContext context, ServerOptions options)
+    {
+        var request = context.Request;
 
-    //    if (options.MutualTls.Enabled && options.MutualTls.DomainName.IsPresent())
-    //    {
-    //        if (!options.MutualTls.DomainName.Contains("."))
-    //        {
-    //            if (request.Host.Value.StartsWith(options.MutualTls.DomainName, StringComparison.OrdinalIgnoreCase))
-    //            {
-    //                return request.Scheme + "://" +
-    //                       request.Host.Value.Substring(options.MutualTls.DomainName.Length + 1);
-    //            }
-    //        }
-    //    }
+        if (options.MutualTls.Enabled &&
+            options.MutualTls.DomainName.IsPresent() &&
+            !options.MutualTls.DomainName.Contains(".") &&
+            request.Host.Value.StartsWith(options.MutualTls.DomainName, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Concat(request.Scheme, "://", request.Host.Value.AsSpan(options.MutualTls.DomainName.Length + 1));
+        }
 
-    //    return request.Scheme + "://" + request.Host.Value;
-    //}
+        return $"{request.Scheme}://{request.Host.Value}";
+    }
 
 
     internal static void SetSignOutCalled(this HttpContext? context)
@@ -116,32 +111,33 @@ public static class HttpContextExtensions
         return path;
     }
 
-    ///// <summary>
-    ///// Gets the identity server issuer URI.
-    ///// </summary>
-    ///// <param name="context">The context.</param>
-    ///// <returns></returns>
-    ///// <exception cref="System.ArgumentNullException">context</exception>
-    //public static string GetIdentityServerIssuerUri(this HttpContext context)
-    //{
-    //    if (context == null) throw new ArgumentNullException(nameof(context));
+    /// <summary>
+    /// Gets the identity server issuer URI.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <param name="options">The options.</param>
+    /// <returns></returns>
+    /// <exception cref="System.ArgumentNullException">context</exception>
+    public static string GetServerIssuerUri(this HttpContext context, ServerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(options);
 
-    //    // if they've explicitly configured a URI then use it,
-    //    // otherwise dynamically calculate it
-    //    var options = context.RequestServices.GetRequiredService<ServerOptions>();
-    //    var uri = options.IssuerUri;
-    //    if (uri.IsMissing())
-    //    {
-    //        uri = context.GetIdentityServerOrigin() + context.GetIdentityServerBasePath();
-    //        if (uri.EndsWith("/")) uri = uri.Substring(0, uri.Length - 1);
-    //        if (options.LowerCaseIssuerUri)
-    //        {
-    //            uri = uri.ToLowerInvariant();
-    //        }
-    //    }
+        // if they've explicitly configured a URI then use it,
+        // otherwise dynamically calculate it
+        if (options.IssuerUri.IsPresent())
+            return options.IssuerUri;
 
-    //    return uri;
-    //}
+        var uri = $"{context.GetServerOrigin(options)}{context.GetServerBasePath()}";
+        if (uri.EndsWith('/'))
+            uri = uri[..^1];
+        if (options.LowerCaseIssuerUri)
+            uri = uri.ToLowerInvariant();
+
+        options.IssuerUri = uri;
+
+        return options.IssuerUri;
+    }
 
     //internal static async Task<string> GetIdentityServerSignoutFrameCallbackUrlAsync(this HttpContext context, LogoutMessage logoutMessage = null)
     //{

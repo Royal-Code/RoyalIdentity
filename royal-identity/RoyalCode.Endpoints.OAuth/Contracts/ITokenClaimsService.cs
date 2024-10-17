@@ -27,8 +27,9 @@ public interface ITokenClaimsService
     /// <param name="subject">The subject.</param>
     /// <param name="resources">The resources.</param>
     /// <param name="context">The raw context.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns>
     /// Claims for the access token
     /// </returns>
-    Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(ClaimsPrincipal subject, Resources resources, IWithClient context);
+    Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(ClaimsPrincipal subject, Resources resources, IWithClient context, CancellationToken ct);
 }

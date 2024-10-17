@@ -151,4 +151,9 @@ internal static class CollectionExtensions
             set.Add(value);
 
     }
+
+    internal static IEnumerable<T> IntersectMany<T>(this IEnumerable<IEnumerable<T>> lists)
+    {
+        return lists.Aggregate((l1, l2) => l1.Intersect(l2));
+    }
 }

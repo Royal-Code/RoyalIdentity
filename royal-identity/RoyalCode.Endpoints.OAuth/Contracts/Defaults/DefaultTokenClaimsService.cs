@@ -9,7 +9,16 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultTokenClaimsService : ITokenClaimsService
 {
-    private readonly ILogger<DefaultTokenClaimsService> logger;
+    private readonly ILogger logger;
+    private readonly IProfileService profileService;
+
+    public DefaultTokenClaimsService(
+        ILogger<DefaultTokenClaimsService> logger,
+        IProfileService profileService)
+    {
+        this.logger = logger;
+        this.profileService = profileService;
+    }
 
     public Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(
         ClaimsPrincipal subject,
@@ -20,10 +29,12 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         throw new NotImplementedException();
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(
         ClaimsPrincipal subject,
         Resources resources,
-        IWithClient context)
+        IWithClient context,
+        CancellationToken ct)
     {
         context.AssertHasClient();
 
@@ -81,24 +92,79 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         additionalClaimTypes = FilterRequestedClaimTypes(additionalClaimTypes).ToList();
 
         var profileDataRequest = new ProfileDataRequest(
+            context,
+            resources,
             subject,
             context.Client,
             ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
-            additionalClaimTypes.Distinct())
-        {
-            RequestedResources = resourceResult,
-            ValidatedRequest = context
-        };
+            additionalClaimTypes.Distinct());
 
-        await Profile.GetProfileDataAsync(profileDataRequest);
+        await profileService.GetProfileDataAsync(profileDataRequest);
 
-        var claims = FilterProtocolClaims(profileDataRequest.IssuedClaims);
-        if (claims != null)
-        {
-            outputClaims.AddRange(claims);
-        }
-
+        outputClaims.AddRange(FilterClaims(profileDataRequest.IssuedClaims));
 
         return outputClaims;
+    }
+
+    /// <summary>
+    /// Gets the standard subject claims.
+    /// </summary>
+    /// <param name="subject">The subject.</param>
+    /// <returns>A list of standard claims</returns>
+    protected virtual IEnumerable<Claim> GetStandardSubjectClaims(ClaimsPrincipal subject)
+    {
+        var claims = new List<Claim>
+        {
+            new (JwtClaimTypes.Subject, subject.GetSubjectId()),
+            new (JwtClaimTypes.AuthenticationTime, subject.GetAuthenticationTimeEpoch().ToString(), ClaimValueTypes.Integer64),
+            new (JwtClaimTypes.IdentityProvider, subject.GetIdentityProvider())
+        };
+
+        claims.AddRange(subject.GetAuthenticationMethods());
+
+        return claims;
+    }
+
+    /// <summary>
+    /// Gets additional (and optional) claims from the cookie or incoming subject.
+    /// </summary>
+    /// <param name="subject">The subject.</param>
+    /// <returns>Additional claims</returns>
+    protected virtual IEnumerable<Claim> GetOptionalClaims(ClaimsPrincipal subject)
+    {
+        var claims = new List<Claim>();
+
+        var acr = subject.FindFirst(JwtClaimTypes.AuthenticationContextClassReference);
+        if (acr is not null)
+            claims.Add(acr);
+
+        return claims;
+    }
+
+    /// <summary>
+    /// Filters out protocol claims like amr, nonce etc..
+    /// </summary>
+    /// <param name="claims">The claims.</param>
+    /// <returns></returns>
+    protected virtual IEnumerable<Claim> FilterClaims(List<Claim> claims)
+    {
+        var claimsToFilter = claims
+            .Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))
+            .ToList();
+
+        if (claimsToFilter.Count is not 0)
+            logger.LogDebug("Claim types that were filtered: {ClaimTypes}", claimsToFilter.Select(x => x.Type));
+
+        return claims.Except(claimsToFilter);
+    }
+
+    /// <summary>
+    /// Filters out protocol claims like amr, nonce etc..
+    /// </summary>
+    /// <param name="claimTypes">The claim types.</param>
+    protected virtual IEnumerable<string> FilterRequestedClaimTypes(List<string> claimTypes)
+    {
+        var claimTypesToFilter = claimTypes.Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x));
+        return claimTypes.Except(claimTypesToFilter);
     }
 }

@@ -66,7 +66,7 @@ public abstract class TokenBase
     /// <value>
     /// The claims.
     /// </value>
-    public HashSet<Claim> Claims { get; set; } = new HashSet<Claim>(new ClaimComparer());
+    public HashSet<Claim> Claims { get; } = new HashSet<Claim>(new ClaimComparer());
 
     /// <summary>
     /// A list of allowed algorithm for signing the token. If null or empty, will use the default algorithm.

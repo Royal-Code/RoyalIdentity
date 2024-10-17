@@ -4,72 +4,81 @@ using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
+using Microsoft.Extensions.Options;
+using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultTokenFactory : ITokenFactory
 {
     private readonly ILogger logger;
+    private readonly ITokenClaimsService tokenClaimsService;
+    private readonly TimeProvider clock;
+    private readonly IOptions<ServerOptions> options;
 
-    public async Task<AccessToken> CreateAccessTokenAsync(AccessTokenRequest request)
+    public async Task<AccessToken> CreateAccessTokenAsync(AccessTokenRequest request, CancellationToken ct)
     {
         logger.LogTrace("Creating access token");
 
+        request.Context.AssertHasClient();
+
         var claims = new List<Claim>();
-        claims.AddRange(await ClaimsProvider.GetAccessTokenClaimsAsync(
+        claims.AddRange(await tokenClaimsService.GetAccessTokenClaimsAsync(
             request.Subject,
-            request.ValidatedResources,
-            request.ValidatedRequest));
+            request.Resources,
+            request.Context,
+            ct));
 
-        if (request.ValidatedRequest.Client.IncludeJwtId)
+        var jti = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex);
+        if (request.Context.Client.IncludeJwtId)
         {
-            claims.Add(new Claim(JwtClaimTypes.JwtId, CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex)));
+            claims.Add(new Claim(JwtClaimTypes.JwtId, jti));
         }
 
-        if (request.ValidatedRequest.SessionId.IsPresent())
-        {
-            claims.Add(new Claim(JwtClaimTypes.SessionId, request.ValidatedRequest.SessionId));
-        }
+        // add session id claim
+        var sid = request.Subject.GetSessionId();
+        claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
 
         // iat claim as required by JWT profile
-        claims.Add(new Claim(JwtClaimTypes.IssuedAt, Clock.UtcNow.ToUnixTimeSeconds().ToString(),
+        claims.Add(new Claim(JwtClaimTypes.IssuedAt, clock.GetUtcNow().ToUnixTimeSeconds().ToString(),
             ClaimValueTypes.Integer64));
 
-        var issuer = request.HttpContext.GetServerIssuerUri();
+        var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
 
-        var token = new AccessToken(OidcConstants.TokenTypes.AccessToken)
+        var token = new AccessToken(
+            request.Context.Client.Id,
+            issuer,
+            AccessTokenType.Jwt,
+            clock.GetUtcNow().UtcDateTime,
+            request.Context.Client.AccessTokenLifetime,
+            jti,
+            OidcConstants.TokenResponse.BearerTokenType)
         {
-            CreationTime = Clock.UtcNow.UtcDateTime,
-            Issuer = issuer,
-            Lifetime = request.ValidatedRequest.AccessTokenLifetime,
-            Claims = claims.Distinct(new ClaimComparer()).ToList(),
-            ClientId = request.ValidatedRequest.Client.ClientId,
-            Description = request.Description,
-            AccessTokenType = request.ValidatedRequest.AccessTokenType,
-            AllowedSigningAlgorithms = request.ValidatedResources.Resources.ApiResources.FindMatchingSigningAlgorithms()
+            AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
         };
+        token.Claims.AddRange(claims);
 
         // add aud based on ApiResources in the validated request
-        foreach (var aud in request.ValidatedResources.Resources.ApiResources.Select(x => x.Name).Distinct())
+        foreach (var aud in request.Resources.ApiResources.Select(x => x.Name).Distinct())
         {
             token.Audiences.Add(aud);
         }
 
-        if (Options.EmitStaticAudienceClaim)
+        if (options.Value.EmitStaticAudienceClaim)
         {
-            token.Audiences.Add(string.Format(IdentityServerConstants.AccessTokenAudience, issuer.EnsureTrailingSlash()));
+            token.Audiences.Add(string.Format(ServerConstants.AccessTokenAudience, [issuer.EnsureTrailingSlash()]));
         }
 
         // add cnf if present
-        if (request.ValidatedRequest.Confirmation.IsPresent())
+        if (request.Context.Confirmation.IsPresent())
         {
-            token.Confirmation = request.ValidatedRequest.Confirmation;
+            token.Confirmation = request.Context.Confirmation;
         }
         else
         {
-            if (Options.MutualTls.AlwaysEmitConfirmationClaim)
+            if (options.Value.MutualTls.AlwaysEmitConfirmationClaim)
             {
-                var clientCertificate = await ContextAccessor.HttpContext.Connection.GetClientCertificateAsync();
+                var clientCertificate = await request.Context.HttpContext.Connection.GetClientCertificateAsync();
                 if (clientCertificate != null)
                 {
                     token.Confirmation = clientCertificate.CreateThumbprintCnf();
@@ -77,11 +86,57 @@ public class DefaultTokenFactory : ITokenFactory
             }
         }
 
+        await CreateAccessTokenAsync(token, ct);
+
         return token;
     }
 
-    public Task<Token> CreateIdentityTokenAsync(IdentityTokenRequest request)
+    public Task<Token> CreateIdentityTokenAsync(IdentityTokenRequest request, CancellationToken ct)
     {
         throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Creates a serialized and protected security token.
+    /// </summary>
+    /// <param name="token">The token.</param>
+    /// <returns>
+    /// A security token in serialized form
+    /// </returns>
+    /// <exception cref="System.InvalidOperationException">Invalid token type.</exception>
+    public virtual async Task<string> CreateAccessTokenAsync(AccessToken token, CancellationToken ct)
+    {
+        string tokenResult;
+
+
+        if (token.AccessTokenType == AccessTokenType.Jwt)
+        {
+            logger.LogTrace("Creating JWT access token");
+
+            tokenResult = await CreationService.CreateTokenAsync(token, ct);
+        }
+        else
+        {
+            logger.LogTrace("Creating reference access token");
+
+            var handle = await ReferenceTokenStore.StoreReferenceTokenAsync(token);
+
+            tokenResult = handle;
+        }
+
+
+
+        // else if (token.Type == OidcConstants.TokenTypes.IdentityToken)
+        // {
+        //     Logger.LogTrace("Creating JWT identity token");
+        //
+        //     tokenResult = await CreationService.CreateTokenAsync(token);
+        // }
+        // else
+        // {
+        //     throw new InvalidOperationException("Invalid token type.");
+        // }
+
+        return tokenResult;
     }
 }

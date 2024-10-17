@@ -30,6 +30,10 @@ public class AuthorizeResponse : IResponseHandler
 
     public string? Token { get; }
 
+    public string? TokenType { get; }
+
+    public int? AccessTokenLifetime { get; }
+
     public string? Scope => Context.RequestedScopes.ToSpaceSeparatedString();
 
     public string? State => Context.State;
@@ -65,19 +69,28 @@ public class AuthorizeResponse : IResponseHandler
         var collection = new NameValueCollection();
 
         if (Code.IsPresent())
-            collection.Add("code", Code);
+            collection.Add(AuthorizeResponseFields.Code, Code);
+
+        if (Token.IsPresent())
+            collection.Add(AuthorizeResponseFields.AccessToken, Token);
+
+        if (TokenType.IsPresent())
+            collection.Add(AuthorizeResponseFields.TokenType, TokenType);
+
+        if (AccessTokenLifetime.HasValue)
+            collection.Add(AuthorizeResponseFields.ExpiresIn, AccessTokenLifetime.Value.ToString());
 
         if (IdentityToken.IsPresent())
-            collection.Add("id_token", IdentityToken);
+            collection.Add(AuthorizeResponseFields.IdentityToken, IdentityToken);
 
         if (Scope.IsPresent())
-            collection.Add("scope", Scope);
+            collection.Add(AuthorizeResponseFields.Scope, Scope);
 
         if (State.IsPresent())
-            collection.Add("state", State);
+            collection.Add(AuthorizeResponseFields.State, State);
 
         if (SessionState.IsPresent())
-            collection.Add("session_state", SessionState);
+            collection.Add(AuthorizeResponseFields.SessionState, SessionState);
 
         return collection;
     }

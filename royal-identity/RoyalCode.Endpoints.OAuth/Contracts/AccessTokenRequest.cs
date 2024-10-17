@@ -2,20 +2,19 @@
 using RoyalIdentity.Models;
 using System.Collections.Specialized;
 using System.Security.Claims;
+using RoyalIdentity.Contexts.Withs;
 
 namespace RoyalIdentity.Contracts;
 
 public class AccessTokenRequest
 {
-    public required HttpContext HttpContext { get; set; }
+    public required IWithClient Context { get; init; }
 
-    public required NameValueCollection Raw { get; set; }
+    public required NameValueCollection Raw { get; init; }
 
-    public required ClaimsPrincipal Subject { get; set; }
+    public required ClaimsPrincipal Subject { get; init; }
 
-    public required Resources Resources { get; set; }
+    public required Resources Resources { get; init; }
 
-    public required Client Client { get; set; }
-
-    public required string Caller { get; set; }
+    public required string Caller { get; init; }
 }

@@ -85,5 +85,5 @@ public class ApiResource : Resource
     /// <summary>
     /// Signing algorithm for access token. If empty, will use the server default signing algorithm.
     /// </summary>
-    public ICollection<string> AllowedAccessTokenSigningAlgorithms { get; set; } = new HashSet<string>();
+    public HashSet<string> AllowedAccessTokenSigningAlgorithms { get; set; } = [];
 }

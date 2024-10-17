@@ -38,5 +38,42 @@ public class ServerOptions
     /// Gets or sets the Content Security Policy options.
     /// </summary>
     public CspOptions Csp { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the mutual TLS options.
+    /// </summary>
+    public MutualTlsOptions MutualTls { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the unique name of this server instance, e.g. https://myissuer.com.
+    /// If not set, the issuer name is inferred from the request
+    /// </summary>
+    /// <value>
+    /// Unique name of this server instance, e.g. https://myissuer.com
+    /// </value>
+    public string? IssuerUri { get; set; }
+
+    /// <summary>
+    /// Set to false to preserve the original casing of the IssuerUri. Defaults to true.
+    /// </summary>
+    public bool LowerCaseIssuerUri { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the value for the JWT typ header for access tokens.
+    /// </summary>
+    /// <value>
+    /// The JWT typ value.
+    /// </value>
+    public string AccessTokenJwtType { get; set; } = "at+jwt";
+
+    /// <summary>
+    /// Emits an aud claim with the format issuer/resources. That's needed for some older access token validation plumbing. Defaults to false.
+    /// </summary>
+    public bool EmitStaticAudienceClaim { get; set; } = false;
+
+    /// <summary>
+    /// Specifies whether scopes in JWTs are emitted as array or string
+    /// </summary>
+    public bool EmitScopesAsSpaceDelimitedStringInJwt { get; set; } = false;
 }
 
