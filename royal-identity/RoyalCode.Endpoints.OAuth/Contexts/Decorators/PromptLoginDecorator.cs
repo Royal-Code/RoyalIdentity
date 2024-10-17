@@ -30,7 +30,9 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
         if (context.PromptModes.Contains(OidcConstants.PromptModes.Login) ||
             context.PromptModes.Contains(OidcConstants.PromptModes.SelectAccount))
         {
-            logger.LogInformation("Showing login: request contains prompt={0}", context.PromptModes.ToSpaceSeparatedString());
+            logger.LogInformation(
+                "Showing login: request contains prompt={PromptModes}", 
+                context.PromptModes.ToSpaceSeparatedString());
 
             // remove prompt so when we redirect back in from login page
             // we won't think we need to force a prompt again
@@ -112,8 +114,7 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
             }
         }
         // check external idp restrictions if user not using local idp
-        else if (context.Client.IdentityProviderRestrictions != null &&
-            context.Client.IdentityProviderRestrictions.Any() &&
+        else if (context.Client.IdentityProviderRestrictions.Count is not 0 &&
             !context.Client.IdentityProviderRestrictions.Contains(currentIdp))
         {
             logger.LogInformation("Showing login: User is logged in with idp: {IdP}, but idp not in client restriction list.", currentIdp);

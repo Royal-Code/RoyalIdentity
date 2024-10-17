@@ -76,25 +76,27 @@ public class AuthorizeEndpoint : IEndpointHandler
         var items = ContextItems.From(options);
         var context = new AuthorizeContext(httpContext, values, items);
 
-        Load(context, values);
+        Load(context);
 
         return ValueTask.FromResult(new EndpointCreationResult(context));
     }
 
-    private void Load(AuthorizeContext context, NameValueCollection Raw)
+    private void Load(AuthorizeContext context)
     {
-        var scope = Raw.Get(OidcConstants.AuthorizeRequest.Scope);
+        var raw = context.Raw;
+
+        var scope = raw.Get(OidcConstants.AuthorizeRequest.Scope);
         context.RequestedScopes.AddRange(scope.FromSpaceSeparatedString());
 
-        var responseType = Raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
+        var responseType = raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
         context.ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
-        context.ClientId = Raw.Get(OidcConstants.AuthorizeRequest.ClientId);
-        context.RedirectUri = Raw.Get(OidcConstants.AuthorizeRequest.RedirectUri);
-        context.State = Raw.Get(OidcConstants.AuthorizeRequest.State);
-        context.ResponseMode = Raw.Get(OidcConstants.AuthorizeRequest.ResponseMode);
-        context.Nonce = Raw.Get(OidcConstants.AuthorizeRequest.Nonce);
+        context.ClientId = raw.Get(OidcConstants.AuthorizeRequest.ClientId);
+        context.RedirectUri = raw.Get(OidcConstants.AuthorizeRequest.RedirectUri);
+        context.State = raw.Get(OidcConstants.AuthorizeRequest.State);
+        context.ResponseMode = raw.Get(OidcConstants.AuthorizeRequest.ResponseMode);
+        context.Nonce = raw.Get(OidcConstants.AuthorizeRequest.Nonce);
 
-        var display = Raw.Get(OidcConstants.AuthorizeRequest.Display);
+        var display = raw.Get(OidcConstants.AuthorizeRequest.Display);
         if (display.IsPresent())
         {
             if (Constants.SupportedDisplayModes.Contains(display))
@@ -107,7 +109,7 @@ public class AuthorizeEndpoint : IEndpointHandler
             }
         }
 
-        var prompt = Raw.Get(OidcConstants.AuthorizeRequest.Prompt);
+        var prompt = raw.Get(OidcConstants.AuthorizeRequest.Prompt);
         if (prompt.IsPresent())
         {
             var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -121,7 +123,7 @@ public class AuthorizeEndpoint : IEndpointHandler
             }
         }
 
-        var maxAge = Raw.Get(OidcConstants.AuthorizeRequest.MaxAge);
+        var maxAge = raw.Get(OidcConstants.AuthorizeRequest.MaxAge);
         if (maxAge.IsPresent())
         {
             if (int.TryParse(maxAge, out var seconds) && seconds >= 0)
@@ -134,14 +136,14 @@ public class AuthorizeEndpoint : IEndpointHandler
             }
         }
 
-        context.UiLocales = Raw.Get(OidcConstants.AuthorizeRequest.UiLocales);
-        context.IdTokenHint = Raw.Get(OidcConstants.AuthorizeRequest.IdTokenHint);
-        context.LoginHint = Raw.Get(OidcConstants.AuthorizeRequest.LoginHint);
+        context.UiLocales = raw.Get(OidcConstants.AuthorizeRequest.UiLocales);
+        context.IdTokenHint = raw.Get(OidcConstants.AuthorizeRequest.IdTokenHint);
+        context.LoginHint = raw.Get(OidcConstants.AuthorizeRequest.LoginHint);
 
-        var acrValues = Raw.Get(OidcConstants.AuthorizeRequest.AcrValues);
+        var acrValues = raw.Get(OidcConstants.AuthorizeRequest.AcrValues);
         context.AuthenticationContextReferenceClasses.AddRange(acrValues.FromSpaceSeparatedString());
 
-        context.CodeChallenge = Raw.Get(OidcConstants.AuthorizeRequest.CodeChallenge);
-        context.CodeChallengeMethod = Raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);
+        context.CodeChallenge = raw.Get(OidcConstants.AuthorizeRequest.CodeChallenge);
+        context.CodeChallengeMethod = raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);
     }
 }

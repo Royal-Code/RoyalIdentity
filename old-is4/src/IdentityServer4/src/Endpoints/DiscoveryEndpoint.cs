@@ -54,7 +54,7 @@ namespace IdentityServer4.Endpoints
             var issuerUri = context.GetIdentityServerIssuerUri();
 
             // generate response
-            _logger.LogTrace("Calling into discovery response generator: {type}", _responseGenerator.GetType().FullName);
+            _logger.LogTrace("Calling into discovery response generator: {Type}", _responseGenerator.GetType().FullName);
             var response = await _responseGenerator.CreateDiscoveryDocumentAsync(baseUrl, issuerUri);
 
             return new DiscoveryDocumentResult(response, _options.Discovery.ResponseCacheInterval);

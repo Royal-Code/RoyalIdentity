@@ -1,14 +1,19 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Options;
+using RoyalIdentity.Responses.HttpResults;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RoyalIdentity.Responses;
 
 public class InteractionResponse : IResponseHandler
 {
-    private readonly IContextBase context;
+    private readonly IEndpointContextBase context;
 
-    public InteractionResponse(IContextBase context)
+    public InteractionResponse(IEndpointContextBase context)
     {
         this.context = context;
     }
@@ -35,6 +40,7 @@ public class InteractionResponse : IResponseHandler
     /// <value>
     /// <c>true</c> if this instance is redirect; otherwise, <c>false</c>.
     /// </value>
+    [MemberNotNullWhen(true, nameof(RedirectUrl))]
     public bool IsRedirect => RedirectUrl.IsPresent();
 
     /// <summary>
@@ -47,6 +53,33 @@ public class InteractionResponse : IResponseHandler
 
     public ValueTask<IResult> CreateResponseAsync(CancellationToken ct)
     {
-        throw new NotImplementedException();
+        IResult? result = null;
+        if (IsLogin)
+        {
+            result = new LoginPageResult(context);
+        }
+        else if (IsConsent)
+        {
+            result = new ConsentPageResult(context);
+        }
+        else if (IsRedirect)
+        {
+            result = new CustomRedirectResult(context, RedirectUrl);
+        }
+
+        if (result is null)
+        {
+            var problemDetails = new ProblemDetails
+            {
+                Type = "about:blank",
+                Status = StatusCodes.Status400BadRequest,
+                Title = OidcConstants.AuthorizeErrors.InvalidRequest,
+                Detail = ""
+            };
+
+            result = Results.Json(problemDetails, statusCode: problemDetails.Status ?? 400);
+        }
+
+        return ValueTask.FromResult(result);
     }
 }

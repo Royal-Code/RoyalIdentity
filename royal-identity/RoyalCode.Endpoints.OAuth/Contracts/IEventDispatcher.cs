@@ -8,5 +8,5 @@ public interface IEventDispatcher
     /// Raises the specified event.
     /// </summary>
     /// <param name="evt">The event.</param>
-    Task DispatchAsync(Event evt);
+    ValueTask DispatchAsync(Event evt);
 }

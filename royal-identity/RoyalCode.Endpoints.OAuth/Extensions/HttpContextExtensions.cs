@@ -67,7 +67,7 @@ public static class HttpContextExtensions
     /// </summary>
     /// <param name="context">The context.</param>
     /// <returns></returns>
-    public static string GeServerHost(this HttpContext context)
+    public static string GetServerHost(this HttpContext context)
     {
         var request = context.Request;
         return request.Scheme + "://" + request.Host.ToUriComponent();

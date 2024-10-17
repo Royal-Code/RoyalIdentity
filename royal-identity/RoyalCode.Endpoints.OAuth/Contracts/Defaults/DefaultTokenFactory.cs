@@ -85,11 +85,6 @@ public class DefaultTokenFactory : ITokenFactory
             token.Audiences.Add(aud);
         }
 
-        if (options.Value.EmitStaticAudienceClaim)
-        {
-            token.Audiences.Add(string.Format(ServerConstants.AccessTokenAudience, [issuer.EnsureTrailingSlash()]));
-        }
-
         // add cnf if present
         if (request.Context.Confirmation.IsPresent())
         {

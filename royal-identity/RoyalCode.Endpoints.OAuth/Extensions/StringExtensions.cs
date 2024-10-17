@@ -86,6 +86,7 @@ internal static class StringExtensions
     }
 
     [DebuggerStepThrough]
+    
     public static string? EnsureLeadingSlash(this string? url)
     {
         if (url is not null && !url.StartsWith('/'))

@@ -71,6 +71,16 @@ public class Client
     public HashSet<Claim> Claims { get; } = [];
 
     /// <summary>
+    /// Specifies allowed URIs to return tokens or authorization codes to
+    /// </summary>
+    public HashSet<string> RedirectUris { get; set; } = [];
+
+    /// <summary>
+    /// Specifies allowed URIs to redirect to after logout
+    /// </summary>
+    public HashSet<string> PostLogoutRedirectUris { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets a value indicating whether JWT access tokens should include an identifier. Defaults to <c>true</c>.
     /// </summary>
     /// <value>
@@ -137,4 +147,14 @@ public class Client
     /// Lifetime of a user consent in seconds. Defaults to null (no expiration)
     /// </summary>
     public int? ConsentLifetime { get; set; } = null;
+
+    /// <summary>
+    /// Specifies whether a consent screen is required (defaults to <c>false</c>)
+    /// </summary>
+    public bool RequireConsent { get; set; } = false;
+
+    /// <summary>
+    /// Specifies whether user can choose to store consent decisions (defaults to <c>true</c>)
+    /// </summary>
+    public bool AllowRememberConsent { get; set; } = true;
 }

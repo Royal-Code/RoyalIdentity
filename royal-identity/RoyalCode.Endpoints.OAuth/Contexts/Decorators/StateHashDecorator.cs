@@ -28,5 +28,7 @@ public class StateHashDecorator : IDecorator<AuthorizeContext>
 
             context.StateHash = stateHash;
         }
+
+        await next();
     }
 }

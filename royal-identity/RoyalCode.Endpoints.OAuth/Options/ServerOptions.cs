@@ -22,6 +22,14 @@ public class ServerOptions
     public InputLengthRestrictions InputLengthRestrictions { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the options for the user interaction.
+    /// </summary>
+    /// <value>
+    /// The user interaction options.
+    /// </value>
+    public UserInteractionOptions UserInteraction { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the logging options
     /// </summary>
     public LoggingOptions Logging { get; set; } = new();
@@ -67,13 +75,13 @@ public class ServerOptions
     public string AccessTokenJwtType { get; set; } = "at+jwt";
 
     /// <summary>
-    /// Emits an aud claim with the format issuer/resources. That's needed for some older access token validation plumbing. Defaults to false.
-    /// </summary>
-    public bool EmitStaticAudienceClaim { get; set; } = false;
-
-    /// <summary>
     /// Specifies whether scopes in JWTs are emitted as array or string
     /// </summary>
     public bool EmitScopesAsSpaceDelimitedStringInJwt { get; set; } = false;
+
+    /// <summary>
+    /// Specifies whether events should be dispatched or not.
+    /// </summary>
+    public bool DispatchEvents { get; set; } = false;
 }
 

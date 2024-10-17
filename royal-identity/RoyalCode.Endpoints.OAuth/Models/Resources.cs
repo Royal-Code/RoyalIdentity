@@ -83,5 +83,7 @@ public class Resources
         return ApiResources.Where(r => r.Scopes.Contains(name));
     }
 
+    public bool Any() => RequestedScopes.Count is not 0;
 
+    public bool None() => RequestedScopes.Count is 0;
 }
