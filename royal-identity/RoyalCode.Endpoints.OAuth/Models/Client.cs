@@ -20,6 +20,11 @@ public class Client
     public string Name { get; set; }
 
     /// <summary>
+    /// Determines whether the client is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the protocol type.
     /// </summary>
     /// <value>

@@ -55,7 +55,7 @@ public class DefaultCodeFactory : ICodeFactory
             StateHash = context.StateHash,
         };
 
-        await codeStore.StoreAuthorizationCodeAsync(code);
+        await codeStore.StoreAuthorizationCodeAsync(code, ct);
         await userSession.AddClientIdAsync(context.ClientId!);
 
         logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, code.Code);

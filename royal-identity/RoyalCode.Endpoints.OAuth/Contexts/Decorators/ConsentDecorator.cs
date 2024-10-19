@@ -36,7 +36,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
             return;
         }
 
-        var consentRequired = await consent.RequiresConsentAsync(context.Subject, context.Client, context.Resources);
+        var consentRequired = await consent.RequiresConsentAsync(context.Subject, context.Client, context.Resources, ct);
 
         if (consentRequired && context.PromptModes.Contains(OidcConstants.PromptModes.None))
         {

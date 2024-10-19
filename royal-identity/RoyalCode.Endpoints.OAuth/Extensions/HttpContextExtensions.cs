@@ -90,7 +90,7 @@ public static class HttpContextExtensions
     /// <returns></returns>
     public static string GetServerBaseUrl(this HttpContext context)
     {
-        return context.GeServerHost() + context.GetServerBasePath();
+        return context.GetServerHost() + context.GetServerBasePath();
     }
 
     /// <summary>

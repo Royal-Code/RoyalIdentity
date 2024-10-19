@@ -23,7 +23,7 @@ public class DefaultConsentService : IConsentService
         this.clock = clock;
     }
 
-    public async ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, Resources resources)
+    public async ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, Resources resources, CancellationToken ct)
     {
         if (!client.RequireConsent)
         {
@@ -43,7 +43,7 @@ public class DefaultConsentService : IConsentService
             return true;
         }
 
-        var consent = await userConsentStore.GetUserConsentAsync(subject.GetSubjectId(), client.Id);
+        var consent = await userConsentStore.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
 
         if (consent is null)
         {
@@ -54,7 +54,7 @@ public class DefaultConsentService : IConsentService
         if (consent.Expiration.HasExpired(clock.GetUtcNow().UtcDateTime))
         {
             logger.LogDebug("Consent found in consent store is expired, consent is required");
-            await userConsentStore.RemoveUserConsentAsync(consent.SubjectId, consent.ClientId);
+            await userConsentStore.RemoveUserConsentAsync(consent.SubjectId, consent.ClientId, ct);
             return true;
         }
 
@@ -80,7 +80,7 @@ public class DefaultConsentService : IConsentService
         return true;
     }
 
-    public async Task UpdateConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<string> scopes)
+    public async Task UpdateConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<string> scopes, CancellationToken ct)
     {
         if (client.AllowRememberConsent)
         {
@@ -106,7 +106,7 @@ public class DefaultConsentService : IConsentService
                     consent.Expiration = consent.CreationTime.AddSeconds(client.ConsentLifetime.Value);
                 }
 
-                await userConsentStore.StoreUserConsentAsync(consent);
+                await userConsentStore.StoreUserConsentAsync(consent, ct);
             }
             else
             {
@@ -114,7 +114,7 @@ public class DefaultConsentService : IConsentService
                     "Client allows remembering consent, and no scopes provided. Removing consent from consent store for subject: {Subject}", 
                     subject.GetSubjectId());
 
-                await userConsentStore.RemoveUserConsentAsync(subjectId, clientId);
+                await userConsentStore.RemoveUserConsentAsync(subjectId, clientId, ct);
             }
         }
     }

@@ -18,7 +18,7 @@ public interface IAuthorizeParametersStore
     /// <param name="id">The identifier.</param>
     /// <param name="ct">Cancellation Token</param>
     /// <returns></returns>
-    Task<NameValueCollection> ReadAsync(string id, CancellationToken ct);
+    Task<NameValueCollection?> ReadAsync(string id, CancellationToken ct);
 
     /// <summary>
     /// Deletes the authorization parameters.

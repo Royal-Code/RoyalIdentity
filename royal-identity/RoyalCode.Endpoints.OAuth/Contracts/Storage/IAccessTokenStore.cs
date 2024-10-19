@@ -7,21 +7,24 @@ public interface IAccessTokenStore
     /// <summary>
     /// Stores the Access Token.
     /// </summary>
-    /// <param name="code">The code.</param>
+    /// <param name="token">The token.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns></returns>
-    Task<string> StoreAsync(AccessToken code, CancellationToken ct);
+    Task<string> StoreAsync(AccessToken token, CancellationToken ct);
 
     /// <summary>
     /// Gets the Access Token.
     /// </summary>
-    /// <param name="code">The code.</param>
+    /// <param name="jti">The id of the token.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns></returns>
-    Task<AuthorizationCode> GetAsync(string jti, CancellationToken ct);
+    Task<AccessToken?> GetAsync(string jti, CancellationToken ct);
 
     /// <summary>
     /// Removes the Access Token.
     /// </summary>
-    /// <param name="code">The code.</param>
+    /// <param name="jti">The id of the token.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns></returns>
     Task RemoveAsync(string jti, CancellationToken ct);
 }

@@ -26,6 +26,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.Pipelines", "Tests.Pi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity", "RoyalCode.Endpoints.OAuth\RoyalIdentity.csproj", "{B8072DB8-A1E0-4B7E-8AE7-F695613C9A48}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Storage.InMemory", "RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj", "{D55297E5-CABE-42EA-9C6A-84C5D8B59D01}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{B8072DB8-A1E0-4B7E-8AE7-F695613C9A48}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B8072DB8-A1E0-4B7E-8AE7-F695613C9A48}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8072DB8-A1E0-4B7E-8AE7-F695613C9A48}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D55297E5-CABE-42EA-9C6A-84C5D8B59D01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D55297E5-CABE-42EA-9C6A-84C5D8B59D01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D55297E5-CABE-42EA-9C6A-84C5D8B59D01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D55297E5-CABE-42EA-9C6A-84C5D8B59D01}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -67,6 +73,7 @@ Global
 		{7E10B637-9E82-4C45-A920-7603A25CA34A} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
 		{D5DE8A1E-065C-4022-B1FB-A843E6184F8F} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
 		{B8072DB8-A1E0-4B7E-8AE7-F695613C9A48} = {722691C4-EF38-489C-B03E-B53D3C941470}
+		{D55297E5-CABE-42EA-9C6A-84C5D8B59D01} = {722691C4-EF38-489C-B03E-B53D3C941470}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A22735B7-0B63-4698-8CF5-359FC47E98DD}
