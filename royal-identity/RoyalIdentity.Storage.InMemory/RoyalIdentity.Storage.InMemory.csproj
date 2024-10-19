@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\RoyalCode.Endpoints.OAuth\RoyalIdentity.csproj" />
+      <ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
     </ItemGroup>
 
 
