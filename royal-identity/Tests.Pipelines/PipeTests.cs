@@ -102,7 +102,7 @@ file class TestResponse : IResponseHandler
 
 file class ClientContextDecorator : IDecorator<IContextWithClient>
 {
-    public ValueTask Decorate(IContextWithClient context, Func<ValueTask> next, CancellationToken cancellationToken)
+    public Task Decorate(IContextWithClient context, Func<Task> next, CancellationToken cancellationToken)
     {
         context.Client = new ClientContext()
         {

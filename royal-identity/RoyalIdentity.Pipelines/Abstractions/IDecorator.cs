@@ -2,5 +2,5 @@
 
 public interface IDecorator<in TContext>
 {
-    ValueTask Decorate(TContext context, Func<ValueTask> next, CancellationToken ct);
+    Task Decorate(TContext context, Func<Task> next, CancellationToken ct);
 }

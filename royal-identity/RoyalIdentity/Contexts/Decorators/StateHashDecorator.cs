@@ -14,7 +14,7 @@ public class StateHashDecorator : IDecorator<AuthorizeContext>
         this.keyManager = keyManager;
     }
 
-    public async ValueTask Decorate(AuthorizeContext context, Func<ValueTask> next, CancellationToken ct)
+    public async Task Decorate(AuthorizeContext context, Func<Task> next, CancellationToken ct)
     {
         context.AssertHasClient();
 

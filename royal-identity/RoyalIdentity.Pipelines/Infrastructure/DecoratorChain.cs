@@ -19,6 +19,6 @@ internal sealed class DecoratorChain<TContext, TDecorator, TChain> : IContextPip
 
     public async Task SendAsync(TContext context, CancellationToken ct)
     {
-        await decorator.Decorate(context, async () => await next.SendAsync(context, ct), ct);
+        await decorator.Decorate(context, () => next.SendAsync(context, ct), ct);
     }
 }

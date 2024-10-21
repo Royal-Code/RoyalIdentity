@@ -21,7 +21,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         this.logger = logger;
     }
 
-    public async ValueTask Decorate(AuthorizeContext context, Func<ValueTask> next, CancellationToken ct)
+    public async Task Decorate(AuthorizeContext context, Func<Task> next, CancellationToken ct)
     {
         context.AssertHasClient();
 

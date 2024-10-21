@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Primitives;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Encodings.Web;
 
@@ -155,5 +156,11 @@ internal static class CollectionExtensions
     internal static IEnumerable<T> IntersectMany<T>(this IEnumerable<IEnumerable<T>> lists)
     {
         return lists.Aggregate((l1, l2) => l1.Intersect(l2));
+    }
+
+    public static bool TryGet(this NameValueCollection values, string key,[NotNullWhen(true)] out string? value)
+    {
+        value = values[key];
+        return value is not null;
     }
 }

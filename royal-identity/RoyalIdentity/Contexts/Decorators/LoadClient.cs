@@ -22,7 +22,7 @@ public class LoadClient : IDecorator<IWithClient>
         this.logger = logger;
     }
 
-    public async ValueTask Decorate(IWithClient context, Func<ValueTask> next, CancellationToken ct)
+    public async Task Decorate(IWithClient context, Func<Task> next, CancellationToken ct)
     {
         var clientId = context.ClientId;
 

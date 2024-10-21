@@ -33,6 +33,7 @@ public class DefaultUserSession : IUserSession
     /// <param name="clientId">The client identifier.</param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException">clientId</exception>
+    [Redesign("Os clientes são gravados apenas no cookie, mas deverá ser gravado na base de dados também (opcional)")]
     public virtual async Task AddClientIdAsync(string clientId)
     {
         ArgumentNullException.ThrowIfNull(clientId);

@@ -23,7 +23,7 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
         this.time = time ?? TimeProvider.System;
     }
 
-    public async ValueTask Decorate(AuthorizeContext context, Func<ValueTask> next, CancellationToken ct)
+    public async Task Decorate(AuthorizeContext context, Func<Task> next, CancellationToken ct)
     {
         context.AssertHasClient();
 

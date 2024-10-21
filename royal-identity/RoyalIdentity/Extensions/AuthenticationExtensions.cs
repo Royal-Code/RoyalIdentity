@@ -62,4 +62,25 @@ public static class AuthenticationExtensions
 
         return scheme.Name;
     }
+
+    public static bool IsValidReturnUrl(this string returnUrl)
+    {
+        if (returnUrl.IsLocalUrl())
+        {
+            var index = returnUrl.IndexOf('?');
+            if (index >= 0)
+            {
+                returnUrl = returnUrl.Substring(0, index);
+            }
+
+            if (returnUrl.EndsWith(Constants.ProtocolRoutePaths.Authorize, StringComparison.Ordinal) ||
+                returnUrl.EndsWith(Constants.ProtocolRoutePaths.AuthorizeCallback, StringComparison.Ordinal))
+            {
+                
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
