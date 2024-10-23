@@ -29,7 +29,7 @@ public static class PrincipalExtensions
     [DebuggerStepThrough]
     public static long GetAuthenticationTimeEpoch(this IPrincipal principal)
     {
-        return principal.Identity?.GetAuthenticationTimeEpoch() ?? throw new InvalidOperationException("auth_time is missing.");
+        return principal?.Identity?.GetAuthenticationTimeEpoch() ?? throw new InvalidOperationException("auth_time is missing.");
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public static class PrincipalExtensions
     [DebuggerStepThrough]
     public static string GetIdentityProvider(this IPrincipal principal)
     {
-        return principal.Identity?.GetIdentityProvider() ?? throw new InvalidOperationException("idp claim is missing");
+        return principal?.Identity?.GetIdentityProvider() ?? throw new InvalidOperationException("idp claim is missing");
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
@@ -9,7 +10,7 @@ using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class RequestedResourcesValidator : IValidator<AuthorizeContext>
+public class RequestedResourcesValidator : IValidator<IWithResources>
 {
     private readonly ServerOptions options;
     private readonly IResourceStore resourceStore;
@@ -25,7 +26,7 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
         this.logger = logger;
     }
 
-    public async ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
+    public async ValueTask Validate(IWithResources context, CancellationToken cancellationToken)
     {
         context.AssertHasClient();
 
@@ -52,6 +53,7 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
             context.IsApiResourceRequest = true;
         }
 
+
         //////////////////////////////////////////////////////////
         // check scope vs response_type plausibility
         //////////////////////////////////////////////////////////
@@ -62,7 +64,9 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
         {
             logger.LogError(options, "The parameter response_type requires the openid scope", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing openid scope");
+            return;
         }
+
 
         //////////////////////////////////////////////////////////
         // check id vs resource scopes and response types plausibility
@@ -100,7 +104,7 @@ public class RequestedResourcesValidator : IValidator<AuthorizeContext>
         }
     }
 
-    private bool IsScopeValidAsync(AuthorizeContext context, Client client, Resources resourcesFromStore, string requestedScope)
+    private bool IsScopeValidAsync(IWithResources context, Client client, Resources resourcesFromStore, string requestedScope)
     {
         if (requestedScope == ServerConstants.StandardScopes.OfflineAccess)
         {

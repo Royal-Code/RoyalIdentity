@@ -1,13 +1,15 @@
 ﻿using Microsoft.Extensions.Logging;
+using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
+using System.Security.Claims;
 
 namespace RoyalIdentity.Contexts.Decorators;
 
-public class PromptLoginDecorator : IDecorator<AuthorizeContext>
+public class PromptLoginDecorator : IDecorator<IWithPrompt>
 {
     private readonly IProfileService profileService;
     private readonly ILogger logger;
@@ -23,7 +25,7 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
         this.time = time ?? TimeProvider.System;
     }
 
-    public async Task Decorate(AuthorizeContext context, Func<Task> next, CancellationToken ct)
+    public async Task Decorate(IWithPrompt context, Func<Task> next, CancellationToken ct)
     {
         context.AssertHasClient();
 
@@ -46,9 +48,12 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
             return;
         }
 
-        var isUserActive = context.Identity?.IsAuthenticated is true &&
+        var principal = context.Subject ?? new ClaimsPrincipal(new ClaimsIdentity());
+        var identity = principal.Identity ?? new ClaimsIdentity();
+
+        var isUserActive = identity.IsAuthenticated &&
             await profileService.IsActiveAsync(
-                context.Subject,
+                principal,
                 context.Client,
                 ServerConstants.ProfileIsActiveCallers.AuthorizeEndpoint);
 
@@ -65,7 +70,7 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
         }
 
         // check current idp
-        var currentIdp = context.Subject.GetIdentityProvider();
+        var currentIdp = principal.GetIdentityProvider();
 
         // check if idp login hint matches current provider
         var idp = context.GetIdP();
@@ -84,7 +89,7 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
         // check authentication freshness
         if (context.MaxAge.HasValue)
         {
-            var authTime = context.Subject.GetAuthenticationTime();
+            var authTime = principal.GetAuthenticationTime();
             if (time.GetUtcNow() > authTime.AddSeconds(context.MaxAge.Value))
             {
                 logger.LogInformation("Showing login: Requested MaxAge exceeded.");
@@ -129,7 +134,7 @@ public class PromptLoginDecorator : IDecorator<AuthorizeContext>
         // check client's user SSO timeout
         if (context.Client.UserSsoLifetime.HasValue)
         {
-            var authTimeEpoch = context.Subject.GetAuthenticationTimeEpoch();
+            var authTimeEpoch = principal.GetAuthenticationTimeEpoch();
             var nowEpoch = time.GetUtcNow().ToUnixTimeSeconds();
 
             var diff = nowEpoch - authTimeEpoch;

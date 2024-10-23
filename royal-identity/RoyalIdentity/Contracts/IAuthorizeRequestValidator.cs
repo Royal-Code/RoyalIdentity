@@ -1,6 +1,4 @@
-﻿using RoyalIdentity.Contexts;
-
-namespace RoyalIdentity.Contracts;
+﻿namespace RoyalIdentity.Contracts;
 
 /// <summary>
 ///  Authorize endpoint request validator.
@@ -8,10 +6,15 @@ namespace RoyalIdentity.Contracts;
 public interface IAuthorizeRequestValidator
 {
     /// <summary>
-    ///  Validates authorize request parameters.
+    /// <para>
+    ///     Validates authorize request parameters.
+    /// </para>
+    /// <para>
+    ///     When the parameters are correct, an authorisation context is generated,
+    ///     when they are invalid, error details are generated.
+    /// </para>
     /// </summary>
-    /// <param name="parameters"></param>
-    /// <param name="subject"></param>
+    /// <param name="request"></param>
     /// <returns></returns>
-    Task ValidateAsync(AuthorizeValidationContext context, CancellationToken ct);
+    Task<AuthorizationValidationResult> ValidateAsync(AuthorizationValidationRequest request, CancellationToken ct);
 }

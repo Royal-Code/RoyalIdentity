@@ -1,5 +1,7 @@
 using System.Collections.Specialized;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
@@ -62,6 +64,12 @@ public class AuthorizeResponse : IResponseHandler
         }
 
         return ValueTask.FromResult(result);
+    }
+
+    public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
+    {
+        problem = null;
+        return false;
     }
 
     private NameValueCollection ToNameValueCollection()

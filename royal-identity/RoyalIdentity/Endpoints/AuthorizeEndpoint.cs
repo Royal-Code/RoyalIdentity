@@ -141,7 +141,7 @@ public class AuthorizeEndpoint : IEndpointHandler
         context.LoginHint = raw.Get(OidcConstants.AuthorizeRequest.LoginHint);
 
         var acrValues = raw.Get(OidcConstants.AuthorizeRequest.AcrValues);
-        context.AuthenticationContextReferenceClasses.AddRange(acrValues.FromSpaceSeparatedString());
+        context.AcrValues.AddRange(acrValues.FromSpaceSeparatedString());
 
         context.CodeChallenge = raw.Get(OidcConstants.AuthorizeRequest.CodeChallenge);
         context.CodeChallengeMethod = raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);

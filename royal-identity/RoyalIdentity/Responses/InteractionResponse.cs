@@ -82,4 +82,10 @@ public class InteractionResponse : IResponseHandler
 
         return ValueTask.FromResult(result);
     }
+
+    public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
+    {
+        problem = null;
+        return false;
+    }
 }

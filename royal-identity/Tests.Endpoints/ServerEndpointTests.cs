@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Tests.Endpoints;
 
@@ -72,6 +74,12 @@ file class TestContextPipeline : IContextPipeline<TestContext>
         public ValueTask<IResult> CreateResponseAsync(CancellationToken ct)
         {
             return ValueTask.FromResult(Results.Ok(context));
+        }
+
+        public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
+        {
+            problem = null;
+            return false;
         }
     }
 }

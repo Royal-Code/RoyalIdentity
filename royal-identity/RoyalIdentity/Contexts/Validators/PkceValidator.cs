@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
@@ -7,7 +8,7 @@ using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class PkceValidator : IValidator<AuthorizeContext>
+public class PkceValidator : IValidator<IWithCodeChallenge>
 {
     private readonly ServerOptions options;
     private readonly ILogger logger;
@@ -18,7 +19,7 @@ public class PkceValidator : IValidator<AuthorizeContext>
         this.logger = logger;
     }
 
-    public ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
+    public ValueTask Validate(IWithCodeChallenge context, CancellationToken cancellationToken)
     {
         context.AssertHasClient();
 

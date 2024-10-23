@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Pipelines.Infrastructure;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Tests.Pipelines;
 
@@ -98,6 +100,12 @@ file class TestResponse : IResponseHandler
     {
         return Results.Ok();
     }
+
+    public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
+    {
+        problem = null;
+        return false;
+    }
 }
 
 file class ClientContextDecorator : IDecorator<IContextWithClient>
@@ -131,5 +139,11 @@ file class BadResponse : IResponseHandler
     public async ValueTask<IResult> CreateResponseAsync(CancellationToken ct)
     {
         return Results.BadRequest("invalid client");
+    }
+
+    public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
+    {
+        problem = null;
+        return false;
     }
 }

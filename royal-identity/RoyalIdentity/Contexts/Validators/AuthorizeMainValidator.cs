@@ -7,7 +7,7 @@ using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class AuthorizeMainValidator : IValidator<AuthorizeContext>
+public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
 {
     private readonly ServerOptions options;
     private readonly ILogger logger;
@@ -18,7 +18,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         this.logger = logger;
     }
 
-    public ValueTask Validate(AuthorizeContext context, CancellationToken cancellationToken)
+    public ValueTask Validate(IAuthorizationContextBase context, CancellationToken cancellationToken)
     {
         context.AssertHasClient();
 
@@ -163,7 +163,7 @@ public class AuthorizeMainValidator : IValidator<AuthorizeContext>
         // check acr_values
         //////////////////////////////////////////////////////////
         ////////////////////////////////////////.AcrValues//////////////////
-        if (context.AuthenticationContextReferenceClasses.Count > 0)
+        if (context.AcrValues.Count > 0)
         {
             var acrValues = context.Raw.Get(AuthorizeRequest.AcrValues)!;
             if (acrValues.Length > options.InputLengthRestrictions.AcrValues)

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using RoyalIdentity.Endpoints.Abstractions;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 namespace RoyalIdentity.Endpoints.Defaults;
@@ -20,4 +21,13 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
 
     /// <inheritdoc />
     public ValueTask<IResult> CreateResponseAsync(CancellationToken ct) => ValueTask.FromResult(result);
+
+    public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
+    {
+        problem = result is IValueHttpResult<ProblemDetails> valueResult 
+            ? valueResult.Value
+            : null;
+
+        return problem is not null;
+    }
 }
