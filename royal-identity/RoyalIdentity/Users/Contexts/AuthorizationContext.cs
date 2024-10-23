@@ -1,10 +1,20 @@
-﻿using RoyalIdentity.Models;
+﻿using Microsoft.AspNetCore.Http;
+using RoyalIdentity.Contexts;
+using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Models;
 using System.Collections.Specialized;
+using System.Security.Claims;
 
 namespace RoyalIdentity.Users.Contexts;
 
-public class AuthorizationContext
+public class AuthorizationContext : IAuthorizationContextBase
 {
+    public NameValueCollection Raw { get; }
+
+    public HttpContext HttpContext { get; }
+
+    public ContextItems Items { get; }
+
     /// <summary>
     /// Gets the entire parameter collection.
     /// </summary>
@@ -91,11 +101,44 @@ public class AuthorizationContext
     /// </value>
     public string? Tenant { get; init; }
 
-    /// <summary>
-    /// Gets the validated contents of the request object (if present)
-    /// </summary>
-    /// <value>
-    /// The request object values
-    /// </value>
-    public Dictionary<string, string> RequestObjectValues { get; } = [];
+    public string? ResponseMode { get; set; }
+
+    public string? Nonce { get; }
+
+    public HashSet<string> RequestedScopes { get; } = [];
+
+    public bool IsOpenIdRequest { get; set; }
+
+    public bool IsApiResourceRequest { get; set; }
+
+    public HashSet<string> ResponseTypes { get; } = [];
+
+    public ClaimsPrincipal? Subject { get; }
+
+    public int? MaxAge { get; set; }
+
+    public string? ClientId { get; set; }
+
+    public string? ClientSecret { get; set; }
+
+    public HashSet<Claim> ClientClaims { get; set; } = [];
+
+    public string? Confirmation { get; set; }
+
+    public IResponseHandler? Response { get; set; }
+
+    public void AssertHasClient()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void AssertHasRedirectUri()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void SetClient(Client client, string? secret = null, string? confirmation = null)
+    {
+        throw new NotImplementedException();
+    }
 }

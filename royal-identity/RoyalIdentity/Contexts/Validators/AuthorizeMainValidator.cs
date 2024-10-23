@@ -162,7 +162,6 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         // check acr_values
         //////////////////////////////////////////////////////////
-        ////////////////////////////////////////.AcrValues//////////////////
         if (context.AcrValues.Count > 0)
         {
             var acrValues = context.Raw.Get(AuthorizeRequest.AcrValues)!;

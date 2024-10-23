@@ -11,7 +11,7 @@ using System.Security.Claims;
 
 namespace RoyalIdentity.Contexts;
 
-public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, IWithCodeChallenge
+public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, IWithCodeChallenge, IWithResources, IWithPrompt
 {
     public AuthorizeContext(HttpContext httpContext, NameValueCollection raw, ContextItems? items = null) 
         : base(httpContext, raw, items)
