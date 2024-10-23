@@ -1,4 +1,5 @@
 ﻿using RoyalIdentity.Models;
+using RoyalIdentity.Users.Contexts;
 using System.Collections.Specialized;
 using System.Security.Claims;
 
@@ -15,6 +16,8 @@ public class AuthorizeValidationContext
     /// The authenticated user, if any.
     /// </summary>
     public ClaimsPrincipal? Subject { get; init; }
+
+    public AuthorizationContext? Context { get; set; };
 
     /// <summary>
     /// Handler para geração de respostas de erros.

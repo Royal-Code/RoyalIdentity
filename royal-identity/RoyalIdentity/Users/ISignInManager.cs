@@ -11,6 +11,6 @@ public interface ISignInManager
     /// Gets the authorization context.
     /// </summary>
     /// <param name="returnUrl">The return URL.</param>
-    /// <param name="ct">Cancelation Token.</param>
-    Task<AuthorizationContext> GetAuthorizationContextAsync(string returnUrl, CancellationToken ct);
+    /// <param name="ct">Cancellation Token.</param>
+    Task<AuthorizationContext?> GetAuthorizationContextAsync(string returnUrl, CancellationToken ct);
 }

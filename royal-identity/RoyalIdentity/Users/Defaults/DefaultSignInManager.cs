@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
+using RoyalIdentity.Contexts;
+using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -12,8 +14,9 @@ public class DefaultSignInManager : ISignInManager
     private readonly ILogger logger;
     private readonly IAuthorizeParametersStore? authorizeParametersStore;
     private readonly IUserSession userSession;
+    private readonly IAuthorizeRequestValidator _validator;
 
-    public async Task<AuthorizationContext> GetAuthorizationContextAsync(string returnUrl, CancellationToken ct)
+    public async Task<AuthorizationContext?> GetAuthorizationContextAsync(string returnUrl, CancellationToken ct)
     {
         if (returnUrl.IsValidReturnUrl())
         {
@@ -27,11 +30,16 @@ public class DefaultSignInManager : ISignInManager
             }
 
             var user = await userSession.GetUserAsync();
-            var result = await _validator.ValidateAsync(parameters, user);
-            if (!result.IsError)
+            var validationContext = new AuthorizeValidationContext()
+            {
+                Parameters = parameters,
+                Subject = user
+            };
+            await _validator.ValidateAsync(validationContext, ct);
+            if (validationContext.Error is null && validationContext.Context is not null)
             {
                 logger.LogTrace("AuthorizationRequest being returned");
-                return new AuthorizationRequest(result.ValidatedRequest);
+                return validationContext.Context;
             }
         }
         else
