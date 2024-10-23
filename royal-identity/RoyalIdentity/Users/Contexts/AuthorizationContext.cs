@@ -9,12 +9,6 @@ namespace RoyalIdentity.Users.Contexts;
 
 public class AuthorizationContext : IAuthorizationContextBase
 {
-    public NameValueCollection Raw { get; }
-
-    public HttpContext HttpContext { get; }
-
-    public ContextItems Items { get; }
-
     /// <summary>
     /// Gets the entire parameter collection.
     /// </summary>
@@ -101,44 +95,4 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// </value>
     public string? Tenant { get; init; }
 
-    public string? ResponseMode { get; set; }
-
-    public string? Nonce { get; }
-
-    public HashSet<string> RequestedScopes { get; } = [];
-
-    public bool IsOpenIdRequest { get; set; }
-
-    public bool IsApiResourceRequest { get; set; }
-
-    public HashSet<string> ResponseTypes { get; } = [];
-
-    public ClaimsPrincipal? Subject { get; }
-
-    public int? MaxAge { get; set; }
-
-    public string? ClientId { get; set; }
-
-    public string? ClientSecret { get; set; }
-
-    public HashSet<Claim> ClientClaims { get; set; } = [];
-
-    public string? Confirmation { get; set; }
-
-    public IResponseHandler? Response { get; set; }
-
-    public void AssertHasClient()
-    {
-        throw new NotImplementedException();
-    }
-
-    public void AssertHasRedirectUri()
-    {
-        throw new NotImplementedException();
-    }
-
-    public void SetClient(Client client, string? secret = null, string? confirmation = null)
-    {
-        throw new NotImplementedException();
-    }
 }

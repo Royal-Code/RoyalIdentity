@@ -2,7 +2,7 @@
 
 namespace RoyalIdentity.Contexts;
 
-public interface IAuthorizationContextBase : IWithRedirectUri//, IWithResources, IWithPrompt
+public interface IAuthorizationContextBase : IWithRedirectUri, IWithResources, IWithPrompt
 {
     /// <summary>
     /// Gets or sets the response mode.
