@@ -74,76 +74,10 @@ public class AuthorizeEndpoint : IEndpointHandler
         }
 
         var items = ContextItems.From(options);
-        var context = new AuthorizeContext(httpContext, values, items);
+        var context = new AuthorizeContext(httpContext, values, httpContext.User, items);
 
-        Load(context);
+        context.Load(logger);
 
         return ValueTask.FromResult(new EndpointCreationResult(context));
-    }
-
-    private void Load(AuthorizeContext context)
-    {
-        var raw = context.Raw;
-
-        var scope = raw.Get(OidcConstants.AuthorizeRequest.Scope);
-        context.RequestedScopes.AddRange(scope.FromSpaceSeparatedString());
-
-        var responseType = raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
-        context.ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
-        context.ClientId = raw.Get(OidcConstants.AuthorizeRequest.ClientId);
-        context.RedirectUri = raw.Get(OidcConstants.AuthorizeRequest.RedirectUri);
-        context.State = raw.Get(OidcConstants.AuthorizeRequest.State);
-        context.ResponseMode = raw.Get(OidcConstants.AuthorizeRequest.ResponseMode);
-        context.Nonce = raw.Get(OidcConstants.AuthorizeRequest.Nonce);
-
-        var display = raw.Get(OidcConstants.AuthorizeRequest.Display);
-        if (display.IsPresent())
-        {
-            if (Constants.SupportedDisplayModes.Contains(display))
-            {
-                context.DisplayMode = display;
-            }
-            else
-            {
-                logger.LogDebug("Unsupported display mode - ignored: {Display}", display);
-            }
-        }
-
-        var prompt = raw.Get(OidcConstants.AuthorizeRequest.Prompt);
-        if (prompt.IsPresent())
-        {
-            var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (prompts.All(Constants.SupportedPromptModes.Contains))
-            {
-                context.PromptModes = prompts.ToHashSet();
-            }
-            else
-            {
-                logger.LogDebug("Unsupported prompt mode - ignored: {Promp}", prompt);
-            }
-        }
-
-        var maxAge = raw.Get(OidcConstants.AuthorizeRequest.MaxAge);
-        if (maxAge.IsPresent())
-        {
-            if (int.TryParse(maxAge, out var seconds) && seconds >= 0)
-            {
-                context.MaxAge = seconds;
-            }
-            else
-            {
-                logger.LogDebug("Invalid max_age - ignored: {MaxAge}", maxAge);
-            }
-        }
-
-        context.UiLocales = raw.Get(OidcConstants.AuthorizeRequest.UiLocales);
-        context.IdTokenHint = raw.Get(OidcConstants.AuthorizeRequest.IdTokenHint);
-        context.LoginHint = raw.Get(OidcConstants.AuthorizeRequest.LoginHint);
-
-        var acrValues = raw.Get(OidcConstants.AuthorizeRequest.AcrValues);
-        context.AcrValues.AddRange(acrValues.FromSpaceSeparatedString());
-
-        context.CodeChallenge = raw.Get(OidcConstants.AuthorizeRequest.CodeChallenge);
-        context.CodeChallengeMethod = raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);
     }
 }

@@ -12,5 +12,5 @@ public interface ISignInManager
     /// </summary>
     /// <param name="returnUrl">The return URL.</param>
     /// <param name="ct">Cancellation Token.</param>
-    Task<AuthorizationContext?> GetAuthorizationContextAsync(string returnUrl, CancellationToken ct);
+    Task<AuthorizationContext?> GetAuthorizationContextAsync(string? returnUrl, CancellationToken ct);
 }

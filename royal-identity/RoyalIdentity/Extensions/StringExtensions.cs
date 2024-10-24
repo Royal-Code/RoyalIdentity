@@ -144,7 +144,7 @@ internal static class StringExtensions
     }
 
     [DebuggerStepThrough]
-    public static bool IsLocalUrl(this string? url)
+    public static bool IsLocalUrl([NotNullWhen(true)] this string? url)
     {
         if (string.IsNullOrEmpty(url))
         {

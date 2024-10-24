@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Options;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RoyalIdentity.Extensions;
 
@@ -63,7 +65,7 @@ public static class AuthenticationExtensions
         return scheme.Name;
     }
 
-    public static bool IsValidReturnUrl(this string returnUrl)
+    public static bool IsValidReturnUrl([NotNullWhen(true)] this string? returnUrl)
     {
         if (returnUrl.IsLocalUrl())
         {
@@ -82,5 +84,48 @@ public static class AuthenticationExtensions
         }
 
         return false;
+    }
+
+    public static string? GetPrefixedAcrValue(this IWithAcr context, string prefix)
+    {
+        var value = context.AcrValues.FirstOrDefault(x => x.StartsWith(prefix));
+
+        if (value is not null)
+            value = value.Substring(prefix.Length);
+
+
+        return value;
+    }
+
+    public static void RemovePrefixedAcrValue(this IWithAcr context, string prefix)
+    {
+        foreach (var acr in context.AcrValues.Where(acr => acr.StartsWith(prefix, StringComparison.Ordinal)))
+        {
+            context.AcrValues.Remove(acr);
+        }
+        var acr_values = context.AcrValues.ToSpaceSeparatedString();
+        if (acr_values.IsPresent())
+        {
+            context.Raw[OidcConstants.AuthorizeRequest.AcrValues] = acr_values;
+        }
+        else
+        {
+            context.Raw.Remove(OidcConstants.AuthorizeRequest.AcrValues);
+        }
+    }
+
+    public static string? GetIdP(this IWithAcr context)
+    {
+        return context.GetPrefixedAcrValue(Constants.KnownAcrValues.HomeRealm);
+    }
+
+    public static void RemoveIdP(this IWithAcr context)
+    {
+        context.RemovePrefixedAcrValue(Constants.KnownAcrValues.HomeRealm);
+    }
+
+    public static string? GetTenant(this IWithAcr context)
+    {
+        return context.GetPrefixedAcrValue(Constants.KnownAcrValues.Tenant);
     }
 }

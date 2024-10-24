@@ -4,22 +4,35 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contexts;
+using RoyalIdentity.Users.Contracts;
 
 namespace RoyalIdentity.Users.Defaults;
 
 public class DefaultSignInManager : ISignInManager
 {
-    private readonly ILogger logger;
     private readonly IAuthorizeParametersStore? authorizeParametersStore;
-    private readonly IUserSession userSession;
     private readonly IAuthorizeRequestValidator authorizeRequestValidator;
+    private readonly IUserStore userStore;
+    private readonly ILogger logger;
+
+    public DefaultSignInManager(
+        IAuthorizeRequestValidator authorizeRequestValidator,
+        IUserStore userStore,
+        ILogger<DefaultSignInManager> logger,
+        IAuthorizeParametersStore? authorizeParametersStore = null)
+    {
+        this.authorizeRequestValidator = authorizeRequestValidator;
+        this.userStore = userStore;
+        this.logger = logger;
+        this.authorizeParametersStore = authorizeParametersStore;
+    }
 
     [Redesign("Disparar exception ou mudar para método Try com out do context e error")]
-    public async Task<AuthorizationContext?> GetAuthorizationContextAsync(string returnUrl, CancellationToken ct)
+    public async Task<AuthorizationContext?> GetAuthorizationContextAsync(string? returnUrl, CancellationToken ct)
     {
         if (returnUrl.IsValidReturnUrl())
         {
-            logger.LogTrace("returnUrl is valid");
+            logger.LogDebug("returnUrl is valid");
 
             var parameters = returnUrl.ReadQueryStringAsNameValueCollection();
             if (authorizeParametersStore is not null
@@ -28,11 +41,9 @@ public class DefaultSignInManager : ISignInManager
                 parameters = await authorizeParametersStore.ReadAsync(messageStoreId, ct) ?? [];
             }
 
-            var user = await userSession.GetUserAsync();
             var authorizationRequest = new AuthorizationValidationRequest()
             {
-                Parameters = parameters,
-                Subject = user
+                Parameters = parameters
             };
             var authorizationResult = await authorizeRequestValidator.ValidateAsync(authorizationRequest, ct);
             if (authorizationResult.Error is null && authorizationResult.Context is not null)
@@ -45,10 +56,10 @@ public class DefaultSignInManager : ISignInManager
         }
         else
         {
-            logger.LogTrace("returnUrl is not valid");
+            logger.LogDebug("returnUrl is not valid");
         }
 
-        logger.LogTrace("No AuthorizationRequest being returned");
+        logger.LogDebug("No AuthorizationRequest being returned");
         return null;
     }
 }

@@ -19,6 +19,8 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
     public static ResponseHandler Problem(ProblemDetails problemDetails)
         => new(Results.Json(problemDetails, statusCode: problemDetails.Status ?? 400));
 
+    public static ResponseHandler Ok() => new(Results.Ok());
+
     /// <inheritdoc />
     public ValueTask<IResult> CreateResponseAsync(CancellationToken ct) => ValueTask.FromResult(result);
 

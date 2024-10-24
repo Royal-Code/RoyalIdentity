@@ -2,6 +2,7 @@
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
+using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Handlers;
 using RoyalIdentity.Pipelines.Configurations;
 using RoyalIdentity.Pipelines.Infrastructure;
@@ -36,7 +37,19 @@ public static class Pipes
 
             authorizeContextPipe.UseHandler<AuthorizeContextHandler>();
 
+            //////////////////////////////
+            //// AuthorizeValidateContext
+            //////////////////////////////
+            var authorizeValidateContextPipe = builder.For<AuthorizeValidateContext>()
+                .UseDecorator<ProcessRequestObject>()
+                .UseDecorator<LoadClient>()
+                .UseValidator<RedirectUriValidator>()
+                .UseValidator<AuthorizeMainValidator>()
+                .UseValidator<RequestedResourcesValidator>();
 
+            options.CustomizeAuthorizeContextHandler?.Invoke(authorizeValidateContextPipe);
+
+            authorizeValidateContextPipe.UseHandler<OkHandler<AuthorizeValidateContext>>();
         });
     }
 }
@@ -44,4 +57,6 @@ public static class Pipes
 public class CustomOptions
 {
     public Action<IPipelineConfigurationBuilder<AuthorizeContext>>? CustomizeAuthorizeContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<AuthorizeValidateContext>>? CustomizeAuthorizeContextHandler { get; set; }
 }

@@ -11,7 +11,7 @@ public class ValidationError
     /// <value>
     /// The error.
     /// </value>
-    public string Error { get; set; }
+    public required string Error { get; init; }
 
     /// <summary>
     /// Gets or sets the error description.
@@ -19,10 +19,10 @@ public class ValidationError
     /// <value>
     /// The error description.
     /// </value>
-    public string ErrorDescription { get; set; }
+    public string? ErrorDescription { get; init; }
 
     /// <summary>
     /// Gets or sets the error uri.
     /// </summary>
-    public string ErrorUri { get; set; }
+    public string? ErrorUri { get; init; }
 }

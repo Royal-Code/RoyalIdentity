@@ -1,26 +1,41 @@
-﻿using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Contexts;
-using RoyalIdentity.Endpoints.Abstractions;
+﻿using RoyalIdentity.Contexts;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using System.Collections.Specialized;
-using System.Security.Claims;
 
 namespace RoyalIdentity.Users.Contexts;
 
-public class AuthorizationContext : IAuthorizationContextBase
+public class AuthorizationContext
 {
+    public AuthorizationContext(AuthorizeValidateContext context)
+    {
+        Client = context.Client!;
+        RedirectUri = context.RedirectUri!;
+        DisplayMode = context.DisplayMode;
+        UiLocales = context.UiLocales;
+        IdP = context.GetIdP();
+        Tenant = context.GetTenant();
+        LoginHint = context.LoginHint;
+        PromptModes = context.PromptModes;
+        AcrValues = context.AcrValues;
+        Resources = context.Resources;
+        Parameters = context.Raw;
+
+        RequestObjectValues = null;
+    }
+
     /// <summary>
     /// Gets the entire parameter collection.
     /// </summary>
     /// <value>
     /// The parameters.
     /// </value>
-    public required NameValueCollection Parameters { get; init; }
+    public NameValueCollection Parameters { get; }
 
     /// <summary>
     /// The client.
     /// </summary>
-    public required Client Client { get; init; }
+    public Client Client { get; }
 
     /// <summary>
     /// Gets or sets the redirect URI.
@@ -28,7 +43,7 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The redirect URI.
     /// </value>
-    public required string RedirectUri { get; init; }
+    public string RedirectUri { get; }
 
     /// <summary>
     /// The display mode passed from the authorization request.
@@ -36,7 +51,7 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The display mode.
     /// </value>
-    public string? DisplayMode { get; init; }
+    public string? DisplayMode { get; }
 
     /// <summary>
     /// The UI locales passed from the authorization request.
@@ -44,7 +59,7 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The UI locales.
     /// </value>
-    public string? UiLocales { get; init; }
+    public string? UiLocales { get; }
 
     /// <summary>
     /// The expected username the user will use to login. This is requested from the client 
@@ -53,7 +68,7 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The LoginHint.
     /// </value>
-    public string? LoginHint { get; init; }
+    public string? LoginHint { get; }
 
     /// <summary>
     /// Gets or sets the collection of prompt modes.
@@ -61,12 +76,12 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The collection of prompt modes.
     /// </value>
-    public HashSet<string> PromptModes { get; init; } = [];
+    public HashSet<string> PromptModes { get; }
 
     /// <summary>
     /// The validated resources.
     /// </summary>
-    public required Resources Resources { get; init; }
+    public Resources Resources { get; }
 
     /// <summary>
     /// The acr values passed from the authorization request.
@@ -74,7 +89,7 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The acr values.
     /// </value>
-    public HashSet<string> AcrValues { get; } = [];
+    public HashSet<string> AcrValues { get; }
 
     /// <summary>
     /// The external identity provider requested. This is used to bypass home realm 
@@ -84,7 +99,7 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The external identity provider identifier.
     /// </value>
-    public string? IdP { get; init; }
+    public string? IdP { get; }
 
     /// <summary>
     /// The tenant requested. This is provided via the <c>"tenant:"</c> prefix to 
@@ -93,6 +108,13 @@ public class AuthorizationContext : IAuthorizationContextBase
     /// <value>
     /// The tenant.
     /// </value>
-    public string? Tenant { get; init; }
+    public string? Tenant { get; }
 
+    /// <summary>
+    /// Gets the validated contents of the request object (if present)
+    /// </summary>
+    /// <value>
+    /// The request object values
+    /// </value>
+    public Dictionary<string, string>? RequestObjectValues { get; }
 }

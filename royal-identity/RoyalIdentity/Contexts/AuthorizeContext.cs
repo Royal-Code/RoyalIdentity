@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Endpoints.Abstractions;
@@ -11,11 +12,18 @@ using System.Security.Claims;
 
 namespace RoyalIdentity.Contexts;
 
-public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, IWithCodeChallenge, IWithResources, IWithPrompt
+public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, IWithCodeChallenge
 {
-    public AuthorizeContext(HttpContext httpContext, NameValueCollection raw, ContextItems? items = null) 
-        : base(httpContext, raw, items)
-    { }
+    private readonly ClaimsPrincipal subject;
+
+    public AuthorizeContext(
+        HttpContext httpContext,
+        NameValueCollection raw,
+        ClaimsPrincipal? subject = null,
+        ContextItems? items = null) : base(httpContext, raw, items)
+    {
+        this.subject = subject ?? httpContext.User;
+    }
 
     /// <summary>
     /// Gets or sets the subject.
@@ -23,9 +31,12 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <value>
     /// The subject.
     /// </value>
-    public ClaimsPrincipal Subject => HttpContext.User;
+    public ClaimsPrincipal Subject => subject;
 
-    public ClaimsIdentity? Identity => HttpContext.User?.Identity as ClaimsIdentity;
+    /// <summary>
+    /// Gets the subject identity.
+    /// </summary>
+    public ClaimsIdentity? Identity => Subject?.Identity as ClaimsIdentity;
 
     /// <summary>
     /// Gets or sets the client model.
@@ -217,6 +228,86 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
         Confirmation = confirmation;
 
         ClientClaims.AddRange(client.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)));
+    }
+
+    /// <summary>
+    /// <para>
+    ///     Use <see cref="EndpointContextBase.Raw"/> to call <see cref="Load(NameValueCollection, ILogger)"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    public void Load(ILogger logger) => Load(Raw, logger);
+
+    /// <summary>
+    /// <para>
+    ///     Load the parameters from the <paramref name="raw"/> and sets the <see cref="AuthorizeContext"/> 
+    ///     properties.
+    /// </para>
+    /// </summary>
+    /// <param name="raw">The parameters.</param>
+    /// <param name="logger">The logger.</param>
+    public virtual void Load(NameValueCollection raw, ILogger logger)
+    {
+        var scope = raw.Get(OidcConstants.AuthorizeRequest.Scope);
+        RequestedScopes.AddRange(scope.FromSpaceSeparatedString());
+
+        var responseType = raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
+        ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
+        ClientId = raw.Get(OidcConstants.AuthorizeRequest.ClientId);
+        RedirectUri = raw.Get(OidcConstants.AuthorizeRequest.RedirectUri);
+        State = raw.Get(OidcConstants.AuthorizeRequest.State);
+        ResponseMode = raw.Get(OidcConstants.AuthorizeRequest.ResponseMode);
+        Nonce = raw.Get(OidcConstants.AuthorizeRequest.Nonce);
+
+        var display = raw.Get(OidcConstants.AuthorizeRequest.Display);
+        if (display.IsPresent())
+        {
+            if (Constants.SupportedDisplayModes.Contains(display))
+            {
+                DisplayMode = display;
+            }
+            else
+            {
+                logger.LogDebug("Unsupported display mode - ignored: {Display}", display);
+            }
+        }
+
+        var prompt = raw.Get(OidcConstants.AuthorizeRequest.Prompt);
+        if (prompt.IsPresent())
+        {
+            var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (prompts.All(Constants.SupportedPromptModes.Contains))
+            {
+                PromptModes = prompts.ToHashSet();
+            }
+            else
+            {
+                logger.LogDebug("Unsupported prompt mode - ignored: {Promp}", prompt);
+            }
+        }
+
+        var maxAge = raw.Get(OidcConstants.AuthorizeRequest.MaxAge);
+        if (maxAge.IsPresent())
+        {
+            if (int.TryParse(maxAge, out var seconds) && seconds >= 0)
+            {
+                MaxAge = seconds;
+            }
+            else
+            {
+                logger.LogDebug("Invalid max_age - ignored: {MaxAge}", maxAge);
+            }
+        }
+
+        UiLocales = raw.Get(OidcConstants.AuthorizeRequest.UiLocales);
+        IdTokenHint = raw.Get(OidcConstants.AuthorizeRequest.IdTokenHint);
+        LoginHint = raw.Get(OidcConstants.AuthorizeRequest.LoginHint);
+
+        var acrValues = raw.Get(OidcConstants.AuthorizeRequest.AcrValues);
+        AcrValues.AddRange(acrValues.FromSpaceSeparatedString());
+
+        CodeChallenge = raw.Get(OidcConstants.AuthorizeRequest.CodeChallenge);
+        CodeChallengeMethod = raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);
     }
 
 #pragma warning disable CS8774
