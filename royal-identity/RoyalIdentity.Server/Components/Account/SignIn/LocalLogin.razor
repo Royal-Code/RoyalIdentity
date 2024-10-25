@@ -1,0 +1,95 @@
+﻿@using RoyalIdentity.Users
+
+@inject ISignInManager SignInManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<div class="card">
+    <div class="card-header">
+        <h2>Local Account</h2>
+    </div>
+
+    <div class="card-body">
+
+        <StatusMessage Message="@errorMessage" />
+
+        <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+
+            <input type="hidden" value="@Input.ReturnUrl" />
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Username" class="form-control" autocomplete="username" aria-required="true" placeholder="Username" />
+                <label for="email" class="form-label">Username</label>
+                <ValidationMessage For="() => Input.Username" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="off" aria-required="true" />
+                <label for="password" class="form-label">Password</label>
+                <ValidationMessage For="() => Input.Password" class="text-danger" />
+            </div>
+
+            <div class="checkbox mb-3">
+                <label class="form-label">
+                    <InputCheckbox @bind-Value="Input.RememberLogin" class="darker-border-checkbox form-check-input" />
+                    Remember My Login
+                </label>
+            </div>
+
+            <div>
+                <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
+            </div>
+
+            <div>
+                <p>
+                    <a href="Account/ForgotPassword">Forgot your password?</a>
+                </p>
+                <p>
+                    <a href="Account/ResendEmailConfirmation">Resend email confirmation</a>
+                </p>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [Parameter, EditorRequired]
+    public LoginViewModel Model { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private LoginInputModel Input { get; set; } = new();
+
+    public async Task LoginUser()
+    {
+
+        // This doesn't count login failures towards account lockout
+        // To enable password failures to trigger account lockout, set lockoutOnFailure: true
+        // var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+        // if (result.Succeeded)
+        // {
+        //     Logger.LogInformation("User logged in.");
+        //     RedirectManager.RedirectTo(Model.ReturnUrl);
+        // }
+        // else if (result.RequiresTwoFactor)
+        // {
+        //     RedirectManager.RedirectTo(
+        //         "Account/LoginWith2fa",
+        //         new() { ["returnUrl"] = Model.ReturnUrl, ["rememberLogin"] = Input.RememberLogin });
+        // }
+        // else if (result.IsLockedOut)
+        // {
+        //     Logger.LogWarning("User account locked out.");
+        //     RedirectManager.RedirectTo("Account/Lockout");
+        // }
+        // else
+        // {
+        //     errorMessage = "Error: Invalid login attempt.";
+        // }
+    }
+}

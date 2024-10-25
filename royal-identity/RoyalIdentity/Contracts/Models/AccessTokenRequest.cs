@@ -1,10 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Models;
+﻿using RoyalIdentity.Models;
 using System.Collections.Specialized;
 using System.Security.Claims;
 using RoyalIdentity.Contexts.Withs;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Models;
 
 public class AccessTokenRequest
 {

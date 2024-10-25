@@ -6,9 +6,26 @@
 @inject ISignInManager SignInManager
 @inject IAuthenticationSchemeProvider SchemeProvider
 
+<PageTitle>Log in</PageTitle>
+
+<h1>Log in</h1>
+
 @if (model is not null)
 {
-    
+    <div class="row">
+        @if (model.EnableLocalLogin)
+        {
+            <div class="col-md-4">
+                <LocalLogin Model="model" />
+            </div>
+        }
+        @if (model.EnableExternalLogin)
+        {
+            <div class="col-md-6 col-md-offset-2">
+                <ExternalLoginPicker ExternalProviders="model.GetVisibleExternalProviders()" />
+            </div>
+        }
+    </div>
 }
 
 @code {
@@ -71,7 +88,7 @@
                 EnableLocalLogin = allowLocal && AccountOptions.AllowLocalLogin,
                 ReturnUrl = ReturnUrl,
                 Username = context?.LoginHint,
-                ExternalProviders = providers.ToList()
+                ExternalProviders = providers.ToArray()
             };
     }
 

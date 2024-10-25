@@ -1,7 +1,7 @@
 ﻿using RoyalIdentity.Models;
 using RoyalIdentity.Users.Contexts;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Models;
 
 public readonly struct AuthorizationValidationResult
 {

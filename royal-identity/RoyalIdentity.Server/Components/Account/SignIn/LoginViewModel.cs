@@ -2,13 +2,20 @@
 
 public class LoginViewModel : LoginInputModel
 {
+    private ExternalProvider[]? visibleExternalProviders = null;
+
+
     public bool AllowRememberLogin { get; set; } = true;
 
     public bool EnableLocalLogin { get; set; } = true;
 
-    public IEnumerable<ExternalProvider> ExternalProviders { get; set; } = [];
+    public bool EnableExternalLogin => GetVisibleExternalProviders().Length is not 0;
 
-    public IEnumerable<ExternalProvider> VisibleExternalProviders => ExternalProviders.Where(x => !string.IsNullOrWhiteSpace(x.DisplayName));
+    public ExternalProvider[] ExternalProviders { get; set; } = [];
+
+    public ExternalProvider[] GetVisibleExternalProviders()
+        => visibleExternalProviders ??= ExternalProviders.Where(static x => !string.IsNullOrWhiteSpace(x.DisplayName)).ToArray();
+
 
     public bool IsExternalLoginOnly => !EnableLocalLogin && ExternalProviders?.Count() == 1;
 

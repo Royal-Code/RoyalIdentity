@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
+using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Models;
 using RoyalIdentity.Users.Contexts;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -45,7 +47,7 @@ public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
         if (context.Response.HasProblem(out var problems))
             return new AuthorizationValidationResult()
             {
-                Error = new Models.ValidationError()
+                Error = new ValidationError()
                 {
                     Error = problems.Title ?? AuthorizeErrors.InvalidRequest,
                     ErrorDescription = problems.Detail,

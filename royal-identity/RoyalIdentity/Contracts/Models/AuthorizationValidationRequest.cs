@@ -1,7 +1,6 @@
 ﻿using System.Collections.Specialized;
-using System.Security.Claims;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Models;
 
 public class AuthorizationValidationRequest
 {

@@ -1,4 +1,5 @@
-﻿using RoyalIdentity.Models;
+﻿using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Models;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Contracts;

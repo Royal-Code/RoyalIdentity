@@ -1,4 +1,6 @@
-﻿namespace RoyalIdentity.Contracts;
+﻿using RoyalIdentity.Contracts.Models;
+
+namespace RoyalIdentity.Contracts;
 
 /// <summary>
 ///  Authorize endpoint request validator.

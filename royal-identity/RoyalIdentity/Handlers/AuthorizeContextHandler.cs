@@ -2,6 +2,7 @@
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Events;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;

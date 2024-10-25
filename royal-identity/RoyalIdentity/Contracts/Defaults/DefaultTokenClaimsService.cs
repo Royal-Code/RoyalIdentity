@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Withs;
+using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;

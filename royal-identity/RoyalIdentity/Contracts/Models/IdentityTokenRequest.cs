@@ -3,7 +3,7 @@ using RoyalIdentity.Models;
 using System.Collections.Specialized;
 using System.Security.Claims;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Models;
 
 public class IdentityTokenRequest
 {

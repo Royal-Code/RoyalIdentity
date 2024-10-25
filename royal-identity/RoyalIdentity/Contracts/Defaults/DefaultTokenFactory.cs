@@ -6,6 +6,7 @@ using System.Security.Claims;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Contracts.Models;
 
 namespace RoyalIdentity.Contracts.Defaults;
 

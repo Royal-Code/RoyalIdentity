@@ -12,7 +12,9 @@ namespace RoyalIdentity;
 public static class Pipes
 {
 
-    public static void AddRoyalIdentityPipelines(this IServiceCollection services, Action<CustomOptions>? customization)
+    public static void AddRoyalIdentityPipelines(
+        this IServiceCollection services, 
+        Action<CustomOptions>? customization = null)
     {
         var options = new CustomOptions();
         customization?.Invoke(options);

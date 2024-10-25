@@ -1,9 +1,8 @@
-﻿using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Models;
+﻿using RoyalIdentity.Models;
 using System.Security.Claims;
 using RoyalIdentity.Contexts;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Models;
 
 /// <summary>
 /// Class describing the profile data request

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Endpoints.Mapping;
 using RoyalIdentity.Pipelines.Configurations;
 
@@ -22,6 +23,7 @@ public static class Pipe
         services.TryAddTransient(typeof(HandlerChain<,>));
         services.TryAddTransient(typeof(DecoratorChain<,,>));
         services.TryAddTransient(typeof(ValidatorChain<,,>));
+        services.TryAddSingleton(typeof(OkHandler<>));
 
         var builder = new DefaultPipelineConfigurationBuilder(services);
         configureAction(builder);
