@@ -8,30 +8,29 @@
 
 <PageTitle>Log in</PageTitle>
 
-<h1>Log in</h1>
+<AccountContent>
+    <Title>
+        <h1>Log in</h1>
+    </Title>
+    <ChildContent>
+        @if (model is not null)
+        {
+            @if (model.EnableLocalLogin)
+            {
+                <LocalLogin Model="model"/>
+            }
 
-@if (model is not null)
-{
-    <div class="row">
-        @if (model.EnableLocalLogin)
-        {
-            <div class="col-md-4">
-                <LocalLogin Model="model" />
-            </div>
+            @if (model.EnableExternalLogin)
+            {
+                <ExternalLoginPicker ExternalProviders="model.GetVisibleExternalProviders()"/>
+            }
         }
-        @if (model.EnableExternalLogin)
-        {
-            <div class="col-md-6 col-md-offset-2">
-                <ExternalLoginPicker ExternalProviders="model.GetVisibleExternalProviders()" />
-            </div>
-        }
-    </div>
-}
+    </ChildContent>
+</AccountContent>
 
 @code {
 
-    [SupplyParameterFromQuery]
-    private string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
 
     private LoginViewModel? model = null;
 
@@ -45,11 +44,11 @@
 
             // this is meant to short circuit the UI and only trigger the one external IdP
             model = new LoginViewModel
-                {
-                    EnableLocalLogin = local,
-                    ReturnUrl = ReturnUrl,
-                    Username = context.LoginHint,
-                };
+            {
+                EnableLocalLogin = local,
+                ReturnUrl = ReturnUrl,
+                Username = context.LoginHint,
+            };
 
             if (!local)
             {
@@ -64,10 +63,10 @@
         var providers = schemes
             .Where(x => x.DisplayName != null)
             .Select(x => new ExternalProvider
-                {
-                    DisplayName = x.DisplayName ?? x.Name,
-                    AuthenticationScheme = x.Name
-                });
+            {
+                DisplayName = x.DisplayName ?? x.Name,
+                AuthenticationScheme = x.Name
+            });
 
         var allowLocal = true;
         if (context is not null)
@@ -79,17 +78,16 @@
                 providers = providers
                     .Where(provider => context.Client.IdentityProviderRestrictions.Contains(provider.AuthenticationScheme));
             }
-
         }
 
         model = new LoginViewModel
-            {
-                AllowRememberLogin = AccountOptions.AllowRememberLogin,
-                EnableLocalLogin = allowLocal && AccountOptions.AllowLocalLogin,
-                ReturnUrl = ReturnUrl,
-                Username = context?.LoginHint,
-                ExternalProviders = providers.ToArray()
-            };
+        {
+            AllowRememberLogin = AccountOptions.AllowRememberLogin,
+            EnableLocalLogin = allowLocal && AccountOptions.AllowLocalLogin,
+            ReturnUrl = ReturnUrl,
+            Username = context?.LoginHint,
+            ExternalProviders = providers.ToArray()
+        };
     }
 
 }

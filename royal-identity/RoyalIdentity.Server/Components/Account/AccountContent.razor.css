@@ -1,0 +1,39 @@
+
+section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: auto;
+    white-space: normal;
+    border-radius: 5px;
+    position: relative;
+    grid-area: center;
+    box-shadow: none;
+    vertical-align: baseline;
+    box-sizing: content-box;
+}
+
+.account-content-title {
+    padding: 40px 40px 24px;
+    box-sizing: content-box;
+}
+
+.account-content-title h1 {
+    font-size: 32px;
+    margin: 24px 0 0;
+    color: #2d333a;
+    width: 320px;
+    text-align: center;
+}
+
+.account-content-body {
+    background-color: #fff;
+    padding: 0 40px 40px;
+    border-radius: 3px;
+    box-shadow: none;
+    width: 320px;
+    box-sizing: content-box;
+    flex-shrink: 0;
+}

@@ -1,15 +1,25 @@
 ﻿@inherits LayoutComponentBase
-@layout RoyalIdentity.Server.Components.Layout.MainLayout
+@layout MainLayout
 @inject NavigationManager NavigationManager
 
-@if (HttpContext is null)
-{
-    <p>Loading...</p>
-}
-else
-{
-    @Body
-}
+<div class="account-page">
+    <header class="brand-header">
+        <img src="icon.png" alt="Royal Identity" />
+    </header>
+    <main>
+        @if (HttpContext is null)
+        {
+        <p>Loading...</p>
+        }
+        else
+        {
+        @Body
+        }
+    </main>
+    <footer>
+
+    </footer>
+</div>
 
 @code {
     [CascadingParameter]
