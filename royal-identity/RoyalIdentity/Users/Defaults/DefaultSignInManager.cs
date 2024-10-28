@@ -6,11 +6,16 @@ using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contexts;
 using RoyalIdentity.Users.Contracts;
+using static RoyalIdentity.Users.CredentialsValidationResult.WellKnownReasons;
 
 namespace RoyalIdentity.Users.Defaults;
 
 public class DefaultSignInManager : ISignInManager
 {
+    public static string InvalidCredentialsErrorMessage { get; set; } = "Invalid username or password";
+    public static string InactiveUserErrorMessage { get; set; } = "Invalid username or password";
+    public static string BlockedUserErrorMessage { get; set; } = "Invalid username or password";
+
     private readonly IAuthorizeParametersStore? authorizeParametersStore;
     private readonly IAuthorizeRequestValidator authorizeRequestValidator;
     private readonly IUserStore userStore;
@@ -62,5 +67,31 @@ public class DefaultSignInManager : ISignInManager
 
         logger.LogDebug("No AuthorizationRequest being returned");
         return null;
+    }
+
+    public async Task<CredentialsValidationResult> ValidateCredentialsAsync(string username, string password, CancellationToken ct)
+    {
+        var user = await userStore.GetUserAsync(username, ct);
+        if (user is null)
+        {
+            return new CredentialsValidationResult(NotFound, InvalidCredentialsErrorMessage);
+        }
+
+        if (!user.IsActive)
+        {
+            return new CredentialsValidationResult(Inactive, InactiveUserErrorMessage);
+        }
+
+        if (await user.IsBlockedAsync(ct))
+        {
+            return new CredentialsValidationResult(Blocked, BlockedUserErrorMessage);
+        }
+
+        if (!await user.ValidateCredentialsAsync(password, ct))
+        {
+            return new CredentialsValidationResult(InvalidCredentials, InvalidCredentialsErrorMessage);
+        }
+
+        return new CredentialsValidationResult(user);
     }
 }
