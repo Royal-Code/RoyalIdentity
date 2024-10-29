@@ -1,8 +1,30 @@
 @page "/account/manage/user-panel"
+@using Microsoft.AspNetCore.Authorization
+@using RoyalIdentity.Extensions
+
+@attribute [Authorize]
 
 <PageTitle>User Panel</PageTitle>
 
-<h3>User Panel</h3>
+<h1>User Panel</h1>
+
+<AuthorizeView>
+
+    <h2>
+        Olá @context.User.GetDisplayName().
+    </h2>
+
+    <div>
+        <div>User information</div>
+        <div>
+            @foreach(var claim in context.User.Claims)
+            {
+                <div>@claim.Type: @claim.Value</div>
+            }
+        </div>
+    </div>
+
+</AuthorizeView>
 
 @code {
 

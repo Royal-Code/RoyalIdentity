@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components.Authorization;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Server.Services;
 using RoyalIdentity.Storage.InMemory.Extensions;
@@ -16,12 +16,23 @@ public static class HostServices
         services.AddScoped<IdentityRedirectManager>();
         services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
-        services.AddAuthentication(options =>
+        // authentication
+        services.AddAuthentication()
+            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
             {
-                options.DefaultScheme = IdentityConstants.ApplicationScheme;
-                options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-            })
-            .AddIdentityCookies();
+                options.Events.OnValidatePrincipal = async context =>
+                {
+                    if (context.Principal is null)
+                        return;
+
+                    var isSessionActive = await context.HttpContext.ValidateUserSessionAsync(context.Principal);
+                    if (!isSessionActive)
+                    {
+                        context.RejectPrincipal();
+                    }
+                };
+            });
+        services.AddAuthorization();
 
         // Storage Services
         services.AddInMemoryStorage();

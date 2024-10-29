@@ -27,4 +27,12 @@ public interface IUserSessionStore
     ///     The current session if it exists, null otherwise.
     /// </returns>
     ValueTask<IdentitySession?> GetCurrentSessionAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Try to get the session for the user with the given session identifier.
+    /// </summary>
+    /// <param name="sessionId">The session identifier (sid).</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The session if it exists, null otherwise.</returns>
+    ValueTask<IdentitySession?> GetUserSessionAsync(string sessionId, CancellationToken ct);
 }

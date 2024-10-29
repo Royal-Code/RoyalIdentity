@@ -49,13 +49,15 @@ public class UserSessionStore : IUserSessionStore
     {
         IdentitySession? session = null;
         var httpContext = accessor.HttpContext;
-        if (httpContext is null)
-            return new ValueTask<IdentitySession?>(session);
 
-        if (!httpContext.User.IsAuthenticated())
-            return new ValueTask<IdentitySession?>(session);
+        return httpContext is not null && httpContext.User.IsAuthenticated()
+            ? GetUserSessionAsync(httpContext.User.GetSessionId(), ct)
+            : new ValueTask<IdentitySession?>(session);
+    }
 
-        memoryStorage.UserSessions.TryGetValue(httpContext.User.GetSessionId(), out session);
+    public ValueTask<IdentitySession?> GetUserSessionAsync(string sessionId, CancellationToken ct)
+    {
+        memoryStorage.UserSessions.TryGetValue(sessionId, out var session);
         return new ValueTask<IdentitySession?>(session);
     }
 }

@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Options;
+using RoyalIdentity.Users.Contracts;
 
 namespace RoyalIdentity.Extensions;
 
@@ -137,6 +139,14 @@ public static class HttpContextExtensions
         options.IssuerUri = uri;
 
         return options.IssuerUri;
+    }
+
+    public static async Task<bool> ValidateUserSessionAsync(this HttpContext context, ClaimsPrincipal principal)
+    {
+        var sessionId = principal.GetSessionId();
+        var userSessionStore = context.RequestServices.GetRequiredService<IUserSessionStore>();
+        var currentSession = await userSessionStore.GetUserSessionAsync(sessionId, context.RequestAborted);
+        return currentSession is { IsActive : true };
     }
 
     //internal static async Task<string> GetIdentityServerSignoutFrameCallbackUrlAsync(this HttpContext context, LogoutMessage logoutMessage = null)

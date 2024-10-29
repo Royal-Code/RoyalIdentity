@@ -14,5 +14,5 @@ public abstract class IdentityUser
 
     public abstract ValueTask<bool> IsBlockedAsync(CancellationToken ct = default);
 
-    public abstract ValueTask<ClaimsPrincipal> CreatePrincipalAsync(CancellationToken ct = default);
+    public abstract ValueTask<ClaimsPrincipal> CreatePrincipalAsync(string? amr, CancellationToken ct = default);
 }

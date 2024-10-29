@@ -41,7 +41,7 @@
     {
         var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, default);
 
-        var returnUrl = ReturnUrl ?? "/account/manage/user-panel";
+        var returnUrl = ReturnUrl ?? "account/manage/user-panel";
 
         if (context?.IdP is not null && await SchemeProvider.GetSchemeAsync(context.IdP) is not null)
         {

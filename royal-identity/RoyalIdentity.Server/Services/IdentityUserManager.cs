@@ -22,7 +22,7 @@ public class IdentityUserManager
             user = await userStore.GetUserAsync(userName);
 
         if (user is null)
-            redirectManager.RedirectToWithStatus("Account/InvalidUser", $"Error: Unable to load user with UserName '{userName}'.", context);
+            redirectManager.RedirectToWithStatus("Account/InvalidUser", $"Error: Unable to load user with Username '{userName}'.", context);
 
         return user;
     }

@@ -47,7 +47,7 @@ public class UserStore : IUserStore, IUserDetailsStore
 
     public Task SaveUserDetailsAsync(UserDetails details, CancellationToken ct = default)
     {
-        storage.UsersDetails.AddOrUpdate(details.UserName, details, (_, _) => details);
+        storage.UsersDetails.AddOrUpdate(details.Username, details, (_, _) => details);
         return Task.CompletedTask;
     }
 }

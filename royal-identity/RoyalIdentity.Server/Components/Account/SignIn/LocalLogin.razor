@@ -84,7 +84,7 @@
         var evt2 = new UserLoginSuccessEvent(Input.Username!, user, context);
         await EventDispatcher.DispatchAsync(evt2);
 
-        await SignInManager.SignInAsync(user, Input.RememberLogin, default);
+        await SignInManager.SignInAsync(user, Input.RememberLogin, "pwd", default);
 
         if (context is not null)
         {
@@ -106,7 +106,7 @@
             NavigationManager.NavigateTo("/", true);
         }
 
-        var uri = new Uri(Input.ReturnUrl!);
+        var uri = new Uri(Input.ReturnUrl!, UriKind.RelativeOrAbsolute);
 
         // if it's an absolute URI, and it's not a local page (from the same host) it throws an exception
         if (uri is { IsAbsoluteUri: true, IsLoopback: false })
@@ -115,7 +115,7 @@
         }
 
         // redirect to the return URL
-        NavigationManager.NavigateTo(Input.ReturnUrl!);
+        NavigationManager.NavigateTo(uri.ToString(), true);
     }
 
 }

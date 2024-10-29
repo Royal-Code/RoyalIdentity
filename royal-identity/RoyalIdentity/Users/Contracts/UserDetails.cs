@@ -4,7 +4,7 @@ namespace RoyalIdentity.Users.Contracts;
 
 public class UserDetails
 {
-    public string UserName { get; set; }
+    public string Username { get; set; }
 
     public string PasswordHash { get; set; }
 
@@ -14,5 +14,5 @@ public class UserDetails
 
     public int LoginAttemptsWithPasswordErrors { get; set; }
 
-    public HashSet<Claim> Claims { get; } = [];
+    public HashSet<Claim> Claims { get; set; } = [];
 }

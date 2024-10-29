@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -102,8 +103,10 @@ public class DefaultSignInManager : ISignInManager
         return new CredentialsValidationResult(user);
     }
 
-    public async Task SignInAsync(IdentityUser user, bool inputRememberLogin, CancellationToken ct)
+    public async Task SignInAsync(IdentityUser user, bool inputRememberLogin, string amr, CancellationToken ct)
     {
+        //new Claim("amr", "pwd")
+
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext is null)
             throw new InvalidOperationException("HttpContext is required for SignInAsync");
@@ -120,7 +123,7 @@ public class DefaultSignInManager : ISignInManager
             };
         }
 
-        var principal = await user.CreatePrincipalAsync(ct);
+        var principal = await user.CreatePrincipalAsync(amr, ct);
 
         var sid = principal.FindFirst(JwtClaimTypes.SessionId);
         if (sid is null)
@@ -132,7 +135,8 @@ public class DefaultSignInManager : ISignInManager
         props ??= new();
         props.Items[JwtClaimTypes.SessionId] = sid.Value;
 
-        await httpContext.SignInAsync(principal, props);
+        var authenticationScheme = await httpContext.GetCookieAuthenticationSchemeAsync();
+        await httpContext.SignInAsync(authenticationScheme, principal, props);
 
         logger.LogInformation("User logged in: {Username}, Session id: {SessionId}", user.UserName, sid.Value);
     }
