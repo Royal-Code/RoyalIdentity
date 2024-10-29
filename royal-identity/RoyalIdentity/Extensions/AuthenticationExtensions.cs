@@ -21,7 +21,7 @@ public static class AuthenticationExtensions
     // /// <returns></returns>
     // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user)
     // {
-    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal());
+    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipalAsync());
     // }
 
     // /// <summary>
@@ -34,7 +34,7 @@ public static class AuthenticationExtensions
     // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user,
     //     AuthenticationProperties properties)
     // {
-    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal(),
+    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipalAsync(),
     //         properties);
     // }
 

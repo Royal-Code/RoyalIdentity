@@ -14,15 +14,13 @@ namespace RoyalIdentity.Contexts;
 
 public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, IWithCodeChallenge
 {
-    private readonly ClaimsPrincipal subject;
-
     public AuthorizeContext(
         HttpContext httpContext,
         NameValueCollection raw,
         ClaimsPrincipal? subject = null,
         ContextItems? items = null) : base(httpContext, raw, items)
     {
-        this.subject = subject ?? httpContext.User;
+        Subject = subject ?? httpContext.User;
     }
 
     /// <summary>
@@ -31,7 +29,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <value>
     /// The subject.
     /// </value>
-    public ClaimsPrincipal Subject => subject;
+    public ClaimsPrincipal Subject { get; }
 
     /// <summary>
     /// Gets the subject identity.

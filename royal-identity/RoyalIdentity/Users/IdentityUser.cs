@@ -1,4 +1,6 @@
-﻿namespace RoyalIdentity.Users;
+﻿using System.Security.Claims;
+
+namespace RoyalIdentity.Users;
 
 public abstract class IdentityUser
 {
@@ -11,4 +13,6 @@ public abstract class IdentityUser
     public abstract ValueTask<bool> ValidateCredentialsAsync(string password, CancellationToken ct = default);
 
     public abstract ValueTask<bool> IsBlockedAsync(CancellationToken ct = default);
+
+    public abstract ValueTask<ClaimsPrincipal> CreatePrincipalAsync(CancellationToken ct = default);
 }

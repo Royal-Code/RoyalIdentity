@@ -1,0 +1,28 @@
+@page "/account/signedin"
+@using RoyalIdentity.Users
+
+@inject ISignInManager SignInManager
+
+<PageTitle>Signed In</PageTitle>
+
+<AccountContent>
+    <div class="signed-in-container">
+        <div class="signed-in-message">
+            <h2>Welcome back!</h2>
+            <p>You have successfully signed in.</p>
+            <p>You can now return to your application.</p>
+        </div>
+    </div>
+</AccountContent>
+
+@code {
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, default);
+    }
+
+}

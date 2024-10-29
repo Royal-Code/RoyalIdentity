@@ -4,6 +4,7 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Contracts;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -12,20 +13,20 @@ public class DefaultCodeFactory : ICodeFactory
     private readonly TimeProvider time;
     private readonly ISessionStateGenerator sessionStateGenerator;
     private readonly IAuthorizationCodeStore codeStore;
-    private readonly IUserSession userSession;
+    private readonly IUserSessionStore userSessionStore;
     private readonly ILogger logger;
 
     public DefaultCodeFactory(
         TimeProvider time,
         ISessionStateGenerator sessionStateGenerator,
         IAuthorizationCodeStore codeStore,
-        IUserSession userSession,
+        IUserSessionStore userSession,
         ILogger<DefaultCodeFactory> logger)
     {
         this.time = time;
         this.sessionStateGenerator = sessionStateGenerator;
         this.codeStore = codeStore;
-        this.userSession = userSession;
+        this.userSessionStore = userSessionStore;
         this.logger = logger;
     }
 
@@ -35,6 +36,8 @@ public class DefaultCodeFactory : ICodeFactory
 
         context.AssertHasClient();
         context.AssertHasRedirectUri();
+
+        var sid = context.Subject.GetSessionId();
 
         var sessionState = sessionStateGenerator.GenerateSessionStateValue(context);
 
@@ -56,7 +59,7 @@ public class DefaultCodeFactory : ICodeFactory
         };
 
         await codeStore.StoreAuthorizationCodeAsync(code, ct);
-        await userSession.AddClientIdAsync(context.ClientId!);
+        await userSessionStore.AddClientIdAsync(sid, context.ClientId!, ct);
 
         logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, code.Code);
 

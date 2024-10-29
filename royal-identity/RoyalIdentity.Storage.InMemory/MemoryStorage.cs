@@ -3,6 +3,8 @@ using System.Collections.Specialized;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Contracts;
+using RoyalIdentity.Users.Defaults;
 
 namespace RoyalIdentity.Storage.InMemory;
 
@@ -24,5 +26,7 @@ public class MemoryStorage
 
     public ConcurrentDictionary<string, Consent> Consents { get; } = new();
 
-    public ConcurrentDictionary<string, IdentityUser> Users { get; } = new();
+    public ConcurrentDictionary<string, UserDetails> UsersDetails { get; } = new();
+
+    public ConcurrentDictionary<string, IdentitySession> UserSessions { get; } = new();
 }

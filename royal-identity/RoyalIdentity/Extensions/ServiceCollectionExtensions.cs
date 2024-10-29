@@ -5,6 +5,7 @@ using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
 using RoyalIdentity.Handlers;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
 
 namespace RoyalIdentity.Extensions;
@@ -37,6 +38,8 @@ public static class ServiceCollectionExtensions
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();
         services.AddScoped<IUserSession, DefaultUserSession>();
+        services.AddScoped<ISignInManager, DefaultSignInManager>();
+        services.AddScoped<IPasswordProtector, DefaultPasswordProtector>();
 
         // Decorators
         services.AddTransient<ConsentDecorator>();

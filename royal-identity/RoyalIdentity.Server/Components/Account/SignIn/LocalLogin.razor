@@ -9,13 +9,13 @@
 @inject IEventDispatcher EventDispatcher;
 
 
-<StatusMessage Message="@errorMessage"/>
+<StatusMessage Message="@errorMessage" MessageClass="danger"/>
 
 <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
     <DataAnnotationsValidator/>
     <ValidationSummary class="text-danger" role="alert"/>
 
-    <input type="hidden" value="@Input.ReturnUrl"/>
+    <InputText @bind-Value="Input.ReturnUrl" type="hidden" />
 
     <div class="form-floating mb-3">
         <InputText @bind-Value="Input.Username" class="form-control" id="Username" autocomplete="username" aria-required="true" placeholder="Username"/>
@@ -29,12 +29,15 @@
         <ValidationMessage For="() => Input.Password" class="text-danger"/>
     </div>
 
-    <div class="checkbox mb-3">
-        <label class="form-label">
-            <InputCheckbox @bind-Value="Input.RememberLogin" class="darker-border-checkbox form-check-input"/>
-            Remember My Login
-        </label>
-    </div>
+    @if (Model.AllowRememberLogin)
+    {
+        <div class="checkbox mb-3">
+            <label class="form-label">
+                <InputCheckbox @bind-Value="Input.RememberLogin" class="darker-border-checkbox form-check-input"/>
+                Remember My Login
+            </label>
+        </div>
+    }
 
     <div>
         <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
@@ -42,7 +45,7 @@
 
     <div class="mt-2">
         <p class="text-center">
-            <a href="Account/ForgotPassword">Forgot your password?</a>
+            <a href="account/forgot-password">Forgot your password?</a>
         </p>
     </div>
 </EditForm>
@@ -56,6 +59,12 @@
 
     [SupplyParameterFromForm]
     private LoginInputModel Input { get; set; } = new();
+
+    protected override Task OnParametersSetAsync()
+    {
+        Input.ReturnUrl = Model.ReturnUrl;
+        return base.OnParametersSetAsync();
+    }
 
     public async Task LoginUser()
     {
@@ -75,32 +84,38 @@
         var evt2 = new UserLoginSuccessEvent(Input.Username!, user, context);
         await EventDispatcher.DispatchAsync(evt2);
 
+        await SignInManager.SignInAsync(user, Input.RememberLogin, default);
 
+        if (context is not null)
+        {
+            var redirectUri = context.RedirectUri;
 
-        // This doesn't count login failures towards account lockout
-        // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-        // var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+            if (!redirectUri.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                // The client is native, so this change in how to
+                // return the response is for better UX for the end user.
+                NavigationManager.NavigateTo("/account/signedin?redirectUri=" + redirectUri);
+            }
 
-        // if (result.Succeeded)
-        // {
-        //     Logger.LogInformation("User logged in.");
-        //     RedirectManager.RedirectTo(Model.ReturnUrl);
-        // }
-        // else if (result.RequiresTwoFactor)
-        // {
-        //     RedirectManager.RedirectTo(
-        //         "Account/LoginWith2fa",
-        //         new() { ["returnUrl"] = Model.ReturnUrl, ["rememberLogin"] = Input.RememberLogin });
-        // }
-        // else if (result.IsLockedOut)
-        // {
-        //     Logger.LogWarning("User account locked out.");
-        //     RedirectManager.RedirectTo("Account/Lockout");
-        // }
-        // else
-        // {
-        //     errorMessage = "Error: Invalid login attempt.";
-        // }
+            // we can trust in the redirectUri since GetAuthorizationContextAsync returned non-null
+            NavigationManager.NavigateTo(context.RedirectUri);
+        }
+
+        if (string.IsNullOrEmpty(Input.ReturnUrl))
+        {
+            NavigationManager.NavigateTo("/", true);
+        }
+
+        var uri = new Uri(Input.ReturnUrl!);
+
+        // if it's an absolute URI, and it's not a local page (from the same host) it throws an exception
+        if (uri is { IsAbsoluteUri: true, IsLoopback: false })
+        {
+            throw new Exception("invalid return URL");
+        }
+
+        // redirect to the return URL
+        NavigationManager.NavigateTo(Input.ReturnUrl!);
     }
 
 }

@@ -51,7 +51,7 @@ public class DefaultUserSession : IUserSession
     }
 
     [Redesign("Ver definição na interface")]
-    public async ValueTask<ClaimsPrincipal?> GetUserAsync()
+    public async ValueTask<ClaimsPrincipal?> GetUserAsync(CancellationToken ct = default)
     {
         if (!authenticated)
             await AuthenticateAsync();

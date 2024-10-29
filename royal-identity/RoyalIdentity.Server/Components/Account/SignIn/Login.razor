@@ -1,10 +1,12 @@
 ﻿@page "/account/login"
 
+@using Microsoft.Extensions.Options
 @using RoyalIdentity.Options
 @using RoyalIdentity.Users
 
 @inject ISignInManager SignInManager
 @inject IAuthenticationSchemeProvider SchemeProvider
+@inject IOptions<AccountOptions> AccountOptions
 
 <PageTitle>Log in</PageTitle>
 
@@ -15,12 +17,12 @@
     <ChildContent>
         @if (model is not null)
         {
-            @if (model.EnableLocalLogin)
+            if (model.EnableLocalLogin)
             {
                 <LocalLogin Model="model"/>
             }
 
-            @if (model.EnableExternalLogin)
+            if (model.EnableExternalLogin)
             {
                 <ExternalLoginPicker ExternalProviders="model.GetVisibleExternalProviders()"/>
             }
@@ -39,6 +41,8 @@
     {
         var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, default);
 
+        var returnUrl = ReturnUrl ?? "/account/manage/user-panel";
+
         if (context?.IdP is not null && await SchemeProvider.GetSchemeAsync(context.IdP) is not null)
         {
             var local = context.IdP == ServerConstants.LocalIdentityProvider;
@@ -47,7 +51,7 @@
             model = new LoginViewModel
             {
                 EnableLocalLogin = local,
-                ReturnUrl = ReturnUrl,
+                ReturnUrl = returnUrl,
                 Username = context.LoginHint,
             };
 
@@ -83,9 +87,9 @@
 
         model = new LoginViewModel
         {
-            AllowRememberLogin = AccountOptions.AllowRememberLogin,
-            EnableLocalLogin = allowLocal && AccountOptions.AllowLocalLogin,
-            ReturnUrl = ReturnUrl,
+            AllowRememberLogin = AccountOptions.Value.AllowRememberLogin,
+            EnableLocalLogin = allowLocal && AccountOptions.Value.AllowLocalLogin,
+            ReturnUrl = returnUrl,
             Username = context?.LoginHint,
             ExternalProviders = providers.ToArray()
         };

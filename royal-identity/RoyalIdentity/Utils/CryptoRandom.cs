@@ -5,10 +5,9 @@ namespace RoyalIdentity.Utils;
 /// <summary>
 /// A class that mimics the standard Random class in the .NET Framework - but uses a random number generator internally.
 /// </summary>
-public class CryptoRandom : Random
+public static class CryptoRandom
 {
     private static readonly RandomNumberGenerator Rng = RandomNumberGenerator.Create();
-    private readonly byte[] _uint32Buffer = new byte[4];
 
     /// <summary>
     /// Output format for unique IDs
@@ -43,6 +42,15 @@ public class CryptoRandom : Random
     }
 
     /// <summary>
+    /// Creates a random key for the specified byte array.
+    /// </summary>
+    /// <returns></returns>
+    public static void CreateRandomKey(byte[] bytes)
+    {
+        Rng.GetBytes(bytes);
+    }
+
+    /// <summary>
     /// Creates a URL safe unique identifier.
     /// </summary>
     /// <param name="length">The length.</param>
@@ -62,26 +70,16 @@ public class CryptoRandom : Random
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="CryptoRandom"/> class.
-    /// </summary>
-    public CryptoRandom() { }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CryptoRandom"/> class.
-    /// </summary>
-    /// <param name="ignoredSeed">seed (ignored)</param>
-    public CryptoRandom(int ignoredSeed) { }
-
-    /// <summary>
     /// Returns a nonnegative random number.
     /// </summary>
     /// <returns>
     /// A 32-bit signed integer greater than or equal to zero and less than <see cref="F:System.Int32.MaxValue"/>.
     /// </returns>
-    public override int Next()
+    public static int Next()
     {
-        Rng.GetBytes(_uint32Buffer);
-        return BitConverter.ToInt32(_uint32Buffer, 0) & 0x7FFFFFFF;
+        var buffer = new byte[4];
+        Rng.GetBytes(buffer);
+        return BitConverter.ToInt32(buffer, 0) & 0x7FFFFFFF;
     }
 
     /// <summary>
@@ -94,7 +92,7 @@ public class CryptoRandom : Random
     /// <exception cref="T:System.ArgumentOutOfRangeException">
     /// 	<paramref name="maxValue"/> is less than zero.
     /// </exception>
-    public override int Next(int maxValue)
+    public static int Next(int maxValue)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maxValue);
         return Next(0, maxValue);
@@ -111,18 +109,19 @@ public class CryptoRandom : Random
     /// <exception cref="T:System.ArgumentOutOfRangeException">
     /// 	<paramref name="minValue"/> is greater than <paramref name="maxValue"/>.
     /// </exception>
-    public override int Next(int minValue, int maxValue)
+    public static int Next(int minValue, int maxValue)
     {
         ArgumentOutOfRangeException.ThrowIfGreaterThan(minValue, maxValue);
         if (minValue == maxValue)
             return minValue;
 
         var diff = maxValue - minValue;
+        var buffer = new byte[4];
 
         while (true)
         {
-            Rng.GetBytes(_uint32Buffer);
-            var rand = BitConverter.ToUInt32(_uint32Buffer, 0);
+            Rng.GetBytes(buffer);
+            var rand = BitConverter.ToUInt32(buffer, 0);
 
             var max = 1 + (long)uint.MaxValue;
             var remainder = max % diff;
@@ -139,10 +138,11 @@ public class CryptoRandom : Random
     /// <returns>
     /// A double-precision floating point number greater than or equal to 0.0, and less than 1.0.
     /// </returns>
-    public override double NextDouble()
+    public static double NextDouble()
     {
-        Rng.GetBytes(_uint32Buffer);
-        var rand = BitConverter.ToUInt32(_uint32Buffer, 0);
+        var buffer = new byte[4];
+        Rng.GetBytes(buffer);
+        var rand = BitConverter.ToUInt32(buffer, 0);
         return rand / (1.0 + uint.MaxValue);
     }
 
@@ -153,7 +153,7 @@ public class CryptoRandom : Random
     /// <exception cref="T:System.ArgumentNullException">
     /// 	<paramref name="buffer"/> is null.
     /// </exception>
-    public override void NextBytes(byte[] buffer)
+    public static void NextBytes(byte[] buffer)
     {
         ArgumentNullException.ThrowIfNull(buffer);
         Rng.GetBytes(buffer);

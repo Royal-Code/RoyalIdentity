@@ -32,4 +32,6 @@ public interface ISignInManager
     /// <param name="ct"></param>
     /// <returns></returns>
     Task<CredentialsValidationResult> ValidateCredentialsAsync(string username, string password, CancellationToken ct);
+
+    Task SignInAsync(IdentityUser user, bool inputRememberLogin, CancellationToken ct);
 }

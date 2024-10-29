@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
@@ -12,23 +15,25 @@ namespace RoyalIdentity.Users.Defaults;
 
 public class DefaultSignInManager : ISignInManager
 {
-    public static string InvalidCredentialsErrorMessage { get; set; } = "Invalid username or password";
-    public static string InactiveUserErrorMessage { get; set; } = "Invalid username or password";
-    public static string BlockedUserErrorMessage { get; set; } = "Invalid username or password";
-
+    private readonly IHttpContextAccessor httpContextAccessor;
     private readonly IAuthorizeParametersStore? authorizeParametersStore;
     private readonly IAuthorizeRequestValidator authorizeRequestValidator;
     private readonly IUserStore userStore;
+    private readonly AccountOptions accountOptions;
     private readonly ILogger logger;
 
     public DefaultSignInManager(
+        IHttpContextAccessor httpContextAccessor,
         IAuthorizeRequestValidator authorizeRequestValidator,
         IUserStore userStore,
+        IOptions<AccountOptions> accountOptions,
         ILogger<DefaultSignInManager> logger,
         IAuthorizeParametersStore? authorizeParametersStore = null)
     {
+        this.httpContextAccessor = httpContextAccessor;
         this.authorizeRequestValidator = authorizeRequestValidator;
         this.userStore = userStore;
+        this.accountOptions = accountOptions.Value;
         this.logger = logger;
         this.authorizeParametersStore = authorizeParametersStore;
     }
@@ -42,7 +47,8 @@ public class DefaultSignInManager : ISignInManager
 
             var parameters = returnUrl.ReadQueryStringAsNameValueCollection();
             if (authorizeParametersStore is not null
-                && parameters.TryGet(Constants.AuthorizationParamsStore.MessageStoreIdParameterName, out var messageStoreId))
+                && parameters.TryGet(Constants.AuthorizationParamsStore.MessageStoreIdParameterName,
+                    out var messageStoreId))
             {
                 parameters = await authorizeParametersStore.ReadAsync(messageStoreId, ct) ?? [];
             }
@@ -69,29 +75,65 @@ public class DefaultSignInManager : ISignInManager
         return null;
     }
 
-    public async Task<CredentialsValidationResult> ValidateCredentialsAsync(string username, string password, CancellationToken ct)
+    public async Task<CredentialsValidationResult> ValidateCredentialsAsync(string username, string password,
+        CancellationToken ct)
     {
         var user = await userStore.GetUserAsync(username, ct);
         if (user is null)
         {
-            return new CredentialsValidationResult(NotFound, InvalidCredentialsErrorMessage);
+            return new CredentialsValidationResult(NotFound, accountOptions.InvalidCredentialsErrorMessage);
         }
 
         if (!user.IsActive)
         {
-            return new CredentialsValidationResult(Inactive, InactiveUserErrorMessage);
+            return new CredentialsValidationResult(Inactive, accountOptions.InactiveUserErrorMessage);
         }
 
         if (await user.IsBlockedAsync(ct))
         {
-            return new CredentialsValidationResult(Blocked, BlockedUserErrorMessage);
+            return new CredentialsValidationResult(Blocked, accountOptions.BlockedUserErrorMessage);
         }
 
         if (!await user.ValidateCredentialsAsync(password, ct))
         {
-            return new CredentialsValidationResult(InvalidCredentials, InvalidCredentialsErrorMessage);
+            return new CredentialsValidationResult(InvalidCredentials, accountOptions.InvalidCredentialsErrorMessage);
         }
 
         return new CredentialsValidationResult(user);
+    }
+
+    public async Task SignInAsync(IdentityUser user, bool inputRememberLogin, CancellationToken ct)
+    {
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is null)
+            throw new InvalidOperationException("HttpContext is required for SignInAsync");
+
+        // only set explicit expiration here if user chooses "remember me".
+        // otherwise we rely upon expiration configured in cookie middleware.
+        AuthenticationProperties? props = null;
+        if (inputRememberLogin && accountOptions.AllowRememberLogin)
+        {
+            props = new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.Add(accountOptions.RememberMeLoginDuration)
+            };
+        }
+
+        var principal = await user.CreatePrincipalAsync(ct);
+
+        var sid = principal.FindFirst(JwtClaimTypes.SessionId);
+        if (sid is null)
+        {
+            // sid is required, when not present, throw exception
+            throw new InvalidOperationException("SessionId claim is required, but it is not present in the principal");
+        }
+
+        props ??= new();
+        props.Items[JwtClaimTypes.SessionId] = sid.Value;
+
+        await httpContext.SignInAsync(principal, props);
+
+        logger.LogInformation("User logged in: {Username}, Session id: {SessionId}", user.UserName, sid.Value);
     }
 }
