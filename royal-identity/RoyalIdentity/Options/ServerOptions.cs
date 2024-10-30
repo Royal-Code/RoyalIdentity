@@ -35,6 +35,11 @@ public class ServerOptions
     public LoggingOptions Logging { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the discovery options.
+    /// </summary>
+    public DiscoveryOptions Discovery { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the endpoint configuration.
     /// </summary>
     /// <value>

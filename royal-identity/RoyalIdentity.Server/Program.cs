@@ -1,3 +1,4 @@
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Server;
 using RoyalIdentity.Server.Components;
 
@@ -22,6 +23,8 @@ app.UseAntiforgery();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapOpenIdConnectProviderEndpoints();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

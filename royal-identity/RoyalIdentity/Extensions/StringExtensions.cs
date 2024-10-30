@@ -86,7 +86,7 @@ internal static class StringExtensions
     }
 
     [DebuggerStepThrough]
-    
+    [return: NotNullIfNotNull(nameof(url))]
     public static string? EnsureLeadingSlash(this string? url)
     {
         if (url is not null && !url.StartsWith('/'))
@@ -98,6 +98,7 @@ internal static class StringExtensions
     }
 
     [DebuggerStepThrough]
+    [return: NotNullIfNotNull(nameof(url))]
     public static string? EnsureTrailingSlash(this string? url)
     {
         if (url is not null && !url.EndsWith('/'))
@@ -109,6 +110,7 @@ internal static class StringExtensions
     }
 
     [DebuggerStepThrough]
+    [return: NotNullIfNotNull(nameof(url))]
     public static string? RemoveLeadingSlash(this string? url)
     {
         if (url is not null && url.StartsWith('/'))
@@ -120,6 +122,7 @@ internal static class StringExtensions
     }
 
     [DebuggerStepThrough]
+    [return: NotNullIfNotNull(nameof(url))]
     public static string? RemoveTrailingSlash(this string? url)
     {
         if (url is not null && url.EndsWith('/'))
@@ -131,6 +134,7 @@ internal static class StringExtensions
     }
 
     [DebuggerStepThrough]
+    [return: NotNullIfNotNull(nameof(url))]
     public static string? CleanUrlPath(this string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) url = "/";
@@ -242,6 +246,7 @@ internal static class StringExtensions
         return [];
     }
 
+    [DebuggerStepThrough]
     public static string? GetOrigin(this string? url)
     {
         if (url is not null)
@@ -265,6 +270,7 @@ internal static class StringExtensions
         return null;
     }
 
+    [DebuggerStepThrough]
     public static string Obfuscate(this string? value)
     {
         if (value is null)

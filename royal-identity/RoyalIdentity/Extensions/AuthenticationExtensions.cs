@@ -13,31 +13,6 @@ namespace RoyalIdentity.Extensions;
 /// </summary>
 public static class AuthenticationExtensions
 {
-    // /// <summary>
-    // /// Signs the user in.
-    // /// </summary>
-    // /// <param name="context">The manager.</param>
-    // /// <param name="user">The IdentityServer user.</param>
-    // /// <returns></returns>
-    // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user)
-    // {
-    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipalAsync());
-    // }
-
-    // /// <summary>
-    // /// Signs the user in.
-    // /// </summary>
-    // /// <param name="context">The manager.</param>
-    // /// <param name="user">The IdentityServer user.</param>
-    // /// <param name="properties">The authentication properties.</param>
-    // /// <returns></returns>
-    // public static async Task SignInAsync(this HttpContext context, IdentityServerUser user,
-    //     AuthenticationProperties properties)
-    // {
-    //     await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipalAsync(),
-    //         properties);
-    // }
-
     internal static TimeProvider GetClock(this HttpContext context)
     {
         return context.RequestServices.GetRequiredService<TimeProvider>();

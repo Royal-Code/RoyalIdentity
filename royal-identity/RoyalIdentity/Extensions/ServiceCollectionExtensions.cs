@@ -3,6 +3,7 @@ using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
+using RoyalIdentity.Endpoints;
 using RoyalIdentity.Handlers;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
@@ -55,8 +56,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<RequestedResourcesValidator>();
 
         // Handlers
-        
+        services.AddTransient<DiscoveryHandler>();
         services.AddTransient<AuthorizeContextHandler>();
+
+        // Endpoints
+        services.AddTransient<DiscoveryEndpoint>();
+        services.AddTransient<AuthorizeEndpoint>();
 
         return services;
     }

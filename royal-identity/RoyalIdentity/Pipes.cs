@@ -22,6 +22,15 @@ public static class Pipes
         services.AddPipelines(builder =>
         {
             //////////////////////////////
+            //// Discovery
+            //////////////////////////////
+            var discoveryPipe = builder.For<DiscoveryContext>();
+
+            options.CustomizeDiscoveryContext?.Invoke(discoveryPipe);
+
+            discoveryPipe.UseHandler<DiscoveryHandler>();
+
+            //////////////////////////////
             //// AuthorizeContext
             //////////////////////////////
             var authorizeContextPipe = builder.For<AuthorizeContext>()
@@ -58,6 +67,8 @@ public static class Pipes
 
 public class CustomOptions
 {
+    public Action<IPipelineConfigurationBuilder<DiscoveryContext>>? CustomizeDiscoveryContext { get; set; }
+
     public Action<IPipelineConfigurationBuilder<AuthorizeContext>>? CustomizeAuthorizeContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<AuthorizeValidateContext>>? CustomizeAuthorizeContextHandler { get; set; }
