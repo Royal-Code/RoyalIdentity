@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
 using RoyalIdentity.Server;
 using RoyalIdentity.Server.Components;
 
