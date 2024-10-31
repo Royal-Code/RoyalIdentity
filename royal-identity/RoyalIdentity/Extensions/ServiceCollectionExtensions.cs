@@ -35,6 +35,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
+        services.AddTransient<IExtensionsGrantsProvider, DefaultExtensionsGrantsProvider>();
+        services.AddSingleton<IClientSecretChecker, DefaultClientSecretChecker>();
 
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();

@@ -36,36 +36,36 @@ public static class Pipe
     public static RouteHandlerBuilder MapPipeline<TEndpoint>(this IEndpointRouteBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.Map(pattern, DefaultServerEndpoints.MapServerEndpoint<TEndpoint>);
+        return builder.Map(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipeline<TEndpoint>(this RouteGroupBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.Map(pattern, DefaultServerEndpoints.MapServerEndpoint<TEndpoint>);
+        return builder.Map(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelineGet<TEndpoint>(this IEndpointRouteBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapGet(pattern, DefaultServerEndpoints.MapServerEndpoint<TEndpoint>);
+        return builder.MapGet(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelineGet<TEndpoint>(this RouteGroupBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapGet(pattern, DefaultServerEndpoints.MapServerEndpoint<TEndpoint>);
+        return builder.MapGet(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelinePost<TEndpoint>(this IEndpointRouteBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapPost(pattern, DefaultServerEndpoints.MapServerEndpoint<TEndpoint>);
+        return builder.MapPost(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelinePost<TEndpoint>(this RouteGroupBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapPost(pattern, DefaultServerEndpoints.MapServerEndpoint<TEndpoint>);
+        return builder.MapPost(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 }

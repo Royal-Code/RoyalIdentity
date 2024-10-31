@@ -54,6 +54,15 @@ public class ResourceStore : IResourceStore
         return Task.FromResult(resources);
     }
 
+    public Task<Resources> GetAllEnabledResourcesAsync(CancellationToken ct = default)
+    {
+        Resources resources = new();
+        AddRange(resources.IdentityResources, storage.IdentityResources.Values.Where(x => x.Enabled));
+        AddRange(resources.ApiResources, storage.ApiResources.Values.Where(x => x.Enabled));
+        AddRange(resources.ApiScopes, storage.ApiScopes.Values.Where(x => x.Enabled));
+        return Task.FromResult(resources);
+    }
+
     public Task<Resources> FindResourcesByScopeAsync(
         IEnumerable<string> scopeNames, bool onlyEnabled = false, CancellationToken ct = default)
     {

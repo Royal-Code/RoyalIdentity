@@ -8,6 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddHostServices();
 
 var app = builder.Build();
@@ -19,12 +21,13 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
-app.UseAntiforgery();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapOpenIdConnectProviderEndpoints();
+
+app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

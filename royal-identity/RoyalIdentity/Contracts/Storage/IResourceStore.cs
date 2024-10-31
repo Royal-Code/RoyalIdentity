@@ -28,6 +28,13 @@ public interface IResourceStore
     Task<Resources> GetAllResourcesAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Gets all enabled resources.
+    /// </summary>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<Resources> GetAllEnabledResourcesAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Gets all resources (identity, API scopes, API resources) by scope name.
     /// </summary>
     Task<Resources> FindResourcesByScopeAsync(IEnumerable<string> scopeNames, bool onlyEnabled = false, CancellationToken ct = default);
