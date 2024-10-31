@@ -1,6 +1,7 @@
 ﻿
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Models.Keys;
 
 namespace RoyalIdentity.Contracts;
 

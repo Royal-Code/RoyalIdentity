@@ -1,10 +1,12 @@
 ﻿using Microsoft.IdentityModel.Tokens;
-using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Models.Keys;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultKeyManager : IKeyManager
 {
+
+
     public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(
         ICollection<string> allowedIdentityTokenSigningAlgorithms, CancellationToken ct)
     {

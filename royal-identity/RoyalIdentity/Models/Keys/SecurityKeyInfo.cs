@@ -1,6 +1,6 @@
 using Microsoft.IdentityModel.Tokens;
 
-namespace RoyalIdentity.Contracts.Models;
+namespace RoyalIdentity.Models.Keys;
 
 /// <summary>
 /// Information about a security key
