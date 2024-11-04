@@ -5,6 +5,7 @@ namespace RoyalIdentity.Models.Keys;
 /// <summary>
 /// Information about a security key
 /// </summary>
+[Redesign("Pode ser substituída por SigningCredentials")]
 public class SecurityKeyInfo
 {
     /// <summary>

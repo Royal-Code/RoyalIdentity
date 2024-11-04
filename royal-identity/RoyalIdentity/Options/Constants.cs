@@ -1265,7 +1265,11 @@ public static class ServerConstants
 
         SecurityAlgorithms.EcdsaSha256,
         SecurityAlgorithms.EcdsaSha384,
-        SecurityAlgorithms.EcdsaSha512
+        SecurityAlgorithms.EcdsaSha512,
+
+        SecurityAlgorithms.HmacSha256,
+        SecurityAlgorithms.HmacSha384,
+        SecurityAlgorithms.HmacSha512
     ];
 
     public enum RsaSigningAlgorithm

@@ -1,16 +1,15 @@
-﻿
-using Microsoft.IdentityModel.Tokens;
-using RoyalIdentity.Contracts.Models;
+﻿using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Models.Keys;
 
 namespace RoyalIdentity.Contracts;
 
 public interface IKeyManager
 {
-    [Redesign("Verificar, futuramente, se pode ser ValueTask")]
     ValueTask<SigningCredentials?> GetSigningCredentialsAsync(
         ICollection<string> allowedIdentityTokenSigningAlgorithms, 
         CancellationToken ct);
+
+    ValueTask<SigningCredentials?> GetSigningCredentialsAsync(CancellationToken ct);
 
     /// <summary>
     /// Gets all validation keys.
@@ -23,4 +22,11 @@ public interface IKeyManager
     /// </summary>
     /// <returns></returns>
     ValueTask<IReadOnlyList<SigningCredentials>> GetAllSigningCredentialsAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Creates a new <see cref="SigningCredentials" /> for the current algoritm.
+    /// </summary>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<SigningCredentials> CreateSigningCredentialsAsync(CancellationToken ct);
 }

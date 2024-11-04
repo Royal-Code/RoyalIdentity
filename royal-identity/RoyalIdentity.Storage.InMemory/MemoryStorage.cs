@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Security.Claims;
 using RoyalIdentity.Models;
+using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
@@ -105,6 +106,8 @@ public class MemoryStorage
             ]
         }
     };
+
+    public ConcurrentDictionary<string, KeyParameters> KeyParameters { get; } = new();
 
     public ConcurrentDictionary<string, AccessToken> AccessTokens { get; } = new();
 

@@ -1,26 +1,104 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models.Keys;
+using RoyalIdentity.Options;
+using RoyalIdentity.Utils.Caching;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultKeyManager : IKeyManager
 {
+    private readonly IKeyStore context;
+    private readonly ServerOptions options;
+    private readonly KeyCache cache;
+    private readonly ILogger logger;
 
-
-    public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(
-        ICollection<string> allowedIdentityTokenSigningAlgorithms, CancellationToken ct)
+    public DefaultKeyManager(
+        IKeyStore context,
+        IOptions<ServerOptions> options,
+        KeyCache cache,
+        ILogger<DefaultKeyManager> logger)
     {
-        await Task.Delay(10, ct);
-        return null;
-    }
-
-    public ValueTask<IReadOnlyList<SecurityKeyInfo>> GetValidationKeysAsync(CancellationToken ct)
-    {
-        throw new NotImplementedException();
+        this.context = context;
+        this.options = options.Value;
+        this.cache = cache;
+        this.logger = logger;
     }
 
     public ValueTask<IReadOnlyList<SigningCredentials>> GetAllSigningCredentialsAsync(CancellationToken ct)
     {
-        throw new NotImplementedException();
+        return cache.SigningCredentials.GetOrCreateValue(GetSigningKeyIds, GetSigningCredentials, ct);
+    }
+
+    public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(
+        ICollection<string> allowedIdentityTokenSigningAlgorithms, CancellationToken ct)
+    {
+        var credentials = await GetAllSigningCredentialsAsync(ct);
+        var credential = credentials.First(x => allowedIdentityTokenSigningAlgorithms.Contains(x.Algorithm));
+        return credential;
+    }
+
+    public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(CancellationToken ct)
+    {
+        var credentials = await GetAllSigningCredentialsAsync(ct);
+        var alg = options.Keys.MainSigningCredentialsAlgorithm;
+        var credential = credentials.First(x => alg == x.Algorithm);
+        return credential;
+    }
+
+    public ValueTask<IReadOnlyList<SecurityKeyInfo>> GetValidationKeysAsync(CancellationToken ct)
+    {
+        return cache.ValidationKeys.GetOrCreateValue(GetValidationKeyIds, GetValidationKeys, ct);
+    }
+
+    public async Task<SigningCredentials> CreateSigningCredentialsAsync(CancellationToken ct)
+    {
+        var alg = options.Keys.MainSigningCredentialsAlgorithm;
+
+        var key = KeyParameters.Create(alg);
+    }
+
+    private async Task<IReadOnlyList<string>> GetSigningKeyIds(CancellationToken ct)
+    {
+        logger.LogDebug("Obtendo nomes dos segredos das chaves de assinatura.");
+
+        // Gets all the secret names of the current keys,
+        // which are fit for use on the specified day (today).
+        return await context.ListAllCurrentKeysIdsAsync(ct: ct);
+    }
+
+    private async Task<IReadOnlyList<string>> GetValidationKeyIds(CancellationToken ct)
+    {
+        logger.LogDebug("Obtendo nomes dos segredos das chaves de validação.");
+
+        // Gets all the secret names of the current and expired keys,
+        // just doesn't include future keys.
+        return await context.ListAllKeysIdsAsync(ct: ct);
+    }
+
+    private async Task<IReadOnlyList<SigningCredentials>> GetSigningCredentials(IReadOnlyList<string> keyNames, CancellationToken ct)
+    {
+        logger.LogDebug("Lendo as chaves de assinatura do banco de dados: {KeyNames}", keyNames);
+
+        var parameters = await context.GetKeysAsync(keyNames, ct);
+
+        return parameters.Select(x => x.CreateSigningCredentials()).ToList();
+    }
+
+    private async Task<IReadOnlyList<SecurityKeyInfo>> GetValidationKeys(IReadOnlyList<string> keyNames, CancellationToken ct)
+    {
+        logger.LogDebug("Lendo as chaves de validação do banco de dados: {KeyNames}", keyNames);
+
+        var parameters = await context.GetKeysAsync(keyNames, ct);
+
+        return parameters
+            .Select(s => new SecurityKeyInfo()
+            {
+                Key = s.GetSecurityKey(),
+                SigningAlgorithm = s.SecurityAlgorithm
+            })
+            .ToList();
     }
 }

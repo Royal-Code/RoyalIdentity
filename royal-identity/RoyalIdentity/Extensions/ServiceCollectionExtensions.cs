@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
@@ -8,6 +9,7 @@ using RoyalIdentity.Handlers;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
+using RoyalIdentity.Utils.Caching;
 
 namespace RoyalIdentity.Extensions;
 
@@ -23,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.AddRoyalIdentityPipelines(customization);
 
         // Default contract implementations
+        services.AddTransient<IHostedService, DefaultServerJobsStartup>();
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();
         services.AddTransient<ICodeFactory, DefaultCodeFactory>();
         services.AddTransient<IConsentService, DefaultConsentService>();
@@ -64,6 +67,9 @@ public static class ServiceCollectionExtensions
         // Endpoints
         services.AddTransient<DiscoveryEndpoint>();
         services.AddTransient<AuthorizeEndpoint>();
+
+        // Others
+        services.AddSingleton<KeyCache>();
 
         return services;
     }

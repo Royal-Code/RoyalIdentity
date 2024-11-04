@@ -58,6 +58,11 @@ public class ServerOptions
     public MutualTlsOptions MutualTls { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the Keys Options options.
+    /// </summary>
+    public KeyOptions Keys { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the unique name of this server instance, e.g. https://myissuer.com.
     /// If not set, the issuer name is inferred from the request
     /// </summary>

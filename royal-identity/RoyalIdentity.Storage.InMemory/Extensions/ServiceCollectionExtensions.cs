@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Users.Contracts;
-using RoyalIdentity.Users.Defaults;
 
 namespace RoyalIdentity.Storage.InMemory.Extensions;
 
@@ -20,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IUserStore, UserStore>();
         services.AddTransient<IUserDetailsStore, UserStore>();
         services.AddTransient<IUserSessionStore, UserSessionStore>();
+        services.AddTransient<IKeyStore, KeyStore>();
 
         return services;
     }

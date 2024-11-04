@@ -30,7 +30,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "host", "host", "{D3D28FDF-F
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity.Server", "RoyalIdentity.Server\RoyalIdentity.Server.csproj", "{4DF7E5C8-3EEB-4017-82A4-F4564EA56CC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.WebApp", "Tests.WebApp\Tests.WebApp.csproj", "{9B329235-5C50-4FFD-ABDF-2D6C680ADC45}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.WebApp", "Tests.WebApp\Tests.WebApp.csproj", "{9B329235-5C50-4FFD-ABDF-2D6C680ADC45}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.Identity", "Tests.Identity\Tests.Identity.csproj", "{F1986AC4-78E3-440A-BCAA-CF483E097D5D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -70,6 +72,10 @@ Global
 		{9B329235-5C50-4FFD-ABDF-2D6C680ADC45}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9B329235-5C50-4FFD-ABDF-2D6C680ADC45}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9B329235-5C50-4FFD-ABDF-2D6C680ADC45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F1986AC4-78E3-440A-BCAA-CF483E097D5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F1986AC4-78E3-440A-BCAA-CF483E097D5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F1986AC4-78E3-440A-BCAA-CF483E097D5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F1986AC4-78E3-440A-BCAA-CF483E097D5D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -83,6 +89,7 @@ Global
 		{CB565CB0-DA53-4BA4-9AD8-46543AED5E9B} = {722691C4-EF38-489C-B03E-B53D3C941470}
 		{4DF7E5C8-3EEB-4017-82A4-F4564EA56CC0} = {D3D28FDF-F0A2-4AA5-8215-CAE555330C19}
 		{9B329235-5C50-4FFD-ABDF-2D6C680ADC45} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
+		{F1986AC4-78E3-440A-BCAA-CF483E097D5D} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A22735B7-0B63-4698-8CF5-359FC47E98DD}
