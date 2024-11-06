@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,12 +9,12 @@ using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
 
-public class DiscoveryEndpoint : IEndpointHandler
+public class JwkEndpoint : IEndpointHandler
 {
     private readonly ILogger logger;
     private readonly ServerOptions options;
 
-    public DiscoveryEndpoint(ILogger<DiscoveryEndpoint> logger, IOptions<ServerOptions> options)
+    public JwkEndpoint(ILogger<JwkEndpoint> logger, IOptions<ServerOptions> options)
     {
         this.logger = logger;
         this.options = options.Value;
@@ -22,12 +22,12 @@ public class DiscoveryEndpoint : IEndpointHandler
 
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
-        logger.LogTrace("Processing discovery request.");
+        logger.LogTrace("Processing jwk discovery request.");
 
         // validate HTTP
         if (!HttpMethods.IsGet(httpContext.Request.Method))
         {
-            logger.LogWarning("Discovery endpoint only supports GET requests");
+            logger.LogWarning("JWK Discovery endpoint only supports GET requests");
 
             // return a problem details of a UnsupportedMediaType infoming the http method is not allowed
             var problemDetails = new ProblemDetails
@@ -44,11 +44,11 @@ public class DiscoveryEndpoint : IEndpointHandler
                     ResponseHandler.Problem(problemDetails)));
         }
 
-        logger.LogDebug("Start discovery request");
+        logger.LogDebug("Start jwk discovery request");
 
-        if (!options.Endpoints.EnableDiscoveryEndpoint)
+        if (!options.Discovery.ShowKeySet)
         {
-            logger.LogInformation("Discovery endpoint disabled. 404.");
+            logger.LogInformation("JWK Discovery endpoint disabled. 404.");
 
             // return a problem details of a NotFound informing the discovery endpoint is disabled
             var problemDetails = new ProblemDetails
@@ -66,7 +66,7 @@ public class DiscoveryEndpoint : IEndpointHandler
         }
 
         var items = ContextItems.From(options);
-        var context = new DiscoveryContext(httpContext, options, items);
+        var context = new JwkContext(httpContext, options, items);
 
         return ValueTask.FromResult(new EndpointCreationResult(context));
     }

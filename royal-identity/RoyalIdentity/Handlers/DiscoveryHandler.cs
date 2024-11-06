@@ -10,7 +10,7 @@ using RoyalIdentity.Responses;
 
 namespace RoyalIdentity.Handlers;
 
-public class DiscoveryHandler: IHandler<DiscoveryContext>
+public class DiscoveryHandler : IHandler<DiscoveryContext>
 {
     private readonly IKeyManager keys;
     private readonly IResourceStore resourceStore;
