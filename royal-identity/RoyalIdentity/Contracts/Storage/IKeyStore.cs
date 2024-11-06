@@ -18,7 +18,7 @@ public interface IKeyStore
     /// <returns>
     ///     A list with the names of the key vault secrets for the keys currently valid for use.
     /// </returns>
-    public Task<IReadOnlyList<string>> ListAllCurrentKeysIdsAsync(DateTime? today = null, CancellationToken ct = default);
+    public Task<IReadOnlyList<string>> ListAllCurrentKeysIdsAsync(DateTime? now = null, CancellationToken ct = default);
 
     /// <summary>
     /// <para>
@@ -31,9 +31,9 @@ public interface IKeyStore
     /// <returns>
     ///     A list with the names of the key vault secrets for the keys valid for signature validation.
     /// </returns>
-    public Task<IReadOnlyList<string>> ListAllKeysIdsAsync(DateTime? today = null, CancellationToken ct = default);
+    public Task<IReadOnlyList<string>> ListAllKeysIdsAsync(DateTime? now = null, CancellationToken ct = default);
 
     public Task<KeyParameters> GetKeyAsync(string keyId, CancellationToken ct);
 
-    public Task<IReadOnlyList<KeyParameters>> GetKeysAsync(IReadOnlyList<string> keyNames, CancellationToken ct);
+    public Task<IReadOnlyList<KeyParameters>> GetKeysAsync(IReadOnlyList<string> keyIds, CancellationToken ct);
 }

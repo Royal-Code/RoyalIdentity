@@ -9,54 +9,107 @@ namespace RoyalIdentity.Models.Keys;
 
 public class KeyParameters
 {
-    public static KeyParameters Create(string alg, int keySize = 0)
+    /// <summary>
+    /// <para>
+    ///     Creates a new <see cref="KeyParameters"/> for the given algorithm.
+    /// </para>
+    /// </summary>
+    /// <param name="algorithm">Secutiry algorithm, see <see cref="SecurityAlgorithms"/>.</param>
+    /// <param name="lifetime">Key lifetime.</param>
+    /// <param name="keySize">For RSA keys, the key size must be entered. If not entered, 2048 will be used.</param>
+    /// <returns>
+    ///     A new instance of <see cref=‘KeyParameters’/>.
+    /// </returns>
+    /// <exception cref="NotSupportedException">
+    ///     Occurs when the algorithm is not supported.
+    /// </exception>
+    public static KeyParameters Create(string algorithm, TimeSpan? lifetime = null, int keySize = 0)
     {
         // Validate if the algorithm is supported
-        if (!ServerConstants.SupportedSigningAlgorithms.Contains(alg))
+        if (!ServerConstants.SupportedSigningAlgorithms.Contains(algorithm))
         {
-            throw new NotSupportedException($"The specified algorithm '{alg}' is not supported.");
+            throw new NotSupportedException($"The specified algorithm '{algorithm}' is not supported.");
         }
 
         // Generates key parameters and additional information based on the algorithm
         string keyId = Guid.NewGuid().ToString();
-        string name = $"Key for {alg}";
-        KeySerializationFormat format = KeySerializationFormat.Json; // ou o que for apropriado
-        KeyEncoding encoding = KeyEncoding.Base64; // ou o que for apropriado
+        string name = $"Key for {algorithm}";
+        KeySerializationFormat format;
+        KeyEncoding encoding;
         string key;
 
         // Generates a key based on the algorithm
-        switch (alg)
+        switch (algorithm)
         {
             case SecurityAlgorithms.RsaSha256:
             case SecurityAlgorithms.RsaSha384:
             case SecurityAlgorithms.RsaSha512:
-                key = GenerateRsaKey(keySize);
-                break;
-
             case SecurityAlgorithms.RsaSsaPssSha256:
             case SecurityAlgorithms.RsaSsaPssSha384:
             case SecurityAlgorithms.RsaSsaPssSha512:
-                key = GenerateRsaPssKey(keySize);
+
+                var rsa = RSA.Create(keySize is 0 ? 2048 : keySize);
+                var rsaParameters = rsa.ExportParameters(true);
+                key = SerializeToXml(rsaParameters);
+
+                format = KeySerializationFormat.Xml;
+                encoding = KeyEncoding.Plain;
+
                 break;
 
             case SecurityAlgorithms.EcdsaSha256:
+
+                key = ECKeyHelper.ExportECParametersToXml(ECDsa.Create(ECCurve.NamedCurves.nistP256), true);
+                format = KeySerializationFormat.Xml;
+                encoding = KeyEncoding.Plain;
+
+                break;
+
             case SecurityAlgorithms.EcdsaSha384:
+
+                key = ECKeyHelper.ExportECParametersToXml(ECDsa.Create(ECCurve.NamedCurves.nistP384), true);
+                format = KeySerializationFormat.Xml;
+                encoding = KeyEncoding.Plain;
+
+                break;
+
             case SecurityAlgorithms.EcdsaSha512:
-                key = GenerateEcdsaKey();
+
+                key = ECKeyHelper.ExportECParametersToXml(ECDsa.Create(ECCurve.NamedCurves.nistP521), true);
+                format = KeySerializationFormat.Xml;
+                encoding = KeyEncoding.Plain;
+
                 break;
 
             case SecurityAlgorithms.HmacSha256:
             case SecurityAlgorithms.HmacSha384:
             case SecurityAlgorithms.HmacSha512:
-                key = GenerateHmacKey();
+
+                byte[] bytes = new byte[32];
+                RandomNumberGenerator.Fill(bytes);
+                key = Convert.ToBase64String(bytes);
+
+                format = KeySerializationFormat.None;
+                encoding = KeyEncoding.Plain;
+
                 break;
 
             default:
-                throw new NotSupportedException($"The specified algorithm '{alg}' is not recognized.");
+                throw new NotSupportedException($"The specified algorithm '{algorithm}' is not recognized or supported.");
         }
 
+
+
         // Cria e retorna a nova instância de KeyParameters
-        return new KeyParameters(keyId, name, alg, format, encoding, key);
+        var keyParameters = new KeyParameters(keyId, name, algorithm, format, encoding, key);
+
+        if (lifetime.HasValue)
+        {
+            keyParameters.NotBefore = keyParameters.Created;
+            keyParameters.Expires = keyParameters.Created.Add(lifetime.Value);
+        }
+
+        return keyParameters;
     }
 
     public KeyParameters(string keyId,
@@ -208,5 +261,13 @@ public class KeyParameters
         return Encoding == KeyEncoding.Base64
             ? Convert.FromBase64String(Key)
             : Convert.FromHexString(Key);
+    }
+
+    private static string SerializeToXml(RSAParameters rsaParameters)
+    {
+        using var stringWriter = new StringWriter();
+        var xmlSerializer = new XmlSerializer(typeof(RSAParameters));
+        xmlSerializer.Serialize(stringWriter, rsaParameters);
+        return stringWriter.ToString();
     }
 }

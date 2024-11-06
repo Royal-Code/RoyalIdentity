@@ -3,5 +3,6 @@ namespace RoyalIdentity.Models.Keys;
 public enum KeySerializationFormat
 {
     Json = 0,
-    Xml = 1
+    Xml = 1,
+    None = 2,
 }

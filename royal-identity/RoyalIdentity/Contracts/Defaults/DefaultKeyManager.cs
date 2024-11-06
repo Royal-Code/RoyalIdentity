@@ -10,18 +10,18 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultKeyManager : IKeyManager
 {
-    private readonly IKeyStore context;
+    private readonly IKeyStore store;
     private readonly ServerOptions options;
     private readonly KeyCache cache;
     private readonly ILogger logger;
 
     public DefaultKeyManager(
-        IKeyStore context,
+        IKeyStore store,
         IOptions<ServerOptions> options,
         KeyCache cache,
         ILogger<DefaultKeyManager> logger)
     {
-        this.context = context;
+        this.store = store;
         this.options = options.Value;
         this.cache = cache;
         this.logger = logger;
@@ -44,7 +44,7 @@ public class DefaultKeyManager : IKeyManager
     {
         var credentials = await GetAllSigningCredentialsAsync(ct);
         var alg = options.Keys.MainSigningCredentialsAlgorithm;
-        var credential = credentials.First(x => alg == x.Algorithm);
+        var credential = credentials.FirstOrDefault(x => alg == x.Algorithm);
         return credential;
     }
 
@@ -55,9 +55,20 @@ public class DefaultKeyManager : IKeyManager
 
     public async Task<SigningCredentials> CreateSigningCredentialsAsync(CancellationToken ct)
     {
+        // create new key for SigningCredentials
         var alg = options.Keys.MainSigningCredentialsAlgorithm;
+        var lifetime = options.Keys.DefaultSigningCredentialsLifetime;
+        var keySize = options.Keys.RsaKeySizeInBytes;
+        var key = KeyParameters.Create(alg, lifetime, keySize);
 
-        var key = KeyParameters.Create(alg);
+        // store the key
+        await store.AddKeyAsync(key, ct);
+
+        // updates the host's cache, other instances will update when the cache expires.
+        await cache.SigningCredentials.Update(GetSigningKeyIds, GetSigningCredentials, ct);
+        await cache.ValidationKeys.GetOrCreateValue(GetValidationKeyIds, GetValidationKeys, ct);
+
+        return key.CreateSigningCredentials();
     }
 
     private async Task<IReadOnlyList<string>> GetSigningKeyIds(CancellationToken ct)
@@ -66,7 +77,7 @@ public class DefaultKeyManager : IKeyManager
 
         // Gets all the secret names of the current keys,
         // which are fit for use on the specified day (today).
-        return await context.ListAllCurrentKeysIdsAsync(ct: ct);
+        return await store.ListAllCurrentKeysIdsAsync(ct: ct);
     }
 
     private async Task<IReadOnlyList<string>> GetValidationKeyIds(CancellationToken ct)
@@ -75,14 +86,14 @@ public class DefaultKeyManager : IKeyManager
 
         // Gets all the secret names of the current and expired keys,
         // just doesn't include future keys.
-        return await context.ListAllKeysIdsAsync(ct: ct);
+        return await store.ListAllKeysIdsAsync(ct: ct);
     }
 
     private async Task<IReadOnlyList<SigningCredentials>> GetSigningCredentials(IReadOnlyList<string> keyNames, CancellationToken ct)
     {
         logger.LogDebug("Lendo as chaves de assinatura do banco de dados: {KeyNames}", keyNames);
 
-        var parameters = await context.GetKeysAsync(keyNames, ct);
+        var parameters = await store.GetKeysAsync(keyNames, ct);
 
         return parameters.Select(x => x.CreateSigningCredentials()).ToList();
     }
@@ -91,7 +102,7 @@ public class DefaultKeyManager : IKeyManager
     {
         logger.LogDebug("Lendo as chaves de validação do banco de dados: {KeyNames}", keyNames);
 
-        var parameters = await context.GetKeysAsync(keyNames, ct);
+        var parameters = await store.GetKeysAsync(keyNames, ct);
 
         return parameters
             .Select(s => new SecurityKeyInfo()

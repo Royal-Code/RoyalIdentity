@@ -1,5 +1,4 @@
-﻿
-namespace RoyalIdentity.Contracts.Defaults.Jobs;
+﻿namespace RoyalIdentity.Contracts.Defaults.Jobs;
 
 /// <summary>
 /// Job for creating the first key, or a valid key for signatures.
@@ -24,6 +23,6 @@ public class FirstKeyJob : IServerJob
         if (key is not null)
             return;
 
-        keyManager.CreateSigningCredentialsAsync(ct);
+        await keyManager.CreateSigningCredentialsAsync(ct);
     }
 }

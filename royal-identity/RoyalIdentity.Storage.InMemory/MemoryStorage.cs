@@ -6,7 +6,6 @@ using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
-using RoyalIdentity.Users.Defaults;
 using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Storage.InMemory;

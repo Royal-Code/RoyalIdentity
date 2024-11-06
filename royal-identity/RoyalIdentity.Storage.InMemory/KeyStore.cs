@@ -28,13 +28,13 @@ public class KeyStore : IKeyStore
         return Task.FromResult(key);
     }
 
-    public async Task<IReadOnlyList<KeyParameters>> GetKeysAsync(IReadOnlyList<string> keyNames, CancellationToken ct)
+    public async Task<IReadOnlyList<KeyParameters>> GetKeysAsync(IReadOnlyList<string> keyIds, CancellationToken ct)
     {
         List<KeyParameters> keyParameters = [];
 
-        foreach(var keyName in keyNames)
+        foreach(var keyId in keyIds)
         {
-            var key = await GetKeyAsync(keyName, ct);
+            var key = await GetKeyAsync(keyId, ct);
 
             keyParameters.Add(key);
         }
@@ -42,13 +42,13 @@ public class KeyStore : IKeyStore
         return keyParameters;
     }
 
-    public Task<IReadOnlyList<string>> ListAllCurrentKeysIdsAsync(DateTime? today = null, CancellationToken ct = default)
+    public Task<IReadOnlyList<string>> ListAllCurrentKeysIdsAsync(DateTime? now = null, CancellationToken ct = default)
     {
-        DateTime date = today ?? DateTime.UtcNow.Date;
+        DateTime date = now ?? DateTime.UtcNow;
 
         IReadOnlyList<string> keyNames = storage.KeyParameters.Values
-            .Where(k => k.NotBefore <= date)
-            .Where(k => k.Expires >= date)
+            .Where(k => k.NotBefore == null || k.NotBefore <= date)
+            .Where(k => k.Expires == null || k.Expires >= date)
             .OrderBy(k => k.Created)
             .Select(k => k.KeyId)
             .ToList();
@@ -56,12 +56,12 @@ public class KeyStore : IKeyStore
         return Task.FromResult(keyNames);
     }
 
-    public Task<IReadOnlyList<string>> ListAllKeysIdsAsync(DateTime? today = null, CancellationToken ct = default)
+    public Task<IReadOnlyList<string>> ListAllKeysIdsAsync(DateTime? now = null, CancellationToken ct = default)
     {
-        DateTime date = today ?? DateTime.UtcNow.Date;
+        DateTime date = now ?? DateTime.UtcNow;
 
         IReadOnlyList<string> keyNames = storage.KeyParameters.Values
-            .Where(k => k.NotBefore <= date)
+            .Where(k => k.NotBefore == null || k.NotBefore <= date)
             .OrderBy(k => k.Created)
             .Select(k => k.KeyId)
             .ToList();

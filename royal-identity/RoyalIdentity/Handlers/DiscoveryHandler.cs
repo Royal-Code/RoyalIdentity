@@ -6,6 +6,7 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Responses;
 
 namespace RoyalIdentity.Handlers;
 
@@ -290,5 +291,7 @@ public class DiscoveryHandler: IHandler<DiscoveryContext>
                 }
             }
         }
+
+        context.Response = new DiscoveryResponse(entries);
     }
 }

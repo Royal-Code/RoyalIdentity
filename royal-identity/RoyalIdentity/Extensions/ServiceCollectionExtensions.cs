@@ -4,6 +4,7 @@ using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
+using RoyalIdentity.Contracts.Defaults.Jobs;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Handlers;
 using RoyalIdentity.Users;
@@ -24,8 +25,11 @@ public static class ServiceCollectionExtensions
         // Default Pipelines
         services.AddRoyalIdentityPipelines(customization);
 
-        // Default contract implementations
+        // jobs
         services.AddTransient<IHostedService, DefaultServerJobsStartup>();
+        services.AddTransient<IServerJob, FirstKeyJob>();
+
+        // Default contract implementations
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();
         services.AddTransient<ICodeFactory, DefaultCodeFactory>();
         services.AddTransient<IConsentService, DefaultConsentService>();
