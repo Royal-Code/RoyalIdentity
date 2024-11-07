@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Endpoints.Defaults;
 
 namespace RoyalIdentity.Endpoints.Mapping;
 
@@ -66,7 +67,7 @@ public static class ServerEndpoint<TEndpoint>
                 Detail = "An internal server error has occurred"
             };
 
-            return Results.Json(problemDetails, statusCode: StatusCodes.Status500InternalServerError);
+            return Results.Json(problemDetails.IncludeErrorsProperties(), statusCode: StatusCodes.Status500InternalServerError);
         }
 
         // return the response from the response handler

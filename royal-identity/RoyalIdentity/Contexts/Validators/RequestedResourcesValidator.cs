@@ -26,7 +26,7 @@ public class RequestedResourcesValidator : IValidator<IWithResources>
         this.logger = logger;
     }
 
-    public async ValueTask Validate(IWithResources context, CancellationToken cancellationToken)
+    public async ValueTask Validate(IWithResources context, CancellationToken ct)
     {
         context.AssertHasClient();
 
@@ -34,7 +34,7 @@ public class RequestedResourcesValidator : IValidator<IWithResources>
         // check if scopes are valid/supported and check for resource scopes
         //////////////////////////////////////////////////////////
 
-        var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.RequestedScopes, true, cancellationToken);
+        var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.RequestedScopes, true, ct);
         foreach (var scope in context.RequestedScopes)
         {
             if (!IsScopeValidAsync(context, context.Client, resourcesFromStore, scope))

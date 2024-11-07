@@ -17,7 +17,7 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
         => new(Results.Json(value, statusCode: (int)statusCode));
 
     public static ResponseHandler Problem(ProblemDetails problemDetails)
-        => new(Results.Json(problemDetails, statusCode: problemDetails.Status ?? 400));
+        => new(Results.Json(problemDetails.IncludeErrorsProperties(), statusCode: problemDetails.Status ?? 400));
 
     public static ResponseHandler Ok() => new(Results.Ok());
 

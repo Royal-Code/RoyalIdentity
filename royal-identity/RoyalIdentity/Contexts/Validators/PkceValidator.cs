@@ -19,7 +19,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         this.logger = logger;
     }
 
-    public ValueTask Validate(IWithCodeChallenge context, CancellationToken cancellationToken)
+    public ValueTask Validate(IWithCodeChallenge context, CancellationToken ct)
     {
         context.AssertHasClient();
 

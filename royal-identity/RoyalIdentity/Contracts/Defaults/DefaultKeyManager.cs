@@ -44,7 +44,13 @@ public class DefaultKeyManager : IKeyManager
         ICollection<string> allowedIdentityTokenSigningAlgorithms, CancellationToken ct)
     {
         var credentials = await GetAllSigningCredentialsAsync(ct);
-        var credential = credentials.First(x => allowedIdentityTokenSigningAlgorithms.Contains(x.Algorithm));
+        if (credentials.Count is 0)
+            return null;
+
+        var credential = allowedIdentityTokenSigningAlgorithms.Count is 0
+            ? credentials[0]
+            : credentials.FirstOrDefault(x => allowedIdentityTokenSigningAlgorithms.Contains(x.Algorithm));
+
         return credential;
     }
 

@@ -46,6 +46,7 @@ public class AuthorizeContextHandler : IHandler<AuthorizeContext>
         {
             var code = await codeFactory.CreateCodeAsync(context, ct);
             codeValue = code.Code;
+            sessionState = code.SessionState;
 
             var token = new Token(ResponseTypes.Code, codeValue);
             context.Items.AddToken(token);

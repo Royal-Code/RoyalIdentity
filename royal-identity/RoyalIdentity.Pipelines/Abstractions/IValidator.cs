@@ -2,5 +2,5 @@
 
 public interface IValidator<in TContext>
 {
-    ValueTask Validate(TContext context, CancellationToken cancellationToken);
+    ValueTask Validate(TContext context, CancellationToken ct);
 }

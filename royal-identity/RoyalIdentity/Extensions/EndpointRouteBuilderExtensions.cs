@@ -12,5 +12,7 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapPipeline<DiscoveryEndpoint>(Constants.ProtocolRoutePaths.DiscoveryConfiguration);
         endpoints.MapPipeline<JwkEndpoint>(Constants.ProtocolRoutePaths.DiscoveryWebKeys);
         endpoints.MapPipeline<AuthorizeEndpoint>(Constants.ProtocolRoutePaths.Authorize);
+        endpoints.MapPipeline<AuthorizeCallbackEndpoint>(Constants.ProtocolRoutePaths.AuthorizeCallback);
+        endpoints.MapPipeline<TokenEndpoint>(Constants.ProtocolRoutePaths.Token);
     }
 }

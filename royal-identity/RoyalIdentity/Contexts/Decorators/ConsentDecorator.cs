@@ -51,7 +51,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         {
             logger.LogInformation("Showing consent: User has not yet consented");
 
-            // user was not yet shown conset screen
+            // user was not yet shown consent screen
             context.Response = new InteractionResponse(context)
             {
                 IsConsent = true

@@ -5,9 +5,10 @@ namespace RoyalIdentity.Utils;
 
 public static class Json
 {
-    private static readonly JsonSerializerOptions options = new()
+    private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.Web)
     {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNameCaseInsensitive = true,
     };
 
     public static string Serialize(object o)

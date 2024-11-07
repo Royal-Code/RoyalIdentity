@@ -25,7 +25,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         this.logger = logger;
     }
 
-    public async ValueTask Validate(IWithRedirectUri context, CancellationToken cancellationToken)
+    public async ValueTask Validate(IWithRedirectUri context, CancellationToken ct)
     {
         context.AssertHasClient();
 

@@ -67,7 +67,7 @@ public static class Pipes
                 .UseValidator<AuthorizeMainValidator>()
                 .UseValidator<RequestedResourcesValidator>();
 
-            options.CustomizeAuthorizeContextHandler?.Invoke(authorizeValidateContextPipe);
+            options.CustomizeAuthorizeValidateContext?.Invoke(authorizeValidateContextPipe);
 
             authorizeValidateContextPipe.UseHandler<OkHandler<AuthorizeValidateContext>>();
         });
@@ -82,5 +82,5 @@ public class CustomOptions
 
     public Action<IPipelineConfigurationBuilder<AuthorizeContext>>? CustomizeAuthorizeContext { get; set; }
 
-    public Action<IPipelineConfigurationBuilder<AuthorizeValidateContext>>? CustomizeAuthorizeContextHandler { get; set; }
+    public Action<IPipelineConfigurationBuilder<AuthorizeValidateContext>>? CustomizeAuthorizeValidateContext { get; set; }
 }

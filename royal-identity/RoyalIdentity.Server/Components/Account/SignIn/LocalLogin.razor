@@ -1,5 +1,6 @@
 ﻿@using RoyalIdentity.Contracts
 @using RoyalIdentity.Events
+@using RoyalIdentity.Extensions;
 @using RoyalIdentity.Users
 
 @inject ISignInManager SignInManager
@@ -7,7 +8,6 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject IEventDispatcher EventDispatcher;
-
 
 <StatusMessage Message="@errorMessage" MessageClass="danger"/>
 
@@ -88,6 +88,13 @@
 
         if (context is not null)
         {
+            // if consent is required, navigate to consent page
+            if (context.RequiredConsent)
+            {
+                var consentUrl = "/account/consent".AddQueryString("returnUrl", Input.ReturnUrl!);
+                NavigationManager.NavigateTo(consentUrl);
+            }
+
             var redirectUri = context.RedirectUri;
 
             if (!redirectUri.StartsWith("http", StringComparison.OrdinalIgnoreCase))

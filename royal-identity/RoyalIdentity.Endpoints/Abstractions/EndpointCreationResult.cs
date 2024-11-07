@@ -1,5 +1,4 @@
-﻿
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using RoyalIdentity.Endpoints.Defaults;
 using System.Diagnostics.CodeAnalysis;

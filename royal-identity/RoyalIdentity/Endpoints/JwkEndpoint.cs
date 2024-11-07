@@ -29,19 +29,8 @@ public class JwkEndpoint : IEndpointHandler
         {
             logger.LogWarning("JWK Discovery endpoint only supports GET requests");
 
-            // return a problem details of a UnsupportedMediaType infoming the http method is not allowed
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status405MethodNotAllowed,
-                Title = "Method Not Allowed",
-                Detail = "HTTP method is not allowed"
-            };
-
-            return ValueTask.FromResult(
-                new EndpointCreationResult(
-                    httpContext,
-                    ResponseHandler.Problem(problemDetails)));
+            // return a problem details of a MethodNotAllowed infoming the http method is not allowed
+            return new(EndpointProblemResults.MethodNotAllowed(httpContext));
         }
 
         logger.LogDebug("Start jwk discovery request");

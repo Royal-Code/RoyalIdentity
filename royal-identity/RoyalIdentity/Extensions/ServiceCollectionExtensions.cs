@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<PkceValidator>();
         services.AddTransient<RedirectUriValidator>();
         services.AddTransient<RequestedResourcesValidator>();
+        services.AddTransient<ConsentValidator>();
 
         // Handlers
         services.AddTransient<DiscoveryHandler>();
@@ -73,6 +74,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DiscoveryEndpoint>();
         services.AddTransient<JwkEndpoint>();
         services.AddTransient<AuthorizeEndpoint>();
+        services.AddTransient<AuthorizeCallbackEndpoint>();
+        services.AddTransient<TokenEndpoint>();
 
         // Others
         services.AddSingleton<KeyCache>();

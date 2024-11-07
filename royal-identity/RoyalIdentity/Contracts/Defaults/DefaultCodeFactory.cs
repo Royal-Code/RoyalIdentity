@@ -20,7 +20,7 @@ public class DefaultCodeFactory : ICodeFactory
         TimeProvider time,
         ISessionStateGenerator sessionStateGenerator,
         IAuthorizationCodeStore codeStore,
-        IUserSessionStore userSession,
+        IUserSessionStore userSessionStore,
         ILogger<DefaultCodeFactory> logger)
     {
         this.time = time;

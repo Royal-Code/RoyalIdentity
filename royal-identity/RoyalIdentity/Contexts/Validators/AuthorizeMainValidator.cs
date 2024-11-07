@@ -18,7 +18,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         this.logger = logger;
     }
 
-    public ValueTask Validate(IAuthorizationContextBase context, CancellationToken cancellationToken)
+    public ValueTask Validate(IAuthorizationContextBase context, CancellationToken ct)
     {
         context.AssertHasClient();
 

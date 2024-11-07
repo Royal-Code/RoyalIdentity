@@ -72,14 +72,17 @@ public sealed class DefaultIdentityUser : IdentityUser
         if (currentSession is null)
             throw new InvalidOperationException("There is no active session for the user.");
 
-        var claims = new List<Claim>();
-        claims.Add(new Claim(JwtClaimTypes.Subject, details.Username));
-        claims.Add(new Claim(JwtClaimTypes.Name, details.DisplayName));
-        claims.Add(new Claim(JwtClaimTypes.AuthenticationTime, new DateTimeOffset( currentSession.StartedAt).ToUnixTimeSeconds().ToString()));
-        claims.Add(new Claim(JwtClaimTypes.SessionId, currentSession.Id));
+        var claims = new List<Claim>
+        {
+            new(JwtClaimTypes.Subject, details.Username),
+            new(JwtClaimTypes.Name, details.DisplayName),
+            new(JwtClaimTypes.AuthenticationTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
+            new(JwtClaimTypes.SessionId, currentSession.Id),
+            new(JwtClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider)
+        };
 
         if (amr.IsPresent())
-            claims.Add(new Claim(JwtClaimTypes.AuthenticationMethod, amr));
+            claims.Add(new(JwtClaimTypes.AuthenticationMethod, amr));
 
         claims.AddRange(details.Claims);
 

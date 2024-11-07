@@ -87,8 +87,7 @@ public sealed class ContextItems
     public T GetOrCreate<T>()
         where T : class, new()
     {
-        var item = Get<T>();
-        if (item is null)
+        if (!TryGet<T>(out var item))
         {
             item = new T();
             Set(item);

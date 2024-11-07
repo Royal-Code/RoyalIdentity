@@ -25,6 +25,7 @@ public class ResponseToFormPostResult : IResult, IStatusCodeHttpResult
     {
         httpContext.Response.SetNoCache();
         AddSecurityHeaders(httpContext);
+        httpContext.Response.StatusCode = StatusCodes.Status200OK;
         await httpContext.Response.WriteHtmlAsync(GetFormPostHtml());
     }
 

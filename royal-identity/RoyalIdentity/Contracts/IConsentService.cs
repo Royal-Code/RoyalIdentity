@@ -28,5 +28,17 @@ public interface IConsentService
     /// <param name="scopes">The scopes.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns></returns>
-    Task UpdateConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<string> scopes, CancellationToken ct);
+    Task UpdateConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<ConsentedScope> scopes, CancellationToken ct);
+
+    /// <summary>
+    /// Validates if consent is valid.
+    /// </summary>
+    /// <param name="subject">The user.</param>
+    /// <param name="client">The client.</param>
+    /// <param name="resources">The scopes.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>
+    /// Boolean if the resources are consented.
+    /// </returns>
+    ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, Resources resources, CancellationToken ct);
 }

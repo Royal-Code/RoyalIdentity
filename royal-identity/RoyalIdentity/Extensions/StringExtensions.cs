@@ -7,7 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace RoyalIdentity.Extensions;
 
-internal static class StringExtensions
+public static class StringExtensions
 {
     internal static readonly char[] separator = [' '];
 
