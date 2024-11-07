@@ -4,6 +4,7 @@ using RoyalIdentity.Utils;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Serialization;
+using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Models.Keys;
 
@@ -18,7 +19,7 @@ public class KeyParameters
     /// <param name="lifetime">Key lifetime.</param>
     /// <param name="keySize">For RSA keys, the key size must be entered. If not entered, 2048 will be used.</param>
     /// <returns>
-    ///     A new instance of <see cref=�KeyParameters�/>.
+    ///     A new instance of <see cref=�KeyParameters�/>.
     /// </returns>
     /// <exception cref="NotSupportedException">
     ///     Occurs when the algorithm is not supported.
@@ -100,7 +101,7 @@ public class KeyParameters
 
 
 
-        // Cria e retorna a nova inst�ncia de KeyParameters
+        // Cria e retorna a nova instância de KeyParameters
         var keyParameters = new KeyParameters(keyId, name, algorithm, format, encoding, key);
 
         if (lifetime.HasValue)
@@ -269,5 +270,55 @@ public class KeyParameters
         var xmlSerializer = new XmlSerializer(typeof(RSAParameters));
         xmlSerializer.Serialize(stringWriter, rsaParameters);
         return stringWriter.ToString();
+    }
+
+    public (SecurityKey, JsonWebKey?) GetValidationKey()
+    {
+        SecurityKey key;
+        JsonWebKey? jwk;
+
+        if (SecurityAlgorithm.StartsWith("RS") || SecurityAlgorithm.StartsWith("PS"))
+        {
+            var rsaKey = CreateRsaSecurityKey();
+            key = rsaKey;
+
+            // if rsaKey has a private key, we need to convert it to a public key
+            if (rsaKey.PrivateKeyStatus == PrivateKeyStatus.Exists)
+            {
+                rsaKey = rsaKey.WithoutPrivateKey();
+            }
+
+            // generate the JWK from the RSA key
+            jwk = JsonWebKeyConverter.ConvertFromRSASecurityKey(rsaKey);
+            jwk.KeyId = KeyId;
+        }
+        else if (SecurityAlgorithm.StartsWith("ES"))
+        {
+            var ecKey = CreateECDsaSecurityKey();
+            key = ecKey;
+
+            // if ecKey has a private key, we need to convert it to a public key
+            if (ecKey.PrivateKeyStatus == PrivateKeyStatus.Exists)
+            {
+                ecKey = ecKey.WithoutPrivateKey();
+            }
+
+            // generate the JWK from the EC key
+            jwk = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(ecKey);
+            jwk.KeyId = KeyId;
+        }
+        else if (SecurityAlgorithm.StartsWith("HS"))
+        {
+            key = CreateSymmetricSecurityKey();
+
+            // Não será retornado a JWK para chaves simétricas de validação, pois há apenas conteúdo privado.
+            jwk = null;
+        }
+        else
+        {
+            throw new NotSupportedException("SecurityAlgorithm not supported");
+        }
+
+        return (key, jwk);
     }
 }

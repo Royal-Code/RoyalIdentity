@@ -31,6 +31,15 @@ public static class Pipes
             discoveryPipe.UseHandler<DiscoveryHandler>();
 
             //////////////////////////////
+            //// Discovery Jwk
+            //////////////////////////////
+            var jwkPipe = builder.For<JwkContext>();
+
+            options.CustomizeDiscoveryJsonWebKeysContext?.Invoke(jwkPipe);
+
+            jwkPipe.UseHandler<JwkHandler>();
+
+            //////////////////////////////
             //// AuthorizeContext
             //////////////////////////////
             var authorizeContextPipe = builder.For<AuthorizeContext>()
@@ -68,6 +77,8 @@ public static class Pipes
 public class CustomOptions
 {
     public Action<IPipelineConfigurationBuilder<DiscoveryContext>>? CustomizeDiscoveryContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<JwkContext>>? CustomizeDiscoveryJsonWebKeysContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<AuthorizeContext>>? CustomizeAuthorizeContext { get; set; }
 

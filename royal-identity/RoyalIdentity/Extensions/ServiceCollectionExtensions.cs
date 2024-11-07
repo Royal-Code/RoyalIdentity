@@ -66,10 +66,12 @@ public static class ServiceCollectionExtensions
 
         // Handlers
         services.AddTransient<DiscoveryHandler>();
+        services.AddTransient<JwkHandler>();
         services.AddTransient<AuthorizeContextHandler>();
 
         // Endpoints
         services.AddTransient<DiscoveryEndpoint>();
+        services.AddTransient<JwkEndpoint>();
         services.AddTransient<AuthorizeEndpoint>();
 
         // Others

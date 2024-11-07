@@ -15,6 +15,12 @@ public class DefaultKeyManager : IKeyManager
     private readonly KeyCache cache;
     private readonly ILogger logger;
 
+    private Func<CancellationToken, Task<IReadOnlyList<string>>>? getSigningKeyIds;
+    private Func<IReadOnlyList<string>, CancellationToken, Task<IReadOnlyList<SigningCredentials>>>? getSigningCredentials;
+
+    private Func<CancellationToken, Task<IReadOnlyList<string>>>? getValidationKeyIds;
+    private Func<IReadOnlyList<string>, CancellationToken, Task<ValidationKeysInfo>>? getValidationKeys;
+
     public DefaultKeyManager(
         IKeyStore store,
         IOptions<ServerOptions> options,
@@ -29,7 +35,9 @@ public class DefaultKeyManager : IKeyManager
 
     public ValueTask<IReadOnlyList<SigningCredentials>> GetAllSigningCredentialsAsync(CancellationToken ct)
     {
-        return cache.SigningCredentials.GetOrCreateValue(GetSigningKeyIds, GetSigningCredentials, ct);
+        getSigningKeyIds ??= GetSigningKeyIds;
+        getSigningCredentials ??= GetSigningCredentials;
+        return cache.SigningCredentials.GetOrCreateValue(getSigningKeyIds, getSigningCredentials, ct);
     }
 
     public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(
@@ -48,9 +56,11 @@ public class DefaultKeyManager : IKeyManager
         return credential;
     }
 
-    public ValueTask<IReadOnlyList<SecurityKeyInfo>> GetValidationKeysAsync(CancellationToken ct)
+    public ValueTask<ValidationKeysInfo> GetValidationKeysAsync(CancellationToken ct)
     {
-        return cache.ValidationKeys.GetOrCreateValue(GetValidationKeyIds, GetValidationKeys, ct);
+        getValidationKeyIds ??= GetValidationKeyIds;
+        getValidationKeys ??= GetValidationKeys;
+        return cache.ValidationKeys.GetOrCreateValue(getValidationKeyIds, getValidationKeys, ct);
     }
 
     public async Task<SigningCredentials> CreateSigningCredentialsAsync(CancellationToken ct)
@@ -98,18 +108,26 @@ public class DefaultKeyManager : IKeyManager
         return parameters.Select(x => x.CreateSigningCredentials()).ToList();
     }
 
-    private async Task<IReadOnlyList<SecurityKeyInfo>> GetValidationKeys(IReadOnlyList<string> keyNames, CancellationToken ct)
+    private async Task<ValidationKeysInfo> GetValidationKeys(IReadOnlyList<string> keyNames, CancellationToken ct)
     {
         logger.LogDebug("Lendo as chaves de validação do banco de dados: {KeyNames}", keyNames);
 
         var parameters = await store.GetKeysAsync(keyNames, ct);
 
-        return parameters
-            .Select(s => new SecurityKeyInfo()
+        var lists = parameters
+            .Select(s => s.GetValidationKey())
+            .Aggregate((new List<SecurityKey>(), new List<JsonWebKey>()), (lists, pair) =>
             {
-                Key = s.GetSecurityKey(),
-                SigningAlgorithm = s.SecurityAlgorithm
-            })
-            .ToList();
+                lists.Item1.Add(pair.Item1);
+                if (pair.Item2 is not null)
+                    lists.Item2.Add(pair.Item2);
+                return lists;
+            });
+
+        return new ValidationKeysInfo
+        {
+            Keys = lists.Item1,
+            Jwks = lists.Item2
+        };
     }
 }

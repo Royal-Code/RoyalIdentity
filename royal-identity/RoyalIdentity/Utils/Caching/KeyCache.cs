@@ -11,10 +11,10 @@ public sealed class KeyCache
     /// <summary>
     /// Cache of keys for signing. It should only contain active keys.
     /// </summary>
-    public KeyCacheEntry<SigningCredentials> SigningCredentials { get; } = new();
+    public KeyCacheEntry<IReadOnlyList<SigningCredentials>> SigningCredentials { get; } = new();
 
     /// <summary>
     /// Cache of keys for validation. Must contain all keys, active and expired.
     /// </summary>
-    public KeyCacheEntry<SecurityKeyInfo> ValidationKeys { get; } = new();
+    public KeyCacheEntry<ValidationKeysInfo> ValidationKeys { get; } = new();
 }

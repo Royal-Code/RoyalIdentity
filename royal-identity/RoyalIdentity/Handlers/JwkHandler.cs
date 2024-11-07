@@ -1,23 +1,29 @@
-﻿using Microsoft.AspNetCore.DataProtection.KeyManagement;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
+using RoyalIdentity.Contracts;
+using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Responses;
 
 namespace RoyalIdentity.Handlers;
 
 public class JwkHandler : IHandler<JwkContext>
 {
     private readonly IKeyManager keys;
-    private readonly ILogger logger;
+    private readonly ServerOptions options;
 
-    public JwkHandler(IKeyManager keys, ILogger logger)
+    public JwkHandler(IKeyManager keys, IOptions<ServerOptions> options)
     {
         this.keys = keys;
-        this.logger = logger;
+        this.options = options.Value;
     }
 
-    public Task Handle(JwkContext context, CancellationToken ct)
+    public async Task Handle(JwkContext context, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        var validationKeys = await keys.GetValidationKeysAsync(ct);
+
+        var webKeys = validationKeys.Jwks;
+
+        context.Response = new JwkResponse(webKeys, options.Discovery.ResponseCacheInterval);
     }
 }

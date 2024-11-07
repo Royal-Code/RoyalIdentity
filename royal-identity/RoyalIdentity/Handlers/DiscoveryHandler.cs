@@ -44,7 +44,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         };
 
         // jwks
-        if (options.Discovery.ShowKeySet && (await keys.GetValidationKeysAsync(ct)).Count is not 0)
+        if (options.Discovery.ShowKeySet && (await keys.GetValidationKeysAsync(ct)).Keys.Count is not 0)
         {
             entries.Add(OidcConstants.Discovery.JwksUri, baseUrl + Constants.ProtocolRoutePaths.DiscoveryWebKeys);
         }
