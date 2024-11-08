@@ -5,5 +5,5 @@ public interface IExtensionsGrantsProvider
     /// <summary>
     /// Gets the available grant types.
     /// </summary>
-    IEnumerable<string> GetAvailableGrantTypes();
+    IReadOnlyList<string> GetAvailableGrantTypes();
 }
