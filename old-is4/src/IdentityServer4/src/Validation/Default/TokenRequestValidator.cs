@@ -100,7 +100,9 @@ namespace IdentityServer4.Validation
         /// or
         /// client
         /// </exception>
-        public async Task<TokenRequestValidationResult> ValidateRequestAsync(NameValueCollection parameters, ClientSecretValidationResult clientValidationResult)
+        public async Task<TokenRequestValidationResult> ValidateRequestAsync(
+            NameValueCollection parameters, 
+            ClientSecretValidationResult clientValidationResult)
         {
             _logger.LogDebug("Start token request validation");
 
@@ -110,7 +112,8 @@ namespace IdentityServer4.Validation
                 Options = _options
             };
 
-            if (clientValidationResult == null) throw new ArgumentNullException(nameof(clientValidationResult));
+            if (clientValidationResult == null) 
+                throw new ArgumentNullException(nameof(clientValidationResult));
 
             _validatedRequest.SetClient(clientValidationResult.Client, clientValidationResult.Secret, clientValidationResult.Confirmation);
 

@@ -87,9 +87,9 @@ public class DefaultTokenFactory : ITokenFactory
         }
 
         // add cnf if present
-        if (request.Context.Confirmation.IsPresent())
+        if (request.Confirmation.IsPresent())
         {
-            token.Confirmation = request.Context.Confirmation;
+            token.Confirmation = request.Confirmation;
         }
         else
         {

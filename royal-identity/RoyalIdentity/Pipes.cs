@@ -70,6 +70,19 @@ public static class Pipes
             options.CustomizeAuthorizeValidateContext?.Invoke(authorizeValidateContextPipe);
 
             authorizeValidateContextPipe.UseHandler<OkHandler<AuthorizeValidateContext>>();
+
+
+            //////////////////////////////
+            //// AuthorizationCodeContext
+            //////////////////////////////
+            var authorizationCodeContextPipe = builder.For<AuthorizationCodeContext>()
+                .UseDecorator<EvaluateClient>()
+                .UseValidator<RedirectUriValidator>()
+                .UseDecorator<LoadCode>();
+
+            options.CustomizeAuthorizationCodeContext?.Invoke(authorizationCodeContextPipe);
+
+            authorizationCodeContextPipe.UseHandler<AuthorizationCodeHandler>();
         });
     }
 }
@@ -83,4 +96,6 @@ public class CustomOptions
     public Action<IPipelineConfigurationBuilder<AuthorizeContext>>? CustomizeAuthorizeContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<AuthorizeValidateContext>>? CustomizeAuthorizeValidateContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<AuthorizationCodeContext>>? CustomizeAuthorizationCodeContext { get; set; }
 }

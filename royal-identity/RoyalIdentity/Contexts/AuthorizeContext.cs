@@ -47,14 +47,6 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public string? ClientId { get; set; }
 
     /// <summary>
-    /// Gets or sets the client secret.
-    /// </summary>
-    /// <remarks>
-    /// The client secret is not received on the authorize endpoint.
-    /// </remarks>
-    public string? ClientSecret { get; set; }
-
-    /// <summary>
     /// Gets or sets the client claims for the current request.
     /// This value is initally read from the client configuration but can be modified in the request pipeline
     /// </summary>
@@ -207,24 +199,14 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public Resources Resources { get; } = new();
 
     /// <summary>
-    /// Gets or sets the value of the confirmation method (will become the cnf claim). Must be a JSON object.
-    /// </summary>
-    /// <value>
-    /// The confirmation.
-    /// </value>
-    public string? Confirmation { get; set; }
-
-    /// <summary>
     /// Gets the session id from the current user.
     /// </summary>
     public string? SessionId => Identity?.FindFirst(c => c.Type == JwtClaimTypes.SessionId)?.Value;
 
-    public void SetClient(Client client, string? secret = null, string? confirmation = null)
+    public void SetClient(Client client)
     {
         Client = client;
-        ClientSecret = secret;
-        Confirmation = confirmation;
-
+        
         ClientClaims.AddRange(client.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)));
     }
 

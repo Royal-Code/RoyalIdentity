@@ -12,7 +12,7 @@ public interface IClientSecretsEvaluator
     /// <returns>
     /// A parsed secret
     /// </returns>
-    Task<ParsedSecret?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct);
+    Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct);
 
     /// <summary>
     /// Returns the authentication method name that this parser implements

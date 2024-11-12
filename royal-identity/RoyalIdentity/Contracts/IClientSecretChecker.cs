@@ -16,7 +16,7 @@ public interface IClientSecretChecker
     /// A parsed secret
     /// </returns>
     [Redesign("Troca o tipo de retorno;")]
-    Task<ParsedSecret?> ParseAsync(IEndpointContextBase context, CancellationToken ct);
+    Task<EvaluatedClient?> EvaluateClientAsync(IEndpointContextBase context, CancellationToken ct);
 
     /// <summary>
     /// Gets all available authentication methods.

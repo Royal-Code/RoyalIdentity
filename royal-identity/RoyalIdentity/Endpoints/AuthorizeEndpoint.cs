@@ -17,7 +17,7 @@ namespace RoyalIdentity.Endpoints;
 public class AuthorizeEndpoint : IEndpointHandler
 {
     private readonly ServerOptions options;
-    public readonly ILogger logger;
+    private readonly ILogger logger;
 
     public AuthorizeEndpoint(IOptions<ServerOptions> options, ILogger<AuthorizeEndpoint> logger)
     {

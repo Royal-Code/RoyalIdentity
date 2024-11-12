@@ -17,31 +17,36 @@ public class DefaultClientSecretChecker : IClientSecretChecker
         this.logger = logger;
     }
 
-    public async Task<ParsedSecret?> ParseAsync(IEndpointContextBase context, CancellationToken ct)
+    public async Task<EvaluatedClient?> EvaluateClientAsync(IEndpointContextBase context, CancellationToken ct)
     {
-        // see if a registered parser finds a secret on the request
-        ParsedSecret? bestSecret = null;
-        foreach (var parser in evaluators)
+        // see if a registered evaluators finds a secret on the request
+        EvaluatedClient? evaluation = null;
+        foreach (var evaluator in evaluators)
         {
-            var parsedSecret = await parser.EvaluateAsync(context, ct);
-            if (parsedSecret == null)
+            var evaluatedClient = await evaluator.EvaluateAsync(context, ct);
+            if (evaluatedClient == null)
                 continue;
 
-            logger.LogDebug("Parser found secret: {Type}", parser.GetType().Name);
+            logger.LogDebug("Parser found secret: {Type}", evaluator.GetType().Name);
 
-            bestSecret = parsedSecret;
+            evaluation = evaluatedClient;
 
-            if (parsedSecret.Type is not ServerConstants.ParsedSecretTypes.NoSecret)
+            if (evaluatedClient.Credential.Type is not ServerConstants.ParsedSecretTypes.NoSecret)
                 break;
         }
 
-        if (bestSecret is not null)
+        if (evaluation is not null)
         {
-            logger.LogDebug("Secret id found: {Id}", bestSecret.Id);
-            return bestSecret;
+            logger.LogDebug("Client evaluated: {Type}, {Name} ({Id})", 
+                evaluation.Credential.Type, 
+                evaluation.Client.Name,
+                evaluation.Client.Id);
+
+            return evaluation;
         }
 
-        logger.LogDebug("Parser found no secret");
+        logger.LogDebug("Client not found");
+
         return null;
     }
 

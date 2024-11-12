@@ -9,7 +9,7 @@ using RoyalIdentity.Pipelines.Configurations;
 
 namespace RoyalIdentity.Pipelines.Infrastructure;
 
-public static class Pipe
+public static class PipelineExtensions
 {
     public static IServiceCollection AddPipelines(
         this IServiceCollection services,

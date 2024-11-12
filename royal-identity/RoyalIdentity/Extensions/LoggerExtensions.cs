@@ -59,6 +59,18 @@ public static class LoggerExtensions
         }
     }
 
+    internal static void LogError(this ILogger logger,
+        IEndpointContextBase context,
+        string message,
+        string? details = null)
+    {
+        var options = context.Items.GetOrCreate<ServerOptions>();
+        if (details.IsPresent())
+            logger.LogError(options, message, details, context);
+        else
+            logger.LogError(options, message, context);
+    }
+
     private static string GetRaw(IEndpointContextBase context, ICollection<string> sensitiveValuesFilter)
     {
         var dict = context.Raw.ToScrubbedDictionary(sensitiveValuesFilter);

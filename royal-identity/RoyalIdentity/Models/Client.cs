@@ -162,4 +162,19 @@ public class Client
     /// Specifies whether user can choose to store consent decisions (defaults to <c>true</c>)
     /// </summary>
     public bool AllowRememberConsent { get; set; } = true;
+
+    /// <summary>
+    /// Client secrets - only relevant for flows that require a secret
+    /// </summary>
+    public HashSet<ClientSecret> ClientSecrets { get; set; } = [];
+
+    /// <summary>
+    /// If set to false, no client secret is needed to request tokens at the token endpoint (defaults to <c>true</c>)
+    /// </summary>
+    public bool RequireClientSecret { get; set; } = true;
+
+    /// <summary>
+    /// Specifies the allowed grant types (legal combinations of AuthorizationCode, Implicit, Hybrid, ResourceOwner, ClientCredentials).
+    /// </summary>
+    public HashSet<string> AllowedGrantTypes { get; set; } = [GrantType.AuthorizationCode];
 }

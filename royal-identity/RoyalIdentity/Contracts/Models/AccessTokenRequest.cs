@@ -16,4 +16,12 @@ public class AccessTokenRequest
     public required Resources Resources { get; init; }
 
     public required string Caller { get; init; }
+
+    /// <summary>
+    /// Gets or sets the value of the confirmation method (will become the cnf claim). Must be a JSON object.
+    /// </summary>
+    /// <value>
+    /// The confirmation.
+    /// </value>
+    public string? Confirmation { get; init; }
 }

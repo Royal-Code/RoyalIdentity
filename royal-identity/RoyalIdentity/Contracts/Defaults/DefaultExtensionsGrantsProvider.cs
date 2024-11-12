@@ -13,7 +13,9 @@ public class DefaultExtensionsGrantsProvider : IExtensionsGrantsProvider
     /// </summary>
     /// <param name="extensions">The validators.</param>
     /// <param name="logger">The logger.</param>
-    public DefaultExtensionsGrantsProvider(IEnumerable<IExtensionGrant> extensions, ILogger<DefaultExtensionsGrantsProvider> logger)
+    public DefaultExtensionsGrantsProvider(
+        IEnumerable<IExtensionGrant> extensions,
+        ILogger<DefaultExtensionsGrantsProvider> logger)
     {
         this.extensions = extensions;
         this.logger = logger;
