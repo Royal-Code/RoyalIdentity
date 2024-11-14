@@ -31,10 +31,12 @@ public static class ServiceCollectionExtensions
 
         // Default contract implementations
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();
+        services.AddSingleton<IClientSecretChecker, DefaultClientSecretChecker>();
         services.AddTransient<ICodeFactory, DefaultCodeFactory>();
         services.AddTransient<IConsentService, DefaultConsentService>();
         services.AddTransient<IEventDispatcher, DefaultEventDispatcher>();
         services.AddTransient(typeof(DefaultEventDispatcher<>));
+        services.AddTransient<IExtensionsGrantsProvider, DefaultExtensionsGrantsProvider>();
         services.AddTransient<IJwtFactory, DefaultJwtFactory>();
         services.AddTransient<IKeyManager, DefaultKeyManager>();
         services.AddTransient<IProfileService, DefaultProfileService>();
@@ -42,8 +44,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
-        services.AddTransient<IExtensionsGrantsProvider, DefaultExtensionsGrantsProvider>();
-        services.AddSingleton<IClientSecretChecker, DefaultClientSecretChecker>();
 
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();
@@ -53,28 +53,34 @@ public static class ServiceCollectionExtensions
 
         // Decorators
         services.AddTransient<ConsentDecorator>();
+        services.AddTransient<EvaluateClient>();
         services.AddTransient<LoadClient>();
+        services.AddTransient<LoadCode>();
         services.AddTransient<ProcessRequestObject>();
         services.AddTransient<PromptLoginDecorator>();
         services.AddTransient<StateHashDecorator>();
 
         // Validators
+        services.AddTransient<ActiveUserValidator>();
         services.AddTransient<AuthorizeMainValidator>();
+        services.AddTransient<ConsentValidator>();
+        services.AddTransient<GrantTypeValidator>();
+        services.AddTransient<PkceMatchValidator>();
         services.AddTransient<PkceValidator>();
         services.AddTransient<RedirectUriValidator>();
         services.AddTransient<RequestedResourcesValidator>();
-        services.AddTransient<ConsentValidator>();
 
         // Handlers
+        services.AddTransient<AuthorizationCodeHandler>();
+        services.AddTransient<AuthorizeHandler>();
         services.AddTransient<DiscoveryHandler>();
         services.AddTransient<JwkHandler>();
-        services.AddTransient<AuthorizeContextHandler>();
 
         // Endpoints
+        services.AddTransient<AuthorizeCallbackEndpoint>();
+        services.AddTransient<AuthorizeEndpoint>();
         services.AddTransient<DiscoveryEndpoint>();
         services.AddTransient<JwkEndpoint>();
-        services.AddTransient<AuthorizeEndpoint>();
-        services.AddTransient<AuthorizeCallbackEndpoint>();
         services.AddTransient<TokenEndpoint>();
 
         // Others

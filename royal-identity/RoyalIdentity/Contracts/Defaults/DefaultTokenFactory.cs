@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Models;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -16,6 +17,7 @@ public class DefaultTokenFactory : ITokenFactory
     private readonly ITokenClaimsService tokenClaimsService;
     private readonly IJwtFactory jwtFactory;
     private readonly IAccessTokenStore accessTokenStore;
+    private readonly IRefreshTokenStore refreshTokenStore;
     private readonly IKeyManager keys;
     private readonly TimeProvider clock;
     private readonly ILogger logger;
@@ -25,6 +27,7 @@ public class DefaultTokenFactory : ITokenFactory
         ITokenClaimsService tokenClaimsService,
         IJwtFactory jwtFactory,
         IAccessTokenStore accessTokenStore,
+        IRefreshTokenStore refreshTokenStore,
         IKeyManager keys,
         TimeProvider clock,
         ILogger<DefaultTokenFactory> logger)
@@ -33,6 +36,7 @@ public class DefaultTokenFactory : ITokenFactory
         this.tokenClaimsService = tokenClaimsService;
         this.jwtFactory = jwtFactory;
         this.accessTokenStore = accessTokenStore;
+        this.refreshTokenStore = refreshTokenStore;
         this.keys = keys;
         this.clock = clock;
         this.logger = logger;
@@ -176,7 +180,6 @@ public class DefaultTokenFactory : ITokenFactory
             request.Context));
 
 
-
         var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
 
         var idToken = new IdentityToken(request.Context.Client.Id,
@@ -194,8 +197,54 @@ public class DefaultTokenFactory : ITokenFactory
         return idToken;
     }
 
-    public Task<RefreshToken> CreateRefreshTokenAsync(RefreshTokenRequest request, CancellationToken ct)
+    public async Task<RefreshToken> CreateRefreshTokenAsync(RefreshTokenRequest request, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        logger.LogDebug("Creating refresh token");
+
+        request.Context.AssertHasClient();
+        Client client = request.Context.Client;
+
+        int lifetime;
+        if (client.RefreshTokenExpiration == TokenExpiration.Absolute)
+        {
+            logger.LogDebug("Setting an absolute lifetime: {AbsoluteLifetime}", client.AbsoluteRefreshTokenLifetime);
+            lifetime = client.AbsoluteRefreshTokenLifetime;
+        }
+        else
+        {
+            lifetime = client.SlidingRefreshTokenLifetime;
+            if (client.AbsoluteRefreshTokenLifetime > 0 && lifetime > client.AbsoluteRefreshTokenLifetime)
+            {
+                logger.LogWarning(
+                    "Client {ClientId}'s configured SlidingRefreshTokenLifetime" +
+                    " of {SlidingLifetime} exceeds its AbsoluteRefreshTokenLifetime" +
+                    " of {AbsoluteLifetime}. The refresh_token's sliding lifetime will be capped to the absolute lifetime",
+                    client.Id, 
+                    lifetime,
+                    client.AbsoluteRefreshTokenLifetime);
+
+                lifetime = client.AbsoluteRefreshTokenLifetime;
+            }
+
+            logger.LogDebug("Setting a sliding lifetime: {SlidingLifetime}", lifetime);
+        }
+
+        var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
+        var tokenItSelf = CryptoRandom.CreateUniqueId();
+        
+        var refreshToken = new RefreshToken(
+            request.Subject.GetSubjectId(),
+            request.Subject.GetSessionId(),
+            request.AccessToken.Id,
+            request.AccessToken.Scopes.ToList(),
+            client.Id,
+            issuer,
+            clock.GetUtcNow().UtcDateTime,
+            lifetime, 
+            tokenItSelf);
+
+        await refreshTokenStore.StoreAsync(refreshToken, ct);
+
+        return refreshToken;
     }
 }

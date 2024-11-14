@@ -638,6 +638,7 @@ public static class OidcConstants
         public const string AccessToken = "access_token";
         public const string IdentityToken = "id_token";
         public const string RefreshToken = "refresh_token";
+        public const string Code = "code";
     }
 
     public static class TokenTypeIdentifiers
@@ -1209,6 +1210,8 @@ public static class ServerConstants
     {
         public const string IdentityToken = "id_token";
         public const string AccessToken = "access_token";
+        public const string RefreshToken = "refresh_token";
+        public const string Code = "code";
     }
 
     public static class ClaimValueTypes

@@ -55,7 +55,7 @@ public static class Pipes
 
             options.CustomizeAuthorizeContext?.Invoke(authorizeContextPipe);
 
-            authorizeContextPipe.UseHandler<AuthorizeContextHandler>();
+            authorizeContextPipe.UseHandler<AuthorizeHandler>();
 
             //////////////////////////////
             //// AuthorizeValidateContext

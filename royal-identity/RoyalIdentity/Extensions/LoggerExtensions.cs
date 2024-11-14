@@ -60,6 +60,21 @@ public static class LoggerExtensions
     }
 
     internal static void LogError(this ILogger logger,
+        ServerOptions options,
+        Exception ex,
+        string message,
+        IEndpointContextBase context)
+    {
+        var raw = GetRaw(context, options.Logging.SensitiveValuesFilter);
+        logger.LogError(ex, "{Message}\n{Raw}", message, raw);
+
+        if (options.Logging.UseLogService)
+        {
+            // TODO: chamar o log sevice
+        }
+    }
+
+    internal static void LogError(this ILogger logger,
         IEndpointContextBase context,
         string message,
         string? details = null)
@@ -69,6 +84,15 @@ public static class LoggerExtensions
             logger.LogError(options, message, details, context);
         else
             logger.LogError(options, message, context);
+    }
+
+    internal static void LogError(this ILogger logger,
+        IEndpointContextBase context,
+        Exception ex,
+        string message)
+    {
+        var options = context.Items.GetOrCreate<ServerOptions>();
+        logger.LogError(options, ex, message, context);
     }
 
     private static string GetRaw(IEndpointContextBase context, ICollection<string> sensitiveValuesFilter)

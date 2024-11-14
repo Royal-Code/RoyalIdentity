@@ -28,12 +28,4 @@ public class EvaluatedClient
     /// The credential.
     /// </value>
     public EvaluatedCredential Credential { get; }
-
-    ///// <summary>
-    ///// Gets or sets additional properties.
-    ///// </summary>
-    ///// <value>
-    ///// The properties.
-    ///// </value>
-    //public Dictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
 }

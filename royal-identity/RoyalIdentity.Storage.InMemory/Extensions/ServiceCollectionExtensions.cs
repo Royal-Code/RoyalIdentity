@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IUserDetailsStore, UserStore>();
         services.AddTransient<IUserSessionStore, UserSessionStore>();
         services.AddTransient<IKeyStore, KeyStore>();
+        services.AddTransient<IRefreshTokenStore, RefreshTokenStore>();
 
         return services;
     }

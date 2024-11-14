@@ -16,7 +16,7 @@ public abstract class Event
     /// <param name="id">The identifier.</param>
     /// <param name="message">The message.</param>
     /// <exception cref="System.ArgumentNullException">category</exception>
-    protected Event(string category, string name, EventTypes type, string message = null)
+    protected Event(string category, string name, EventTypes type, string? message = null)
     {
         Category = category ?? throw new ArgumentNullException(nameof(category));
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -64,7 +64,7 @@ public abstract class Event
     /// <value>
     /// The message.
     /// </value>
-    public string Message { get; set; }
+    public string? Message { get; set; }
 
     /// <summary>
     /// Gets or sets the per-request activity identifier.

@@ -5,9 +5,14 @@ using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class ValidateGrantType : IValidator<ITokenEndpointContextBase>
+public class GrantTypeValidator : IValidator<ITokenEndpointContextBase>
 {
     private readonly ILogger logger;
+
+    public GrantTypeValidator(ILogger<GrantTypeValidator> logger)
+    {
+        this.logger = logger;
+    }
 
     public ValueTask Validate(ITokenEndpointContextBase context, CancellationToken ct)
     {

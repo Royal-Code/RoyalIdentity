@@ -25,7 +25,7 @@ public class DefaultClientSecretChecker : IClientSecretChecker
         foreach (var evaluator in evaluators)
         {
             var evaluatedClient = await evaluator.EvaluateAsync(context, ct);
-            if (evaluatedClient == null)
+            if (evaluatedClient is null)
                 continue;
 
             logger.LogDebug("Parser found secret: {Type}", evaluator.GetType().Name);

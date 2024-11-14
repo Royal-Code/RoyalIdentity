@@ -177,4 +177,10 @@ public class Client
     /// Specifies the allowed grant types (legal combinations of AuthorizationCode, Implicit, Hybrid, ResourceOwner, ClientCredentials).
     /// </summary>
     public HashSet<string> AllowedGrantTypes { get; set; } = [GrantType.AuthorizationCode];
+
+    /// <summary>
+    /// Absolute: the refresh token will expire on a fixed point in time (specified by the AbsoluteRefreshTokenLifetime)
+    /// Sliding: when refreshing the token, the lifetime of the refresh token will be renewed (by the amount specified in SlidingRefreshTokenLifetime). The lifetime will not exceed AbsoluteRefreshTokenLifetime.
+    /// </summary>        
+    public TokenExpiration RefreshTokenExpiration { get; set; } = TokenExpiration.Absolute;
 }

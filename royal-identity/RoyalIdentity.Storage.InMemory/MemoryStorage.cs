@@ -117,4 +117,6 @@ public class MemoryStorage
     public ConcurrentDictionary<string, Consent> Consents { get; } = new();
 
     public ConcurrentDictionary<string, IdentitySession> UserSessions { get; } = new();
+
+    public ConcurrentDictionary<string, RefreshToken> RefreshTokens { get; } = new();
 }
