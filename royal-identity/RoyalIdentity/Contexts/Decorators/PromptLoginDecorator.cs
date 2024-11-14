@@ -55,7 +55,8 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             await profileService.IsActiveAsync(
                 principal,
                 context.Client,
-                ServerConstants.ProfileIsActiveCallers.AuthorizeEndpoint);
+                ServerConstants.ProfileIsActiveCallers.AuthorizeEndpoint,
+                ct);
 
         if (!isUserActive)
         {

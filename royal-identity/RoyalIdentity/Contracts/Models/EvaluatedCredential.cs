@@ -1,4 +1,4 @@
-﻿namespace RoyalIdentity.Contracts;
+﻿namespace RoyalIdentity.Contracts.Models;
 
 public class EvaluatedCredential
 {

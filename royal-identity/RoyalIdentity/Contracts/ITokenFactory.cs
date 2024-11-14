@@ -21,4 +21,12 @@ public interface ITokenFactory
     /// <param name="ct">The cancellation token.</param>
     /// <returns>An access token</returns>
     Task<AccessToken> CreateAccessTokenAsync(AccessTokenRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Creates a refresh token.
+    /// </summary>
+    /// <param name="request">The refresh token creation request.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A refresh token</returns>
+    Task<RefreshToken> CreateRefreshTokenAsync(RefreshTokenRequest request, CancellationToken ct);
 }

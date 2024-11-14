@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
+using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;

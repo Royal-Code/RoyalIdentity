@@ -78,7 +78,9 @@ public static class Pipes
             var authorizationCodeContextPipe = builder.For<AuthorizationCodeContext>()
                 .UseDecorator<EvaluateClient>()
                 .UseValidator<RedirectUriValidator>()
-                .UseDecorator<LoadCode>();
+                .UseDecorator<LoadCode>()
+                .UseValidator<PkceMatchValidator>()
+                .UseValidator<ActiveUserValidator>();
 
             options.CustomizeAuthorizationCodeContext?.Invoke(authorizationCodeContextPipe);
 

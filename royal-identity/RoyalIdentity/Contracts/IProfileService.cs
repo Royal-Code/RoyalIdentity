@@ -31,5 +31,5 @@ public interface IProfileService
     ///     <c>true</c> if the subject is active; otherwise, <c>false</c>.
     /// </para>
     /// </returns>
-    ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller);
+    ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller, CancellationToken ct);
 }

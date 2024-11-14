@@ -12,7 +12,7 @@ public class DefaultProfileService : IProfileService
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller)
+    public ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller, CancellationToken ct)
     {
         return ValueTask.FromResult(true);
     }

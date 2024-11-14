@@ -1,11 +1,10 @@
 using RoyalIdentity.Models;
 
-namespace RoyalIdentity.Contracts;
+namespace RoyalIdentity.Contracts.Models;
 
 /// <summary>
 /// Represents a secret extracted from the HttpContext
 /// </summary>
-[Redesign("Trocar nome (?SecretChecked?), não necessidade de carregar dados dos segredos, mas sim retornar alguns dados identificando o tipo e resultado da validação")]
 public class EvaluatedClient
 {
     public EvaluatedClient(Client client, EvaluatedCredential credential)

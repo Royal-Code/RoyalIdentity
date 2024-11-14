@@ -6,6 +6,9 @@ using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Models.Tokens;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
+using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts;
@@ -24,13 +27,23 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithRedirectU
 
     public string? Code { get; private set; }
 
+    public string? CodeVerifier { get; private set; }
+
     public AuthorizationCode? AuthorizationCode { get; set; }
+
+    public Resources? Resources { get; set; }
+
+    public override ClaimsPrincipal? GetSubject()
+    {
+        return AuthorizationCode?.Subject;
+    }
 
     public override void Load(ILogger logger)
     {
         RedirectUri = Raw.Get(TokenRequest.RedirectUri);
         ClientId = Raw.Get(TokenRequest.ClientId);
         Code = Raw.Get(TokenRequest.Code);
+        CodeVerifier = Raw.Get(TokenRequest.CodeVerifier);
     }
 
 #pragma warning disable CS8774
@@ -38,7 +51,7 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithRedirectU
     private bool hasCode;
     private bool hasRedirectUri;
 
-    [MemberNotNull(nameof(Code), nameof(AuthorizationCode))]
+    [MemberNotNull(nameof(Code), nameof(AuthorizationCode), nameof(Resources))]
     public void AssertHasCode()
     {
         if (hasCode)

@@ -8,6 +8,7 @@ using RoyalIdentity.Models;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
+using RoyalIdentity.Contracts.Models;
 
 namespace RoyalIdentity.Contexts;
 
@@ -35,6 +36,8 @@ public abstract class TokenEndpointContextBase : EndpointContextBase, ITokenEndp
     public HashSet<Claim> ClientClaims { get; set; } = [];
 
     public abstract void Load(ILogger logger);
+
+    public abstract ClaimsPrincipal? GetSubject();
 
     public void SetClient(Client client)
     {

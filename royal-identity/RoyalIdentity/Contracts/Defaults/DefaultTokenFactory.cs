@@ -175,6 +175,8 @@ public class DefaultTokenFactory : ITokenFactory
             request.AccessTokenToHash.IsPresent(),
             request.Context));
 
+
+
         var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
 
         var idToken = new IdentityToken(request.Context.Client.Id,
@@ -185,8 +187,15 @@ public class DefaultTokenFactory : ITokenFactory
             AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
         };
 
+        idToken.Claims.AddRange(claims);
+
         await jwtFactory.CreateTokenAsync(idToken, ct);
 
         return idToken;
+    }
+
+    public Task<RefreshToken> CreateRefreshTokenAsync(RefreshTokenRequest request, CancellationToken ct)
+    {
+        throw new NotImplementedException();
     }
 }

@@ -1,4 +1,5 @@
 using RoyalIdentity.Contexts;
+using RoyalIdentity.Contracts.Models;
 
 namespace RoyalIdentity.Contracts;
 

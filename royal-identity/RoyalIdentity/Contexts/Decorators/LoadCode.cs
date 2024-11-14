@@ -10,13 +10,19 @@ namespace RoyalIdentity.Contexts.Decorators;
 
 public class LoadCode : IDecorator<AuthorizationCodeContext>
 {
-    private readonly IAuthorizationCodeStore store;
+    private readonly IAuthorizationCodeStore codeStore;
+    private readonly IResourceStore resourceStore;
     private readonly TimeProvider clock;
     private readonly ILogger logger;
 
-    public LoadCode(IAuthorizationCodeStore store, TimeProvider clock, ILogger<LoadCode> logger)
+    public LoadCode(
+        IAuthorizationCodeStore codeStore,
+        IResourceStore resourceStore,
+        TimeProvider clock,
+        ILogger<LoadCode> logger)
     {
-        this.store = store;
+        this.codeStore = codeStore;
+        this.resourceStore = resourceStore;
         this.clock = clock;
         this.logger = logger;
     }
@@ -43,7 +49,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         }
 
         // load the authorization code.
-        var authorizationCode = await store.GetAuthorizationCodeAsync(code, ct);
+        var authorizationCode = await codeStore.GetAuthorizationCodeAsync(code, ct);
 
         if (authorizationCode == null)
         {
@@ -67,7 +73,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         }
 
         // Removes the authorization code.
-        await store.RemoveAuthorizationCodeAsync(code, ct);
+        await codeStore.RemoveAuthorizationCodeAsync(code, ct);
 
         if (authorizationCode.CreationTime.HasExceeded(authorizationCode.Lifetime, clock.GetUtcNow().DateTime))
         {
@@ -76,8 +82,14 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
             return;
         }
 
+        // get the requested resources
+        var scopes = authorizationCode.RequestedScopes;
+        var resources = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);
+
+
 
         context.AuthorizationCode = authorizationCode;
+        context.Resources = resources;
         context.Items.GetOrCreate<Asserts>().HasCode = true;
 
         await next();
