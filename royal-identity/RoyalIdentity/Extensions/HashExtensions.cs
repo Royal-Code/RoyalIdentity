@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Security.Cryptography;
 
 namespace RoyalIdentity.Extensions;
@@ -29,11 +30,8 @@ public static class HashExtensions
     /// </summary>
     /// <param name="input">The input.</param>
     /// <returns>A hash.</returns>
-    public static byte[]? Sha256(this byte[] input)
+    public static byte[] Sha256(this byte[] input)
     {
-        if (input == null)
-            return null;
-
         return SHA256.HashData(input);
     }
 

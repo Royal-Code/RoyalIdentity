@@ -98,9 +98,15 @@ public class Client
     /// Defaults to <c>true</c>
     /// </summary>
     /// <value>
-    /// <c>true</c> if claims should always be sent; otherwise, <c>false</c>.
+    /// <c>true</c> if claims should always be sent; otherwise, <c>true</c>.
     /// </value>
     public bool AlwaysSendClientClaims { get; set; } = true;
+
+    /// <summary>
+    /// When requesting both an id token and access token, should the user claims always be added to the id token instead of requiring the client to use the userinfo endpoint.
+    /// Defaults to <c>false</c>.
+    /// </summary>
+    public bool AlwaysIncludeUserClaimsInIdToken { get; set; } = false;
 
     /// <summary>
     /// Gets or sets a value to prefix it on client claim types. Defaults to <c>null</c>.

@@ -18,6 +18,7 @@ public class MemoryStorage
         {
             Id = "client",
             Name = "Client",
+            RequireClientSecret = false,
             AllowedScopes = { "openid", "profile", "email" },
             AllowedResponseTypes = { "code" },
             RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }

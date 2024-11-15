@@ -1,7 +1,9 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contexts.Validators;
 
@@ -28,20 +30,30 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
             return default;
         }
 
+        bool equals;
         switch (context.AuthorizationCode.CodeChallengeMethod)
         {
             case OidcConstants.CodeChallengeMethods.Plain:
             {
-                if (context.AuthorizationCode.CodeChallenge != context.CodeVerifier)
+                equals = TimeConstantComparer.IsEqual(
+                    context.CodeVerifier.Sha256(),
+                    context.AuthorizationCode.CodeChallenge);
+
+                if (!equals)
                     context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code verifier does not match code challenge");
 
                 break;
             }
             case OidcConstants.CodeChallengeMethods.Sha256:
             {
-                var hash = context.CodeVerifier.Sha256();
+                var codeVerifierBytes = Encoding.ASCII.GetBytes(context.CodeVerifier);
+                var transformedCodeVerifier = Base64Url.Encode(codeVerifierBytes.Sha256());
 
-                if (context.AuthorizationCode.CodeChallenge != hash)
+                equals = TimeConstantComparer.IsEqual(
+                    transformedCodeVerifier.Sha256(),
+                    context.AuthorizationCode.CodeChallenge);
+
+                if (!equals)
                 {
                     context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code verifier does not match code challenge");
                 }

@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
@@ -18,10 +19,10 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
 
     public PrivateKeyJwtSecretEvaluator(
         IClientStore clientStore,
-        ServerOptions options,
+        IOptions<ServerOptions> options,
         TimeProvider clock,
         IReplayCache replayCache,
-        ILogger<PrivateKeyJwtSecretEvaluator> logger) : base(clientStore, options, clock, logger)
+        ILogger<PrivateKeyJwtSecretEvaluator> logger) : base(clientStore, options.Value, clock, logger)
     {
         this.replayCache = replayCache;
     }

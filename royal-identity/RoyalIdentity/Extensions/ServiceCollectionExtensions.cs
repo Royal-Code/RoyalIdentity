@@ -6,6 +6,7 @@ using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
 using RoyalIdentity.Contracts.Defaults.Jobs;
 using RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Handlers;
 using RoyalIdentity.Users;
@@ -42,6 +43,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IKeyManager, DefaultKeyManager>();
         services.AddTransient<IProfileService, DefaultProfileService>();
         services.AddTransient<IRedirectUriValidator, DefaultRedirectUriValidator>();
+        services.AddTransient<IReplayCache, DefaultReplayNoCache>();
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
@@ -50,6 +52,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IClientSecretsEvaluator, BasicSecretEvaluator>();
         services.AddTransient<IClientSecretsEvaluator, PostBodySecretEvaluator>();
         services.AddTransient<IClientSecretsEvaluator, PrivateKeyJwtSecretEvaluator>();
+        services.AddTransient<IClientSecretsEvaluator, TlsClientAuthSecretEvaluator>();
+        services.AddTransient<IClientSecretsEvaluator, NoSecretEvaluator>();
 
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();

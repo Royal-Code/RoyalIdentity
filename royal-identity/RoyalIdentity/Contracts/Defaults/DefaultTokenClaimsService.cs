@@ -21,13 +21,61 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         this.profileService = profileService;
     }
 
-    public Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(
+    /// <inheritdoc />
+    public async Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(
         ClaimsPrincipal subject,
         Resources resources,
         bool includeAllIdentityClaims,
         IWithClient context)
     {
-        throw new NotImplementedException();
+        context.AssertHasClient();
+
+        logger.LogDebug("Getting claims for identity token for subject: {Subject} and client: {ClientId}",
+            subject.GetSubjectId(),
+            context.Client.Id);
+
+        var outputClaims = new List<Claim>(GetStandardSubjectClaims(subject));
+        outputClaims.AddRange(GetOptionalClaims(subject));
+
+        // fetch all identity claims that need to go into the id token
+        if (includeAllIdentityClaims || context.Client.AlwaysIncludeUserClaimsInIdToken)
+        {
+            var additionalClaimTypes = new List<string>();
+
+            foreach (var identityResource in resources.IdentityResources)
+            {
+                foreach (var userClaim in identityResource.UserClaims)
+                {
+                    additionalClaimTypes.Add(userClaim);
+                }
+            }
+
+            // filter so we don't ask for claim types that we will eventually filter out
+            additionalClaimTypes = FilterRequestedClaimTypes(additionalClaimTypes).ToList();
+
+            var profileDataRequest = new ProfileDataRequest(
+                context,
+                resources,
+                subject,
+                context.Client,
+                ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
+                additionalClaimTypes.Distinct());
+
+            await profileService.GetProfileDataAsync(profileDataRequest);
+
+            var claims = FilterProtocolClaims(profileDataRequest.IssuedClaims);
+
+            outputClaims.AddRange(claims);
+        }
+        else
+        {
+            logger.LogDebug(
+                "In addition to an id_token, an access_token was requested. " +
+                "No claims other than sub are included in the id_token. " +
+                "To obtain more user claims, either use the user info endpoint or set AlwaysIncludeUserClaimsInIdToken on the client configuration.");
+        }
+
+        return outputClaims;
     }
 
     /// <inheritdoc />
@@ -109,9 +157,10 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     {
         var claims = new List<Claim>
         {
-            new (JwtClaimTypes.Subject, subject.GetSubjectId()),
-            new (JwtClaimTypes.AuthenticationTime, subject.GetAuthenticationTimeEpoch().ToString(), ClaimValueTypes.Integer64),
-            new (JwtClaimTypes.IdentityProvider, subject.GetIdentityProvider())
+            new(JwtClaimTypes.Subject, subject.GetSubjectId()),
+            new(JwtClaimTypes.AuthenticationTime, subject.GetAuthenticationTimeEpoch().ToString(),
+                ClaimValueTypes.Integer64),
+            new(JwtClaimTypes.IdentityProvider, subject.GetIdentityProvider())
         };
 
         claims.AddRange(subject.GetAuthenticationMethods());
@@ -160,5 +209,25 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     {
         var claimTypesToFilter = claimTypes.Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x));
         return claimTypes.Except(claimTypesToFilter);
+    }
+
+    /// <summary>
+    /// Filters out protocol claims like amr, nonce etc..
+    /// </summary>
+    /// <param name="claims">The claims.</param>
+    /// <returns></returns>
+    protected virtual IEnumerable<Claim> FilterProtocolClaims(List<Claim> claims)
+    {
+        var claimsToFilter = claims
+            .Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))
+            .ToList();
+
+        if (claimsToFilter.Count is not 0 && logger.IsEnabled(LogLevel.Debug))
+        {
+            var types = claimsToFilter.Select(x => x.Type);
+            logger.LogDebug("Claim types from profile service that were filtered: {ClaimTypes}", types);
+        }
+
+        return claims.Except(claimsToFilter);
     }
 }
