@@ -5,6 +5,7 @@ using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
 using RoyalIdentity.Contracts.Defaults.Jobs;
+using RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Handlers;
 using RoyalIdentity.Users;
@@ -44,6 +45,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
+
+        // Secret Evaluators
+        services.AddTransient<IClientSecretsEvaluator, BasicSecretEvaluator>();
+        services.AddTransient<IClientSecretsEvaluator, PostBodySecretEvaluator>();
+        services.AddTransient<IClientSecretsEvaluator, PrivateKeyJwtSecretEvaluator>();
 
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();

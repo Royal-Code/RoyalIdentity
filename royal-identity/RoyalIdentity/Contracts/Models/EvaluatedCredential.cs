@@ -1,8 +1,10 @@
-﻿namespace RoyalIdentity.Contracts.Models;
+﻿using RoyalIdentity.Models;
+
+namespace RoyalIdentity.Contracts.Models;
 
 public class EvaluatedCredential
 {
-    public EvaluatedCredential(string type, bool isValid, object? credential = null, string? confirmation = null)
+    public EvaluatedCredential(string type, bool isValid, ClientSecret? credential = null, string? confirmation = null)
     {
         Type = type;
         IsValid = isValid;
@@ -14,7 +16,7 @@ public class EvaluatedCredential
 
     public bool IsValid { get; }
 
-    public object? Credential { get; }
+    public ClientSecret? Credential { get; }
 
     /// <summary>
     /// Gets the value of the confirmation method (will become the cnf claim). Must be a JSON object.

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -53,6 +54,6 @@ public class DefaultClientSecretChecker : IClientSecretChecker
 
     public IEnumerable<string> GetAvailableAuthenticationMethods()
     {
-        return evaluators.Select(p => p.AuthenticationMethod).Where(p => !string.IsNullOrWhiteSpace(p));
+        return evaluators.Select(p => p.AuthenticationMethod).Where(p => p.IsPresent());
     }
 }
