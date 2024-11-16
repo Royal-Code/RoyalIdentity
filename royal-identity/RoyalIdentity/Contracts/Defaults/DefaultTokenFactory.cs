@@ -90,6 +90,12 @@ public class DefaultTokenFactory : ITokenFactory
             token.Audiences.Add(aud);
         }
 
+        // add client_id to audiences if is openid
+        if (request.Resources.IsOpenId)
+        {
+            token.Audiences.Add(request.Context.Client.Id);
+        }
+
         // add cnf if present
         if (request.Confirmation.IsPresent())
         {
@@ -99,8 +105,8 @@ public class DefaultTokenFactory : ITokenFactory
         {
             if (options.Value.MutualTls.AlwaysEmitConfirmationClaim)
             {
-                var clientCertificate = await request.Context.HttpContext.Connection.GetClientCertificateAsync();
-                if (clientCertificate != null)
+                var clientCertificate = await request.Context.HttpContext.Connection.GetClientCertificateAsync(ct);
+                if (clientCertificate is not null)
                 {
                     token.Confirmation = clientCertificate.CreateThumbprintCnf();
                 }
@@ -179,6 +185,11 @@ public class DefaultTokenFactory : ITokenFactory
             request.AccessTokenToHash.IsPresent(),
             request.Context));
 
+        // add client_id to audiences if is openid
+        if (request.Resources.IsOpenId)
+        {
+            claims.Add(new Claim(JwtClaimTypes.Audience, request.Context.Client.Id));
+        }
 
         var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
 

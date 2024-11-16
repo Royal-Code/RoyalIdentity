@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Models;
 
@@ -37,6 +38,11 @@ public class Resources
         ApiResources = new HashSet<ApiResource>(apiResources);
         ApiScopes = new HashSet<ApiScope>(apiScopes);
     }
+
+    /// <summary>
+    /// Gets a value indicating whether this instance has identity resources.
+    /// </summary>
+    public bool IsOpenId => IdentityResources.Any(x => x.Name == ServerConstants.StandardScopes.OpenId);
 
     /// <summary>
     /// Gets or sets a value indicating whether [offline access].
