@@ -1,6 +1,7 @@
 ﻿using RoyalIdentity.Models;
 using System.Security.Claims;
 using RoyalIdentity.Contexts;
+using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contracts.Models;
 
@@ -88,5 +89,5 @@ public class ProfileDataRequest
     /// <value>
     /// The issued claims.
     /// </value>
-    public List<Claim> IssuedClaims { get; } = [];
+    public HashSet<Claim> IssuedClaims { get; } = new HashSet<Claim>(new ClaimComparer());
 }

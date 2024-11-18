@@ -14,7 +14,7 @@ public interface IProfileService
     /// </summary>
     /// <param name="request">The data request.</param>
     /// <returns></returns>
-    ValueTask GetProfileDataAsync(ProfileDataRequest request);
+    ValueTask GetProfileDataAsync(ProfileDataRequest request, CancellationToken ct);
 
     /// <summary>
     /// This method gets called whenever identity server needs to determine if the user is valid or active (e.g. if the user's account has been deactivated since they logged in).

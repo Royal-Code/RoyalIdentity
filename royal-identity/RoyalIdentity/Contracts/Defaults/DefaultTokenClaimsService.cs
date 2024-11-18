@@ -26,7 +26,8 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         ClaimsPrincipal subject,
         Resources resources,
         bool includeAllIdentityClaims,
-        IWithClient context)
+        IWithClient context, 
+        CancellationToken ct)
     {
         context.AssertHasClient();
 
@@ -61,7 +62,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
                 ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
                 additionalClaimTypes.Distinct());
 
-            await profileService.GetProfileDataAsync(profileDataRequest);
+            await profileService.GetProfileDataAsync(profileDataRequest, ct);
 
             var claims = FilterProtocolClaims(profileDataRequest.IssuedClaims);
 
@@ -141,7 +142,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
             additionalClaimTypes.Distinct());
 
-        await profileService.GetProfileDataAsync(profileDataRequest);
+        await profileService.GetProfileDataAsync(profileDataRequest, ct);
 
         outputClaims.AddRange(FilterClaims(profileDataRequest.IssuedClaims));
 
@@ -189,7 +190,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     /// </summary>
     /// <param name="claims">The claims.</param>
     /// <returns></returns>
-    protected virtual IEnumerable<Claim> FilterClaims(List<Claim> claims)
+    protected virtual IEnumerable<Claim> FilterClaims(HashSet<Claim> claims)
     {
         var claimsToFilter = claims
             .Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))
@@ -216,7 +217,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     /// </summary>
     /// <param name="claims">The claims.</param>
     /// <returns></returns>
-    protected virtual IEnumerable<Claim> FilterProtocolClaims(List<Claim> claims)
+    protected virtual IEnumerable<Claim> FilterProtocolClaims(HashSet<Claim> claims)
     {
         var claimsToFilter = claims
             .Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))

@@ -5,6 +5,7 @@ namespace RoyalIdentity.Contexts.Items;
 /// <summary>
 /// Data structure serializing issued tokens
 /// </summary>
+[Redesign("Acredito que o uso destes seja desnecessário.")]
 public class Token
 {
     /// <summary>

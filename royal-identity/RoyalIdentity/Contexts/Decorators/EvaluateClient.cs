@@ -21,6 +21,8 @@ public class EvaluateClient : IDecorator<IWithClientCredentials>
 
     public async Task Decorate(IWithClientCredentials context, Func<Task> next, CancellationToken ct)
     {
+        logger.LogDebug("Start client evaluation");
+
         var evaluatedClient = await clientSecretChecker.EvaluateClientAsync(context, ct);
         if (evaluatedClient is null)
         {

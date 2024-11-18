@@ -19,7 +19,7 @@ public interface ITokenClaimsService
     /// <returns>
     /// Claims for the identity token
     /// </returns>
-    Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(ClaimsPrincipal subject, Resources resources, bool includeAllIdentityClaims, IWithClient context);
+    Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(ClaimsPrincipal subject, Resources resources, bool includeAllIdentityClaims, IWithClient context, CancellationToken ct);
 
     /// <summary>
     /// Returns claims for an access token.

@@ -23,6 +23,8 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
 
     public async Task Decorate(AuthorizeContext context, Func<Task> next, CancellationToken ct)
     {
+        logger.LogDebug("Start authorize consent validation");
+
         context.AssertHasClient();
 
         if (context.PromptModes.Count is not 0 &&

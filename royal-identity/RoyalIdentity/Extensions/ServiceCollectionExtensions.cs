@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
 
         // Default contract implementations
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();
+        services.AddTransient<IBearerTokenLocator, DefaultBearerTokenLocator>();
         services.AddSingleton<IClientSecretChecker, DefaultClientSecretChecker>();
         services.AddTransient<ICodeFactory, DefaultCodeFactory>();
         services.AddTransient<IConsentService, DefaultConsentService>();
@@ -47,6 +48,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
+        services.AddTransient<ITokenValidator, DefaultTokenValidator>();
 
         // Secret Evaluators
         services.AddTransient<IClientSecretsEvaluator, BasicSecretEvaluator>();
@@ -63,6 +65,7 @@ public static class ServiceCollectionExtensions
 
         // Decorators
         services.AddTransient<ConsentDecorator>();
+        services.AddTransient<EvaluateBearerToken>();
         services.AddTransient<EvaluateClient>();
         services.AddTransient<LoadClient>();
         services.AddTransient<LoadCode>();
@@ -92,6 +95,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DiscoveryEndpoint>();
         services.AddTransient<JwkEndpoint>();
         services.AddTransient<TokenEndpoint>();
+        services.AddTransient<UserInfoEndpoint>();
 
         // Others
         services.AddSingleton<KeyCache>();

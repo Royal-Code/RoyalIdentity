@@ -14,5 +14,6 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapPipeline<AuthorizeEndpoint>(Constants.ProtocolRoutePaths.Authorize);
         endpoints.MapPipeline<AuthorizeCallbackEndpoint>(Constants.ProtocolRoutePaths.AuthorizeCallback);
         endpoints.MapPipeline<TokenEndpoint>(Constants.ProtocolRoutePaths.Token);
+        endpoints.MapPipeline<UserInfoEndpoint>(Constants.ProtocolRoutePaths.UserInfo);
     }
 }

@@ -85,6 +85,17 @@ public static class Pipes
             options.CustomizeAuthorizationCodeContext?.Invoke(authorizationCodeContextPipe);
 
             authorizationCodeContextPipe.UseHandler<AuthorizationCodeHandler>();
+
+
+            //////////////////////////////
+            //// UserInfoContext
+            //////////////////////////////
+            var userinfoContextPipe = builder.For<UserInfoContext>()
+                .UseDecorator<EvaluateBearerToken>();
+
+            options.CustomizeUserInfoContext?.Invoke(userinfoContextPipe);
+
+            userinfoContextPipe.UseHandler<UserInfoHandler>();
         });
     }
 }
@@ -100,4 +111,6 @@ public class CustomOptions
     public Action<IPipelineConfigurationBuilder<AuthorizeValidateContext>>? CustomizeAuthorizeValidateContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<AuthorizationCodeContext>>? CustomizeAuthorizationCodeContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<UserInfoContext>>? CustomizeUserInfoContext { get; set; }
 }

@@ -183,7 +183,8 @@ public class DefaultTokenFactory : ITokenFactory
             request.Subject,
             request.Resources,
             request.AccessTokenToHash.IsPresent(),
-            request.Context));
+            request.Context,
+            ct));
 
         // add client_id to audiences if is openid
         if (request.Resources.IsOpenId)
