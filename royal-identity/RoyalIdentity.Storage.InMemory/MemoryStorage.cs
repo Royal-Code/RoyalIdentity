@@ -14,11 +14,12 @@ public class MemoryStorage
 {
     public ConcurrentDictionary<string, Client> Clients { get; } = new()
     {
-        ["client"] = new Client
+        ["demo_client"] = new Client
         {
-            Id = "client",
-            Name = "Client",
+            Id = "demo_client",
+            Name = "Demo Client",
             RequireClientSecret = false,
+            AllowOfflineAccess = true,
             AllowedScopes = { "openid", "profile", "email" },
             AllowedResponseTypes = { "code" },
             RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }

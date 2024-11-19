@@ -7,118 +7,100 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Utils;
+using Microsoft.Extensions.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultTokenValidator : ITokenValidator
 {
-    private readonly IKeyManager _keys;
-    private readonly IClientStore _clients;
-    private readonly IAccessTokenStore _tokens;
-    private readonly ILogger _logger;
-    private readonly ServerOptions _options;
-    private readonly TimeProvider _clock;
+    private readonly IKeyManager keys;
+    private readonly IClientStore clients;
+    private readonly IAccessTokenStore tokens;
+    private readonly ILogger logger;
+    private readonly ServerOptions options;
+    private readonly TimeProvider clock;
+
+    public DefaultTokenValidator(
+        IKeyManager keys,
+        IClientStore clients,
+        IAccessTokenStore tokens,
+        ILogger<DefaultTokenValidator> logger,
+        IOptions<ServerOptions> options,
+        TimeProvider clock)
+    {
+        this.keys = keys;
+        this.clients = clients;
+        this.tokens = tokens;
+        this.logger = logger;
+        this.options = options.Value;
+        this.clock = clock;
+    }
 
     public async Task<TokenEvaluationResult> ValidateJwtAccessTokenAsync(
         string jwt, string? expectedScope = null, string? audience = null, CancellationToken ct = default)
     {
-        var keys = await _keys.GetValidationKeysAsync(ct);
 
-        var handler = new JwtSecurityTokenHandler();
-        handler.InboundClaimTypeMap.Clear();
+        (var principal, var securityToken, var error) = await TryGetPrincipal(jwt, audience, ct);
 
-        var parameters = new TokenValidationParameters
+        if (error is not null)
         {
-            ValidIssuer = _options.IssuerUri,
-            IssuerSigningKeys = keys.Keys,
-            ValidateLifetime = true
-        };
-
-        if (audience.IsPresent())
-        {
-            parameters.ValidAudience = audience;
-        }
-        else
-        {
-            parameters.ValidateAudience = false;
+            return new(error);
         }
 
-        try
+        // if no audience is specified, we make at least sure that it is an access token
+        if (audience.IsMissing() &&
+            options.AccessTokenJwtType.IsPresent() &&
+            securityToken is JwtSecurityToken jwtSecurityToken &&
+            !string.Equals(jwtSecurityToken.Header.Typ, options.AccessTokenJwtType))
         {
-            var principal = handler.ValidateToken(jwt, parameters, out var securityToken);
-
-            // if no audience is specified, we make at least sure that it is an access token
-            if (audience.IsMissing() &&
-                _options.AccessTokenJwtType.IsPresent() &&
-                securityToken is JwtSecurityToken jwtSecurityToken && 
-                !string.Equals(jwtSecurityToken.Header.Typ, _options.AccessTokenJwtType))
-            {
-                return new(new ValidationError()
-                {
-                    Error = "invalid JWT token type"
-                });
-            }
-
-            // load the client that belongs to the client_id claim
-            Client? client = null;
-            var clientId = principal.FindFirst(JwtClaimTypes.ClientId);
-            if (clientId is not null)
-                client = await _clients.FindEnabledClientByIdAsync(clientId.Value, ct);
-
-            if (client is null)
-            {
-                _logger.LogError("Client not found or deleted or disabled: {ClientId}", clientId);
-                return new(new ValidationError()
-                {
-                    Error = OidcConstants.ProtectedResourceErrors.InvalidToken
-                });
-            }
-
-            var evaluatedToken = new EvaluatedToken()
-            {
-                Principal = principal,
-                Client = client,
-                Jwt = jwt,
-            };
-
-            return new TokenEvaluationResult(evaluatedToken);
-        }
-        catch (SecurityTokenExpiredException expiredException)
-        {
-            _logger.LogInformation(expiredException, "JWT token validation error: {Exception}", expiredException.Message);
             return new(new ValidationError()
             {
-                Error = OidcConstants.ProtectedResourceErrors.ExpiredToken
+                Error = "invalid JWT token type"
             });
         }
-        catch (Exception ex)
+
+        // load the client that belongs to the client_id claim
+        Client? client = null;
+        var clientId = principal!.FindFirst(JwtClaimTypes.ClientId);
+        if (clientId is not null)
+            client = await clients.FindEnabledClientByIdAsync(clientId.Value, ct);
+
+        if (client is null)
         {
-            _logger.LogError(ex, "JWT token validation error: {Exception}", ex.Message);
+            logger.LogError("Client not found or deleted or disabled: {ClientId}", clientId);
             return new(new ValidationError()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });
         }
+
+        var evaluatedToken = new EvaluatedToken()
+        {
+            Principal = principal,
+            Client = client,
+            Jwt = jwt,
+        };
+
+        return new TokenEvaluationResult(evaluatedToken);
     }
 
     public async Task<TokenEvaluationResult> ValidateReferenceAccessTokenAsync(string jti, CancellationToken ct = default)
     {
-        var token = await _tokens.GetAsync(jti, ct);
+        var token = await tokens.GetAsync(jti, ct);
 
         if (token is null)
         {
-            _logger.LogError("Invalid reference token.");
+            logger.LogError("Invalid reference token.");
             return new(new ValidationError()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });
         }
 
-        if (token.CreationTime.HasExceeded(token.Lifetime, _clock.GetUtcNow().UtcDateTime))
+        if (token.CreationTime.HasExceeded(token.Lifetime, clock.GetUtcNow().UtcDateTime))
         {
-            _logger.LogError("Token expired.");
+            logger.LogError("Token expired.");
             return new(new ValidationError()
             {
                 Error = OidcConstants.ProtectedResourceErrors.ExpiredToken
@@ -126,10 +108,10 @@ public class DefaultTokenValidator : ITokenValidator
         }
 
         // load the client that belongs to the client_id claim
-        var client = await _clients.FindEnabledClientByIdAsync(token.ClientId, ct);
+        var client = await clients.FindEnabledClientByIdAsync(token.ClientId, ct);
         if (client is null)
         {
-            _logger.LogError("Client deleted or disabled: {ClientId}", token.ClientId);
+            logger.LogError("Client deleted or disabled: {ClientId}", token.ClientId);
             return new(new ValidationError()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
@@ -150,12 +132,125 @@ public class DefaultTokenValidator : ITokenValidator
             Client = client,
             ReferenceTokenId = jti,
         };
-        
+
         return new TokenEvaluationResult(evaluatedToken);
     }
 
-    public Task<TokenEvaluationResult> ValidateIdentityTokenAsync(string token, string? clientId = null, bool validateLifetime = true)
+    public async Task<TokenEvaluationResult> ValidateIdentityTokenAsync(
+        string token, string? clientId = null, bool validateLifetime = true, CancellationToken ct = default)
     {
-        throw new NotImplementedException();
+        logger.LogDebug("Start identity token validation");
+
+        if (token.Length > options.InputLengthRestrictions.Jwt)
+        {
+            logger.LogError("JWT too long");
+            return new(new ValidationError()
+            {
+                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+            });
+        }
+
+        if (clientId.IsMissing())
+            clientId = GetClientIdFromJwt(token);
+
+        if (clientId.IsMissing())
+        {
+            logger.LogError("No clientId supplied, can't find id in identity token.");
+            return new(new ValidationError()
+            {
+                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+            });
+        }
+
+        var client = await clients.FindEnabledClientByIdAsync(clientId, ct);
+        if (client == null)
+        {
+            logger.LogError("Unknown or disabled client: {ClientId}.", clientId);
+            return new(new ValidationError()
+            {
+                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+            });
+        }
+
+        logger.LogDebug("Client found: {ClientId} / {ClientName}", client.Id, client.Name);
+
+        (var principal, _, var error) = await TryGetPrincipal(token, clientId, ct);
+
+        if (error is not null)
+        {
+            return new(error);
+        }
+
+        var evaluatedToken = new EvaluatedToken()
+        {
+            Principal = principal!,
+            Client = client,
+            Jwt = token,
+        };
+
+        return new TokenEvaluationResult(evaluatedToken);
+    }
+
+    private string? GetClientIdFromJwt(string token)
+    {
+        try
+        {
+            var jwt = new JwtSecurityToken(token);
+            var clientId = jwt.Audiences.FirstOrDefault();
+
+            return clientId;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Malformed JWT token: {Exception}", ex.Message);
+            return null;
+        }
+    }
+
+    private async Task<(ClaimsPrincipal?, SecurityToken?, ValidationError?)> TryGetPrincipal(string jwt, string? audience, CancellationToken ct)
+    {
+        var validationsKeys = await this.keys.GetValidationKeysAsync(ct);
+
+        var handler = new JwtSecurityTokenHandler();
+        handler.InboundClaimTypeMap.Clear();
+
+        var parameters = new TokenValidationParameters
+        {
+            ValidIssuer = options.IssuerUri,
+            IssuerSigningKeys = validationsKeys.Keys,
+            ValidateLifetime = true
+        };
+
+        if (audience.IsPresent())
+        {
+            parameters.ValidAudience = audience;
+        }
+        else
+        {
+            parameters.ValidateAudience = false;
+        }
+
+        try
+        {
+            var principal = handler.ValidateToken(jwt, parameters, out var securityToken);
+
+            return (principal, securityToken, null);
+        }
+        catch (SecurityTokenExpiredException expiredException)
+        {
+            logger.LogInformation(expiredException, "JWT token validation error: {Exception}", expiredException.Message);
+            return (null, null, new ValidationError()
+            {
+                Error = OidcConstants.ProtectedResourceErrors.ExpiredToken
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "JWT token validation error: {Exception}", ex.Message);
+            return (null, null, new ValidationError()
+            {
+                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+            });
+        }
     }
 }

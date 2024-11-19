@@ -16,11 +16,12 @@ builder.Services.AddAuthentication(options =>
     .AddOpenIdConnect(options =>
     {
         options.Authority = "https://localhost:7200";
-        options.ClientId = "client";
+        options.ClientId = "demo_client";
         options.ResponseType = "code";
         options.Scope.Add("openid");
         options.Scope.Add("profile");
         options.Scope.Add("email");
+        options.Scope.Add("offline_access");
         options.SaveTokens = true;
         options.GetClaimsFromUserInfoEndpoint = true;
     });

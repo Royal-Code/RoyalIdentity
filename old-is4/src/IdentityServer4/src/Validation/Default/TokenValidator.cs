@@ -279,6 +279,7 @@ namespace IdentityServer4.Validation
                         {
                             return new TokenValidationResult
                             {
+                                IsError = true,
                                 Error = "invalid JWT token type"
                             };
                         }

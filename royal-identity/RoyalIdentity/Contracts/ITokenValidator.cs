@@ -32,5 +32,5 @@ public interface ITokenValidator
     /// <param name="clientId">The client identifier. Optional, if not informed, client will not be validated.</param>
     /// <param name="validateLifetime">if set to <c>true</c> the lifetime gets validated. Otherwise not.</param>
     /// <returns></returns>
-    Task<TokenEvaluationResult> ValidateIdentityTokenAsync(string token, string? clientId = null, bool validateLifetime = true);
+    Task<TokenEvaluationResult> ValidateIdentityTokenAsync(string token, string? clientId = null, bool validateLifetime = true, CancellationToken ct = default);
 }

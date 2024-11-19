@@ -88,10 +88,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AuthorizeHandler>();
         services.AddTransient<DiscoveryHandler>();
         services.AddTransient<JwkHandler>();
+        services.AddTransient<UserInfoHandler>();
 
         // Endpoints
         services.AddTransient<AuthorizeCallbackEndpoint>();
         services.AddTransient<AuthorizeEndpoint>();
+        services.AddTransient<CheckSessionEndpoint>();
         services.AddTransient<DiscoveryEndpoint>();
         services.AddTransient<JwkEndpoint>();
         services.AddTransient<TokenEndpoint>();

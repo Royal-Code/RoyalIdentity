@@ -7,4 +7,14 @@
     <p>
         Hello @User.Identity?.Name!
     </p>
+
+
+    <dl>
+        @foreach (var c in User.Claims)
+        {
+            <dt>@c.Type</dt>
+            <dd>@c.Value</dd>
+        }
+    </dl>
+
 </div>
