@@ -96,6 +96,18 @@ public static class Pipes
             options.CustomizeUserInfoContext?.Invoke(userinfoContextPipe);
 
             userinfoContextPipe.UseHandler<UserInfoHandler>();
+
+
+            //////////////////////////////
+            //// RevocationInfoContext
+            //////////////////////////////
+            var revocationContextPipe = builder.For<RevocationContext>()
+                .UseDecorator<EvaluateClient>()
+                .UseValidator<RevocationValidator>();
+
+            options.CustomizeRevocationContext?.Invoke(revocationContextPipe);
+
+            revocationContextPipe.UseHandler<RevocationHandler>();
         });
     }
 }
@@ -113,4 +125,6 @@ public class CustomOptions
     public Action<IPipelineConfigurationBuilder<AuthorizationCodeContext>>? CustomizeAuthorizationCodeContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<UserInfoContext>>? CustomizeUserInfoContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<RevocationContext>>? CustomizeRevocationContext { get; set; }
 }

@@ -82,12 +82,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<PkceValidator>();
         services.AddTransient<RedirectUriValidator>();
         services.AddTransient<RequestedResourcesValidator>();
+        services.AddTransient<RevocationValidator>();
 
         // Handlers
         services.AddTransient<AuthorizationCodeHandler>();
         services.AddTransient<AuthorizeHandler>();
         services.AddTransient<DiscoveryHandler>();
         services.AddTransient<JwkHandler>();
+        services.AddTransient<RevocationHandler>();
         services.AddTransient<UserInfoHandler>();
 
         // Endpoints
@@ -96,6 +98,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<CheckSessionEndpoint>();
         services.AddTransient<DiscoveryEndpoint>();
         services.AddTransient<JwkEndpoint>();
+        services.AddTransient<RevocationEndpoint>();
         services.AddTransient<TokenEndpoint>();
         services.AddTransient<UserInfoEndpoint>();
 

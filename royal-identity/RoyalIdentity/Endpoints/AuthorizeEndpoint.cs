@@ -39,7 +39,7 @@ public class AuthorizeEndpoint : IEndpointHandler
         {
             if (!httpContext.Request.HasApplicationFormContentType())
             {
-                // return a problem details of a UnsupportedMediaType infoming the ContentType is invalid
+                // return a problem details of a UnsupportedMediaType informing the ContentType is invalid
                 var problemDetails = new ProblemDetails
                 {
                     Type = "about:blank",

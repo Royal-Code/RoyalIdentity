@@ -29,4 +29,15 @@ public class AccessTokenStore : IAccessTokenStore
         storage.AccessTokens.TryRemove(jti, out _);
         return Task.CompletedTask;
     }
+
+    public Task RemoveReferenceTokensAsync(string subjectId, string clientId, CancellationToken ct)
+    {
+        storage.AccessTokens.Where(kvp => kvp.Value.AccessTokenType == AccessTokenType.Reference &&
+                                          kvp.Value.SubjectId == subjectId &&
+                                          kvp.Value.ClientId == clientId)
+            .ToList()
+            .ForEach(kvp => storage.AccessTokens.TryRemove(kvp.Key, out _));
+
+        return Task.CompletedTask;
+    }
 }
