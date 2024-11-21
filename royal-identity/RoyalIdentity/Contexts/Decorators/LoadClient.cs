@@ -26,6 +26,12 @@ public class LoadClient : IDecorator<IWithClient>
     {
         var clientId = context.ClientId;
 
+        if (clientId.IsMissing() && !context.IsClientRequired)
+        {
+            await next();
+            return;
+        }
+
         if (clientId.IsMissingOrTooLong(options.InputLengthRestrictions.ClientId))
         {
             logger.LogError(options, "The parameter client_id is missing or too long", context);

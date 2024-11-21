@@ -25,7 +25,7 @@ public class RevocationEndpoint : IEndpointHandler
 
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
-        logger.LogTrace("Processing revocation request.");
+        logger.LogDebug("Processing revocation request.");
 
         if (!HttpMethods.IsPost(httpContext.Request.Method))
         {

@@ -108,6 +108,18 @@ public static class Pipes
             options.CustomizeRevocationContext?.Invoke(revocationContextPipe);
 
             revocationContextPipe.UseHandler<RevocationHandler>();
+
+
+            //////////////////////////////
+            //// EndSessionContext
+            //////////////////////////////
+            var endSessionContextPipe = builder.For<EndSessionContext>()
+                .UseDecorator<LoadClient>()
+                .UseDecorator<EndSessionDecorator>();
+
+            options.CustomizeEndSessionContext?.Invoke(endSessionContextPipe);
+
+            endSessionContextPipe.UseHandler<EndSessionHandler>();
         });
     }
 }
@@ -127,4 +139,6 @@ public class CustomOptions
     public Action<IPipelineConfigurationBuilder<UserInfoContext>>? CustomizeUserInfoContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<RevocationContext>>? CustomizeRevocationContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<EndSessionContext>>? CustomizeEndSessionContext { get; set; }
 }

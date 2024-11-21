@@ -37,6 +37,11 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public ClaimsIdentity? Identity => Subject?.Identity as ClaimsIdentity;
 
     /// <summary>
+    /// Client is always required for authorize endpoint.
+    /// </summary>
+    public bool IsClientRequired => true;
+
+    /// <summary>
     /// Gets or sets the client model.
     /// </summary>
     public Client? Client { get; private set; }
@@ -44,13 +49,13 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <summary>
     /// Gets or sets the client id.
     /// </summary>
-    public string? ClientId { get; set; }
+    public string? ClientId { get; private set; }
 
     /// <summary>
     /// Gets or sets the client claims for the current request.
     /// This value is initally read from the client configuration but can be modified in the request pipeline
     /// </summary>
-    public HashSet<Claim> ClientClaims { get; set; } = [];
+    public HashSet<Claim> ClientClaims { get; } = [];
 
     /// <summary>
     /// Gets or sets the redirect URI.

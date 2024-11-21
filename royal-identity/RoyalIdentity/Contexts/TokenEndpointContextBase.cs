@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Items;
-using RoyalIdentity.Contracts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
@@ -29,11 +28,13 @@ public abstract class TokenEndpointContextBase : EndpointContextBase, ITokenEndp
 
     public string? Confirmation => ClientSecret?.Confirmation;
 
+    public bool IsClientRequired => true;
+
     public Client? Client { get; private set; }
 
-    public string? ClientId { get; set; }
+    public string? ClientId { get; private set; }
 
-    public HashSet<Claim> ClientClaims { get; set; } = [];
+    public HashSet<Claim> ClientClaims { get; } = [];
 
     public abstract void Load(ILogger logger);
 

@@ -30,7 +30,7 @@ public class TokenEndpoint : IEndpointHandler
 
     public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
-        logger.LogTrace("Processing token request.");
+        logger.LogDebug("Processing token request.");
 
         // validate HTTP
         if (!HttpMethods.IsPost(httpContext.Request.Method) || !httpContext.Request.HasApplicationFormContentType())

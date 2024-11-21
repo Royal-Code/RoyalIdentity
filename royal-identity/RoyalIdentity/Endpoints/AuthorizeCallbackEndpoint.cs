@@ -29,6 +29,8 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
 
     public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
+        logger.LogDebug("Processing Authorize Callback request.");
+
         if (!HttpMethods.IsGet(httpContext.Request.Method))
         {
             logger.LogWarning("Invalid HTTP method for authorize endpoint.");

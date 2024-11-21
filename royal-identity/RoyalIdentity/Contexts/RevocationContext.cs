@@ -25,11 +25,13 @@ public class RevocationContext : EndpointContextBase, IWithClientCredentials
 
     public string? TokenTypeHint { get; }
 
+    public bool IsClientRequired => true;
+
     public Client? Client { get; private set; }
 
-    public string? ClientId { get; set; }
+    public string? ClientId { get; private set; }
 
-    public HashSet<Claim> ClientClaims { get; set; } = [];
+    public HashSet<Claim> ClientClaims { get; } = [];
 
     public EvaluatedCredential? ClientSecret { get; private set; }
 

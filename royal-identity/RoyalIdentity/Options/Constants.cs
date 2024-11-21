@@ -445,10 +445,10 @@ public static class OidcConstants
     public static class EndSessionRequest
     {
         public const string IdTokenHint = "id_token_hint";
+        public const string LogoutHint = "logout_hint";
+        public const string ClientId = "client_id";
         public const string PostLogoutRedirectUri = "post_logout_redirect_uri";
         public const string State = "state";
-        public const string Sid = "sid";
-        public const string Issuer = "iss";
         public const string UiLocales = "ui_locales";
     }
 

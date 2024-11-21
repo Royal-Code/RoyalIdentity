@@ -19,7 +19,7 @@ public class CheckSessionEndpoint : IEndpointHandler
 
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
-        logger.LogTrace("Processing CheckSession request.");
+        logger.LogDebug("Processing CheckSession request.");
 
         if (!HttpMethods.IsGet(httpContext.Request.Method))
         {
@@ -28,7 +28,7 @@ public class CheckSessionEndpoint : IEndpointHandler
             var problemDetails = new ProblemDetails
             {
                 Type = "about:blank",
-                Status = StatusCodes.Status400BadRequest,
+                Status = StatusCodes.Status405MethodNotAllowed,
                 Title = TokenErrors.InvalidRequest,
                 Detail = "Invalid HTTP request for token endpoint"
             };

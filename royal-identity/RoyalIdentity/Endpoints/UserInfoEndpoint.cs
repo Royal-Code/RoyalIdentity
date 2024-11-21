@@ -29,6 +29,8 @@ public class UserInfoEndpoint : IEndpointHandler
 
     public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
+        logger.LogDebug("Processing User Info request.");
+
         if (!HttpMethods.IsGet(httpContext.Request.Method) && !HttpMethods.IsPost(httpContext.Request.Method))
         {
             logger.LogWarning("Invalid HTTP method for userinfo endpoint.");

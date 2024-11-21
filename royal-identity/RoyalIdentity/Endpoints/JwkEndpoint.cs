@@ -22,7 +22,7 @@ public class JwkEndpoint : IEndpointHandler
 
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
-        logger.LogTrace("Processing jwk discovery request.");
+        logger.LogDebug("Processing jwk discovery request.");
 
         // validate HTTP
         if (!HttpMethods.IsGet(httpContext.Request.Method))

@@ -65,6 +65,7 @@ public static class ServiceCollectionExtensions
 
         // Decorators
         services.AddTransient<ConsentDecorator>();
+        services.AddTransient<EndSessionDecorator>();
         services.AddTransient<EvaluateBearerToken>();
         services.AddTransient<EvaluateClient>();
         services.AddTransient<LoadClient>();
@@ -88,6 +89,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AuthorizationCodeHandler>();
         services.AddTransient<AuthorizeHandler>();
         services.AddTransient<DiscoveryHandler>();
+        services.AddTransient<EndSessionHandler>();
         services.AddTransient<JwkHandler>();
         services.AddTransient<RevocationHandler>();
         services.AddTransient<UserInfoHandler>();
@@ -97,6 +99,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AuthorizeEndpoint>();
         services.AddTransient<CheckSessionEndpoint>();
         services.AddTransient<DiscoveryEndpoint>();
+        services.AddTransient<EndSessionEndpoint>();
         services.AddTransient<JwkEndpoint>();
         services.AddTransient<RevocationEndpoint>();
         services.AddTransient<TokenEndpoint>();

@@ -22,7 +22,7 @@ public class DiscoveryEndpoint : IEndpointHandler
 
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
-        logger.LogTrace("Processing discovery request.");
+        logger.LogDebug("Processing discovery request.");
 
         // validate HTTP
         if (!HttpMethods.IsGet(httpContext.Request.Method))
