@@ -41,7 +41,7 @@ public class DefaultTokenValidator : ITokenValidator
         string jwt, string? expectedScope = null, string? audience = null, CancellationToken ct = default)
     {
 
-        (var principal, var securityToken, var error) = await TryGetPrincipal(jwt, audience, ct);
+        var (principal, securityToken, error) = await TryGetPrincipal(jwt, audience, true, ct);
 
         if (error is not null)
         {
@@ -174,7 +174,7 @@ public class DefaultTokenValidator : ITokenValidator
 
         logger.LogDebug("Client found: {ClientId} / {ClientName}", client.Id, client.Name);
 
-        (var principal, _, var error) = await TryGetPrincipal(token, clientId, ct);
+        var (principal, _, error) = await TryGetPrincipal(token, clientId, validateLifetime, ct);
 
         if (error is not null)
         {
@@ -207,9 +207,13 @@ public class DefaultTokenValidator : ITokenValidator
         }
     }
 
-    private async Task<(ClaimsPrincipal?, SecurityToken?, ValidationError?)> TryGetPrincipal(string jwt, string? audience, CancellationToken ct)
+    private async Task<(ClaimsPrincipal?, SecurityToken?, ValidationError?)> TryGetPrincipal(
+        string jwt,
+        string? audience,
+        bool validateLifetime,
+        CancellationToken ct)
     {
-        var validationsKeys = await this.keys.GetValidationKeysAsync(ct);
+        var validationsKeys = await keys.GetValidationKeysAsync(ct);
 
         var handler = new JwtSecurityTokenHandler();
         handler.InboundClaimTypeMap.Clear();
@@ -218,7 +222,7 @@ public class DefaultTokenValidator : ITokenValidator
         {
             ValidIssuer = options.IssuerUri,
             IssuerSigningKeys = validationsKeys.Keys,
-            ValidateLifetime = true
+            ValidateLifetime = validateLifetime
         };
 
         if (audience.IsPresent())

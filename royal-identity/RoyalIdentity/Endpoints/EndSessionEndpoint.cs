@@ -7,6 +7,7 @@ using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;
+using RoyalIdentity.Contexts;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;

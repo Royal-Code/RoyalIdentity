@@ -1,0 +1,90 @@
+@page "/account/logout"
+@using RoyalIdentity.Contracts.Models.Messages
+@using RoyalIdentity.Contracts.Storage
+@using RoyalIdentity.Users
+
+@inject IMessageStore MessageStore
+@inject ISignOutManager SignOutManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Log out</PageTitle>
+
+<AccountContent>
+    <Title>
+        <h1>Logging out</h1>
+    </Title>
+    <ChildContent>
+        @if (model is not null)
+        {
+            <EditForm method="post" OnValidSubmit="LogoutUser" FormName="logout">
+
+                <InputText name="LogoutConfirmedId" Value="@LogoutId" type="hidden"/>
+
+                <div>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">Log out</button>
+                </div>
+
+            </EditForm>
+        }
+    </ChildContent>
+</AccountContent>
+
+@code {
+
+    private LogoutMessage? model = null;
+
+    [SupplyParameterFromQuery]
+    private string? LogoutId { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? LogoutConfirmedId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (LogoutId is null)
+        {
+            // usar um serviço para obter o model do usuário logado
+        }
+        else
+        {
+            var message = await MessageStore.ReadAsync<LogoutMessage>(LogoutId, default);
+            model = message?.Data;
+        }
+
+        if (model is null || model.ShowSignoutPrompt)
+            return;
+
+        await MessageStore.DeleteAsync(LogoutId, default);
+        var uri = await SignOutManager.SignOutAsync(
+            model.SessionId, model.PostLogoutRedirectUri, model.State, default);
+
+        NavigationManager.NavigateTo(uri.AbsoluteUri);
+
+        await base.OnParametersSetAsync();
+    }
+
+    public async Task LogoutUser()
+    {
+        if (LogoutConfirmedId is null)
+        {
+            // error
+            return;
+        }
+
+        var message = await MessageStore.ReadAsync<LogoutMessage>(LogoutConfirmedId, default);
+        model = message?.Data;
+
+        if (model is null)
+        {
+            // error
+            return;
+        }
+
+        await MessageStore.DeleteAsync(LogoutConfirmedId, default);
+
+        var uri = await SignOutManager.SignOutAsync(
+            model.SessionId, model.PostLogoutRedirectUri, model.State, default);
+
+        NavigationManager.NavigateTo(uri.AbsoluteUri);
+    }
+}

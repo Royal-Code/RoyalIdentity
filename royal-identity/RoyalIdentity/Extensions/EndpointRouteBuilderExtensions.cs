@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Options;
@@ -15,5 +16,7 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapPipeline<AuthorizeCallbackEndpoint>(Constants.ProtocolRoutePaths.AuthorizeCallback);
         endpoints.MapPipeline<TokenEndpoint>(Constants.ProtocolRoutePaths.Token);
         endpoints.MapPipeline<UserInfoEndpoint>(Constants.ProtocolRoutePaths.UserInfo);
+        endpoints.MapPipeline<RevocationEndpoint>(Constants.ProtocolRoutePaths.Revocation);
+        endpoints.MapPipeline<EndSessionEndpoint>(Constants.ProtocolRoutePaths.EndSession);
     }
 }

@@ -78,12 +78,12 @@ public class Client
     /// <summary>
     /// Specifies allowed URIs to return tokens or authorization codes to
     /// </summary>
-    public HashSet<string> RedirectUris { get; set; } = [];
+    public HashSet<string> RedirectUris { get; } = [];
 
     /// <summary>
     /// Specifies allowed URIs to redirect to after logout
     /// </summary>
-    public HashSet<string> PostLogoutRedirectUris { get; set; } = [];
+    public HashSet<string> PostLogoutRedirectUris { get; } = [];
 
     /// <summary>
     /// Gets or sets a value indicating whether JWT access tokens should include an identifier. Defaults to <c>true</c>.
@@ -189,4 +189,9 @@ public class Client
     /// Sliding: when refreshing the token, the lifetime of the refresh token will be renewed (by the amount specified in SlidingRefreshTokenLifetime). The lifetime will not exceed AbsoluteRefreshTokenLifetime.
     /// </summary>        
     public TokenExpiration RefreshTokenExpiration { get; set; } = TokenExpiration.Absolute;
+
+    /// <summary>
+    /// Specifies whether the logout process can be terminated without user confirmation.
+    /// </summary>
+    public bool AllowLogoutWithoutUserConfirmation { get; set; } = false;
 }

@@ -20,7 +20,7 @@ namespace RoyalIdentity.Users
         /// <summary>
         /// The clients (client_id) that the user has sign in into during their session.
         /// </summary>
-        public ICollection<string> Clients { get; set; } = [];
+        public IList<string> Clients { get; set; } = [];
 
         /// <summary>
         /// Indicates if the session is active or not.

@@ -49,6 +49,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
         services.AddTransient<ITokenValidator, DefaultTokenValidator>();
+        services.AddSingleton<IMessageStore, ProtectedDataMessageStore>();
 
         // Secret Evaluators
         services.AddTransient<IClientSecretsEvaluator, BasicSecretEvaluator>();

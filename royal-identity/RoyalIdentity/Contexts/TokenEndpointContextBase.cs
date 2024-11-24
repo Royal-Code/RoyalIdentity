@@ -32,7 +32,7 @@ public abstract class TokenEndpointContextBase : EndpointContextBase, ITokenEndp
 
     public Client? Client { get; private set; }
 
-    public string? ClientId { get; private set; }
+    public string? ClientId { get; protected set; }
 
     public HashSet<Claim> ClientClaims { get; } = [];
 

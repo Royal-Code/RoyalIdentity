@@ -21,6 +21,8 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
 
     public static ResponseHandler Ok() => new(Results.Ok());
 
+    public static ResponseHandler Redirect(string url) => new(Results.Redirect(url));
+
     /// <inheritdoc />
     public ValueTask<IResult> CreateResponseAsync(CancellationToken ct) => ValueTask.FromResult(result);
 

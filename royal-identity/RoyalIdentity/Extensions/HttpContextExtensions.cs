@@ -104,11 +104,11 @@ public static class HttpContextExtensions
     public static string? GetServerRelativeUrl(this HttpContext context, string path)
     {
         if (!path.IsLocalUrl())
-        {
             return null;
-        }
 
-        if (path.StartsWith("~/")) path = path.Substring(1);
+        if (path.StartsWith("~/"))
+            path = path.Substring(1);
+
         path = context.GetServerBaseUrl().EnsureTrailingSlash() + path.RemoveLeadingSlash();
         return path;
     }
