@@ -194,4 +194,24 @@ public class Client
     /// Specifies whether the logout process can be terminated without user confirmation.
     /// </summary>
     public bool AllowLogoutWithoutUserConfirmation { get; set; } = false;
+
+    /// <summary>
+    /// Specifies logout URI at client for HTTP front-channel based logout.
+    /// </summary>
+    public HashSet<string> FrontChannelLogoutUri { get; } = [];
+
+    /// <summary>
+    /// Specifies if the user's session id should be sent to the FrontChannelLogoutUri. Defaults to <c>false</c>.
+    /// </summary>
+    public bool FrontChannelLogoutSessionRequired { get; set; } = false;
+
+    /// <summary>
+    /// Specifies logout URI at client for HTTP back-channel based logout.
+    /// </summary>
+    public HashSet<string> BackChannelLogoutUri { get; } = [];
+
+    /// <summary>
+    /// Specifies if the user's session id should be sent to the BackChannelLogoutUri. Defaults to <c>false</c>.
+    /// </summary>
+    public bool BackChannelLogoutSessionRequired { get; set; } = false;
 }

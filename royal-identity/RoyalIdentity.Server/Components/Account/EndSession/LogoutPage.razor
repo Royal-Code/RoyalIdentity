@@ -1,6 +1,7 @@
 @page "/account/logout"
 @using RoyalIdentity.Contracts.Models.Messages
 @using RoyalIdentity.Contracts.Storage
+@using RoyalIdentity.Extensions
 @using RoyalIdentity.Users
 
 @inject IMessageStore MessageStore
@@ -41,20 +42,29 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (LogoutId is null)
+        var logoutId = LogoutId ?? await SignOutManager.CreateLogoutIdAsync(default);
+        if (logoutId is null)
         {
-            // usar um serviço para obter o model do usuário logado
+            // error
+            var errorMessage = new ErrorMessage()
+                {
+                    Error = "invalid_request",
+                    ErrorDescription = "Logout Id is required"
+                };
+
+            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
+            var redirect = "/error".AddQueryString("errorId", errorId);
+            NavigationManager.NavigateTo(redirect);
+            return;
         }
-        else
-        {
-            var message = await MessageStore.ReadAsync<LogoutMessage>(LogoutId, default);
-            model = message?.Data;
-        }
+        
+        var message = await MessageStore.ReadAsync<LogoutMessage>(logoutId, default);
+        model = message?.Data;
 
         if (model is null || model.ShowSignoutPrompt)
             return;
 
-        await MessageStore.DeleteAsync(LogoutId, default);
+        await MessageStore.DeleteAsync(logoutId, default);
         var uri = await SignOutManager.SignOutAsync(
             model.SessionId, model.PostLogoutRedirectUri, model.State, default);
 
@@ -68,6 +78,15 @@
         if (LogoutConfirmedId is null)
         {
             // error
+            var errorMessage = new ErrorMessage()
+            {
+                Error = "invalid_request",
+                ErrorDescription = "Logout Id is required"
+            };
+
+            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
+            var redirect = "/error".AddQueryString("errorId", errorId);
+            NavigationManager.NavigateTo(redirect);
             return;
         }
 
@@ -77,6 +96,15 @@
         if (model is null)
         {
             // error
+            var errorMessage = new ErrorMessage()
+            {
+                Error = "invalid_request",
+                ErrorDescription = "Logout Id is not found"
+            };
+
+            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
+            var redirect = "/error".AddQueryString("errorId", errorId);
+            NavigationManager.NavigateTo(redirect);
             return;
         }
 

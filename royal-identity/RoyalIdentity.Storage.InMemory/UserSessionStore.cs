@@ -31,7 +31,7 @@ public class UserSessionStore : IUserSessionStore
 
     public Task<IdentitySession> StartSessionAsync(string username, CancellationToken ct = default)
     {
-        var sid = Convert.ToBase64String(CryptoRandom.CreateRandomKey(16));
+        var sid = Base64Url.Encode(CryptoRandom.CreateRandomKey(16));
 
         var session = new IdentitySession
         {
@@ -43,6 +43,15 @@ public class UserSessionStore : IUserSessionStore
         memoryStorage.UserSessions[sid] = session;
 
         return Task.FromResult(session);
+    }
+
+    public async Task<IdentitySession?> EndSessionAsync(string sessionId, CancellationToken ct = default)
+    {
+        var session = await GetUserSessionAsync(sessionId, ct);
+        if (session is not null)
+            session.IsActive = false;
+
+        return session;
     }
 
     public ValueTask<IdentitySession?> GetCurrentSessionAsync(CancellationToken ct)

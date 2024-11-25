@@ -6,7 +6,6 @@ namespace RoyalIdentity.Contracts.Storage;
 /// <summary>
 /// Interface for a message store
 /// </summary>
-///
 public interface IMessageStore
 {
     /// <summary>

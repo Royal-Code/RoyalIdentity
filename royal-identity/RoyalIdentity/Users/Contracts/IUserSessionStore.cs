@@ -20,6 +20,16 @@ public interface IUserSessionStore
     public Task<IdentitySession> StartSessionAsync(string username, CancellationToken ct = default);
 
     /// <summary>
+    /// Ends a user session and returns the <see cref="IdentitySession"/> instance if exists.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>
+    ///     The session if it exists, null otherwise.
+    /// </returns>
+    public Task<IdentitySession?> EndSessionAsync(string sessionId, CancellationToken ct = default);
+
+    /// <summary>
     /// Try to get the current session for the current user.
     /// </summary>
     /// <param name="ct">The cancellation token.</param>
@@ -35,4 +45,5 @@ public interface IUserSessionStore
     /// <param name="ct">The cancellation token.</param>
     /// <returns>The session if it exists, null otherwise.</returns>
     ValueTask<IdentitySession?> GetUserSessionAsync(string sessionId, CancellationToken ct);
+
 }

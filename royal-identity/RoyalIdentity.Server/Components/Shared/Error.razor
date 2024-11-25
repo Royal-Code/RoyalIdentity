@@ -1,0 +1,79 @@
+﻿@page "/Error"
+
+@using System.Diagnostics
+@using RoyalIdentity.Contracts.Models.Messages
+@using RoyalIdentity.Contracts.Storage
+@using RoyalIdentity.Extensions
+@using RoyalIdentity.Server.Components.Account
+
+@inject IMessageStore messageStore
+
+<PageTitle>Error</PageTitle>
+
+<AccountContent>
+    <Title>
+        <h1>Error</h1>
+    </Title>
+    <ChildContent>
+        <div class="alert alert-danger">
+            Sorry, there was an error
+
+            <strong>
+                <em>
+                    : @GetError()
+                </em>
+            </strong>
+
+            <div>@GetDescription()</div>
+
+        </div>
+
+        @if (ShowRequestId)
+        {
+            <div class="request-id">Request Id: RequestId</div>
+        }
+    </ChildContent>
+</AccountContent>
+
+@code {
+    private ErrorMessage? errorMessage;
+
+    [SupplyParameterFromQuery]
+    private string? ErrorId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    private string? ErrorType { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ErrorDescription { get; set; }
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+
+    protected override void OnInitialized() => RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ErrorId.IsMissing())
+            return;
+
+        var message = await messageStore.ReadAsync<ErrorMessage>(ErrorId, default);
+        if (message is null)
+            return;
+
+        errorMessage = message.Data;
+
+        if (errorMessage?.RequestId is not null)
+            RequestId = errorMessage.RequestId;
+
+        await messageStore.DeleteAsync(ErrorId, default);
+    }
+
+    private string GetError() => errorMessage?.Error ?? ErrorType ?? "Error";
+
+    private string GetDescription() => errorMessage?.ErrorDescription ?? ErrorDescription ?? string.Empty;
+}

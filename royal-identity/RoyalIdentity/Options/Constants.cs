@@ -203,7 +203,7 @@ internal static class Constants
             public const string Login = "/account/login";
             public const string Logout = "/account/logout";
             public const string Consent = "/account/consent";
-            public const string Error = "/home/error";
+            public const string Error = "/error";
             public const string DeviceVerification = "/device";
         }
     }

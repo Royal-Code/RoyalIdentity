@@ -105,11 +105,8 @@ public class DefaultSignInManager : ISignInManager
 
     public async Task SignInAsync(IdentityUser user, bool inputRememberLogin, string amr, CancellationToken ct)
     {
-        //new Claim("amr", "pwd")
-
-        var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null)
-            throw new InvalidOperationException("HttpContext is required for SignInAsync");
+        var httpContext = httpContextAccessor.HttpContext 
+            ?? throw new InvalidOperationException("HttpContext is required for SignInAsync");
 
         // only set explicit expiration here if user chooses "remember me".
         // otherwise we rely upon expiration configured in cookie middleware.
