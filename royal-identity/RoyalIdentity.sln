@@ -32,7 +32,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RoyalIdentity.Server", "Roy
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.WebApp", "Tests.WebApp\Tests.WebApp.csproj", "{9B329235-5C50-4FFD-ABDF-2D6C680ADC45}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.Identity", "Tests.Identity\Tests.Identity.csproj", "{F1986AC4-78E3-440A-BCAA-CF483E097D5D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.Identity", "Tests.Identity\Tests.Identity.csproj", "{F1986AC4-78E3-440A-BCAA-CF483E097D5D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

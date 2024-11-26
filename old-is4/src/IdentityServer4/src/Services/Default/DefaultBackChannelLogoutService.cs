@@ -62,7 +62,7 @@ namespace IdentityServer4.Services
             IdentityServerTools tools,
             ILogoutNotificationService logoutNotificationService,
             IBackChannelLogoutHttpClient backChannelLogoutHttpClient,
-            ILogger<IBackChannelLogoutService> logger)
+            ILogger<DefaultBackChannelLogoutService> logger)
         {
             Clock = clock;
             Tools = tools;

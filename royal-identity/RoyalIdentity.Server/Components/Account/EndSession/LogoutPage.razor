@@ -19,7 +19,7 @@
         {
             <EditForm method="post" OnValidSubmit="LogoutUser" FormName="logout">
 
-                <InputText name="LogoutConfirmedId" Value="@LogoutId" type="hidden"/>
+                <InputText name="ConfirmedId" Value="@LogoutId" type="hidden"/>
 
                 <div>
                     <button type="submit" class="w-100 btn btn-lg btn-primary">Log out</button>
@@ -38,7 +38,7 @@
     private string? LogoutId { get; set; }
 
     [SupplyParameterFromForm]
-    private string? LogoutConfirmedId { get; set; }
+    private LogoutInputModel? LogoutInput { get; set; }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -75,7 +75,7 @@
 
     public async Task LogoutUser()
     {
-        if (LogoutConfirmedId is null)
+        if (LogoutInput is null || LogoutInput.ConfirmedId is null)
         {
             // error
             var errorMessage = new ErrorMessage()
@@ -90,7 +90,7 @@
             return;
         }
 
-        var message = await MessageStore.ReadAsync<LogoutMessage>(LogoutConfirmedId, default);
+        var message = await MessageStore.ReadAsync<LogoutMessage>(LogoutInput.ConfirmedId, default);
         model = message?.Data;
 
         if (model is null)
@@ -108,7 +108,7 @@
             return;
         }
 
-        await MessageStore.DeleteAsync(LogoutConfirmedId, default);
+        await MessageStore.DeleteAsync(LogoutInput.ConfirmedId, default);
 
         var uri = await SignOutManager.SignOutAsync(
             model.SessionId, model.PostLogoutRedirectUri, model.State, default);

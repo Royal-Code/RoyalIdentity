@@ -34,6 +34,7 @@ public sealed class DefaultIdentityUser : IdentityUser
     public override string UserName => details.Username;
 
     public override string DysplayName => details.DisplayName;
+
     public override bool IsActive => details.IsActive;
 
     public override async ValueTask<bool> ValidateCredentialsAsync(string password, CancellationToken ct = default)

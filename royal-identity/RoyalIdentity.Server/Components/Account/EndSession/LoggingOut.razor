@@ -1,0 +1,54 @@
+﻿@page "/account/logout/processing"
+@using RoyalIdentity.Contracts.Models.Messages
+@using RoyalIdentity.Contracts.Storage
+@using RoyalIdentity.Extensions
+
+@inject IMessageStore MessageStore
+@inject NavigationManager NavigationManager
+
+<PageTitle>Logging out</PageTitle>
+
+<AccountContent>
+    <Title>
+        <h1>Logging out</h1>
+    </Title>
+    <ChildContent>
+        <div>
+            Processing, wait a moment
+        </div>
+        @if (model is not null)
+        {
+            if (model.HasChannel())
+            {
+                <iframe width="0" height="0" class="signout" src="@model.SignOutIframeUrl.AddQueryString("callbackId", LogoutId!)"></iframe>
+            }
+        }
+    </ChildContent>
+</AccountContent>
+
+@code {
+    // ?? "/account/logout/done"
+
+    private LogoutCallbackMessage? model;
+
+    [SupplyParameterFromQuery]
+    private string? LogoutId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (LogoutId is null)
+        {
+            // error
+            return;
+        }
+
+        var message = await MessageStore.ReadAsync<LogoutCallbackMessage>(LogoutId, default);
+        if (message is null)
+        {
+            // error
+            return;
+        }
+
+        model = message.Data;
+    }
+}

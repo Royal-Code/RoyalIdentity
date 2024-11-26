@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
 
@@ -111,6 +112,19 @@ public static class HttpContextExtensions
 
         path = context.GetServerBaseUrl().EnsureTrailingSlash() + path.RemoveLeadingSlash();
         return path;
+    }
+
+    /// <summary>
+    /// Gets the identity server issuer URI.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <param name="options">The options.</param>
+    /// <returns></returns>
+    /// <exception cref="System.ArgumentNullException">context</exception>
+    public static string GetServerIssuerUri(this HttpContext context)
+    {
+        var options = context.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value;
+        return context.GetServerIssuerUri(options);
     }
 
     /// <summary>

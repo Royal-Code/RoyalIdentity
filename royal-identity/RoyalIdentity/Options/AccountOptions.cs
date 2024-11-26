@@ -8,9 +8,10 @@ public class AccountOptions
 
     public TimeSpan RememberMeLoginDuration { get; set; } = TimeSpan.FromDays(30);
 
+    [Redesign("Property from the client")]
     public bool ShowLogoutPrompt { get; set; } = true;
 
-    public bool AutomaticRedirectAfterSignOut { get; set; } = false;
+    public bool AutomaticRedirectAfterSignOut { get; set; } = true;
 
     public string InvalidCredentialsErrorMessage { get; set; } = "Invalid username or password";
 
