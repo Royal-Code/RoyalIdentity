@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models.Messages;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contracts.Models;
 
 namespace RoyalIdentity.Users.Defaults;
 
@@ -18,6 +19,7 @@ public class DefaultSignOutManager : ISignOutManager
     private readonly IUserSessionStore userSessionStore;
     private readonly IEventDispatcher eventDispatcher;
     private readonly IClientStore clients;
+    private readonly IBackChannelLogoutNotifier backChannelNotifier;
     private readonly IMessageStore messageStore;
     private readonly AccountOptions accountOptions;
     private readonly ILogger logger;
@@ -27,6 +29,7 @@ public class DefaultSignOutManager : ISignOutManager
         IUserSessionStore userSessionStore,
         IEventDispatcher eventDispatcher,
         IClientStore clients,
+        IBackChannelLogoutNotifier backChannelNotifier,
         IMessageStore messageStore,
         IOptions<AccountOptions> accountOptions,
         ILogger<DefaultSignOutManager> logger)
@@ -34,6 +37,7 @@ public class DefaultSignOutManager : ISignOutManager
         this.httpContextAccessor = httpContextAccessor;
         this.userSessionStore = userSessionStore;
         this.eventDispatcher = eventDispatcher;
+        this.backChannelNotifier = backChannelNotifier;
         this.clients = clients;
         this.messageStore = messageStore;
         this.accountOptions = accountOptions.Value;
@@ -76,7 +80,7 @@ public class DefaultSignOutManager : ISignOutManager
         }
 
         HashSet<string> frontChannelLogout = [];
-        HashSet<LogoutBackChannelMessage> backChannelLogout = [];
+        HashSet<LogoutBackChannelRequest> backChannelLogout = [];
 
         if (session is not null && httpContext is not null)
         {
@@ -103,8 +107,9 @@ public class DefaultSignOutManager : ISignOutManager
                 {
                     iss ??= httpContext.GetServerIssuerUri();
 
-                    backChannelLogout.Add(new LogoutBackChannelMessage()
+                    backChannelLogout.Add(new LogoutBackChannelRequest()
                     {
+                        ClientId = clientId,
                         Issuer = iss,
                         Subject = session.Username,
                         SessionId = session.Id,
@@ -116,11 +121,18 @@ public class DefaultSignOutManager : ISignOutManager
             }
         }
 
+        if (backChannelLogout.Count is not 0)
+        {
+            foreach(var backChannelRequest in backChannelLogout)
+            {
+                await backChannelNotifier.SendAsync(backChannelRequest, ct);
+            }
+        }
+
         var message = new LogoutCallbackMessage()
         {
             PostLogoutRedirectUri = postLogoutRedirectUri,
             FrontChannelLogout = frontChannelLogout,
-            BackChannelLogout = backChannelLogout,
             SessionId = session?.Id,
             State = state,
             AutomaticRedirectAfterSignOut = accountOptions.AutomaticRedirectAfterSignOut

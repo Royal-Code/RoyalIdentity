@@ -201,9 +201,9 @@ public class Client
     public HashSet<string> FrontChannelLogoutUri { get; } = [];
 
     /// <summary>
-    /// Specifies if the user's session id should be sent to the FrontChannelLogoutUri. Defaults to <c>false</c>.
+    /// Specifies if the user's session id should be sent to the FrontChannelLogoutUri. Defaults to <c>true</c>.
     /// </summary>
-    public bool FrontChannelLogoutSessionRequired { get; set; } = false;
+    public bool FrontChannelLogoutSessionRequired { get; set; } = true;
 
     /// <summary>
     /// Specifies logout URI at client for HTTP back-channel based logout.
@@ -211,7 +211,7 @@ public class Client
     public HashSet<string> BackChannelLogoutUri { get; } = [];
 
     /// <summary>
-    /// Specifies if the user's session id should be sent to the BackChannelLogoutUri. Defaults to <c>false</c>.
+    /// Specifies if the user's session id should be sent to the BackChannelLogoutUri. Defaults to <c>true</c>.
     /// </summary>
-    public bool BackChannelLogoutSessionRequired { get; set; } = false;
+    public bool BackChannelLogoutSessionRequired { get; set; } = true;
 }

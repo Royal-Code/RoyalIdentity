@@ -39,7 +39,7 @@ public class DefaultJwtFactory : IJwtFactory
         var payload = await CreatePayloadAsync(token, ct);
         var jst = new JwtSecurityToken(header, payload);
 
-        var jwt = await CreateJwtAsync(jst);
+        var jwt = await CreateJwtAsync(jst, ct);
 
         token.Token = jwt;
     }
@@ -93,7 +93,7 @@ public class DefaultJwtFactory : IJwtFactory
     /// </summary>
     /// <param name="jwt">The JWT object.</param>
     /// <returns>The signed JWT</returns>
-    protected virtual ValueTask<string> CreateJwtAsync(JwtSecurityToken jwt)
+    protected virtual ValueTask<string> CreateJwtAsync(JwtSecurityToken jwt, CancellationToken ct)
     {
         var handler = new JwtSecurityTokenHandler();
         return ValueTask.FromResult(handler.WriteToken(jwt));

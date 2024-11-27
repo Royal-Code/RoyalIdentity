@@ -16,6 +16,7 @@ public static class HostServices
         services.AddScoped<IdentityRedirectManager>();
         services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
+        // TODO: Requer configurar com "ServerOptions.Authentication"
         // authentication
         services.AddAuthentication()
             .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>

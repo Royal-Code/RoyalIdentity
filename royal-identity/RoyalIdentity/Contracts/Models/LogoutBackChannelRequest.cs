@@ -1,8 +1,8 @@
-﻿namespace RoyalIdentity.Contracts.Models.Messages;
+﻿namespace RoyalIdentity.Contracts.Models;
 
 #nullable disable // POCO
 
-public class LogoutBackChannelMessage
+public class LogoutBackChannelRequest
 {
     public string Uri { get; set; }
 
@@ -13,6 +13,8 @@ public class LogoutBackChannelMessage
     public string Audience { get; set; }
 
     public string SessionId { get; set; }
+
+    public string ClientId { get; set; }
 
     public bool RequireSessionId { get; set; }
 }

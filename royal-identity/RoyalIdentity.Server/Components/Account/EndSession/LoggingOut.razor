@@ -18,7 +18,7 @@
         </div>
         @if (model is not null)
         {
-            if (model.HasChannel())
+            if (model.HasFrontChannel())
             {
                 <iframe width="0" height="0" class="signout" src="@model.SignOutIframeUrl.AddQueryString("callbackId", LogoutId!)"></iframe>
             }

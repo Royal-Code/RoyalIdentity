@@ -9,9 +9,11 @@ using RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Handlers;
+using RoyalIdentity.Options;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
+using RoyalIdentity.Utils;
 using RoyalIdentity.Utils.Caching;
 
 namespace RoyalIdentity.Extensions;
@@ -33,6 +35,7 @@ public static class ServiceCollectionExtensions
 
         // Default contract implementations
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();
+        services.AddTransient<IBackChannelLogoutNotifier, DefaultBackChannelLogoutNotifier>();
         services.AddTransient<IBearerTokenLocator, DefaultBearerTokenLocator>();
         services.AddSingleton<IClientSecretChecker, DefaultClientSecretChecker>();
         services.AddTransient<ICodeFactory, DefaultCodeFactory>();
@@ -109,6 +112,11 @@ public static class ServiceCollectionExtensions
 
         // Others
         services.AddSingleton<KeyCache>();
+        services.AddTransient<JwtUtil>();
+        services.AddHttpClient(ServerConstants.HttpClients.BackChannelLogoutHttpClient)
+            .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(ServerConstants.HttpClients.DefaultTimeoutSeconds))
+            .AddPolicyHandler(ServerConstants.HttpClients.GetRetryPolicy())
+            .AddPolicyHandler(ServerConstants.HttpClients.GetCircuitBreakerPolicy());
 
         return services;
     }

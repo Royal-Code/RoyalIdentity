@@ -1,4 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
+using Polly;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Options;
@@ -1176,6 +1177,8 @@ public static class JwtClaimTypes
 public static class ServerConstants
 {
     public const string LocalIdentityProvider = "local";
+
+    // Cookies padrão do aspnetcore.
     public const string DefaultCookieAuthenticationScheme = "idsrv";
     public const string SignoutScheme = "idsrv";
     public const string ExternalCookieAuthenticationScheme = "idsrv.external";
@@ -1340,5 +1343,19 @@ public static class ServerConstants
         public const int DefaultTimeoutSeconds = 10;
         public const string JwtRequestUriHttpClient = "RoyalIdentity:JwtRequestUriClient";
         public const string BackChannelLogoutHttpClient = "RoyalIdentity:BackChannelLogoutClient";
+
+        public static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+        {
+            return Policy
+                .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode) // Define a condição de erro
+                .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))); // Retry 3 vezes, com backoff exponencial
+        }
+
+        public static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+        {
+            return Policy
+                .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)  // Define a condição de erro
+                .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));  // Após 5 falhas consecutivas, quebra por 30 segundos
+        }
     }
 }

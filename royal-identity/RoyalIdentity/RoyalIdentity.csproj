@@ -8,6 +8,7 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="$(IdVer)" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="$(AspVer)" />
+		<PackageReference Include="Microsoft.Extensions.Http.Polly" Version="$(AspVer)" />
 	</ItemGroup>
 
 </Project>

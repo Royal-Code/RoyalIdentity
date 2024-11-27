@@ -12,15 +12,12 @@ public class LogoutCallbackMessage
 
     public HashSet<string>? FrontChannelLogout { get; set; }
 
-    public HashSet<LogoutBackChannelMessage>? BackChannelLogout { get; set; }
-
     public bool AutomaticRedirectAfterSignOut { get; set; }
 
     public string SignOutIframeUrl { get; set; } = ProtocolRoutePaths.EndSessionCallback;
 
-    public bool HasChannel()
+    public bool HasFrontChannel()
     {
-        return (FrontChannelLogout is not null && FrontChannelLogout.Any()) ||
-            (BackChannelLogout is not null && BackChannelLogout.Any());
+        return FrontChannelLogout is not null && FrontChannelLogout.Any();
     }
 }
