@@ -15,8 +15,6 @@ public sealed class DefaultIdentityUser : IdentityUser
     private readonly IUserDetailsStore userStore;
     private readonly IPasswordProtector passwordProtector;
 
-    private IdentitySession? session;
-
     public DefaultIdentityUser(
         UserDetails details,
         IOptions<AccountOptions> options,
@@ -37,7 +35,7 @@ public sealed class DefaultIdentityUser : IdentityUser
 
     public override bool IsActive => details.IsActive;
 
-    public override async ValueTask<bool> ValidateCredentialsAsync(string password, CancellationToken ct = default)
+    public override async ValueTask<ValidateCredentialsResult> ValidateCredentialsAsync(string password, CancellationToken ct = default)
     {
         var isValid = await passwordProtector.VerifyPasswordAsync(password, details.PasswordHash, ct);
         if (!isValid)
@@ -54,9 +52,9 @@ public sealed class DefaultIdentityUser : IdentityUser
         }
 
         // start a new session
-        session = await sessionStore.StartSessionAsync(details.Username, ct);
+        var session = await sessionStore.StartSessionAsync(details.Username, ct);
 
-        return true;
+        return session;
     }
 
     public override ValueTask<bool> IsBlockedAsync(CancellationToken ct = default)
@@ -65,7 +63,8 @@ public sealed class DefaultIdentityUser : IdentityUser
         return new ValueTask<bool>(isBlock);
     }
 
-    public override async ValueTask<ClaimsPrincipal> CreatePrincipalAsync(string? amr, CancellationToken ct = default)
+    public override async ValueTask<ClaimsPrincipal> CreatePrincipalAsync(
+        IdentitySession? session, string? amr, CancellationToken ct = default)
     {
         // check if session was created, if not, load it
         var currentSession = session ?? await sessionStore.GetCurrentSessionAsync(ct);

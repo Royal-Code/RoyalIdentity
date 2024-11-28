@@ -4,9 +4,10 @@ namespace RoyalIdentity.Users;
 
 public readonly struct CredentialsValidationResult
 {
-    public CredentialsValidationResult(IdentityUser user)
+    public CredentialsValidationResult(IdentityUser user, IdentitySession session)
     {
         User = user;
+        Session = session;
         Reason = null;
         ErrorMessage = null;
     }
@@ -18,7 +19,7 @@ public readonly struct CredentialsValidationResult
         ErrorMessage = errorMessage;
     }
 
-    [MemberNotNullWhen(true, nameof(User))]
+    [MemberNotNullWhen(true, nameof(User), nameof(Session))]
     [MemberNotNullWhen(false, nameof(Reason), nameof(ErrorMessage))]
     public bool Success => User is not null;
 
@@ -27,6 +28,8 @@ public readonly struct CredentialsValidationResult
     public string? ErrorMessage { get;}
 
     public IdentityUser? User { get; }
+
+    public IdentitySession? Session { get; }
 
     public static class WellKnownReasons
     {

@@ -8,7 +8,7 @@ using static RoyalIdentity.Options.OidcConstants;
 namespace RoyalIdentity.Contracts.Defaults;
 
 /// <summary>
-/// Default implamentation of <see cref="IBackChannelLogoutNotifier"/>.
+/// Default implementation of <see cref="IBackChannelLogoutNotifier"/>.
 /// </summary>
 public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
 {
@@ -32,8 +32,10 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
     }
 
     /// <inheritdoc />
-    public async Task SendAsync(LogoutBackChannelRequest request, CancellationToken ct)
+    public virtual async Task SendAsync(LogoutBackChannelRequest request, CancellationToken ct)
     {
+        logger.LogDebug("Sending back-channel logout request to {Url}", request.Uri);
+
         var data = await CreateFormPostPayloadAsync(request);
         await PostAsync(request.Uri, data);
     }
@@ -43,7 +45,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
     /// </summary>
     /// <param name="request"></param>
     /// <returns></returns>
-    protected async Task<Dictionary<string, string>> CreateFormPostPayloadAsync(LogoutBackChannelRequest request)
+    protected virtual async Task<Dictionary<string, string>> CreateFormPostPayloadAsync(LogoutBackChannelRequest request)
     {
         var token = await CreateTokenAsync(request);
 
@@ -75,7 +77,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
     /// </summary>
     /// <param name="request"></param>
     /// <returns>The claims to include in the token.</returns>
-    protected Task<IEnumerable<Claim>> CreateClaimsForTokenAsync(LogoutBackChannelRequest request)
+    protected virtual Task<IEnumerable<Claim>> CreateClaimsForTokenAsync(LogoutBackChannelRequest request)
     {
         if (request.RequireSessionId && request.SessionId is null)
         {

@@ -33,5 +33,5 @@ public interface ISignInManager
     /// <returns></returns>
     Task<CredentialsValidationResult> ValidateCredentialsAsync(string username, string password, CancellationToken ct);
 
-    Task SignInAsync(IdentityUser user, bool inputRememberLogin, string amr, CancellationToken ct);
+    Task SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, string amr, CancellationToken ct);
 }

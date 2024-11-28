@@ -20,7 +20,7 @@
         {
             if (model.HasFrontChannel())
             {
-                <iframe width="0" height="0" class="signout" src="@model.SignOutIframeUrl.AddQueryString("callbackId", LogoutId!)"></iframe>
+                <iframe width="0" height="0" class="sign-out" src="@model.SignOutIframeUrl.AddQueryString("callbackId", LogoutId!)"></iframe>
             }
         }
     </ChildContent>
@@ -31,6 +31,13 @@
 
     private LogoutCallbackMessage? model;
 
+    private string RedirectUrl => model?.PostLogoutRedirectUri ?? "/account/logout/done";
+
+    /// <summary>
+    /// Automatic redirect after sign out if the post logout redirect uri is not set or if the automatic redirect is enabled.
+    /// </summary>
+    private bool AutomaticRedirect => model?.AutomaticRedirectAfterSignOut ?? model is { PostLogoutRedirectUri: null };
+
     [SupplyParameterFromQuery]
     private string? LogoutId { get; set; }
 
@@ -39,6 +46,16 @@
         if (LogoutId is null)
         {
             // error
+            var errorMessage = new ErrorMessage()
+            {
+                Error = "invalid_request",
+                ErrorDescription = "Logout Id is required"
+            };
+
+            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
+            var redirect = "/error".AddQueryString("errorId", errorId);
+            NavigationManager.NavigateTo(redirect);
+
             return;
         }
 
@@ -46,6 +63,18 @@
         if (message is null)
         {
             // error
+            var errorMessage = new ErrorMessage()
+            {
+                Error = "unauthorized",
+                ErrorDescription = "There is currently no session for a user. " +
+                                   "This could be because the session has already been terminated " +
+                                   "or because of an invalid request."
+            };
+
+            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
+            var redirect = "/error".AddQueryString("errorId", errorId);
+            NavigationManager.NavigateTo(redirect);
+
             return;
         }
 

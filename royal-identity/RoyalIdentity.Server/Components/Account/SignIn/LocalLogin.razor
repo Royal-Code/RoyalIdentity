@@ -80,11 +80,11 @@
             return;
         }
 
-        var user = result.User!;
+        var user = result.User;
         var evt2 = new UserLoginSuccessEvent(Input.Username!, user, context);
         await EventDispatcher.DispatchAsync(evt2);
 
-        await SignInManager.SignInAsync(user, Input.RememberLogin, "pwd", default);
+        await SignInManager.SignInAsync(user, result.Session, Input.RememberLogin, "pwd", default);
 
         if (context is not null)
         {

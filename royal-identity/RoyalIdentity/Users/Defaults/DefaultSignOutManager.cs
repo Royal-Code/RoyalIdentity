@@ -121,12 +121,25 @@ public class DefaultSignOutManager : ISignOutManager
             }
         }
 
-        if (backChannelLogout.Count is not 0)
+        foreach(var backChannelRequest in backChannelLogout)
         {
-            foreach(var backChannelRequest in backChannelLogout)
-            {
-                await backChannelNotifier.SendAsync(backChannelRequest, ct);
-            }
+            await backChannelNotifier.SendAsync(backChannelRequest, ct);
+        }
+
+        // determine if it can directly redirect to post logout uri
+        // must have a post logout uri, no front channel logouts, and automatic redirect after signout
+        var canRedirectToPostLogoutUri = postLogoutRedirectUri is not null &&
+            frontChannelLogout.Count == 0 &&
+            accountOptions.AutomaticRedirectAfterSignOut;
+
+        if (canRedirectToPostLogoutUri)
+        {
+            var redirectUri = postLogoutRedirectUri!;
+
+            if (state.IsPresent())
+                redirectUri = redirectUri.AddQueryString(OidcConstants.EndSessionRequest.State, state);
+
+            return new Uri(redirectUri);
         }
 
         var message = new LogoutCallbackMessage()
@@ -138,8 +151,8 @@ public class DefaultSignOutManager : ISignOutManager
             AutomaticRedirectAfterSignOut = accountOptions.AutomaticRedirectAfterSignOut
         };
 
-        var loggoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(message), ct);
+        var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(message), ct);
 
-        return new("/account/logout/processing".AddQueryString("LogoutId", loggoutCallbackId));
+        return new("/account/logout/processing".AddQueryString("LogoutId", logoutCallbackId));
     }
 }
