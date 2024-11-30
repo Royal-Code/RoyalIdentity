@@ -2,13 +2,15 @@ namespace RoyalIdentity.Contracts.Models.Messages;
 
 public class LogoutMessage
 {
-    public required string SessionId { get; set; }
+    public required string SessionId { get; init; }
 
-    public string? PostLogoutRedirectUri { get; set; }
+    public string? PostLogoutRedirectUri { get; init; }
 
-    public bool ShowSignoutPrompt { get; set; }
+    public string? ClientName { get; init; }
 
-    public string? State { get; set; }
+    public bool ShowSignoutPrompt { get; init; }
 
-    public string? UiLocales { get; set; }
+    public string? State { get; init; }
+
+    public string? UiLocales { get; init; }
 }

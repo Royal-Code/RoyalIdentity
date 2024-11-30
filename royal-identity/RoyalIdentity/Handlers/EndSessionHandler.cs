@@ -37,6 +37,7 @@ public class EndSessionHandler : IHandler<EndSessionContext>
             SessionId = sid,
             ShowSignoutPrompt = !canLogoutWithoutUserConfirmation,
             PostLogoutRedirectUri = context.PostLogoutRedirectUri,
+            ClientName = context.Client?.Name,
             State = context.State,
             UiLocales = context.UiLocales
         };

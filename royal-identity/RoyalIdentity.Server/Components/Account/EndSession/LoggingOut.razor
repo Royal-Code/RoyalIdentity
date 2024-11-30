@@ -16,6 +16,9 @@
         <div>
             Processing, wait a moment
         </div>
+        <div>
+            Click <a class="@ClickCssClasses" href="@RedirectUrl">here</a> @ToReturnMessage
+        </div>
         @if (model is not null)
         {
             if (model.HasFrontChannel())
@@ -27,16 +30,23 @@
 </AccountContent>
 
 @code {
-    // ?? "/account/logout/done"
 
     private LogoutCallbackMessage? model;
 
+    private string ClickCssClasses => $"post-logout-redirect-uri{(AutomaticRedirect ? " automatic-redirect" : "")}";
+
     private string RedirectUrl => model?.PostLogoutRedirectUri ?? "/account/logout/done";
+
+    private string ToReturnMessage => HasClientName
+        ? $"to return to the {model?.ClientName} application."
+        : "to return to the application.";
 
     /// <summary>
     /// Automatic redirect after sign out if the post logout redirect uri is not set or if the automatic redirect is enabled.
     /// </summary>
     private bool AutomaticRedirect => model?.AutomaticRedirectAfterSignOut ?? model is { PostLogoutRedirectUri: null };
+
+    private bool HasClientName => model?.ClientName.IsPresent() ?? false;
 
     [SupplyParameterFromQuery]
     private string? LogoutId { get; set; }

@@ -8,7 +8,11 @@ public class LogoutCallbackMessage
 
     public string? PostLogoutRedirectUri { get; set; }
 
+    public string? ClientName { get; set; }
+
     public string? State { get; set; }
+
+    public string? UiLocales { get; set; }
 
     public HashSet<string>? FrontChannelLogout { get; set; }
 

@@ -18,11 +18,18 @@ public class Message<TModel>
     /// </summary>
     /// <param name="data">The data.</param>
     /// <param name="now">The current UTC date/time.</param>
+    public Message(TModel data, DateTime now) : this(data, now.Ticks) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Message{TModel}"/> class.
+    /// </summary>
+    /// <param name="data">The data.</param>
+    /// <param name="created">The ticks the message was created.</param>
     [JsonConstructor]
-    public Message(TModel data, DateTime now)
+    public Message(TModel data, long created)
     {
-        Created = now.Ticks;
         Data = data;
+        Created = created;
     }
 
     /// <summary>

@@ -51,8 +51,12 @@ public class DefaultSignOutManager : ISignOutManager
         throw new NotImplementedException();
     }
 
-    public async Task<Uri> SignOutAsync(string sessionId, string? postLogoutRedirectUri, string? state, CancellationToken ct)
+    public async Task<Uri> SignOutAsync(LogoutMessage message, CancellationToken ct)
     {
+        var sessionId = message.SessionId;
+        var postLogoutRedirectUri = message.PostLogoutRedirectUri;
+        var state = message.State;
+
         logger.LogDebug("Start Sign Out, session: {SessionId}, post logout uri: {Uri}", sessionId, postLogoutRedirectUri);
 
         var session = await userSessionStore.EndSessionAsync(sessionId, ct);
@@ -142,17 +146,20 @@ public class DefaultSignOutManager : ISignOutManager
             return new Uri(redirectUri);
         }
 
-        var message = new LogoutCallbackMessage()
+        var callbackMessage = new LogoutCallbackMessage()
         {
             PostLogoutRedirectUri = postLogoutRedirectUri,
+            ClientName = message.ClientName,
             FrontChannelLogout = frontChannelLogout,
             SessionId = session?.Id,
             State = state,
+            UiLocales = message.UiLocales,
             AutomaticRedirectAfterSignOut = accountOptions.AutomaticRedirectAfterSignOut
         };
 
-        var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(message), ct);
+        var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(callbackMessage), ct);
 
+        // TODO: URL must be configurable
         return new("/account/logout/processing".AddQueryString("LogoutId", logoutCallbackId));
     }
 }
