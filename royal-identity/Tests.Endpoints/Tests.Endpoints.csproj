@@ -6,4 +6,8 @@
 	  <ProjectReference Include="..\RoyalIdentity.Endpoints\RoyalIdentity.Endpoints.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<Using Include="Xunit" />
+	</ItemGroup>
+	
 </Project>

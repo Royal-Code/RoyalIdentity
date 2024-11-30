@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="..\RoyalIdentity.Endpoints\RoyalIdentity.Endpoints.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity.Endpoints\RoyalIdentity.Endpoints.csproj" />
+	</ItemGroup>
 </Project>

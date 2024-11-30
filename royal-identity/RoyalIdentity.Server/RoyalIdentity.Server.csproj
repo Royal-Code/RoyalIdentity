@@ -1,14 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj" />
-    <ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj" />
+		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
+	</ItemGroup>
 
 </Project>
