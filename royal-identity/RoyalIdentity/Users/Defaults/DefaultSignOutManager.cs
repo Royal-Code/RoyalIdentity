@@ -44,11 +44,24 @@ public class DefaultSignOutManager : ISignOutManager
         this.logger = logger;
     }
 
-    public Task<string?> CreateLogoutIdAsync(CancellationToken ct)
+    public async Task<string?> CreateLogoutIdAsync(CancellationToken ct)
     {
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is null || httpContext.User.Identity is null || !httpContext.User.Identity.IsAuthenticated)
+        {
+            return null;
+        }
 
+        var identity = httpContext.User.Identity;
+        var sid = identity.GetSessionId();
 
-        throw new NotImplementedException();
+        LogoutMessage message = new LogoutMessage()
+        {
+            SessionId = sid,
+            ShowSignoutPrompt = true,
+        };
+
+        return await messageStore.WriteAsync<LogoutMessage>(new(message), ct);
     }
 
     public async Task<Uri> SignOutAsync(LogoutMessage message, CancellationToken ct)

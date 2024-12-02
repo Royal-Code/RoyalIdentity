@@ -20,6 +20,7 @@
 <body>
     <Routes @rendermode="RenderModeForPage" />
     <script src="_framework/blazor.web.js"></script>
+    <script src="js/app.js"></script>
     <script src="js/signout-redirect.js"></script>
 </body>
 
@@ -31,5 +32,5 @@
 
     private IComponentRenderMode? RenderModeForPage => HttpContext.Request.Path.StartsWithSegments("/account")
         ? null
-        : InteractiveServer;
+        : InteractiveAuto;
 }

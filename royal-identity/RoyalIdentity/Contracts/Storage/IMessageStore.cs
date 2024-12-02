@@ -1,4 +1,3 @@
-using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Models.Messages;
 
 namespace RoyalIdentity.Contracts.Storage;

@@ -18,13 +18,13 @@
     <InputText @bind-Value="Input.ReturnUrl" type="hidden" />
 
     <div class="form-floating mb-3">
-        <InputText @bind-Value="Input.Username" class="form-control" id="Username" autocomplete="username" aria-required="true" placeholder="Username"/>
+        <InputText @bind-Value="Input.Username" class="form-control" id="Username" autocomplete="username" aria-required="true" placeholder="Username" auto-focus />
         <label for="Username" class="form-label">Username</label>
         <ValidationMessage For="() => Input.Username" class="text-danger"/>
     </div>
 
     <div class="form-floating mb-3">
-        <InputText type="password" @bind-Value="Input.Password" class="form-control" id="Password" autocomplete="off" aria-required="true"/>
+        <InputText type="password" @bind-Value="Input.Password" class="form-control" id="Password" autocomplete="off" aria-required="true" placeholder="Password" />
         <label for="Password" class="form-label">Password</label>
         <ValidationMessage For="() => Input.Password" class="text-danger"/>
     </div>
@@ -124,5 +124,4 @@
         // redirect to the return URL
         NavigationManager.NavigateTo(uri.ToString(), true);
     }
-
 }

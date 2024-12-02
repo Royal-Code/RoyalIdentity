@@ -102,9 +102,14 @@ public class TokenEndpoint : IEndpointHandler
             case GrantTypes.DeviceCode:
 
                 break;
+            case GrantTypes.TokenExchange:
+
+                break;
             default:
                 if (extensionsGrantsProvider.GetAvailableGrantTypes().Contains(grantType))
                 {
+
+                    
                     // Executar grant_type
                 }
                 break;
