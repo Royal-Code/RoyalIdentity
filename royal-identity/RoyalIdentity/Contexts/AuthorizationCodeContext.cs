@@ -7,7 +7,6 @@ using RoyalIdentity.Models.Tokens;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -40,8 +39,9 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithRedirectU
 
     public override void Load(ILogger logger)
     {
-        RedirectUri = Raw.Get(TokenRequest.RedirectUri);
         ClientId = Raw.Get(TokenRequest.ClientId);
+        Scope = Raw.Get(TokenRequest.Scope);
+        RedirectUri = Raw.Get(TokenRequest.RedirectUri);
         Code = Raw.Get(TokenRequest.Code);
         CodeVerifier = Raw.Get(TokenRequest.CodeVerifier);
     }

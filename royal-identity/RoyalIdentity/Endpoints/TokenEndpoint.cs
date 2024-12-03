@@ -94,7 +94,7 @@ public class TokenEndpoint : IEndpointHandler
                 context = new AuthorizationCodeContext(httpContext, parameters, grantType, items);
                 break;
             case GrantTypes.RefreshToken:
-
+                context = new RefreshTokenContext(httpContext, parameters, grantType, items);
                 break;
             case GrantTypes.ClientCredentials:
 

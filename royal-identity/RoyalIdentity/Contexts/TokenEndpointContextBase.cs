@@ -24,6 +24,10 @@ public abstract class TokenEndpointContextBase : EndpointContextBase, ITokenEndp
 
     public string GrantType { get; }
 
+    public string? ClientId { get; protected set; }
+
+    public string? Scope { get; protected set; }
+
     public EvaluatedCredential? ClientSecret { get; private set; }
 
     public string? Confirmation => ClientSecret?.Confirmation;
@@ -31,8 +35,6 @@ public abstract class TokenEndpointContextBase : EndpointContextBase, ITokenEndp
     public bool IsClientRequired => true;
 
     public Client? Client { get; private set; }
-
-    public string? ClientId { get; protected set; }
 
     public HashSet<Claim> ClientClaims { get; } = [];
 
