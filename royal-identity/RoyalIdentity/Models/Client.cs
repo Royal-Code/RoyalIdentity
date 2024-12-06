@@ -1,4 +1,5 @@
-﻿using RoyalIdentity.Options;
+﻿using RoyalIdentity.Contexts.Items;
+using RoyalIdentity.Options;
 using System.Security.Claims;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -186,9 +187,31 @@ public class Client
 
     /// <summary>
     /// Absolute: the refresh token will expire on a fixed point in time (specified by the AbsoluteRefreshTokenLifetime)
-    /// Sliding: when refreshing the token, the lifetime of the refresh token will be renewed (by the amount specified in SlidingRefreshTokenLifetime). The lifetime will not exceed AbsoluteRefreshTokenLifetime.
-    /// </summary>        
+    /// Sliding: when refreshing the token, the lifetime of the refresh token will be renewed (by the amount specified in SlidingRefreshTokenLifetime). 
+    /// The lifetime will not exceed AbsoluteRefreshTokenLifetime.
+    /// </summary>
     public TokenExpiration RefreshTokenExpiration { get; set; } = TokenExpiration.Absolute;
+
+    /// <summary>
+    /// <para>
+    ///     When a Refresh Token is used to obtain a new Access Token, 
+    ///     it is considered “consumed” and should not be reused. 
+    ///     However, there may be cases where the Refresh Token consumption operation fails on the client side, 
+    ///     preventing it from storing the new access token.
+    /// </para>
+    /// <para>
+    ///     The RefreshTokenPostConsumedTimeTolerance property defines a time interval 
+    ///     that the server is willing to allow additional Refresh Token consumptions, 
+    ///     to ensure that the client can redo the request for a new Access Token, 
+    ///     even if the Refresh Token has “technically” already been consumed.
+    /// </para>
+    /// <para>
+    ///     Use <see cref=“TimeSpan.MaxValue”/> to allow unrestricted reuse and
+    ///     use <see cref=“TimeSpan.Zero”/> to never allow reuse.
+    ///     Other values will be used to calculate whether you can still use the Refresh Token.
+    /// </para>
+    /// </summary>
+    public TimeSpan RefreshTokenPostConsumedTimeTolerance { get; set; } = TimeSpan.MaxValue;
 
     /// <summary>
     /// Specifies whether the logout process can be terminated without user confirmation.

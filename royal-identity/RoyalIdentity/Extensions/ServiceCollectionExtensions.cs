@@ -55,11 +55,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMessageStore, ProtectedDataMessageStore>();
 
         // Secret Evaluators
-        services.AddTransient<IClientSecretsEvaluator, BasicSecretEvaluator>();
-        services.AddTransient<IClientSecretsEvaluator, PostBodySecretEvaluator>();
-        services.AddTransient<IClientSecretsEvaluator, PrivateKeyJwtSecretEvaluator>();
-        services.AddTransient<IClientSecretsEvaluator, TlsClientAuthSecretEvaluator>();
-        services.AddTransient<IClientSecretsEvaluator, NoSecretEvaluator>();
+        services.AddTransient<IClientSecretEvaluator, BasicSecretEvaluator>();
+        services.AddTransient<IClientSecretEvaluator, PostBodySecretEvaluator>();
+        services.AddTransient<IClientSecretEvaluator, PrivateKeyJwtSecretEvaluator>();
+        services.AddTransient<IClientSecretEvaluator, TlsClientAuthSecretEvaluator>();
+        services.AddTransient<IClientSecretEvaluator, NoSecretEvaluator>();
 
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();

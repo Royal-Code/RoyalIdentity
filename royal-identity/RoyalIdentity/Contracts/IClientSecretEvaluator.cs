@@ -3,7 +3,7 @@ using RoyalIdentity.Contracts.Models;
 
 namespace RoyalIdentity.Contracts;
 
-public interface IClientSecretsEvaluator
+public interface IClientSecretEvaluator
 {
     public static readonly Task<EvaluatedClient?> NotFound = Task.FromResult<EvaluatedClient?>(null);
 

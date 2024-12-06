@@ -8,7 +8,7 @@ using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
-public abstract class SecretEvaluatorBase : IClientSecretsEvaluator
+public abstract class SecretEvaluatorBase : IClientSecretEvaluator
 {
     protected readonly IClientStore clientStore;
     protected readonly ServerOptions options;

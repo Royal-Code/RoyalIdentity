@@ -4,6 +4,7 @@ using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Handlers;
+using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Pipelines.Configurations;
 using RoyalIdentity.Pipelines.Infrastructure;
 
@@ -30,6 +31,7 @@ public static class Pipes
 
             discoveryPipe.UseHandler<DiscoveryHandler>();
 
+
             //////////////////////////////
             //// Discovery Jwk
             //////////////////////////////
@@ -38,6 +40,7 @@ public static class Pipes
             options.CustomizeDiscoveryJsonWebKeysContext?.Invoke(jwkPipe);
 
             jwkPipe.UseHandler<JwkHandler>();
+
 
             //////////////////////////////
             //// AuthorizeContext
@@ -56,6 +59,7 @@ public static class Pipes
             options.CustomizeAuthorizeContext?.Invoke(authorizeContextPipe);
 
             authorizeContextPipe.UseHandler<AuthorizeHandler>();
+
 
             //////////////////////////////
             //// AuthorizeValidateContext
@@ -85,6 +89,18 @@ public static class Pipes
             options.CustomizeAuthorizationCodeContext?.Invoke(authorizationCodeContextPipe);
 
             authorizationCodeContextPipe.UseHandler<AuthorizationCodeHandler>();
+
+
+            //////////////////////////////
+            //// RefreshTokenContext
+            //////////////////////////////
+            var refreshTokenContextPipe = builder.For<RefreshTokenContext>()
+                .UseDecorator<EvaluateClient>()
+                .UseDecorator<LoadRefreshToken>();
+
+            options.CustomizeRefreshTokenContext?.Invoke(refreshTokenContextPipe);
+
+            refreshTokenContextPipe.UseHandler<RefreshTokenHandler>();
 
 
             //////////////////////////////
@@ -135,6 +151,8 @@ public class CustomOptions
     public Action<IPipelineConfigurationBuilder<AuthorizeValidateContext>>? CustomizeAuthorizeValidateContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<AuthorizationCodeContext>>? CustomizeAuthorizationCodeContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<RefreshTokenContext>>? CustomizeRefreshTokenContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<UserInfoContext>>? CustomizeUserInfoContext { get; set; }
 

@@ -8,11 +8,11 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultClientSecretChecker : IClientSecretChecker
 {
-    private readonly IEnumerable<IClientSecretsEvaluator> evaluators;
-    private readonly ILogger<IClientSecretChecker> logger;
+    private readonly IEnumerable<IClientSecretEvaluator> evaluators;
+    private readonly ILogger<DefaultClientSecretChecker> logger;
 
     public DefaultClientSecretChecker(
-        IEnumerable<IClientSecretsEvaluator> evaluators,
+        IEnumerable<IClientSecretEvaluator> evaluators,
         ILogger<DefaultClientSecretChecker> logger)
     {
         this.evaluators = evaluators;
@@ -21,6 +21,8 @@ public class DefaultClientSecretChecker : IClientSecretChecker
 
     public async Task<EvaluatedClient?> EvaluateClientAsync(IEndpointContextBase context, CancellationToken ct)
     {
+        logger.LogDebug("Start evaluate client secret");
+
         // see if a registered evaluators finds a secret on the request
         EvaluatedClient? evaluation = null;
         foreach (var evaluator in evaluators)
@@ -29,7 +31,7 @@ public class DefaultClientSecretChecker : IClientSecretChecker
             if (evaluatedClient is null)
                 continue;
 
-            logger.LogDebug("Parser found secret: {Type}", evaluator.GetType().Name);
+            logger.LogDebug("Evaluator found secret: {Type}", evaluator.GetType().Name);
 
             evaluation = evaluatedClient;
 
@@ -39,10 +41,13 @@ public class DefaultClientSecretChecker : IClientSecretChecker
 
         if (evaluation is not null)
         {
-            logger.LogDebug("Client evaluated: {Type}, {Name} ({Id})", 
+            var isValid = evaluation.Credential.IsValid ? "secret is valid" : "secret is not valid";
+
+            logger.LogDebug("Client evaluated: {Type}, {Name} ({Id}), {IsValid}", 
                 evaluation.Credential.Type, 
                 evaluation.Client.Name,
-                evaluation.Client.Id);
+                evaluation.Client.Id,
+                isValid);
 
             return evaluation;
         }

@@ -10,16 +10,29 @@ namespace RoyalIdentity.Contexts.Decorators;
 public class LoadRefreshToken : IDecorator<RefreshTokenContext>
 {
     private readonly IRefreshTokenStore store;
+    private readonly TimeProvider clock;
     private readonly ILogger logger;
 
+    public LoadRefreshToken(IRefreshTokenStore store, TimeProvider clock, ILogger<LoadRefreshToken> logger)
+    {
+        this.store = store;
+        this.clock = clock;
+        this.logger = logger;
+    }
 
     public async Task Decorate(RefreshTokenContext context, Func<Task> next, CancellationToken ct)
     {
         logger.LogDebug("Start loading refresh token");
 
-        ServerOptions options = context.Items.GetOrCreate<ServerOptions>();
+        context.AssertHasClient();
 
+        var options = context.Items.GetOrCreate<ServerOptions>();
+        var client = context.Client;
         var token = context.Token;
+
+        /////////////////////////////////////////////
+        // check if refresh token is valid
+        /////////////////////////////////////////////
         if (token.IsMissing())
         {
             logger.LogError(context, "Refresh token is missing");
@@ -39,8 +52,56 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         {
             logger.LogWarning("Invalid refresh token");
             context.Error(TokenErrors.InvalidGrant, "Invalid refresh token");
+            return;
         }
 
-        throw new NotImplementedException();
+        /////////////////////////////////////////////
+        // check if refresh token has expired
+        /////////////////////////////////////////////
+        if (refreshToken.CreationTime.HasExceeded(refreshToken.Lifetime, clock.GetUtcNow().DateTime))
+        {
+            logger.LogWarning("Refresh token has expired.");
+            context.Error(TokenErrors.InvalidGrant, "Refresh token has expired");
+            return;
+        }
+
+        /////////////////////////////////////////////
+        // check if client belongs to requested refresh token
+        /////////////////////////////////////////////
+        if (client.Id != refreshToken.ClientId)
+        {
+            logger.LogError("{ClientId} tries to refresh token belonging to {RefreshTokenClientId}", client.Id, refreshToken.ClientId);
+            context.Error(TokenErrors.InvalidGrant, "Invalid client");
+            return;
+        }
+
+        /////////////////////////////////////////////
+        // check if client still has offline_access scope
+        /////////////////////////////////////////////
+        if (!client.AllowOfflineAccess)
+        {
+            logger.LogError("{ClientId} does not have access to offline_access scope anymore", client.Id);
+            context.Error(TokenErrors.InvalidGrant, "Invalid client");
+            return;
+        }
+
+        /////////////////////////////////////////////
+        // check if refresh token has been consumed
+        /////////////////////////////////////////////
+        if (refreshToken.ConsumedTime.HasValue && 
+            client.RefreshTokenPostConsumedTimeTolerance != TimeSpan.MaxValue)
+        {
+            bool doNotAcceptConsumedToken = client.RefreshTokenPostConsumedTimeTolerance == TimeSpan.Zero
+                || refreshToken.ConsumedTime.HasExceeded(client.RefreshTokenPostConsumedTimeTolerance, clock.GetUtcNow().DateTime);
+
+            if (doNotAcceptConsumedToken)
+            {
+                logger.LogWarning("Rejecting refresh token because it has been consumed already.");
+                context.Error(TokenErrors.InvalidGrant, "Refresh token has been consumed already.");
+                return;
+            }
+        }
+
+        context.RefreshToken = refreshToken;
     }
 }
