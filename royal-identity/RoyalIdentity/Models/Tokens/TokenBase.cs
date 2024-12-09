@@ -106,4 +106,14 @@ public abstract class TokenBase
     /// The scopes.
     /// </value>
     public IEnumerable<string> Scopes => Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
+
+    public ClaimsPrincipal CreatePrincipal()
+    {
+        var identity = new ClaimsIdentity(Claims,
+            Constants.ServerAuthenticationType, 
+            JwtClaimTypes.Subject,
+            JwtClaimTypes.Role);
+
+        return new ClaimsPrincipal(identity);
+    }
 }

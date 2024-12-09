@@ -150,7 +150,12 @@ internal static class CollectionExtensions
     {
         foreach (var value in values)
             set.Add(value);
+    }
 
+    public static void AddRange<T>(this ICollection<T> set, IEnumerable<T> values)
+    {
+        foreach (var value in values)
+            set.Add(value);
     }
 
     internal static IEnumerable<T> IntersectMany<T>(this IEnumerable<IEnumerable<T>> lists)

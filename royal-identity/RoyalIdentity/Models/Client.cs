@@ -1,5 +1,4 @@
-﻿using RoyalIdentity.Contexts.Items;
-using RoyalIdentity.Options;
+﻿using RoyalIdentity.Options;
 using System.Security.Claims;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -212,6 +211,15 @@ public class Client
     /// </para>
     /// </summary>
     public TimeSpan RefreshTokenPostConsumedTimeTolerance { get; set; } = TimeSpan.MaxValue;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the access token (and its claims) should be updated on a refresh token request.
+    /// Defaults to <c>false</c>.
+    /// </summary>
+    /// <value>
+    /// <c>true</c> if the token should be updated; otherwise, <c>false</c>.
+    /// </value>
+    public bool UpdateAccessTokenClaimsOnRefresh { get; set; } = false;
 
     /// <summary>
     /// Specifies whether the logout process can be terminated without user confirmation.

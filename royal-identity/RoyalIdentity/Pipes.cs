@@ -4,7 +4,6 @@ using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Handlers;
-using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Pipelines.Configurations;
 using RoyalIdentity.Pipelines.Infrastructure;
 
@@ -51,6 +50,7 @@ public static class Pipes
                 .UseValidator<RedirectUriValidator>()
                 .UseValidator<AuthorizeMainValidator>()
                 .UseValidator<PkceValidator>()
+                .UseDecorator<ResourcesDecorator>()
                 .UseValidator<RequestedResourcesValidator>()
                 .UseDecorator<PromptLoginDecorator>()
                 .UseDecorator<ConsentDecorator>()
@@ -69,6 +69,7 @@ public static class Pipes
                 .UseDecorator<LoadClient>()
                 .UseValidator<RedirectUriValidator>()
                 .UseValidator<AuthorizeMainValidator>()
+                .UseDecorator<ResourcesDecorator>()
                 .UseValidator<RequestedResourcesValidator>();
 
             options.CustomizeAuthorizeValidateContext?.Invoke(authorizeValidateContextPipe);
@@ -96,7 +97,8 @@ public static class Pipes
             //////////////////////////////
             var refreshTokenContextPipe = builder.For<RefreshTokenContext>()
                 .UseDecorator<EvaluateClient>()
-                .UseDecorator<LoadRefreshToken>();
+                .UseDecorator<LoadRefreshToken>()
+                .UseValidator<ActiveUserValidator>();
 
             options.CustomizeRefreshTokenContext?.Invoke(refreshTokenContextPipe);
 

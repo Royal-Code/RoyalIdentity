@@ -101,11 +101,6 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             return ValueTask.CompletedTask;
         }
 
-        if (context.RequestedScopes.Contains(ServerConstants.StandardScopes.OpenId))
-        {
-            context.IsOpenIdRequest = true;
-        }
-
 
         //////////////////////////////////////////////////////////
         // check nonce

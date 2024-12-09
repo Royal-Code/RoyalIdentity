@@ -10,6 +10,8 @@ namespace RoyalIdentity.Contexts;
 
 public class RefreshTokenContext : TokenEndpointContextBase
 {
+    private ClaimsPrincipal? subject;
+
     public RefreshTokenContext(
         HttpContext httpContext,
         NameValueCollection raw,
@@ -23,9 +25,16 @@ public class RefreshTokenContext : TokenEndpointContextBase
 
     public RefreshToken? RefreshToken { get; set; }
 
+    public DateTime? TokenFirstConsumedAt { get; set; }
+
     public override ClaimsPrincipal? GetSubject()
     {
-        throw new NotImplementedException();
+        if (subject is null && RefreshToken is not null)
+        {
+            subject = RefreshToken.CreatePrincipal();
+        }
+
+        return subject;
     }
 
     public override void Load(ILogger logger)
@@ -33,7 +42,5 @@ public class RefreshTokenContext : TokenEndpointContextBase
         ClientId = Raw.Get(TokenRequest.ClientId);
         Scope = Raw.Get(TokenRequest.Scope);
         Token = Raw.Get(TokenRequest.RefreshToken);
-
-        throw new NotImplementedException();
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Models;
@@ -71,6 +72,27 @@ public class Resources
     /// Gets or sets the API resources.
     /// </summary>
     public ICollection<ApiResource> ApiResources { get; } = [];
+
+    /// <summary>
+    /// Copies the resources to the specified other.
+    /// </summary>
+    /// <param name="other"></param>
+    public void CopyTo(Resources other)
+    {
+        other.OfflineAccess = OfflineAccess;
+        
+        other.RequestedScopes.Clear();
+        other.RequestedScopes.AddRange(RequestedScopes);
+
+        other.IdentityResources.Clear();
+        other.IdentityResources.AddRange(IdentityResources);
+        
+        other.ApiResources.Clear();
+        other.ApiResources.AddRange(ApiResources);
+        
+        other.ApiScopes.Clear();
+        other.ApiScopes.AddRange(ApiScopes);
+    }
 
     public bool TryFindIdentityResourceByName(string name, [NotNullWhen(true)] out IdentityResource? identityResource)
     {

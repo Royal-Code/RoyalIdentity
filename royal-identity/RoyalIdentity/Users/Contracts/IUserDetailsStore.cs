@@ -1,5 +1,3 @@
-using RoyalIdentity.Users.Defaults;
-
 namespace RoyalIdentity.Users.Contracts;
 
 public interface IUserDetailsStore

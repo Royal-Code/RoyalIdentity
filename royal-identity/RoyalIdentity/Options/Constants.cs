@@ -255,6 +255,7 @@ internal static class Constants
         ];
     }
 
+    [Redesign("Change consts values")]
     public static class EnvironmentKeys
     {
         public const string ServerBasePath = "idsvr:ServerBasePath";
@@ -693,13 +694,8 @@ public static class OidcConstants
     public static class ResponseTypes
     {
         public const string Code = "code";
-        public const string Token = "token";
+        public const string Token = "token"; // implicit flow - considered harmful in oauth2.1 -- remove?
         public const string IdToken = "id_token";
-        // TODO: remove
-        //public const string IdTokenToken = "id_token token";
-        //public const string CodeIdToken = "code id_token";
-        //public const string CodeToken = "code token";
-        //public const string CodeIdTokenToken = "code id_token token";
     }
 
     public static class ResponseModes

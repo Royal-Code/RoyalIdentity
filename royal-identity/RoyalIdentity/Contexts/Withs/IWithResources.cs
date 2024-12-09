@@ -32,12 +32,4 @@ public interface IWithResources : IWithClient
     /// <c>true</c> if this instance is API resource request; otherwise, <c>false</c>.
     /// </value>
     public bool IsApiResourceRequest { get; set; }
-
-    /// <summary>
-    /// Gets or sets the type of the response.
-    /// </summary>
-    /// <value>
-    /// The type of the response.
-    /// </value>
-    public HashSet<string> ResponseTypes { get; }
 }

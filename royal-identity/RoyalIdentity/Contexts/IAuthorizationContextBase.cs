@@ -13,6 +13,14 @@ public interface IAuthorizationContextBase : IWithRedirectUri, IWithResources, I
     public string? ResponseMode { get; set; }
 
     /// <summary>
+    /// Gets or sets the type of the response.
+    /// </summary>
+    /// <value>
+    /// The type of the response.
+    /// </value>
+    public HashSet<string> ResponseTypes { get; }
+
+    /// <summary>
     /// Gets or sets the nonce.
     /// </summary>
     /// <value>

@@ -1,58 +1,28 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using RoyalIdentity.Contexts.Withs;
-using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class RequestedResourcesValidator : IValidator<IWithResources>
+public class RequestedResourcesValidator : IValidator<IAuthorizationContextBase>
 {
     private readonly ServerOptions options;
-    private readonly IResourceStore resourceStore;
     private readonly ILogger logger;
 
     public RequestedResourcesValidator(
         IOptions<ServerOptions> options,
-        IResourceStore resourceStore,
         ILogger<RequestedResourcesValidator> logger)
     {
         this.options = options.Value;
-        this.resourceStore = resourceStore;
         this.logger = logger;
     }
 
-    public async ValueTask Validate(IWithResources context, CancellationToken ct)
+    public ValueTask Validate(IAuthorizationContextBase context, CancellationToken ct)
     {
         context.AssertHasClient();
-
-        //////////////////////////////////////////////////////////
-        // check if scopes are valid/supported and check for resource scopes
-        //////////////////////////////////////////////////////////
-
-        var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.RequestedScopes, true, ct);
-        foreach (var scope in context.RequestedScopes)
-        {
-            if (!IsScopeValidAsync(context, context.Client, resourcesFromStore, scope))
-                return;
-        }
-
-        if (context.Resources.IdentityResources.Count is not 0 && !context.IsOpenIdRequest)
-        {
-            logger.LogError(options, "Identity related scope requests, but no openid scope", context);
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "Identity scopes requested, but openid scope is missing");
-            return;
-        }
-
-        if (context.Resources.ApiScopes.Count is not 0)
-        {
-            context.IsApiResourceRequest = true;
-        }
-
 
         //////////////////////////////////////////////////////////
         // check scope vs response_type plausibility
@@ -64,7 +34,7 @@ public class RequestedResourcesValidator : IValidator<IWithResources>
         {
             logger.LogError(options, "The parameter response_type requires the openid scope", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing openid scope");
-            return;
+            return default;
         }
 
 
@@ -100,67 +70,8 @@ public class RequestedResourcesValidator : IValidator<IWithResources>
         if (!responseTypeValidationCheck)
         {
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "Invalid scope for response type");
-            return;
-        }
-    }
-
-    private bool IsScopeValidAsync(IWithResources context, Client client, Resources resourcesFromStore, string requestedScope)
-    {
-        if (requestedScope == ServerConstants.StandardScopes.OfflineAccess)
-        {
-            if (client.AllowOfflineAccess)
-            {
-                context.Resources.OfflineAccess = true;
-            }
-            else
-            {
-                logger.LogError(options, "Offline access is not allowed for this client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                context.InvalidRequest(AuthorizeErrors.InvalidScope, "Offline access is not allowed for this client");
-                return false;
-            }
-        }
-        else
-        {
-            if (resourcesFromStore.TryFindIdentityResourceByName(requestedScope, out var identity))
-            {
-                if (client.AllowedScopes.Contains(identity.Name))
-                {
-                    context.Resources.IdentityResources.Add(identity);
-                }
-                else
-                {
-                    logger.LogError(options, "Identity Scope not allowed for the client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                    context.InvalidRequest(AuthorizeErrors.InvalidScope);
-                    return false;
-                }
-            }
-            else if (resourcesFromStore.TryFindApiScopeByName(requestedScope, out var apiScope))
-            {
-                if (client.AllowedScopes.Contains(apiScope.Name))
-                {
-                    context.Resources.ApiScopes.Add(apiScope);
-
-                    var apis = resourcesFromStore.FindApiResourceByScopeName(apiScope.Name);
-                    foreach (var api in apis)
-                    {
-                        context.Resources.ApiResources.Add(api);
-                    }
-                }
-                else
-                {
-                    logger.LogError(options, "Api Scope not allowed for the client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                    context.InvalidRequest(AuthorizeErrors.InvalidScope);
-                    return false;
-                }
-            }
-            else
-            {
-                logger.LogError(options, "Scope not found in store", requestedScope, context);
-                context.InvalidRequest(AuthorizeErrors.InvalidScope);
-                return false;
-            }
         }
 
-        return true;
+        return default;
     }
 }
