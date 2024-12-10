@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<Import Project="../tests.targets" />
+
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj" />
+		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Xunit" />
+	</ItemGroup>
+
+</Project>
