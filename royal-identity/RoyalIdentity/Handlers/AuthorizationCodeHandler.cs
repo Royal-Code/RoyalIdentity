@@ -49,7 +49,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             Subject = context.AuthorizationCode.Subject,
             Resources = context.Resources,
             Confirmation = context.ClientSecret.Confirmation,
-            Caller = context.GrantType
+            Caller = nameof(AuthorizationCodeHandler)
         };
 
         accessToken = await tokenFactory.CreateAccessTokenAsync(accessTokenRequest, ct);
@@ -66,7 +66,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
                 Raw = context.Raw,
                 Subject = context.AuthorizationCode.Subject,
                 AccessToken = accessToken,
-                Caller = context.GrantType
+                Caller = nameof(AuthorizationCodeHandler)
             };
 
             refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);
@@ -83,7 +83,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
                 Raw = context.Raw,
                 Subject = context.AuthorizationCode.Subject,
                 Resources = context.Resources,
-                Caller = context.GrantType,
+                Caller = nameof(AuthorizationCodeHandler),
                 Nonce = context.AuthorizationCode.Nonce,
                 AccessTokenToHash = accessToken.Token,
             };

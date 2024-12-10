@@ -18,6 +18,7 @@ public interface IWithResources : IWithClient
     /// <value>
     /// <c>true</c> if the request was an OpenID Connect request; otherwise, <c>false</c>.
     /// </value>
+    [Redesign("Pode ser obtido de Resources.IsOpenId")]
     public bool IsOpenIdRequest { get; set; }
 
     /// <summary>
@@ -31,5 +32,6 @@ public interface IWithResources : IWithClient
     /// <value>
     /// <c>true</c> if this instance is API resource request; otherwise, <c>false</c>.
     /// </value>
+    [Redesign("Poderia ser incluído em Resources, outro detalhe, não foi usado para nada, apenas atribuído")]
     public bool IsApiResourceRequest { get; set; }
 }

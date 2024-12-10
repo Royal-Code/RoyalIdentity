@@ -1,4 +1,8 @@
 ﻿
+using RoyalIdentity.Extensions;
+using RoyalIdentity.Options;
+using System.Security.Claims;
+
 namespace RoyalIdentity.Models.Tokens;
 
 public class AccessToken : TokenBase
@@ -30,5 +34,34 @@ public class AccessToken : TokenBase
     /// </value>
     public AccessTokenType AccessTokenType { get; }
 
+    /// <summary>
+    /// The type of the token, for example "Bearer".
+    /// </summary>
     public string TokenType { get; set; }
+
+    /// <summary>
+    /// Creates a new object that is a copy of the current instance.
+    /// </summary>
+    /// <returns></returns>
+    public AccessToken Renew(string jti, DateTime creationTime, int lifetime)
+    {
+        var newToken = new AccessToken(
+            ClientId,
+            Issuer,
+            AccessTokenType,
+            creationTime,
+            lifetime,
+            jti,
+            TokenType)
+        {
+            AllowedSigningAlgorithms = AllowedSigningAlgorithms,
+            Confirmation = Confirmation,
+            Audiences = Audiences,
+        };
+
+        newToken.Claims.AddRange(Claims.Where(c => c.Type != "jti"));
+        newToken.Claims.Add(new Claim(JwtClaimTypes.JwtId, jti));
+
+        return newToken;
+    }
 }

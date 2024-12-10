@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Endpoints.Defaults;
 
@@ -40,37 +41,85 @@ public static class ServerEndpoint<TEndpoint>
     public static async Task<IResult> EndpointHandler(
         HttpContext httpContext,
         TEndpoint endpointHandler,
-        IPipelineDispatcher pipelineDispatcher)
+        IPipelineDispatcher pipelineDispatcher,
+        ILogger<TEndpoint> logger)
     {
-        // try to create a context from the http context for the endpoint
-        var result = await endpointHandler.TryCreateContextAsync(httpContext);
+        IResponseHandler? responseHandler;
+        IContextBase? context;
 
-        if (!result.IsValid(out var context, out var responseHandler))
+        /////////////////////////////////////////////////////////////////////
+        // Try to create a context from the http context for the endpoint
+        /////////////////////////////////////////////////////////////////////
+
+        try
         {
+            var result = await endpointHandler.TryCreateContextAsync(httpContext);
+
+            if (!result.IsValid(out context, out responseHandler))
+            {
+                return await responseHandler.CreateResponseAsync(httpContext.RequestAborted);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create a context using the endpoint handler");
+
+            return InternalServerError();
+        }
+
+        /////////////////////////////////////////////////////////////////////
+        // Send the context through the pipeline to be processed
+        /////////////////////////////////////////////////////////////////////
+
+        try
+        {
+            await pipelineDispatcher.SendAsync(context, httpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to execute the pipeline");
+
+            return InternalServerError();
+        }
+
+        /////////////////////////////////////////////////////////////////////
+        // Creates the Result from the ResponseHandler.
+        /////////////////////////////////////////////////////////////////////
+
+        try
+        {
+            // get the response handler from the context
+            responseHandler = context.Response;
+
+            if (responseHandler is null)
+            {
+                logger.LogError("Endpoint did not produce a ResponseHandler");
+
+                return InternalServerError();
+            }
+
+            // return the response from the response handler
             return await responseHandler.CreateResponseAsync(httpContext.RequestAborted);
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create the Result from the ResponseHandler");
 
-        // send the context through the pipeline to be processed
-        await pipelineDispatcher.SendAsync(context, httpContext.RequestAborted);
-
-        // get the response handler from the context
-        responseHandler = context.Response;
-
-        if (responseHandler is null) 
-        { 
-            // generate a internal server error
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "Internal server error",
-                Detail = "An internal server error has occurred"
-            };
-
-            return Results.Json(problemDetails.IncludeErrorsProperties(), statusCode: StatusCodes.Status500InternalServerError);
+            return InternalServerError();
         }
+    }
 
-        // return the response from the response handler
-        return await responseHandler.CreateResponseAsync(httpContext.RequestAborted);
+    private static IResult InternalServerError()
+    {
+        // generate a internal server error
+        var problemDetails = new ProblemDetails
+        {
+            Type = "about:blank",
+            Status = StatusCodes.Status500InternalServerError,
+            Title = "Internal server error",
+            Detail = "An internal server error has occurred"
+        };
+
+        return Results.Json(problemDetails.IncludeErrorsProperties(), statusCode: StatusCodes.Status500InternalServerError);
     }
 }

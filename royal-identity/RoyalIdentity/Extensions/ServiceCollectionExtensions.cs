@@ -75,14 +75,17 @@ public static class ServiceCollectionExtensions
         services.AddTransient<EvaluateClient>();
         services.AddTransient<LoadClient>();
         services.AddTransient<LoadCode>();
+        services.AddTransient<LoadRefreshToken>();
         services.AddTransient<ProcessRequestObject>();
         services.AddTransient<PromptLoginDecorator>();
+        services.AddTransient<ResourcesDecorator>();
         services.AddTransient<StateHashDecorator>();
 
         // Validators
         services.AddTransient<ActiveUserValidator>();
         services.AddTransient<AuthorizeMainValidator>();
         services.AddTransient<ConsentValidator>();
+        services.AddTransient<EndSessionValidator>();
         services.AddTransient<GrantTypeValidator>();
         services.AddTransient<PkceMatchValidator>();
         services.AddTransient<PkceValidator>();
@@ -96,6 +99,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DiscoveryHandler>();
         services.AddTransient<EndSessionHandler>();
         services.AddTransient<JwkHandler>();
+        services.AddTransient<RefreshTokenHandler>();
         services.AddTransient<RevocationHandler>();
         services.AddTransient<UserInfoHandler>();
 

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -104,5 +105,6 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
 
         context.RefreshToken = refreshToken;
         context.TokenFirstConsumedAt = refreshToken.ConsumedTime;
+        context.Items.GetOrCreate<Asserts>().HasToken = true;
     }
 }

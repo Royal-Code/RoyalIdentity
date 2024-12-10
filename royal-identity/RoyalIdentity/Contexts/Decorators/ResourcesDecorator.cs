@@ -54,11 +54,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         // check for openid scope
         //////////////////////////////////////////////////////////
         
-        if (context.RequestedScopes.Contains(ServerConstants.StandardScopes.OpenId))
-        {
-            context.IsOpenIdRequest = true;
-        }
-
+        context.IsOpenIdRequest = context.Resources.IsOpenId;
         if (context.Resources.IdentityResources.Count is not 0 && !context.IsOpenIdRequest)
         {
             logger.LogError(options, "Identity related scope requests, but no openid scope", context);
@@ -70,6 +66,8 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         {
             context.IsApiResourceRequest = true;
         }
+
+        await next();
     }
 
     private bool IsScopeValidAsync(IWithResources context, Client client, Resources resourcesFromStore, string requestedScope)

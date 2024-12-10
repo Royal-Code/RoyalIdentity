@@ -10,6 +10,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".items", ".items", "{D067ACD1-856A-43B9-85DC-5ACDE6F09AA7}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		..\ADR.md = ..\ADR.md
 		Directory.Build.props = Directory.Build.props
 		..\README.md = ..\README.md
 		tests.targets = tests.targets
@@ -34,6 +35,11 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.WebApp", "Tests.WebApp\Tests.WebApp.csproj", "{9B329235-5C50-4FFD-ABDF-2D6C680ADC45}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests.Identity", "Tests.Identity\Tests.Identity.csproj", "{F1986AC4-78E3-440A-BCAA-CF483E097D5D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "adrs", "adrs", "{071A853D-594E-486C-985F-4C433A1E2DB6}"
+	ProjectSection(SolutionItems) = preProject
+		..\adrs\ADR-001.md = ..\adrs\ADR-001.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -91,6 +97,7 @@ Global
 		{4DF7E5C8-3EEB-4017-82A4-F4564EA56CC0} = {D3D28FDF-F0A2-4AA5-8215-CAE555330C19}
 		{9B329235-5C50-4FFD-ABDF-2D6C680ADC45} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
 		{F1986AC4-78E3-440A-BCAA-CF483E097D5D} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
+		{071A853D-594E-486C-985F-4C433A1E2DB6} = {D067ACD1-856A-43B9-85DC-5ACDE6F09AA7}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A22735B7-0B63-4698-8CF5-359FC47E98DD}
