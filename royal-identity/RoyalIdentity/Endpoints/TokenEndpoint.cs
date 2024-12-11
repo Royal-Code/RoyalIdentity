@@ -108,9 +108,7 @@ public class TokenEndpoint : IEndpointHandler
             default:
                 if (extensionsGrantsProvider.GetAvailableGrantTypes().Contains(grantType))
                 {
-
-                    
-                    // Executar grant_type
+                    context = await extensionsGrantsProvider.CreateContextAsync(grantType, httpContext.RequestAborted);
                 }
                 break;
         }

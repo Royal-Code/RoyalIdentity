@@ -2,17 +2,19 @@ using RoyalIdentity.Contexts;
 
 namespace RoyalIdentity.Contracts;
 
-[Redesign("Ao implementar, melhorar os métodos.")]
+/// <summary>
+/// Represents an extension grant.
+/// </summary>
 public interface IExtensionGrant
 {
     /// <summary>
-    /// Validates the custom grant request.
+    /// Creates the context for the specified grant type.
     /// </summary>
     /// <param name="context">The context.</param>
     /// <returns>
-    /// A principal
+    /// A <see cref="ValueTask" /> representing the asynchronous operation.
     /// </returns>
-    Task ValidateAsync(IEndpointContextBase context);
+    ValueTask<ITokenEndpointContextBase> CreateContextAsync(CancellationToken ct);
 
     /// <summary>
     /// Returns the grant type this validator can deal with
