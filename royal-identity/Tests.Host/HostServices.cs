@@ -1,39 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Storage.InMemory.Extensions;
 
-namespace Tests.Integration.Prepare;
-
-internal class Program
-{
-    public static async Task Main(string[] args)
-    {
-        var builder = WebApplication.CreateBuilder(args);
-
-        // Add services to the container.
-        builder.Services.AddHostServices();
-
-        var app = builder.Build();
-
-        // Configure the HTTP request pipeline.
-        if (!app.Environment.IsDevelopment())
-        {
-            app.UseExceptionHandler("/Error", createScopeForErrors: true);
-        }
-
-        app.UseStaticFiles();
-
-        app.UseAuthentication();
-        app.UseAuthorization();
-
-        app.MapOpenIdConnectProviderEndpoints();
-
-        await app.RunAsync();
-    }
-}
+namespace Tests.Host;
 
 public static class HostServices
 {
@@ -41,6 +10,7 @@ public static class HostServices
     {
         // TODO: Requer configurar com "ServerOptions.Authentication"
         // authentication
+
         services.AddAuthentication()
             .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
             {

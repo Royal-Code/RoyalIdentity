@@ -3,8 +3,7 @@
 	<Import Project="../tests.targets" />
 
 	<ItemGroup>
-		<ProjectReference Include="..\RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj" />
-		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
+	  <ProjectReference Include="..\Tests.Host\Tests.Host.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
