@@ -1,5 +1,6 @@
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Contracts;
 using Tests.Host;
 
 #pragma warning disable S1118 // public Program 
@@ -39,6 +40,12 @@ app.MapPost("login", async (HttpContext context, ISignInManager signInManager) =
             detail: result.ErrorMessage);
     }
 });
+
+app.MapGet("profile", async (HttpContext context, IUserStore userManager) =>
+{
+    var user = await userManager.GetUserAsync(context.User.GetSubjectId(), context.RequestAborted);
+    return Results.Ok(user);
+}).RequireAuthorization();
 
 app.Run();
 
