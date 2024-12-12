@@ -32,6 +32,22 @@ public class UserInteractionOptions
     public string LogoutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Logout.EnsureLeadingSlash()!;
 
     /// <summary>
+    /// Gets or sets the logging out URL. If a local URL, the value must start with a leading slash.
+    /// </summary>
+    /// <value>
+    /// The logout URL.
+    /// </value>
+    public string LoggingOutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.LogginOut.EnsureLeadingSlash()!;
+
+    /// <summary>
+    /// Gets or sets the logged out URL. If a local URL, the value must start with a leading slash.
+    /// </summary>
+    /// <value>
+    /// The logout URL.
+    /// </value>
+    public string LoggedOutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.LoggedOut.EnsureLeadingSlash()!;
+
+    /// <summary>
     /// Gets or sets the logout identifier parameter.
     /// </summary>
     /// <value>

@@ -22,6 +22,7 @@ public class DefaultSignOutManager : ISignOutManager
     private readonly IBackChannelLogoutNotifier backChannelNotifier;
     private readonly IMessageStore messageStore;
     private readonly AccountOptions accountOptions;
+    private readonly ServerOptions serverOptions;
     private readonly ILogger logger;
 
     public DefaultSignOutManager(
@@ -32,6 +33,7 @@ public class DefaultSignOutManager : ISignOutManager
         IBackChannelLogoutNotifier backChannelNotifier,
         IMessageStore messageStore,
         IOptions<AccountOptions> accountOptions,
+        IOptions<ServerOptions> serverOptions,
         ILogger<DefaultSignOutManager> logger)
     {
         this.httpContextAccessor = httpContextAccessor;
@@ -41,6 +43,7 @@ public class DefaultSignOutManager : ISignOutManager
         this.clients = clients;
         this.messageStore = messageStore;
         this.accountOptions = accountOptions.Value;
+        this.serverOptions = serverOptions.Value;
         this.logger = logger;
     }
 
@@ -172,7 +175,13 @@ public class DefaultSignOutManager : ISignOutManager
 
         var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(callbackMessage), ct);
 
-        // TODO: URL must be configurable
-        return new("/account/logout/processing".AddQueryString("LogoutId", logoutCallbackId));
+        var url = serverOptions.UserInteraction.LoggingOutUrl;
+
+        if (logoutCallbackId is not null)
+        {
+            url = url.AddQueryString(serverOptions.UserInteraction.LogoutIdParameter, logoutCallbackId);
+        }
+
+        return new Uri(url, UriKind.RelativeOrAbsolute);
     }
 }

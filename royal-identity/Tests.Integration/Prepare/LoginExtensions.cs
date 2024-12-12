@@ -10,7 +10,7 @@ internal static class LoginExtensions
             ["password"] = password
         });
 
-        var response = await client.PostAsync("login", content);
+        var response = await client.PostAsync("account/login", content);
         response.EnsureSuccessStatusCode();
     }
 

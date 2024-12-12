@@ -1,3 +1,5 @@
+using RoyalIdentity.Contracts.Models.Messages;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
@@ -19,7 +21,7 @@ app.UseAuthorization();
 
 app.MapOpenIdConnectProviderEndpoints();
 
-app.MapPost("login", async (HttpContext context, ISignInManager signInManager) =>
+app.MapPost("account/login", async (HttpContext context, ISignInManager signInManager) =>
 {
     var username = context.Request.Form["username"].FirstOrDefault() ?? string.Empty;
     var password = context.Request.Form["password"].FirstOrDefault() ?? string.Empty;
@@ -41,11 +43,43 @@ app.MapPost("login", async (HttpContext context, ISignInManager signInManager) =
     }
 });
 
-app.MapGet("profile", async (HttpContext context, IUserStore userManager) =>
+app.MapGet("account/profile", async (HttpContext context, IUserStore userManager) =>
 {
     var user = await userManager.GetUserAsync(context.User.GetSubjectId(), context.RequestAborted);
     return Results.Ok(user);
 }).RequireAuthorization();
+
+app.MapGet("account/logout", async (HttpContext context, IMessageStore messageStore, ISignOutManager signOutManager) =>
+{
+    var logoutId = context.Request.Query["logoutId"].FirstOrDefault()
+        ?? await signOutManager.CreateLogoutIdAsync(context.RequestAborted);
+
+    if (logoutId is null)
+    {
+        return Results.Problem(
+            statusCode: 400,
+            type: "invalid-logout-id",
+            title: "Invalid logout id",
+            detail: "The logout id is invalid or expired.");
+    }
+
+    var message = await messageStore.ReadAsync<LogoutMessage>(logoutId, default);
+    var model = message?.Data;
+
+    if (model is null)
+    {
+        return Results.Problem(
+            statusCode: 400,
+            type: "invalid-logout-id",
+            title: "Invalid logout id",
+            detail: "The logout id is invalid or expired.");
+    }
+
+    await messageStore.DeleteAsync(logoutId, default);
+    _ = await signOutManager.SignOutAsync(model, default);
+
+    return Results.Ok();
+});
 
 app.Run();
 

@@ -1,5 +1,4 @@
-﻿using RoyalIdentity.Users;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace Tests.Integration.Prepare;
 
@@ -20,7 +19,7 @@ public class LoginTests : IClassFixture<AppFactory>
 
         // Act
         await LoginExtensions.LoginAliceAsync(client);
-        var response = await client.GetAsync("profile");
+        var response = await client.GetAsync("account/profile");
 
         // Assert
         Assert.NotNull(response);
@@ -36,5 +35,20 @@ public class LoginTests : IClassFixture<AppFactory>
 
         string userName = user["userName"].ToString()!;
         Assert.Equal("alice", userName);
+    }
+
+    [Fact]
+    public async Task Login_Logout()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+
+        // Act
+        await LoginExtensions.LoginAliceAsync(client);
+        var response = await client.GetAsync("account/logout");
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.IsSuccessStatusCode);
     }
 }

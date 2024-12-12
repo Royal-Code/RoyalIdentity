@@ -194,7 +194,7 @@ internal static class Constants
             public const string Login = "returnUrl";
             public const string Consent = "returnUrl";
             public const string Logout = "logoutId";
-            public const string EndSessionCallback = "endSessionId";
+            public const string EndSessionCallback = "endSessionId"; // TODO: remove
             public const string Custom = "returnUrl";
             public const string UserCode = "userCode";
         }
@@ -203,6 +203,8 @@ internal static class Constants
         {
             public const string Login = "/account/login";
             public const string Logout = "/account/logout";
+            public const string LogginOut = "/account/logout/processing";
+            public const string LoggedOut = "/account/logout/done";
             public const string Consent = "/account/consent";
             public const string Error = "/error";
             public const string DeviceVerification = "/device";
