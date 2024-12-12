@@ -16,14 +16,12 @@ public class DiscoveryTests : IClassFixture<AppFactory>
     public async Task Get_Must_ReturnsTheJsonDocument()
     {
         // Arrange
-
         var client = factory.CreateClient();
 
         // Act
         var response = await client.GetAsync("/.well-known/openid-configuration");
 
         // Assert
-
         Assert.NotNull(response);
         Assert.True(response.IsSuccessStatusCode);
 

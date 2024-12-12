@@ -1,8 +1,10 @@
+using Polly;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
+using RoyalIdentity.Utils;
 using Tests.Host;
 
 #pragma warning disable S1118 // public Program 
@@ -79,6 +81,25 @@ app.MapGet("account/logout", async (HttpContext context, IMessageStore messageSt
     _ = await signOutManager.SignOutAsync(model, default);
 
     return Results.Ok();
+});
+
+app.MapGet("account/token", async (HttpContext context, JwtUtil util) =>
+{
+    var user = context.User;
+    if (user.Identity?.IsAuthenticated != true)
+    {
+        return Results.Unauthorized();
+    }
+
+    var clientId = context.Request.Query["client_id"].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(clientId))
+    {
+        return Results.BadRequest("client_id is required");
+    }
+
+    var token = await util.IssueJwtAsync(clientId, 600, user.Claims);
+
+    return Results.Ok(new { access_token = token });
 });
 
 app.Run();

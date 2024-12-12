@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Options;

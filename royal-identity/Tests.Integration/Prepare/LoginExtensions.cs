@@ -2,7 +2,7 @@
 
 internal static class LoginExtensions
 {
-    public static async Task LoginAsync(HttpClient client, string username, string password)
+    public static async Task LoginAsync(this HttpClient client, string username, string password)
     {
         var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
@@ -14,12 +14,12 @@ internal static class LoginExtensions
         response.EnsureSuccessStatusCode();
     }
 
-    public static async Task LoginAliceAsync(HttpClient client)
+    public static async Task LoginAliceAsync(this HttpClient client)
     {
         await LoginAsync(client, "alice", "alice");
     }
 
-    public static async Task LoginbobAsync(HttpClient client)
+    public static async Task LoginbobAsync(this HttpClient client)
     {
         await LoginAsync(client, "bob", "bob");
     }

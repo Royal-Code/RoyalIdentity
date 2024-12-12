@@ -18,7 +18,7 @@ public class LoginTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
 
         // Act
-        await LoginExtensions.LoginAliceAsync(client);
+        await client.LoginAliceAsync();
         var response = await client.GetAsync("account/profile");
 
         // Assert

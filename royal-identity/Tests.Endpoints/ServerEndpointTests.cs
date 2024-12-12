@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Tests.Endpoints;
@@ -14,12 +16,14 @@ public class ServerEndpointTests
         var httpContext = new DefaultHttpContext();
         var endpointHandler = new TestEndpointHandler();
         var pipelineDispatcher = new TestPipelineDispatcher();
+        var logger = new Logger<TestEndpointHandler>(new NullLoggerFactory());
 
         // act
         var result = await ServerEndpoint<TestEndpointHandler>.EndpointHandler(
             httpContext,
             endpointHandler,
-            pipelineDispatcher);
+            pipelineDispatcher,
+            logger);
 
         // assert
         Assert.IsType<Ok<TestContext>>(result);

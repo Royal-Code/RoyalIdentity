@@ -291,6 +291,7 @@ public class KeyParameters
             // generate the JWK from the RSA key
             jwk = JsonWebKeyConverter.ConvertFromRSASecurityKey(rsaKey);
             jwk.KeyId = KeyId;
+            jwk.Alg = SecurityAlgorithm;
         }
         else if (SecurityAlgorithm.StartsWith("ES"))
         {
@@ -306,6 +307,7 @@ public class KeyParameters
             // generate the JWK from the EC key
             jwk = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(ecKey);
             jwk.KeyId = KeyId;
+            jwk.Alg = SecurityAlgorithm;
         }
         else if (SecurityAlgorithm.StartsWith("HS"))
         {
