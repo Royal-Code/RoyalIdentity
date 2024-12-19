@@ -12,7 +12,7 @@ public class AuthorizationCode
 {
     public AuthorizationCode(string clientId, ClaimsPrincipal subject, string sessionState,
         DateTime creationTime, int lifetime,
-        bool isOpenId, ICollection<string> requestedScopes, string redirectUri)
+        Resources resources, string redirectUri)
     {
         Code = CryptoRandom.CreateUniqueId();
         ClientId = clientId;
@@ -20,8 +20,7 @@ public class AuthorizationCode
         SessionState = sessionState;
         CreationTime = creationTime;
         Lifetime = lifetime;
-        IsOpenId = isOpenId;
-        RequestedScopes = requestedScopes;
+        Resources = resources;
         RedirectUri = redirectUri;
     }
 
@@ -71,20 +70,12 @@ public class AuthorizationCode
     public int Lifetime { get; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether this code is an OpenID Connect code.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if this instance is open identifier; otherwise, <c>false</c>.
-    /// </value>
-    public bool IsOpenId { get; }
-
-    /// <summary>
     /// Gets or sets the requested scopes.
     /// </summary>
     /// <value>
     /// The requested scopes.
     /// </value>
-    public ICollection<string> RequestedScopes { get; }
+    public Resources Resources { get; }
 
     /// <summary>
     /// Gets or sets the redirect URI.

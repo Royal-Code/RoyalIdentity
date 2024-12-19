@@ -53,18 +53,11 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         //////////////////////////////////////////////////////////
         // check for openid scope
         //////////////////////////////////////////////////////////
-        
-        context.IsOpenIdRequest = context.Resources.IsOpenId;
-        if (context.Resources.IdentityResources.Count is not 0 && !context.IsOpenIdRequest)
+        if (!context.Resources.IsOpenId && context.Resources.IdentityResources.Count is not 0)
         {
             logger.LogError(options, "Identity related scope requests, but no openid scope", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "Identity scopes requested, but openid scope is missing");
             return;
-        }
-
-        if (context.Resources.ApiScopes.Count is not 0)
-        {
-            context.IsApiResourceRequest = true;
         }
 
         await next();

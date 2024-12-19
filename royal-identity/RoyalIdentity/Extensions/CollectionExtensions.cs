@@ -188,4 +188,24 @@ internal static class CollectionExtensions
     {
         return collection is null || !collection.Any();
     }
+
+    public static bool None<T>(this ICollection<T> collection)
+    {
+        return collection.Count == 0;
+    }
+
+    public static bool None<T>(this IEnumerable<T> collection)
+    {
+        return !collection.Any();
+    }
+
+    public static bool Only<T>(this ICollection<T> collection, T value)
+    {
+        return collection.Count == 1 && collection.Contains(value);
+    }
+
+    public static bool Only<T>(this IEnumerable<T> collection, T value)
+    {
+        return collection.Count() == 1 && collection.Contains(value);
+    }
 }

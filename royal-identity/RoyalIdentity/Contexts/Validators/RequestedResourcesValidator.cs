@@ -22,54 +22,38 @@ public class RequestedResourcesValidator : IValidator<IAuthorizationContextBase>
 
     public ValueTask Validate(IAuthorizationContextBase context, CancellationToken ct)
     {
+        logger.LogDebug("Start validating requested resources.");
+
         context.AssertHasClient();
 
         //////////////////////////////////////////////////////////
         // check scope vs response_type plausibility
         //////////////////////////////////////////////////////////
-        var requirement = Constants.GetResponseTypeScopeRequirement(context.ResponseTypes);
-        var requireOpenId = requirement == Constants.ScopeRequirement.Identity
-            || requirement == Constants.ScopeRequirement.IdentityOnly;
-        if (requireOpenId && !context.IsOpenIdRequest)
+        if (context.ResponseTypes.Contains(ResponseTypes.IdToken) && !context.Resources.IsOpenId)
         {
             logger.LogError(options, "The parameter response_type requires the openid scope", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing openid scope");
             return default;
         }
 
-
-        //////////////////////////////////////////////////////////
-        // check id vs resource scopes and response types plausibility
-        //////////////////////////////////////////////////////////
-        var responseTypeValidationCheck = true;
-        switch (requirement)
+        if (context.ResponseTypes.Only(ResponseTypes.IdToken) &&
+            (context.Resources.ApiScopes.Any() || context.Resources.ApiResources.Any()))
         {
-            case Constants.ScopeRequirement.Identity:
-                if (!context.Resources.IdentityResources.Any())
-                {
-                    logger.LogError(options, "Requests for id_token response type must include identity scopes", context);
-                    responseTypeValidationCheck = false;
-                }
-                break;
-            case Constants.ScopeRequirement.IdentityOnly:
-                if (!context.Resources.IdentityResources.Any() || context.Resources.ApiScopes.Any())
-                {
-                    logger.LogError(options, "Requests for id_token response type only must not include resource scopes", context);
-                    responseTypeValidationCheck = false;
-                }
-                break;
-            case Constants.ScopeRequirement.ResourceOnly:
-                if (context.Resources.IdentityResources.Any() || !context.Resources.ApiScopes.Any())
-                {
-                    logger.LogError(options, "Requests for token response type only must include resource scopes, but no identity scopes.", context);
-                    responseTypeValidationCheck = false;
-                }
-                break;
+            logger.LogError(options, "Requests for id_token response type only must include identity scopes only", context);
+            context.InvalidRequest(AuthorizeErrors.InvalidScope, "resource scopes are not allowed for id_token response type only");
+            return default;
         }
 
-        if (!responseTypeValidationCheck)
+        if (context.ResponseTypes.Contains(ResponseTypes.Token) && !context.Resources.ApiScopes.Any())
         {
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "Invalid scope for response type");
+            logger.LogError(options, "The parameter response_type requires resource scopes", context);
+            context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing resource scopes");
+            return default;
+        }
+
+        if (context.ResponseTypes.Only(ResponseTypes.Token) && context.Resources.IdentityResources.Any())
+        {
+            logger.LogError(options, "Requests for token response type only must include resource scopes only", context);
         }
 
         return default;

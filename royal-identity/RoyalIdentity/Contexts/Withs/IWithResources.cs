@@ -13,25 +13,7 @@ public interface IWithResources : IWithClient
     public HashSet<string> RequestedScopes { get; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the request was an OpenID Connect request.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if the request was an OpenID Connect request; otherwise, <c>false</c>.
-    /// </value>
-    [Redesign("Pode ser obtido de Resources.IsOpenId")]
-    public bool IsOpenIdRequest { get; set; }
-
-    /// <summary>
     /// The resources of the result.
     /// </summary>
     public Resources Resources { get; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether this instance is API resource request.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if this instance is API resource request; otherwise, <c>false</c>.
-    /// </value>
-    [Redesign("Poderia ser incluído em Resources, outro detalhe, não foi usado para nada, apenas atribuído")]
-    public bool IsApiResourceRequest { get; set; }
 }

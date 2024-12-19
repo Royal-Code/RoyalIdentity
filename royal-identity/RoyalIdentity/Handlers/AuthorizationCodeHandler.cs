@@ -75,7 +75,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             logger.LogDebug("Refresh token issued");
         }
 
-        if (context.AuthorizationCode.IsOpenId)
+        if (context.AuthorizationCode.Resources.IsOpenId)
         {
             var idTokenRequest = new IdentityTokenRequest()
             {
@@ -98,7 +98,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             accessToken, 
             refreshToken, 
             identityToken, 
-            context.AuthorizationCode.RequestedScopes.ToSpaceSeparatedString());
+            context.AuthorizationCode.Resources.RequestedScopes.ToSpaceSeparatedString());
 
         await eventDispatcher.DispatchAsync(atEvent);
 

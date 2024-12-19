@@ -82,6 +82,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 return ValueTask.CompletedTask;
             }            
         }
+        else
+        {
+            // set default response_mode
+            if (responseTypes.Contains(ResponseTypes.Token) || responseTypes.Contains(ResponseTypes.IdToken))
+                context.ResponseMode = ResponseModes.FormPost;
+            else
+                context.ResponseMode = ResponseModes.Query;
+        }
 
 
         //////////////////////////////////////////////////////////
@@ -114,7 +122,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 return ValueTask.CompletedTask;
             }
         }
-        else if (context.IsOpenIdRequest)
+        else if (context.Resources.IsOpenId && context.ResponseTypes.Contains(ResponseTypes.Token))
         {
             logger.LogError(options, "Nonce required for implicit flow with openid scope", context);
             context.InvalidRequest("Invalid nonce", "required");
@@ -154,6 +162,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             return ValueTask.CompletedTask;
         }
 
+
         //////////////////////////////////////////////////////////
         // check acr_values
         //////////////////////////////////////////////////////////
@@ -167,6 +176,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 return ValueTask.CompletedTask;
             }
         }
+
 
         //////////////////////////////////////////////////////////
         // check custom acr_values: idp

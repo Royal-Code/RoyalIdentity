@@ -90,14 +90,6 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public HashSet<string> RequestedScopes => Resources.RequestedScopes;
 
     /// <summary>
-    /// Gets or sets a value indicating whether the request was an OpenID Connect request.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if the request was an OpenID Connect request; otherwise, <c>false</c>.
-    /// </value>
-    public bool IsOpenIdRequest { get; set; }
-
-    /// <summary>
     /// Gets or sets the nonce.
     /// </summary>
     /// <value>
@@ -120,14 +112,6 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// The hash of the <see cref="State"/>.
     /// </value>
     public string? StateHash { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether this instance is API resource request.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if this instance is API resource request; otherwise, <c>false</c>.
-    /// </value>
-    public bool IsApiResourceRequest { get; set; }
 
     /// <summary>
     /// Gets or sets the authentication context reference classes.

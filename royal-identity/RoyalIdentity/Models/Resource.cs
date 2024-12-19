@@ -38,7 +38,7 @@ public abstract class Resource
     /// <summary>
     /// List of associated user claims that should be included when this resource is requested.
     /// </summary>
-    public HashSet<string> UserClaims { get; } = [];
+    public HashSet<string> UserClaims { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the custom properties for the resource.

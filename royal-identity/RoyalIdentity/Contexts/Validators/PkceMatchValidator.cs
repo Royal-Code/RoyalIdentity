@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -34,7 +33,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         switch (context.AuthorizationCode.CodeChallengeMethod)
         {
             case OidcConstants.CodeChallengeMethods.Plain:
-            {
+
                 equals = TimeConstantComparer.IsEqual(
                     context.CodeVerifier.Sha256(),
                     context.AuthorizationCode.CodeChallenge);
@@ -43,14 +42,13 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
                     context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code verifier does not match code challenge");
 
                 break;
-            }
+
             case OidcConstants.CodeChallengeMethods.Sha256:
-            {
-                var codeVerifierBytes = Encoding.ASCII.GetBytes(context.CodeVerifier);
-                var transformedCodeVerifier = Base64Url.Encode(codeVerifierBytes.Sha256());
+
+                var transformedCodeVerifier = PkceHelper.GenerateCodeChallengeS256(context.CodeVerifier);
 
                 equals = TimeConstantComparer.IsEqual(
-                    transformedCodeVerifier.Sha256(),
+                    transformedCodeVerifier, 
                     context.AuthorizationCode.CodeChallenge);
 
                 if (!equals)
@@ -59,7 +57,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
                 }
 
                 break;
-            }
+
             default:
                 context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code challenge method is not supported");
                 break;

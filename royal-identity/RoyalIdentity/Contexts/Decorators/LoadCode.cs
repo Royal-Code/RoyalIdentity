@@ -82,14 +82,8 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
             return;
         }
 
-        // get the requested resources
-        var scopes = authorizationCode.RequestedScopes;
-        var resources = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);
-
-
-
         context.AuthorizationCode = authorizationCode;
-        context.Resources = resources;
+        context.Resources = authorizationCode.Resources;
         context.Items.GetOrCreate<Asserts>().HasCode = true;
 
         await next();

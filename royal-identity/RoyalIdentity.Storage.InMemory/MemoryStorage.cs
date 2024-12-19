@@ -35,7 +35,8 @@ public class MemoryStorage
             Description = "Your user identifier",
             Required = true,
             Emphasize = false,
-            ShowInDiscoveryDocument = true
+            ShowInDiscoveryDocument = true,
+            UserClaims = ["sub"]
         },
         ["profile"] = new IdentityResource
         {
@@ -44,7 +45,13 @@ public class MemoryStorage
             Description = "Your profile data",
             Required = false,
             Emphasize = false,
-            ShowInDiscoveryDocument = true
+            ShowInDiscoveryDocument = true,
+            UserClaims = 
+            [
+                "name", 
+                "family_name", "given_name", "middle_name", "nickname", "preferred_username", 
+                "profile", "picture", "website" 
+            ]
         },
         ["email"] = new IdentityResource
         {
@@ -53,7 +60,8 @@ public class MemoryStorage
             Description = "Your email address",
             Required = false,
             Emphasize = false,
-            ShowInDiscoveryDocument = true
+            ShowInDiscoveryDocument = true,
+            UserClaims = ["email", "email_verified"]
         }
     };
 

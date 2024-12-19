@@ -1,5 +1,4 @@
 using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 
