@@ -28,11 +28,11 @@ app.MapPost("account/login", async (HttpContext context, ISignInManager signInMa
     var username = context.Request.Form["username"].FirstOrDefault() ?? string.Empty;
     var password = context.Request.Form["password"].FirstOrDefault() ?? string.Empty;
 
-    var result = await signInManager.ValidateCredentialsAsync(username, password, context.RequestAborted);
+    var result = await signInManager.AuthenticateUserAsync(username, password, context.RequestAborted);
 
     if (result.Success)
     {
-        await signInManager.SignInAsync(result.User, result.Session, false, "pwd", context.RequestAborted);
+        await signInManager.SignInAsync(result.User, result.Session, false, context.RequestAborted);
         return Results.Ok();
     }
     else

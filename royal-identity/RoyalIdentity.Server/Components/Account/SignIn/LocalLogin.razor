@@ -70,7 +70,7 @@
     {
         var context = await SignInManager.GetAuthorizationContextAsync(Input.ReturnUrl, default);
 
-        var result = await SignInManager.ValidateCredentialsAsync(Input.Username!, Input.Password!, default);
+        var result = await SignInManager.AuthenticateUserAsync(Input.Username!, Input.Password!, default);
 
         if (!result.Success)
         {
@@ -84,7 +84,7 @@
         var evt2 = new UserLoginSuccessEvent(Input.Username!, user, context);
         await EventDispatcher.DispatchAsync(evt2);
 
-        await SignInManager.SignInAsync(user, result.Session, Input.RememberLogin, "pwd", default);
+        await SignInManager.SignInAsync(user, result.Session, Input.RememberLogin, default);
 
         if (context is not null)
         {

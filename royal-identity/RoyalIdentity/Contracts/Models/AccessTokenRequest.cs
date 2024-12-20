@@ -7,11 +7,15 @@ namespace RoyalIdentity.Contracts.Models;
 
 public class AccessTokenRequest
 {
+    [Obsolete]
     public required IWithClient Context { get; init; }
 
+    [Obsolete]
     public required NameValueCollection Raw { get; init; }
 
-    public required ClaimsPrincipal Subject { get; init; }
+    public required ClaimsPrincipal User { get; init; }
+
+    public required Client Client { get; init; }
 
     public required Resources Resources { get; init; }
 

@@ -2,6 +2,8 @@ using System.Security.Claims;
 
 namespace RoyalIdentity.Users.Contracts;
 
+#nullable disable // POCO
+
 public class UserDetails
 {
     public string Username { get; set; }
@@ -13,6 +15,8 @@ public class UserDetails
     public bool IsActive { get; set; }
 
     public int LoginAttemptsWithPasswordErrors { get; set; }
+
+    public HashSet<string> Roles { get; set; } = [];
 
     public HashSet<Claim> Claims { get; set; } = [];
 }

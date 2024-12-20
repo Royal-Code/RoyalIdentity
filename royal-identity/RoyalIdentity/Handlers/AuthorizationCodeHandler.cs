@@ -46,8 +46,9 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         {
             Context = context,
             Raw = context.Raw,
-            Subject = context.AuthorizationCode.Subject,
+            User = context.AuthorizationCode.Subject,
             Resources = context.Resources,
+            Client = context.Client,
             Confirmation = context.ClientSecret.Confirmation,
             Caller = nameof(AuthorizationCodeHandler)
         };

@@ -2,6 +2,9 @@
 
 namespace RoyalIdentity.Users;
 
+/// <summary>
+/// Represents the result of a credential validation.
+/// </summary>
 public readonly struct ValidateCredentialsResult
 {
     // implicit conversion from bool to ValidateCredentialsResult

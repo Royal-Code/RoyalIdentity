@@ -1,4 +1,5 @@
-﻿using RoyalIdentity.Options;
+﻿using RoyalIdentity.Extensions;
+using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 
@@ -109,10 +110,7 @@ public abstract class TokenBase
 
     public ClaimsPrincipal CreatePrincipal()
     {
-        var identity = new ClaimsIdentity(Claims,
-            Constants.ServerAuthenticationType, 
-            JwtClaimTypes.Subject,
-            JwtClaimTypes.Role);
+        var identity = Claims.CreateIdentity();
 
         return new ClaimsPrincipal(identity);
     }

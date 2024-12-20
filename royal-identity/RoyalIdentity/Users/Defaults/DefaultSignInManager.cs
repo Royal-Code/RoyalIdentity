@@ -76,7 +76,8 @@ public class DefaultSignInManager : ISignInManager
         return null;
     }
 
-    public async Task<CredentialsValidationResult> ValidateCredentialsAsync(string username, string password,
+    /// <inheritdoc />
+    public async Task<CredentialsValidationResult> AuthenticateUserAsync(string username, string password,
         CancellationToken ct)
     {
         var user = await userStore.GetUserAsync(username, ct);
@@ -95,7 +96,7 @@ public class DefaultSignInManager : ISignInManager
             return new CredentialsValidationResult(Blocked, accountOptions.BlockedUserErrorMessage);
         }
 
-        var validationResult = await user.ValidateCredentialsAsync(password, ct);
+        var validationResult = await user.AuthenticateAndStartSessionAsync(password, ct);
         if (!validationResult.IsValid)
         {
             return new CredentialsValidationResult(InvalidCredentials, accountOptions.InvalidCredentialsErrorMessage);
@@ -104,7 +105,7 @@ public class DefaultSignInManager : ISignInManager
         return new CredentialsValidationResult(user, validationResult.Session);
     }
 
-    public async Task SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, string amr, CancellationToken ct)
+    public async Task SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, CancellationToken ct)
     {
         var httpContext = httpContextAccessor.HttpContext 
             ?? throw new InvalidOperationException("HttpContext is required for SignInAsync");
@@ -121,7 +122,7 @@ public class DefaultSignInManager : ISignInManager
             };
         }
 
-        var principal = await user.CreatePrincipalAsync(session, amr, ct);
+        var principal = await user.CreatePrincipalAsync(session, ct);
 
         var sid = principal.FindFirst(JwtClaimTypes.SessionId);
         if (sid is null)

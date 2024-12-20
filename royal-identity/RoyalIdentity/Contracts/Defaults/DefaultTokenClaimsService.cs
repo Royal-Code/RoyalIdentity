@@ -87,32 +87,25 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         CancellationToken ct)
     {
         context.AssertHasClient();
+        Client client = context.Client;
 
-        logger.LogDebug("Getting claims for access token for client: {ClientId}", context.Client.Id);
+        logger.LogDebug("Getting claims for access token for client: {ClientId}", client.Id);
 
         var outputClaims = new List<Claim>
         {
-            new(JwtClaimTypes.ClientId, context.ClientId)
+            new(JwtClaimTypes.ClientId, client.Id)
         };
 
-        // log if client ID is overwritten
-        if (!string.Equals(context.ClientId, context.Client.Id))
-        {
-            logger.LogDebug("Client {ClientId} is impersonating {ImpersonatedClientId}",
-                context.Client.Id,
-                context.ClientId);
-        }
-
         // check for client claims
-        if (context.Client.Claims.Count is not 0 && context.Client.AlwaysSendClientClaims)
+        if (client.Claims.Count is not 0 && client.AlwaysSendClientClaims)
         {
-            foreach (var claim in context.ClientClaims)
+            foreach (var claim in client.Claims)
             {
                 var claimType = claim.Type;
 
-                if (context.Client.ClientClaimsPrefix.IsPresent())
+                if (client.ClientClaimsPrefix.IsPresent())
                 {
-                    claimType = context.Client.ClientClaimsPrefix + claimType;
+                    claimType = client.ClientClaimsPrefix + claimType;
                 }
 
                 outputClaims.Add(new Claim(claimType, claim.Value, claim.ValueType));
@@ -138,7 +131,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             context,
             resources,
             subject,
-            context.Client,
+            client,
             ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
             additionalClaimTypes.Distinct());
 

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
-using RoyalIdentity.Utils;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Users.Defaults;
 
@@ -35,7 +35,7 @@ public sealed class DefaultIdentityUser : IdentityUser
 
     public override bool IsActive => details.IsActive;
 
-    public override async ValueTask<ValidateCredentialsResult> ValidateCredentialsAsync(string password, CancellationToken ct = default)
+    public override async ValueTask<ValidateCredentialsResult> AuthenticateAndStartSessionAsync(string password, CancellationToken ct = default)
     {
         var isValid = await passwordProtector.VerifyPasswordAsync(password, details.PasswordHash, ct);
         if (!isValid)
@@ -52,7 +52,7 @@ public sealed class DefaultIdentityUser : IdentityUser
         }
 
         // start a new session
-        var session = await sessionStore.StartSessionAsync(details.Username, ct);
+        var session = await sessionStore.StartSessionAsync(this, AuthenticationMethods.Password, ct);
 
         return session;
     }
@@ -64,7 +64,7 @@ public sealed class DefaultIdentityUser : IdentityUser
     }
 
     public override async ValueTask<ClaimsPrincipal> CreatePrincipalAsync(
-        IdentitySession? session, string? amr, CancellationToken ct = default)
+        IdentitySession? session, CancellationToken ct = default)
     {
         // check if session was created, if not, load it
         var currentSession = session ?? await sessionStore.GetCurrentSessionAsync(ct);
@@ -78,19 +78,16 @@ public sealed class DefaultIdentityUser : IdentityUser
             new(JwtClaimTypes.Name, details.DisplayName),
             new(JwtClaimTypes.AuthenticationTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
             new(JwtClaimTypes.SessionId, currentSession.Id),
-            new(JwtClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider)
+            new(JwtClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
+            new(JwtClaimTypes.AuthenticationMethod, currentSession.Amr)
         };
 
-        if (amr.IsPresent())
-            claims.Add(new(JwtClaimTypes.AuthenticationMethod, amr));
+        foreach (var role in details.Roles)
+            claims.Add(new(JwtClaimTypes.Role, role));
 
         claims.AddRange(details.Claims);
 
-        var identity = new ClaimsIdentity(
-            claims.Distinct(new ClaimComparer()),
-            Constants.ServerAuthenticationType,
-            JwtClaimTypes.Subject,
-            JwtClaimTypes.Role);
+        var identity = claims.CreateIdentity();
 
         return new ClaimsPrincipal(identity);
     }

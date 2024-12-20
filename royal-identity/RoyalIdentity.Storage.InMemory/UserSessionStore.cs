@@ -29,14 +29,15 @@ public class UserSessionStore : IUserSessionStore
         return Task.CompletedTask;
     }
 
-    public Task<IdentitySession> StartSessionAsync(string username, CancellationToken ct = default)
+    public Task<IdentitySession> StartSessionAsync(IdentityUser user, string amr, CancellationToken ct = default)
     {
-        var sid = Base64Url.Encode(CryptoRandom.CreateRandomKey(16));
+        var sid = CryptoRandom.CreateUniqueId(16);
 
         var session = new IdentitySession
         {
             Id = sid,
-            Username = username,
+            User = user,
+            Amr = amr,
             StartedAt = clock.GetUtcNow().UtcDateTime,
         };
 

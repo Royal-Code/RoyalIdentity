@@ -14,10 +14,11 @@ public interface IUserSessionStore
     /// <summary>
     /// Initializes a new session for the user.
     /// </summary>
-    /// <param name="username">The username.</param>
+    /// <param name="user">The user.</param>
+    /// <param name="amr">The authentication method reference.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>The session identifier.</returns>
-    public Task<IdentitySession> StartSessionAsync(string username, CancellationToken ct = default);
+    public Task<IdentitySession> StartSessionAsync(IdentityUser user, string amr, CancellationToken ct = default);
 
     /// <summary>
     /// Ends a user session and returns the <see cref="IdentitySession"/> instance if exists.

@@ -73,11 +73,12 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 
             var request = new AccessTokenRequest()
             {
-                Caller = nameof(RefreshTokenHandler),
                 Context = context,
                 Raw = context.Raw,
+                User = context.GetSubject()!,
+                Client = context.Client,
                 Resources = resources,
-                Subject = context.GetSubject()!
+                Caller = nameof(RefreshTokenHandler),
             };
 
             newAccessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);

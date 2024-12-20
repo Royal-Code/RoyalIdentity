@@ -35,6 +35,8 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
     {
         logger.LogDebug("Handle authorize context start");
 
+        context.AssertHasClient();
+
         string? codeValue = null;
         string? sessionState = null;
         string? accessTokenValue = null;
@@ -61,9 +63,10 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             var request = new AccessTokenRequest()
             {
                 Context = context,
-                Subject = context.Subject,
-                Resources = context.Resources,
                 Raw = context.Raw,
+                User = context.Subject,
+                Client = context.Client,
+                Resources = context.Resources,
                 Caller = ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken
             };
 

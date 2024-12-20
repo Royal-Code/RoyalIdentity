@@ -8,6 +8,7 @@ using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Users.Defaults;
 
+[Obsolete("Remover - Redesign para IUserSessionStore")]
 public class DefaultUserSession : IUserSession
 {
     private readonly IHttpContextAccessor httpContextAccessor;

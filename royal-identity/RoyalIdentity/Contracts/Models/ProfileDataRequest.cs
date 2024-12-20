@@ -41,15 +41,8 @@ public class ProfileDataRequest
     /// <value>
     /// The validatedRequest.
     /// </value>
+    [Obsolete]
     public IEndpointContextBase Context { get; }
-
-    /// <summary>
-    /// Gets or sets the requested resources (if available).
-    /// </summary>
-    /// <value>
-    /// The resources.
-    /// </value>
-    public Resources RequestedResources { get; }
 
     /// <summary>
     /// Gets or sets the subject.
@@ -58,6 +51,14 @@ public class ProfileDataRequest
     /// The subject.
     /// </value>
     public ClaimsPrincipal Subject { get; }
+
+    /// <summary>
+    /// Gets or sets the requested resources (if available).
+    /// </summary>
+    /// <value>
+    /// The resources.
+    /// </value>
+    public Resources RequestedResources { get; }
 
     /// <summary>
     /// Gets or sets the requested claim types.

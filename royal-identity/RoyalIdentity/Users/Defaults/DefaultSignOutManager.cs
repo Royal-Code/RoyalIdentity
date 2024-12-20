@@ -131,7 +131,7 @@ public class DefaultSignOutManager : ISignOutManager
                     {
                         ClientId = clientId,
                         Issuer = iss,
-                        Subject = session.Username,
+                        Subject = session.User.UserName,
                         SessionId = session.Id,
                         Audience = clientId,
                         Uri = uri,

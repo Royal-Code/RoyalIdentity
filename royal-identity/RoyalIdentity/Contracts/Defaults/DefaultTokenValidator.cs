@@ -118,11 +118,7 @@ public class DefaultTokenValidator : ITokenValidator
             });
         }
 
-        var identity = new ClaimsIdentity(
-            token.Claims.Distinct(new ClaimComparer()),
-            Constants.ServerAuthenticationType,
-            JwtClaimTypes.Subject,
-            JwtClaimTypes.Role);
+        var identity = token.Claims.CreateIdentity();
 
         var principal = new ClaimsPrincipal(identity);
 

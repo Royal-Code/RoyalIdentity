@@ -8,11 +8,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class AuthorizeTests : IClassFixture<AppFactory>
+public class CodeAuthorizeTests : IClassFixture<AppFactory>
 {
     private readonly AppFactory factory;
 
-    public AuthorizeTests(AppFactory factory)
+    public CodeAuthorizeTests(AppFactory factory)
     {
         this.factory = factory;
     }

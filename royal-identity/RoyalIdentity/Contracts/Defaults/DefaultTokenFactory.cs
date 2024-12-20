@@ -50,7 +50,7 @@ public class DefaultTokenFactory : ITokenFactory
 
         var claims = new List<Claim>();
         claims.AddRange(await tokenClaimsService.GetAccessTokenClaimsAsync(
-            request.Subject,
+            request.User,
             request.Resources,
             request.Context,
             ct));
@@ -62,7 +62,7 @@ public class DefaultTokenFactory : ITokenFactory
         }
 
         // add session id claim
-        var sid = request.Subject.GetSessionId();
+        var sid = request.User.GetSessionId();
         claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
 
         // iat claim as required by JWT profile

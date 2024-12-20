@@ -41,6 +41,17 @@ internal static class ClaimsExtensions
         return d;
     }
 
+    public static ClaimsIdentity CreateIdentity(this IEnumerable<Claim> claims)
+    {
+        var identity = new ClaimsIdentity(
+            claims.Distinct(new ClaimComparer()),
+            Constants.ServerAuthenticationType,
+            JwtClaimTypes.Subject,
+            JwtClaimTypes.Role);
+
+        return identity;
+    }
+
     private static object GetValue(Claim claim)
     {
         if ((claim.ValueType == ClaimValueTypes.Integer ||
