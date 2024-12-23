@@ -13,7 +13,7 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultTokenFactory : ITokenFactory
 {
-    private readonly IOptions<ServerOptions> options;
+    private readonly ServerOptions options;
     private readonly ITokenClaimsService tokenClaimsService;
     private readonly IJwtFactory jwtFactory;
     private readonly IAccessTokenStore accessTokenStore;
@@ -32,7 +32,7 @@ public class DefaultTokenFactory : ITokenFactory
         TimeProvider clock,
         ILogger<DefaultTokenFactory> logger)
     {
-        this.options = options;
+        this.options = options.Value;
         this.tokenClaimsService = tokenClaimsService;
         this.jwtFactory = jwtFactory;
         this.accessTokenStore = accessTokenStore;
@@ -46,17 +46,15 @@ public class DefaultTokenFactory : ITokenFactory
     {
         logger.LogDebug("Creating access token");
 
-        request.Context.AssertHasClient();
-
         var claims = new List<Claim>();
         claims.AddRange(await tokenClaimsService.GetAccessTokenClaimsAsync(
             request.User,
             request.Resources,
-            request.Context,
+            request.Client,
             ct));
 
         var jti = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex);
-        if (request.Context.Client.IncludeJwtId)
+        if (request.Client.IncludeJwtId)
         {
             claims.Add(new Claim(JwtClaimTypes.JwtId, jti));
         }
@@ -69,14 +67,14 @@ public class DefaultTokenFactory : ITokenFactory
         claims.Add(new Claim(JwtClaimTypes.IssuedAt, clock.GetUtcNow().ToUnixTimeSeconds().ToString(),
             ClaimValueTypes.Integer64));
 
-        var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
+        var issuer = request.HttpContext.GetServerIssuerUri(options);
 
         var token = new AccessToken(
-            request.Context.Client.Id,
+            request.Client.Id,
             issuer,
             AccessTokenType.Jwt,
             clock.GetUtcNow().UtcDateTime,
-            request.Context.Client.AccessTokenLifetime,
+            request.Client.AccessTokenLifetime,
             jti,
             OidcConstants.TokenResponse.BearerTokenType)
         {
@@ -93,7 +91,7 @@ public class DefaultTokenFactory : ITokenFactory
         // add client_id to audiences if is openid
         if (request.Resources.IsOpenId)
         {
-            token.Audiences.Add(request.Context.Client.Id);
+            token.Audiences.Add(request.Client.Id);
         }
 
         // add cnf if present
@@ -103,9 +101,9 @@ public class DefaultTokenFactory : ITokenFactory
         }
         else
         {
-            if (options.Value.MutualTls.AlwaysEmitConfirmationClaim)
+            if (options.MutualTls.AlwaysEmitConfirmationClaim)
             {
-                var clientCertificate = await request.Context.HttpContext.Connection.GetClientCertificateAsync(ct);
+                var clientCertificate = await request.HttpContext.Connection.GetClientCertificateAsync(ct);
                 if (clientCertificate is not null)
                 {
                     token.Confirmation = clientCertificate.CreateThumbprintCnf();
@@ -129,10 +127,10 @@ public class DefaultTokenFactory : ITokenFactory
     {
         logger.LogDebug("Creating access token");
 
-        request.Context.AssertHasClient();
+        var client = request.Client;
 
         var credential = await keys.GetSigningCredentialsAsync(
-            request.Context.Client.AllowedIdentityTokenSigningAlgorithms, 
+            client.AllowedIdentityTokenSigningAlgorithms, 
             ct)
             ?? throw new InvalidOperationException("No signing credential is configured.");
             
@@ -176,28 +174,28 @@ public class DefaultTokenFactory : ITokenFactory
         }
 
         // add sid
-        var sid = request.Subject.GetSessionId();
+        var sid = request.User.GetSessionId();
         claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
 
         claims.AddRange(await tokenClaimsService.GetIdentityTokenClaimsAsync(
-            request.Subject,
+            request.User,
             request.Resources,
+            client,
             request.AccessTokenToHash.IsPresent(),
-            request.Context,
             ct));
 
         // add client_id to audiences if is openid
         if (request.Resources.IsOpenId)
         {
-            claims.Add(new Claim(JwtClaimTypes.Audience, request.Context.Client.Id));
+            claims.Add(new Claim(JwtClaimTypes.Audience, client.Id));
         }
 
-        var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
+        var issuer = request.HttpContext.GetServerIssuerUri(options);
 
-        var idToken = new IdentityToken(request.Context.Client.Id,
+        var idToken = new IdentityToken(client.Id,
             issuer,
             clock.GetUtcNow().UtcDateTime,
-            request.Context.Client.IdentityTokenLifetime)
+            client.IdentityTokenLifetime)
         {
             AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
         };
@@ -213,8 +211,7 @@ public class DefaultTokenFactory : ITokenFactory
     {
         logger.LogDebug("Creating refresh token");
 
-        request.Context.AssertHasClient();
-        Client client = request.Context.Client;
+        Client client = request.Client;
 
         int lifetime;
         if (client.RefreshTokenExpiration == TokenExpiration.Absolute)
@@ -241,7 +238,7 @@ public class DefaultTokenFactory : ITokenFactory
             logger.LogDebug("Setting a sliding lifetime: {SlidingLifetime}", lifetime);
         }
 
-        var issuer = request.Context.HttpContext.GetServerIssuerUri(options.Value);
+        var issuer = request.HttpContext.GetServerIssuerUri(options);
         var tokenItSelf = CryptoRandom.CreateUniqueId();
         
         var refreshToken = new RefreshToken(

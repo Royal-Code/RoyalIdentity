@@ -13,36 +13,24 @@ public class ProfileDataRequest
     /// <summary>
     /// Initializes a new instance of the <see cref="ProfileDataRequest" /> class.
     /// </summary>
-    /// <param name="context">The context.</param>
     /// <param name="requestedResources">The requested resources.</param>
     /// <param name="subject">The subject.</param>
     /// <param name="client">The client.</param>
     /// <param name="caller">The caller.</param>
     /// <param name="requestedClaimTypes">The requested claim types.</param>
     public ProfileDataRequest(
-        IEndpointContextBase context,
         Resources requestedResources,
         ClaimsPrincipal subject,
         Client client,
         string caller,
-        IEnumerable<string> requestedClaimTypes)
+        IReadOnlyList<string> requestedClaimTypes)
     {
-        Context = context;
         RequestedResources = requestedResources;
         Subject = subject;
         Client = client;
         Caller = caller;
         RequestedClaimTypes = requestedClaimTypes;
     }
-
-    /// <summary>
-    /// Gets or sets the validatedRequest.
-    /// </summary>
-    /// <value>
-    /// The validatedRequest.
-    /// </value>
-    [Obsolete]
-    public IEndpointContextBase Context { get; }
 
     /// <summary>
     /// Gets or sets the subject.
@@ -66,7 +54,7 @@ public class ProfileDataRequest
     /// <value>
     /// The requested claim types.
     /// </value>
-    public IEnumerable<string> RequestedClaimTypes { get; }
+    public IReadOnlyList<string> RequestedClaimTypes { get; }
 
     /// <summary>
     /// Gets or sets the client id.

@@ -73,8 +73,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 
             var request = new AccessTokenRequest()
             {
-                Context = context,
-                Raw = context.Raw,
+                HttpContext = context.HttpContext,
                 User = context.GetSubject()!,
                 Client = context.Client,
                 Resources = resources,
@@ -132,9 +131,9 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 
             var refreshTokenRequest = new RefreshTokenRequest()
             {
-                Context = context,
-                Raw = context.Raw,
+                HttpContext = context.HttpContext,
                 Subject = subject,
+                Client = context.Client,
                 AccessToken = accessToken,
                 Caller = nameof(AuthorizationCodeHandler)
             };
@@ -153,9 +152,9 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 
             var idTokenRequest = new IdentityTokenRequest()
             {
-                Context = context,
-                Raw = context.Raw,
-                Subject = subject,
+                HttpContext = context.HttpContext,
+                User = subject,
+                Client = context.Client,
                 Resources = resources,
                 Caller = nameof(AuthorizationCodeHandler),
                 AccessTokenToHash = accessToken.Token,

@@ -68,7 +68,7 @@ public class TokenResponse : IResponseHandler
         var values = new TokenEndpointValues()
         {
             AccessToken = AccessToken.Token,
-            tokenType = AccessToken.TokenType,
+            TokenType = AccessToken.TokenType,
             ExpiresIn = AccessToken.Lifetime,
             RefreshToken = RefreshToken?.Token,
             IdentityToken = IdentityToken?.Token,

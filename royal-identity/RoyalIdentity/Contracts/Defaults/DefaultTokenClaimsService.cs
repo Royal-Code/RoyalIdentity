@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
-using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
@@ -25,42 +24,26 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     public async Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(
         ClaimsPrincipal subject,
         Resources resources,
+        Client client,
         bool includeAllIdentityClaims,
-        IWithClient context, 
         CancellationToken ct)
     {
-        context.AssertHasClient();
-
         logger.LogDebug("Getting claims for identity token for subject: {Subject} and client: {ClientId}",
             subject.GetSubjectId(),
-            context.Client.Id);
+            client.Id);
 
         var outputClaims = new List<Claim>(GetStandardSubjectClaims(subject));
         outputClaims.AddRange(GetOptionalClaims(subject));
 
         // fetch all identity claims that need to go into the id token
-        if (includeAllIdentityClaims || context.Client.AlwaysIncludeUserClaimsInIdToken)
+        if (includeAllIdentityClaims || client.AlwaysIncludeUserClaimsInIdToken)
         {
-            var additionalClaimTypes = new List<string>();
-
-            foreach (var identityResource in resources.IdentityResources)
-            {
-                foreach (var userClaim in identityResource.UserClaims)
-                {
-                    additionalClaimTypes.Add(userClaim);
-                }
-            }
-
-            // filter so we don't ask for claim types that we will eventually filter out
-            additionalClaimTypes = FilterRequestedClaimTypes(additionalClaimTypes).ToList();
-
             var profileDataRequest = new ProfileDataRequest(
-                context,
                 resources,
                 subject,
-                context.Client,
+                client,
                 ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
-                additionalClaimTypes.Distinct());
+                resources.RequestedIdentityClaimTypes());
 
             await profileService.GetProfileDataAsync(profileDataRequest, ct);
 
@@ -83,12 +66,9 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     public async Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(
         ClaimsPrincipal subject,
         Resources resources,
-        IWithClient context,
+        Client client,
         CancellationToken ct)
     {
-        context.AssertHasClient();
-        Client client = context.Client;
-
         logger.LogDebug("Getting claims for access token for client: {ClientId}", client.Id);
 
         var outputClaims = new List<Claim>
@@ -120,20 +100,12 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         outputClaims.AddRange(GetStandardSubjectClaims(subject));
         outputClaims.AddRange(GetOptionalClaims(subject));
 
-        // fetch all resource claims that need to go into the access token
-        var additionalClaimTypes = resources.ApiResources.SelectMany(api => api.UserClaims).ToList();
-        additionalClaimTypes.AddRange(resources.ApiScopes.SelectMany(scope => scope.UserClaims));
-
-        // filter so we don't ask for claim types that we will eventually filter out
-        additionalClaimTypes = FilterRequestedClaimTypes(additionalClaimTypes).ToList();
-
         var profileDataRequest = new ProfileDataRequest(
-            context,
             resources,
             subject,
             client,
             ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
-            additionalClaimTypes.Distinct());
+            resources.RequestedResourcesClaimTypes());
 
         await profileService.GetProfileDataAsync(profileDataRequest, ct);
 
@@ -193,16 +165,6 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             logger.LogDebug("Claim types that were filtered: {ClaimTypes}", claimsToFilter.Select(x => x.Type));
 
         return claims.Except(claimsToFilter);
-    }
-
-    /// <summary>
-    /// Filters out protocol claims like amr, nonce etc..
-    /// </summary>
-    /// <param name="claimTypes">The claim types.</param>
-    protected virtual IEnumerable<string> FilterRequestedClaimTypes(List<string> claimTypes)
-    {
-        var claimTypesToFilter = claimTypes.Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x));
-        return claimTypes.Except(claimTypesToFilter);
     }
 
     /// <summary>

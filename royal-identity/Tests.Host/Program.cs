@@ -1,7 +1,11 @@
 using Polly;
+using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Handlers;
+using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Utils;
@@ -83,7 +87,8 @@ app.MapGet("account/logout", async (HttpContext context, IMessageStore messageSt
     return Results.Ok();
 });
 
-app.MapGet("account/token", async (HttpContext context, JwtUtil util) =>
+app.MapGet("account/token", async (HttpContext context, 
+    IClientStore clients, IResourceStore resources, ITokenFactory tokenFactory) =>
 {
     var user = context.User;
     if (user.Identity?.IsAuthenticated != true)
@@ -96,10 +101,57 @@ app.MapGet("account/token", async (HttpContext context, JwtUtil util) =>
     {
         return Results.BadRequest("client_id is required");
     }
+    var client = await clients.FindEnabledClientByIdAsync(clientId, context.RequestAborted);
+    if (client is null)
+    {
+        return Results.BadRequest("client_id is invalid");
+    }
 
-    var token = await util.IssueJwtAsync(clientId, 600, user.Claims);
+    var scope = context.Request.Query["scope"].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(scope))
+    {
+        return Results.BadRequest("scope is required");
+    }
+    var requestedResources = await resources.FindResourcesByScopeAsync(scope.Split(' '), true, context.RequestAborted);
+    if (requestedResources is null)
+    {
+        return Results.BadRequest("scope is invalid");
+    }
 
-    return Results.Ok(new { access_token = token });
+    var accessTokenRequest = new AccessTokenRequest
+    {
+        HttpContext = context,
+        User = user,
+        Resources = requestedResources,
+        Client = client,
+        Caller = nameof(AuthorizationCodeHandler)
+    };
+
+    var token = await tokenFactory.CreateAccessTokenAsync(accessTokenRequest, context.RequestAborted);
+
+    var refreshToken = default(RefreshToken);
+    if (requestedResources.OfflineAccess)
+    {
+        var refreshTokenRequest = new RefreshTokenRequest
+        {
+            HttpContext = context,
+            Subject = user,
+            Client = client,
+            AccessToken = token,
+            Caller = nameof(AuthorizationCodeHandler)
+        };
+
+        refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, context.RequestAborted);
+    }
+
+    return Results.Ok(new 
+    { 
+        access_token = token.Token,
+        token_type = "Bearer",
+        expires_in = token.Lifetime,
+        refresh_token = refreshToken?.Token,
+        scope = scope   
+    });
 });
 
 app.Run();

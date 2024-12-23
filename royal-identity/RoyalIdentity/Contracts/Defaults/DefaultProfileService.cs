@@ -2,6 +2,7 @@
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
+using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
 using System.Security.Claims;
 
@@ -23,10 +24,18 @@ public class DefaultProfileService : IProfileService
         this.logger = logger;
     }
 
-    public ValueTask GetProfileDataAsync(ProfileDataRequest request, CancellationToken ct)
+    public async ValueTask GetProfileDataAsync(ProfileDataRequest request, CancellationToken ct)
     {
-        request.IssuedClaims.AddRange(request.Subject.Claims);
-        return ValueTask.CompletedTask;
+        var userDetails = await userDetailsStore.GetUserDetailsAsync(request.Subject.GetSubjectId(), ct);
+        if (userDetails is null || !userDetails.IsActive)
+            return;
+
+        // add the user's roles to the claims
+        request.IssuedClaims.AddRange(userDetails.Roles.Select(r => new Claim(JwtClaimTypes.Role, r)));
+
+        // filter the requested claims
+        var requestedClaim = request.RequestedClaimTypes;
+        request.IssuedClaims.AddRange(userDetails.Claims.Where(c => requestedClaim.Contains(c.Type)));
     }
 
     public async ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller, CancellationToken ct)

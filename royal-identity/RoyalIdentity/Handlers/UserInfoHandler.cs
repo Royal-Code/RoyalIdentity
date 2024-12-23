@@ -33,15 +33,13 @@ public class UserInfoHandler : IHandler<UserInfoContext>
 
         var scopes = context.EvaluatedToken.Principal.Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
         var resources = await resourceStore.FindResourcesByScopeAsync(scopes);
-        var requestedClaims = resources.IdentityResources.SelectMany(r => r.UserClaims);
 
         var request = new ProfileDataRequest(
-            context,
             resources,
             context.EvaluatedToken.Principal,
             context.EvaluatedToken.Client,
             nameof(UserInfoHandler),
-            requestedClaims);
+            resources.RequestedIdentityClaimTypes());
 
         await profileService.GetProfileDataAsync(request, ct);
 

@@ -1,4 +1,8 @@
-﻿namespace Tests.Integration.Prepare;
+﻿using RoyalIdentity.Extensions;
+using RoyalIdentity.Responses.HttpResults;
+using System.Text.Json;
+
+namespace Tests.Integration.Prepare;
 
 internal static class LoginExtensions
 {
@@ -19,8 +23,19 @@ internal static class LoginExtensions
         await LoginAsync(client, "alice", "alice");
     }
 
-    public static async Task LoginbobAsync(this HttpClient client)
+    public static async Task LoginBobAsync(this HttpClient client)
     {
         await LoginAsync(client, "bob", "bob");
+    }
+
+    public static async Task<TokenEndpointValues> GetTokenAsync(this HttpClient client, string clientId, string scope)
+    {
+        var path = "account/token".AddQueryString("client_id", clientId).AddQueryString("scope", scope);
+
+        var response = await client.GetAsync(path);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<TokenEndpointValues>(json)!;
     }
 }

@@ -1,17 +1,16 @@
 ﻿using RoyalIdentity.Models;
-using System.Collections.Specialized;
 using System.Security.Claims;
-using RoyalIdentity.Contexts.Withs;
+using Microsoft.AspNetCore.Http;
 
 namespace RoyalIdentity.Contracts.Models;
 
 public class AccessTokenRequest
 {
-    [Obsolete]
-    public required IWithClient Context { get; init; }
-
-    [Obsolete]
-    public required NameValueCollection Raw { get; init; }
+    /// <summary>
+    /// The HttpContext for the current request.
+    /// This is used to get the issuer name for the access token and for mutual TLS authentication.
+    /// </summary>
+    public required HttpContext HttpContext { get; init; }
 
     public required ClaimsPrincipal User { get; init; }
 

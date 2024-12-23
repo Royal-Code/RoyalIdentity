@@ -62,8 +62,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
         {
             var request = new AccessTokenRequest()
             {
-                Context = context,
-                Raw = context.Raw,
+                HttpContext = context.HttpContext,
                 User = context.Subject,
                 Client = context.Client,
                 Resources = context.Resources,
@@ -85,10 +84,10 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
         {
             var tokenRequest = new IdentityTokenRequest
             {
-                Context = context,
-                Subject = context.Subject,
+                HttpContext = context.HttpContext,
+                User = context.Subject,
+                Client = context.Client,
                 Resources = context.Resources,
-                Raw = context.Raw,
                 Caller = ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
                 Nonce = context.Nonce,
                 AccessTokenToHash = accessTokenValue,

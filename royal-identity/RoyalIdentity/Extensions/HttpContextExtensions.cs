@@ -150,9 +150,10 @@ public static class HttpContextExtensions
         if (options.LowerCaseIssuerUri)
             uri = uri.ToLowerInvariant();
 
-        options.IssuerUri = uri;
+        if(!options.MutualTls.Enabled)
+            options.IssuerUri = uri;
 
-        return options.IssuerUri;
+        return uri;
     }
 
     public static async Task<bool> ValidateUserSessionAsync(this HttpContext context, ClaimsPrincipal principal)

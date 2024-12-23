@@ -305,7 +305,7 @@ internal static class Constants
         // filter list for claims returned from profile service prior to creating tokens
         public static readonly string[] ClaimsServiceFilterClaimTypes =
         [
-            // TODO: consider JwtClaimTypes.AuthenticationContextClassReference,
+            JwtClaimTypes.AuthenticationContextClassReference,
             JwtClaimTypes.AccessTokenHash,
             JwtClaimTypes.Audience,
             JwtClaimTypes.AuthenticationMethod,
@@ -1243,6 +1243,7 @@ public static class ServerConstants
         public const string JsonWebKey = "JWK";
     }
 
+    [Redesign("Ver onde chama e atualizar todos lugares para nomes melhores.")]
     public static class ProfileDataCallers
     {
         public const string UserInfoEndpoint = "UserInfoEndpoint";

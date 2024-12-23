@@ -51,4 +51,22 @@ public class LoginTests : IClassFixture<AppFactory>
         Assert.NotNull(response);
         Assert.True(response.IsSuccessStatusCode);
     }
+
+    [Fact]
+    public async Task Login_GetToken()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+        
+        // Act
+        await client.LoginAliceAsync();
+        var token = await client.GetTokenAsync("demo_client", "openid profile offline_access");
+
+        // Assert
+        Assert.NotNull(token);
+        Assert.NotNull(token.AccessToken);
+        Assert.NotNull(token.TokenType);
+        Assert.NotEqual(0, token.ExpiresIn);
+        Assert.NotNull(token.RefreshToken);
+    }
 }

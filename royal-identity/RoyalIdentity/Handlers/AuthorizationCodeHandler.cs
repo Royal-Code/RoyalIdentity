@@ -44,8 +44,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
 
         var accessTokenRequest = new AccessTokenRequest
         {
-            Context = context,
-            Raw = context.Raw,
+            HttpContext = context.HttpContext,
             User = context.AuthorizationCode.Subject,
             Resources = context.Resources,
             Client = context.Client,
@@ -63,9 +62,9 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         {
             var refreshTokenRequest = new RefreshTokenRequest()
             {
-                Context = context,
-                Raw = context.Raw,
+                HttpContext = context.HttpContext,
                 Subject = context.AuthorizationCode.Subject,
+                Client = context.Client,
                 AccessToken = accessToken,
                 Caller = nameof(AuthorizationCodeHandler)
             };
@@ -80,9 +79,9 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         {
             var idTokenRequest = new IdentityTokenRequest()
             {
-                Context = context,
-                Raw = context.Raw,
-                Subject = context.AuthorizationCode.Subject,
+                HttpContext = context.HttpContext,
+                User = context.AuthorizationCode.Subject,
+                Client = context.Client,
                 Resources = context.Resources,
                 Caller = nameof(AuthorizationCodeHandler),
                 Nonce = context.AuthorizationCode.Nonce,
