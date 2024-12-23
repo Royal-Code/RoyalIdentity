@@ -222,7 +222,7 @@ public class Client
     public bool UpdateAccessTokenClaimsOnRefresh { get; set; } = false;
 
     /// <summary>
-    /// Specifies whether the logout process can be terminated without user confirmation.
+    /// Specifies whether the logout process can be terminated without user confirmation. Defaults is <c>false</c>.
     /// </summary>
     public bool AllowLogoutWithoutUserConfirmation { get; set; } = false;
 

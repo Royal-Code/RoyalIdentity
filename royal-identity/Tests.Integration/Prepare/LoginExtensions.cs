@@ -1,6 +1,7 @@
 ﻿using RoyalIdentity.Extensions;
 using RoyalIdentity.Responses.HttpResults;
 using System.Text.Json;
+using System.Web;
 
 namespace Tests.Integration.Prepare;
 
@@ -40,5 +41,31 @@ internal static class LoginExtensions
 
         var json = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<TokenEndpointValues>(json)!;
+    }
+
+    public static async Task<string?> GetAuthorizeAsync(
+        this HttpClient client,
+        string clientId = "demo_client",
+        string scope = "openid profile offline_access",
+        string redirectUri = "http://localhost:5000/callback")
+    {
+        var path = "/connect/authorize"
+            .AddQueryString("client_id", clientId)
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", scope)
+            .AddQueryString("redirect_uri", redirectUri)
+            .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            .AddQueryString("code_challenge_method", "S256");
+
+        var response = await client.GetAsync(path);
+
+        var location = response.Headers.Location;
+
+        if (location is null)
+            return null;
+
+        var parameters = HttpUtility.ParseQueryString(location.Query);
+        return parameters["code"];
     }
 }
