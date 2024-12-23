@@ -28,7 +28,10 @@ internal static class LoginExtensions
         await LoginAsync(client, "bob", "bob");
     }
 
-    public static async Task<TokenEndpointValues> GetTokenAsync(this HttpClient client, string clientId, string scope)
+    public static async Task<TokenEndpointValues> GetTokenAsync(
+        this HttpClient client,
+        string clientId = "demo_client",
+        string scope = "openid profile offline_access")
     {
         var path = "account/token".AddQueryString("client_id", clientId).AddQueryString("scope", scope);
 

@@ -4,6 +4,7 @@ using RoyalIdentity.Extensions;
 using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Utils;
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Tests.Integration.Prepare;
 
@@ -52,18 +53,17 @@ public class CodeTokenTests : IClassFixture<AppFactory>
                     ["redirect_uri"] = "http://localhost:5000/callback"
                 }));
 
-        // Assert
-        var content = await response.Content.ReadAsStringAsync();
-        var token = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
 
+        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        Assert.NotNull(token);
-        Assert.True(token.ContainsKey("access_token"));
-        Assert.True(token.ContainsKey("token_type"));
-        Assert.True(token.ContainsKey("expires_in"));
-        Assert.True(token.ContainsKey("scope"));
-        Assert.True(token.ContainsKey("id_token"));
+        Assert.NotNull(content);
+        Assert.True(content.ContainsKey("access_token"));
+        Assert.True(content.ContainsKey("token_type"));
+        Assert.True(content.ContainsKey("expires_in"));
+        Assert.True(content.ContainsKey("scope"));
+        Assert.True(content.ContainsKey("id_token"));
     }
 
     [Fact]

@@ -30,12 +30,21 @@ public class DefaultProfileService : IProfileService
         if (userDetails is null || !userDetails.IsActive)
             return;
 
-        // add the user's roles to the claims
-        request.IssuedClaims.AddRange(userDetails.Roles.Select(r => new Claim(JwtClaimTypes.Role, r)));
+        // get all users claims
+        IEnumerable<Claim> userClaims = userDetails.Claims;
+        userClaims = userClaims.Concat(
+            [
+                new Claim(JwtClaimTypes.Subject, userDetails.Username),
+                new Claim(JwtClaimTypes.Name, userDetails.DisplayName),
+                new Claim(JwtClaimTypes.PreferredUserName, userDetails.DisplayName)
+            ]);
 
         // filter the requested claims
         var requestedClaim = request.RequestedClaimTypes;
-        request.IssuedClaims.AddRange(userDetails.Claims.Where(c => requestedClaim.Contains(c.Type)));
+        request.IssuedClaims.AddRange(userClaims.Where(c => requestedClaim.Contains(c.Type)));
+
+        // add the user's roles to the claims
+        request.IssuedClaims.AddRange(userDetails.Roles.Select(r => new Claim(JwtClaimTypes.Role, r)));
     }
 
     public async ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller, CancellationToken ct)

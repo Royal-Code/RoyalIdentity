@@ -68,5 +68,6 @@ public class LoginTests : IClassFixture<AppFactory>
         Assert.NotNull(token.TokenType);
         Assert.NotEqual(0, token.ExpiresIn);
         Assert.NotNull(token.RefreshToken);
+        Assert.NotNull(token.IdentityToken);
     }
 }

@@ -144,13 +144,30 @@ app.MapGet("account/token", async (HttpContext context,
         refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, context.RequestAborted);
     }
 
+    var idToken = default(IdentityToken);
+    if (requestedResources.IsOpenId)
+    {
+        var idTokenRequest = new IdentityTokenRequest
+        {
+            HttpContext = context,
+            User = user,
+            Client = client,
+            Resources = requestedResources,
+            AccessTokenToHash = token.Token,
+            Caller = nameof(AuthorizationCodeHandler)
+        };
+
+        idToken = await tokenFactory.CreateIdentityTokenAsync(idTokenRequest, context.RequestAborted);
+    }
+
     return Results.Ok(new 
     { 
         access_token = token.Token,
         token_type = "Bearer",
         expires_in = token.Lifetime,
         refresh_token = refreshToken?.Token,
-        scope = scope   
+        scope,
+        id_token = idToken?.Token,
     });
 });
 
