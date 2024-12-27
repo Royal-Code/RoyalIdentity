@@ -60,7 +60,7 @@ public class LoginTests : IClassFixture<AppFactory>
         
         // Act
         await client.LoginAliceAsync();
-        var token = await client.GetTokenAsync("demo_client", "openid profile offline_access");
+        var token = await client.GetTokensAsync("demo_client", "openid profile offline_access");
 
         // Assert
         Assert.NotNull(token);

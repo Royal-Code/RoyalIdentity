@@ -29,7 +29,7 @@ internal static class LoginExtensions
         await LoginAsync(client, "bob", "bob");
     }
 
-    public static async Task<TokenEndpointValues> GetTokenAsync(
+    public static async Task<TokenEndpointValues> GetTokensAsync(
         this HttpClient client,
         string clientId = "demo_client",
         string scope = "openid profile offline_access")

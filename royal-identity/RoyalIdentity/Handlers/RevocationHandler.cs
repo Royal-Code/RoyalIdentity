@@ -7,6 +7,21 @@ using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Handlers;
 
+/// <summary>
+/// <para>
+///     Handles token revocation requests.
+/// </para>
+/// <para>
+///     The revocation endpoint provides a mechanism for clients to inform the authorization server that a previously
+///     obtained token is no longer needed. This might be due to a compromised client, or because an access token is no
+///     longer needed by a client. 
+///     <br />
+///     The revocation endpoint is an OAuth 2.0 endpoint that clients can use to notify the
+///     authorization server that a previously obtained token is no longer needed.
+///     <br />
+///     https://www.rfc-editor.org/info/rfc7009
+/// </para>
+/// </summary>
 public class RevocationHandler : IHandler<RevocationContext>
 {
     private readonly ILogger logger;
@@ -25,23 +40,26 @@ public class RevocationHandler : IHandler<RevocationContext>
 
     public async Task Handle(RevocationContext context, CancellationToken ct)
     {
+        logger.LogDebug("Handling revocation request");
+
         bool success = false;
 
         // revoke tokens
         if (context.TokenTypeHint == Constants.TokenTypeHints.AccessToken)
         {
-            logger.LogTrace("Hint was for access token");
+            logger.LogDebug("Hint was for access token");
 
             success = await RevokeAccessTokenAsync(context.Token!, context.ClientId!, ct);
         }
         else if (context.TokenTypeHint == Constants.TokenTypeHints.RefreshToken)
         {
-            logger.LogTrace("Hint was for refresh token");
+            logger.LogDebug("Hint was for refresh token");
+
             success = await RevokeRefreshTokenAsync(context.Token!, context.ClientId!, ct);
         }
         else
         {
-            logger.LogTrace("No hint for token type");
+            logger.LogDebug("No hint for token type");
 
             success = await RevokeAccessTokenAsync(context.Token!, context.ClientId!, ct);
 
@@ -51,12 +69,18 @@ public class RevocationHandler : IHandler<RevocationContext>
 
         if (success)
         {
-            logger.LogInformation("Token revocation complete");
-
-            // It is not necessary to raise an event here, there is nothing to do with the result
-            //// await _events.RaiseAsync(new TokenRevokedSuccessEvent(requestValidationResult, requestValidationResult.Client));
+            logger.LogDebug("Token revocation complete");
+        }
+        else
+        {
+            logger.LogInformation("Token revocation failed");
         }
 
+        // The authorization server responds with HTTP status code 200 if the
+        // token has been revoked successfully or if the client submitted an
+        // invalid token.
+        // Note: invalid tokens do not cause an error response since the client
+        // cannot handle such an error in a reasonable way.
         context.Response = ResponseHandler.Ok();
     }
 

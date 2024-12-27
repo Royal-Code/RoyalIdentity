@@ -18,7 +18,7 @@ public class UserInfoTests : IClassFixture<AppFactory>
         // Arrange
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
-        var tokens = await client.GetTokenAsync();
+        var tokens = await client.GetTokensAsync();
         var access_token = tokens.AccessToken;
 
         // Act

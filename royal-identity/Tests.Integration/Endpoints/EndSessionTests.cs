@@ -27,7 +27,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         });
         await client.LoginAliceAsync();
-        var tokens = await client.GetTokenAsync();
+        var tokens = await client.GetTokensAsync();
         var idToken = tokens.IdentityToken!;
 
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();
@@ -128,7 +128,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
         });
         await client.LoginAliceAsync();
         await client.GetAuthorizeAsync(clientId: clientId); // ensures that the client_id is added to the user's session.
-        var tokens = await client.GetTokenAsync(clientId: clientId);
+        var tokens = await client.GetTokensAsync(clientId: clientId);
         var idToken = tokens.IdentityToken!;
 
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();

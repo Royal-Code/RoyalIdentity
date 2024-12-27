@@ -23,7 +23,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         // Arrange
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
-        var tokens = await client.GetTokenAsync();
+        var tokens = await client.GetTokensAsync();
         var refresh_token = tokens.RefreshToken!;
 
         // Act
@@ -73,7 +73,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
 
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
-        var tokens = await client.GetTokenAsync(clientId: clientId);
+        var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
         // Act
@@ -117,7 +117,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
 
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
-        var tokens = await client.GetTokenAsync(clientId: clientId);
+        var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
         // Act
