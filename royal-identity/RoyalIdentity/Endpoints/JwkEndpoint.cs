@@ -1,10 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
@@ -30,28 +28,16 @@ public class JwkEndpoint : IEndpointHandler
             logger.LogWarning("JWK Discovery endpoint only supports GET requests");
 
             // return a problem details of a MethodNotAllowed infoming the http method is not allowed
-            return new(EndpointProblemResults.MethodNotAllowed(httpContext));
+            return new(EndpointErrorResults.MethodNotAllowed(httpContext));
         }
 
         logger.LogDebug("Start jwk discovery request");
 
         if (!options.Discovery.ShowKeySet)
         {
-            logger.LogInformation("JWK Discovery endpoint disabled. 404.");
+            logger.LogDebug("JWK Discovery endpoint disabled. 404.");
 
-            // return a problem details of a NotFound informing the discovery endpoint is disabled
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status404NotFound,
-                Title = "Not Found",
-                Detail = "Discovery endpoint is disabled"
-            };
-
-            return ValueTask.FromResult(
-                new EndpointCreationResult(
-                    httpContext,
-                    ResponseHandler.Problem(problemDetails)));
+            return new(EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled"));
         }
 
         var items = ContextItems.From(options);

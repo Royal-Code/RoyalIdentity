@@ -38,7 +38,7 @@ public class EvaluateBearerToken : IDecorator<IWithBearerToken>
             if (token.Length > options.InputLengthRestrictions.Jwt)
             {
                 logger.LogError("JWT too long");
-                context.Error(OidcConstants.ProtectedResourceErrors.InvalidToken, "Token too long");
+                context.InvalidClient("Token too long");
                 return;
             }
 
@@ -49,7 +49,7 @@ public class EvaluateBearerToken : IDecorator<IWithBearerToken>
             if (token.Length > options.InputLengthRestrictions.TokenHandle)
             {
                 logger.LogError("token handle too long");
-                context.Error(OidcConstants.ProtectedResourceErrors.InvalidToken, "Token too long");
+                context.InvalidClient("Token too long");
                 return;
             }
 
@@ -58,7 +58,7 @@ public class EvaluateBearerToken : IDecorator<IWithBearerToken>
 
         if (evaluationResult.HasError)
         {
-            context.Error(evaluationResult.Error.Error, evaluationResult.Error.ErrorDescription ?? "Token is invalid");
+            context.Error(evaluationResult.Error);
             return;
         }
 

@@ -80,5 +80,6 @@ public class EndpointsOptions
     /// <value>
     /// <c>true</c> if the device authorization endpoint is enabled; otherwise, <c>false</c>.
     /// </value>
-    public bool EnableDeviceAuthorizationEndpoint { get; set; } = true;
+    [Redesign("The Device Authorization must be an extension grant type -- remove this property")]
+    public bool EnableDeviceAuthorizationEndpoint { get; set; } = false;
 }

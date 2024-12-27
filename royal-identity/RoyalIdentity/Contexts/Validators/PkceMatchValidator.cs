@@ -25,7 +25,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         if (context.CodeVerifier.IsMissing())
         {
             logger.LogError(context, "Client is missing code challenge or code challenge method");
-            context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code verifier required");
+            context.InvalidGrant("Code verifier required");
             return default;
         }
 
@@ -39,7 +39,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
                     context.AuthorizationCode.CodeChallenge);
 
                 if (!equals)
-                    context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code verifier does not match code challenge");
+                    context.InvalidGrant("Code verifier does not match code challenge");
 
                 break;
 
@@ -53,13 +53,13 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
 
                 if (!equals)
                 {
-                    context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code verifier does not match code challenge");
+                    context.InvalidGrant("Code verifier does not match code challenge");
                 }
 
                 break;
 
             default:
-                context.Error(OidcConstants.TokenErrors.InvalidGrant, "Code challenge method is not supported");
+                context.InvalidGrant("Code challenge method is not supported");
                 break;
         }
 

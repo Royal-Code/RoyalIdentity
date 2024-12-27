@@ -36,6 +36,6 @@ public class PostBodySecretEvaluator : SecretEvaluatorBase
             return null;
         }
 
-        return await EvaluateAsync(context, clientId, secret, ServerConstants.ParsedSecretTypes.SharedSecret, ct);
+        return await EvaluateAsync(context, clientId!, secret!, ServerConstants.ParsedSecretTypes.SharedSecret, ct);
     }
 }

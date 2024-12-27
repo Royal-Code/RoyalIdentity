@@ -7,7 +7,6 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models;
-using RoyalIdentity.Utils;
 using Microsoft.Extensions.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -54,9 +53,10 @@ public class DefaultTokenValidator : ITokenValidator
             securityToken is JwtSecurityToken jwtSecurityToken &&
             !string.Equals(jwtSecurityToken.Header.Typ, options.AccessTokenJwtType))
         {
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
-                Error = "invalid JWT token type"
+                Error = OidcConstants.ProtectedResourceErrors.InvalidToken,
+                ErrorDescription = "invalid JWT token type"
             });
         }
 
@@ -69,9 +69,9 @@ public class DefaultTokenValidator : ITokenValidator
         if (client is null)
         {
             logger.LogError("Client not found or deleted or disabled: {ClientId}", clientId);
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+                Error = OidcConstants.ProtectedResourceErrors.InvalidToken,
             });
         }
 
@@ -92,7 +92,7 @@ public class DefaultTokenValidator : ITokenValidator
         if (token is null)
         {
             logger.LogError("Invalid reference token.");
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });
@@ -101,7 +101,7 @@ public class DefaultTokenValidator : ITokenValidator
         if (token.CreationTime.HasExceeded(token.Lifetime, clock.GetUtcNow().UtcDateTime))
         {
             logger.LogError("Token expired.");
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.ExpiredToken
             });
@@ -112,7 +112,7 @@ public class DefaultTokenValidator : ITokenValidator
         if (client is null)
         {
             logger.LogError("Client deleted or disabled: {ClientId}", token.ClientId);
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });
@@ -140,7 +140,7 @@ public class DefaultTokenValidator : ITokenValidator
         if (token.Length > options.InputLengthRestrictions.Jwt)
         {
             logger.LogError("JWT too long");
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });
@@ -152,7 +152,7 @@ public class DefaultTokenValidator : ITokenValidator
         if (clientId.IsMissing())
         {
             logger.LogError("No clientId supplied, can't find id in identity token.");
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });
@@ -162,7 +162,7 @@ public class DefaultTokenValidator : ITokenValidator
         if (client == null)
         {
             logger.LogError("Unknown or disabled client: {ClientId}.", clientId);
-            return new(new ValidationError()
+            return new(new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });
@@ -203,7 +203,7 @@ public class DefaultTokenValidator : ITokenValidator
         }
     }
 
-    private async Task<(ClaimsPrincipal?, SecurityToken?, ValidationError?)> TryGetPrincipal(
+    private async Task<(ClaimsPrincipal?, SecurityToken?, ErrorDetails?)> TryGetPrincipal(
         string jwt,
         string? audience,
         bool validateLifetime,
@@ -239,7 +239,7 @@ public class DefaultTokenValidator : ITokenValidator
         catch (SecurityTokenExpiredException expiredException)
         {
             logger.LogInformation(expiredException, "JWT token validation error: {Exception}", expiredException.Message);
-            return (null, null, new ValidationError()
+            return (null, null, new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.ExpiredToken
             });
@@ -247,7 +247,7 @@ public class DefaultTokenValidator : ITokenValidator
         catch (Exception ex)
         {
             logger.LogError(ex, "JWT token validation error: {Exception}", ex.Message);
-            return (null, null, new ValidationError()
+            return (null, null, new ErrorDetails()
             {
                 Error = OidcConstants.ProtectedResourceErrors.InvalidToken
             });

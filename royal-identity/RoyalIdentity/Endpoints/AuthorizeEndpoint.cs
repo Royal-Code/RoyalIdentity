@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;
@@ -38,28 +36,14 @@ public class AuthorizeEndpoint : IEndpointHandler
         else if (HttpMethods.IsPost(httpContext.Request.Method))
         {
             if (!httpContext.Request.HasApplicationFormContentType())
-            {
-                // return a problem details of a UnsupportedMediaType informing the ContentType is invalid
-                var problemDetails = new ProblemDetails
-                {
-                    Type = "about:blank",
-                    Status = StatusCodes.Status415UnsupportedMediaType,
-                    Title = "Invalid ContentType",
-                    Detail = "The content type must be: application/x-www-form-urlencoded"
-                };
-
-                return ValueTask.FromResult(
-                    new EndpointCreationResult(
-                        httpContext,
-                        ResponseHandler.Problem(problemDetails)));
-            }
+                return ValueTask.FromResult(EndpointErrorResults.UnsupportedMediaType(httpContext));
 
             values = httpContext.Request.Form.AsNameValueCollection();
         }
         else
         {
             // return a problem details of a MethodNotAllowed infoming the http method is not allowed
-            return new(EndpointProblemResults.MethodNotAllowed(httpContext));
+            return new(EndpointErrorResults.MethodNotAllowed(httpContext));
         }
 
         var items = ContextItems.From(options);

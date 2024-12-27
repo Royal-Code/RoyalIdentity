@@ -65,7 +65,7 @@ public class TokenResponse : IResponseHandler
 
     public ValueTask<IResult> CreateResponseAsync(CancellationToken ct)
     {
-        var values = new TokenEndpointValues()
+        var values = new TokenEndpointParameters()
         {
             AccessToken = AccessToken.Token,
             TokenType = AccessToken.TokenType,

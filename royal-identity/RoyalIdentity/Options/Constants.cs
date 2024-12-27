@@ -676,14 +676,15 @@ public static class OidcConstants
 
     public static class GrantTypes
     {
-        //public const string Password = "password" --- removido ---
         public const string AuthorizationCode = "authorization_code";
         public const string ClientCredentials = "client_credentials";
         public const string RefreshToken = "refresh_token";
-        public const string Saml2Bearer = "urn:ietf:params:oauth:grant-type:saml2-bearer";
-        public const string JwtBearer = "urn:ietf:params:oauth:grant-type:jwt-bearer";
+
         public const string DeviceCode = "urn:ietf:params:oauth:grant-type:device_code";
         public const string TokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange";
+
+        public const string Saml2Bearer = "urn:ietf:params:oauth:grant-type:saml2-bearer";
+        public const string JwtBearer = "urn:ietf:params:oauth:grant-type:jwt-bearer";
         public const string Ciba = "urn:openid:params:grant-type:ciba";
     }
 

@@ -169,22 +169,22 @@ internal static class CollectionExtensions
         return value is not null;
     }
 
-    public static bool IsNullOrEmpty<T>(this T[]? values)
+    public static bool IsNullOrEmpty<T>([NotNullWhen(false)] this T[]? values)
     {
         return values is null || values.Length == 0;
     }
 
-    public static bool IsNullOrEmpty<TKey, TValue>(this IDictionary<TKey, TValue>? dictionary)
+    public static bool IsNullOrEmpty<TKey, TValue>([NotNullWhen(false)] this IDictionary<TKey, TValue>? dictionary)
     {
         return dictionary is null || dictionary.Count == 0;
     }
 
-    public static bool IsNullOrEmpty<T>(this ICollection<T>? collection)
+    public static bool IsNullOrEmpty<T>([NotNullWhen(false)] this ICollection<T>? collection)
     {
         return collection is null || collection.Count == 0;
     }
 
-    public static bool IsNullOrEmpty<T>(this IEnumerable<T>? collection)
+    public static bool IsNullOrEmpty<T>([NotNullWhen(false)] this IEnumerable<T>? collection)
     {
         return collection is null || !collection.Any();
     }

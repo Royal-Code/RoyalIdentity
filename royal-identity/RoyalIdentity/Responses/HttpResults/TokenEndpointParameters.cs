@@ -2,7 +2,7 @@
 
 namespace RoyalIdentity.Responses.HttpResults;
 
-public class TokenEndpointValues
+public class TokenEndpointParameters
 {
     [JsonPropertyName("access_token")]
     public required string AccessToken { get; init; }

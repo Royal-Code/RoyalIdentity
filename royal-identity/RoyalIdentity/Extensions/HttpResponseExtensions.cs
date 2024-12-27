@@ -11,7 +11,6 @@ public static class HttpResponseExtensions
     {
         var json = Json.Serialize(o);
         await response.WriteJsonAsync(json, contentType);
-        await response.Body.FlushAsync();
     }
 
     public static async Task WriteJsonAsync(this HttpResponse response, string json, string? contentType = null)

@@ -16,8 +16,18 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
     public static ResponseHandler Create(HttpStatusCode statusCode, object value)
         => new(Results.Json(value, statusCode: (int)statusCode));
 
-    public static ResponseHandler Problem(ProblemDetails problemDetails)
-        => new(Results.Json(problemDetails.IncludeErrorsProperties(), statusCode: problemDetails.Status ?? 400));
+    public static ResponseHandler Error(string error, string? description = null, string? uri = null, int statusCode = 400)
+        => new(new ErrorResponseResult(
+            new ErrorResponseParameters
+            {
+                Error = error,
+                ErrorDescription = description,
+                ErrorUri = uri
+            },
+            statusCode));
+
+    public static ResponseHandler Error(ErrorResponseParameters error, int statusCode = 400)
+        => new(new ErrorResponseResult(error, statusCode));
 
     public static ResponseHandler Ok() => new(Results.Ok());
 
@@ -28,7 +38,7 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
 
     public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
     {
-        problem = result is IValueHttpResult<ProblemDetails> valueResult 
+        problem = result is IValueHttpResult<ProblemDetails> valueResult
             ? valueResult.Value
             : null;
 

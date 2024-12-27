@@ -1,11 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Options;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -35,17 +33,7 @@ public class UserInfoEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP method for userinfo endpoint.");
 
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status400BadRequest,
-                Title = TokenErrors.InvalidRequest,
-                Detail = "Invalid HTTP request for userinfo endpoint"
-            };
-
-            return new EndpointCreationResult(
-                httpContext,
-                ResponseHandler.Problem(problemDetails));
+            return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
         // userinfo requires an access token on the request
@@ -54,17 +42,10 @@ public class UserInfoEndpoint : IEndpointHandler
         {
             logger.LogError("No access token found.");
 
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status400BadRequest,
-                Title = ProtectedResourceErrors.InvalidToken,
-                Detail = "Invalid HTTP request for userinfo endpoint, no access token found."
-            };
-
-            return new EndpointCreationResult(
+            return EndpointErrorResults.BadRequest(
                 httpContext,
-                ResponseHandler.Problem(problemDetails));
+                ProtectedResourceErrors.InvalidToken,
+                "Invalid HTTP request for userinfo endpoint, no access token found.");
         }
 
         var items = ContextItems.From(options);

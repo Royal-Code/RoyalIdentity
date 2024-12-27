@@ -13,5 +13,5 @@ public readonly struct AuthorizationValidationResult
     /// <summary>
     /// Details for generating error responses.
     /// </summary>
-    public ValidationError? Error { get; init; }
+    public ErrorDetails? Error { get; init; }
 }

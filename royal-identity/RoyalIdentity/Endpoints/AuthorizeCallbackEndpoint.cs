@@ -1,13 +1,12 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;
 
@@ -36,7 +35,7 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
             logger.LogWarning("Invalid HTTP method for authorize endpoint.");
 
             // return a problem details of a MethodNotAllowed infoming the http method is not allowed
-            return EndpointProblemResults.MethodNotAllowed(httpContext);
+            return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
         logger.LogDebug("Start authorize callback request");
@@ -53,35 +52,13 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
         }
 
         if (parameters is null)
-        {
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status400BadRequest,
-                Title = OidcConstants.AuthorizeErrors.InvalidRequest,
-                Detail = "Invalid parameters"
-            };
-
-            return new EndpointCreationResult(
-                    httpContext,
-                    ResponseHandler.Problem(problemDetails));
-        }
+            return EndpointErrorResults.InvalidRequest(httpContext, "Invalid parameters");
 
         var user = httpContext.User;
 
         if (user is null)
         {
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status400BadRequest,
-                Title = OidcConstants.AuthorizeErrors.LoginRequired,
-                Detail = "Login required"
-            };
-
-            return new EndpointCreationResult(
-                    httpContext,
-                    ResponseHandler.Problem(problemDetails));
+            return EndpointErrorResults.BadRequest(httpContext, AuthorizeErrors.LoginRequired, "Login required");
         }
 
         var items = ContextItems.From(options);

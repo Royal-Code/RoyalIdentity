@@ -60,7 +60,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         if (accessToken is null)
         {
             logger.LogError("Access token not found: {AccessTokenId}", context.RefreshToken.AccessTokenId);
-            context.Error(TokenErrors.InvalidGrant, "Invalid refresh token");
+            context.InvalidGrant("Invalid refresh token");
             return;
         }
 

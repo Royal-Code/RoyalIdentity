@@ -29,16 +29,6 @@ public class AuthenticationOptions
     public SameSiteMode CookieSameSiteMode { get; set; } = SameSiteMode.None;
 
     /// <summary>
-    /// Indicates if user must be authenticated to accept parameters to end session endpoint. Defaults to false.
-    /// 
-    /// TODO: Obsolete/Remove
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if required; otherwise, <c>false</c>.
-    /// </value>
-    public bool RequireAuthenticatedUserForSignOutMessage { get; set; } = false;
-
-    /// <summary>
     /// Gets or sets the name of the cookie used for the check session endpoint.
     /// </summary>
     public string CheckSessionCookieName { get; set; } = ServerConstants.DefaultCheckSessionCookieName;
@@ -46,7 +36,7 @@ public class AuthenticationOptions
     /// <summary>
     /// Gets or sets the domain of the cookie used for the check session endpoint. Defaults to null.
     /// </summary>
-    public string CheckSessionCookieDomain { get; set; }
+    public string? CheckSessionCookieDomain { get; set; }
 
     /// <summary>
     /// Gets or sets the SameSite mode of the cookie used for the check session endpoint. Defaults to SameSiteMode.None.

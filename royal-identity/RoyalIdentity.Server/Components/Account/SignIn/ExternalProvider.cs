@@ -1,5 +1,7 @@
 ﻿namespace RoyalIdentity.Server.Components.Account.SignIn;
 
+#nullable disable // POCO
+
 public class ExternalProvider
 {
     public string DisplayName { get; set; }

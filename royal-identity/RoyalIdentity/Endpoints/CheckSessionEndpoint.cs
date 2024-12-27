@@ -1,10 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Responses;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;
 
@@ -23,19 +20,9 @@ public class CheckSessionEndpoint : IEndpointHandler
 
         if (!HttpMethods.IsGet(httpContext.Request.Method))
         {
-            logger.LogWarning("Invalid HTTP method for check session endpoint");
+            logger.LogDebug("Invalid HTTP method for check session endpoint");
 
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status405MethodNotAllowed,
-                Title = TokenErrors.InvalidRequest,
-                Detail = "Invalid HTTP request for token endpoint"
-            };
-
-            return ValueTask.FromResult(new EndpointCreationResult(
-                httpContext,
-                ResponseHandler.Problem(problemDetails)));
+            return ValueTask.FromResult(EndpointErrorResults.MethodNotAllowed(httpContext));
         }
         else
         {

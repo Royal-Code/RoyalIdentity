@@ -1,20 +1,19 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using RoyalIdentity.Endpoints.Abstractions;
 
 namespace RoyalIdentity.Endpoints.Defaults;
 
 public static class ProblemsExtensions
 {
-    public const string Error = "error";
-    public const string ErrorDescription = "error_description";
-
-    public static ProblemDetails IncludeErrorsProperties(this ProblemDetails problemDetails)
+    public static ErrorResponseResult ToErrorResult(this ProblemDetails problemDetails)
     {
-        if (problemDetails.Extensions.ContainsKey(Error))
-            return problemDetails;
-
-        problemDetails.Extensions.Add(Error, problemDetails.Title);
-        problemDetails.Extensions.Add(ErrorDescription, problemDetails.Detail);
-
-        return problemDetails;
+        return new ErrorResponseResult(
+            new ErrorResponseParameters
+            {
+                Error = problemDetails.Title ?? "invalid_request",
+                ErrorDescription = problemDetails.Detail,
+                ErrorUri = problemDetails.Instance
+            },
+            problemDetails.Status ?? 400);
     }
 }

@@ -87,7 +87,7 @@ file class TestContext : AbstractContextBase, IContextWithClient
 
 file class TestHandler : IHandler<TestContext>
 {
-    public Task Handle(TestContext context, CancellationToken cancellationToken)
+    public Task Handle(TestContext context, CancellationToken ct)
     {
         context.Response = new TestResponse();
         return Task.CompletedTask;
@@ -110,7 +110,7 @@ file class TestResponse : IResponseHandler
 
 file class ClientContextDecorator : IDecorator<IContextWithClient>
 {
-    public Task Decorate(IContextWithClient context, Func<Task> next, CancellationToken cancellationToken)
+    public Task Decorate(IContextWithClient context, Func<Task> next, CancellationToken ct)
     {
         context.Client = new ClientContext()
         {
@@ -123,7 +123,7 @@ file class ClientContextDecorator : IDecorator<IContextWithClient>
 
 file class ClientValidator : IValidator<IContextWithClient>
 {
-    public ValueTask Validate(IContextWithClient context, CancellationToken cancellationToken)
+    public ValueTask Validate(IContextWithClient context, CancellationToken ct)
     {
         if (context.Client == null)
         {

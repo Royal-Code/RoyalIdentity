@@ -1,14 +1,11 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;
 using RoyalIdentity.Contexts;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;
 
@@ -36,18 +33,10 @@ public class EndSessionEndpoint : IEndpointHandler
         {
             if (!httpContext.Request.HasApplicationFormContentType())
             {
-                // return a problem details of a UnsupportedMediaType informing the ContentType is invalid
-                var problemDetails = new ProblemDetails
-                {
-                    Type = "about:blank",
-                    Status = StatusCodes.Status415UnsupportedMediaType,
-                    Title = "Invalid ContentType",
-                    Detail = "The content type must be: application/x-www-form-urlencoded"
-                };
+                logger.LogWarning("Unsupported media type, content type is not valid.");
 
-                return new EndpointCreationResult(
-                        httpContext,
-                        ResponseHandler.Problem(problemDetails));
+                // return a problem details of a UnsupportedMediaType informing the ContentType is invalid
+                return EndpointErrorResults.UnsupportedMediaType(httpContext);
             }
 
             parameters = (await httpContext.Request.ReadFormAsync()).AsNameValueCollection();
@@ -55,17 +44,7 @@ public class EndSessionEndpoint : IEndpointHandler
         else
         {
             logger.LogWarning("Invalid HTTP method for end session endpoint.");
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status405MethodNotAllowed,
-                Title = TokenErrors.InvalidRequest,
-                Detail = "Method not allowed for end session endpoint"
-            };
-
-            return new EndpointCreationResult(
-                    httpContext,
-                    ResponseHandler.Problem(problemDetails));
+            return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
         var items = ContextItems.From(options);

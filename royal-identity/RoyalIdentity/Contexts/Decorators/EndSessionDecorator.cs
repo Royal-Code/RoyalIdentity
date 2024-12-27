@@ -26,7 +26,7 @@ public class EndSessionDecorator : IDecorator<EndSessionContext>
             if (result.HasError)
             {
                 logger.LogError("Error validating id_token_hint: {Error}", result.Error.Error);
-                context.Error(result.Error.Error, result.Error.ErrorDescription ?? "Error validating id_token_hint.");
+                context.Error(result.Error);
                 return;
             }
 

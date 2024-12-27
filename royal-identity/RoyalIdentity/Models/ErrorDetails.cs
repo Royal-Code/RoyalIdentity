@@ -1,9 +1,11 @@
-﻿namespace RoyalIdentity.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace RoyalIdentity.Models;
 
 /// <summary>
-/// Validation error class.
+/// Validation error details.
 /// </summary>
-public class ValidationError
+public class ErrorDetails
 {
     /// <summary>
     /// Gets or sets the error.
@@ -11,6 +13,7 @@ public class ValidationError
     /// <value>
     /// The error.
     /// </value>
+    [JsonPropertyName("error")]
     public required string Error { get; init; }
 
     /// <summary>
@@ -19,10 +22,12 @@ public class ValidationError
     /// <value>
     /// The error description.
     /// </value>
+    [JsonPropertyName("error_description")]
     public string? ErrorDescription { get; init; }
 
     /// <summary>
     /// Gets or sets the error uri.
     /// </summary>
+    [JsonPropertyName("error_uri")]
     public string? ErrorUri { get; init; }
 }

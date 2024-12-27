@@ -55,7 +55,7 @@ public class ApiScope : Resource
     /// <param name="displayName">The display name.</param>
     /// <param name="userClaims">List of associated user claims that should be included when this resource is requested.</param>
     /// <exception cref="System.ArgumentNullException">name</exception>
-    public ApiScope(string name, string displayName, IEnumerable<string> userClaims)
+    public ApiScope(string name, string displayName, IEnumerable<string>? userClaims)
     {
         if (name.IsMissing()) throw new ArgumentNullException(nameof(name));
 

@@ -14,7 +14,7 @@ namespace RoyalIdentity.Contracts.Models;
 
 public class TokenEvaluationResult
 {
-    public TokenEvaluationResult(ValidationError error)
+    public TokenEvaluationResult(ErrorDetails error)
     {
         IsValid = false;
         HasError = true;
@@ -36,7 +36,7 @@ public class TokenEvaluationResult
     [MemberNotNullWhen(true, nameof(Error))]
     public bool HasError { get; }
 
-    public ValidationError? Error { get; }
+    public ErrorDetails? Error { get; }
 
     public EvaluatedToken? Token { get; }
 }

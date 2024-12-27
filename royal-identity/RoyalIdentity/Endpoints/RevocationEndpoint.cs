@@ -31,37 +31,14 @@ public class RevocationEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP method");
 
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status405MethodNotAllowed,
-                Title = "Method Not Allowed",
-                Detail = "Invalid HTTP request for token endpoint"
-            };
-
-            return ValueTask.FromResult(
-                new EndpointCreationResult(
-                    httpContext,
-                    ResponseHandler.Problem(problemDetails)));
+            return new(EndpointErrorResults.MethodNotAllowed(httpContext));
         }
 
         if (!httpContext.Request.HasApplicationFormContentType())
         {
             logger.LogWarning("Invalid media type");
 
-            // return a problem details of a UnsupportedMediaType informing the ContentType is invalid
-            var problemDetails = new ProblemDetails
-            {
-                Type = "about:blank",
-                Status = StatusCodes.Status415UnsupportedMediaType,
-                Title = "Invalid Content Type",
-                Detail = "The content type must be: application/x-www-form-urlencoded"
-            };
-
-            return ValueTask.FromResult(
-                new EndpointCreationResult(
-                    httpContext,
-                    ResponseHandler.Problem(problemDetails)));
+            return new(EndpointErrorResults.UnsupportedMediaType(httpContext));
         }
 
         var items = ContextItems.From(options);

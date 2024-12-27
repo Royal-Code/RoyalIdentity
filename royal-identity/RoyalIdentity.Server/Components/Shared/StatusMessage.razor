@@ -18,7 +18,7 @@
     private HttpContext HttpContext { get; set; } = default!;
 
     private string? DisplayMessage => Message ?? messageFromCookie;
-    private string StatusMessageClass => MessageClass ?? (DisplayMessage.StartsWith("Error") ? "danger" : "success");
+    private string StatusMessageClass => MessageClass ?? (DisplayMessage is not null && DisplayMessage.StartsWith("Error") ? "danger" : "success");
 
     protected override void OnInitialized()
     {

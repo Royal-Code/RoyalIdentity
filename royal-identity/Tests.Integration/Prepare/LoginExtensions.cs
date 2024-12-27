@@ -29,7 +29,7 @@ internal static class LoginExtensions
         await LoginAsync(client, "bob", "bob");
     }
 
-    public static async Task<TokenEndpointValues> GetTokensAsync(
+    public static async Task<TokenEndpointParameters> GetTokensAsync(
         this HttpClient client,
         string clientId = "demo_client",
         string scope = "openid profile offline_access")
@@ -40,7 +40,7 @@ internal static class LoginExtensions
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<TokenEndpointValues>(json)!;
+        return JsonSerializer.Deserialize<TokenEndpointParameters>(json)!;
     }
 
     public static async Task<string?> GetAuthorizeAsync(

@@ -5,9 +5,9 @@ namespace RoyalIdentity.Responses.HttpResults;
 
 public class TokenResult : IResult
 {
-    private readonly TokenEndpointValues values;
+    private readonly TokenEndpointParameters values;
 
-    public TokenResult(TokenEndpointValues values)
+    public TokenResult(TokenEndpointParameters values)
     {
         this.values = values;
     }

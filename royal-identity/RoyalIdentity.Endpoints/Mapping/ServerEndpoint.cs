@@ -112,14 +112,9 @@ public static class ServerEndpoint<TEndpoint>
     private static IResult InternalServerError()
     {
         // generate a internal server error
-        var problemDetails = new ProblemDetails
-        {
-            Type = "about:blank",
-            Status = StatusCodes.Status500InternalServerError,
-            Title = "Internal server error",
-            Detail = "An internal server error has occurred"
-        };
-
-        return Results.Json(problemDetails.IncludeErrorsProperties(), statusCode: StatusCodes.Status500InternalServerError);
+        return ErrorResponseResult.Create(
+            "internal_server_error",
+            "An internal server error has occurred",
+            statusCode: StatusCodes.Status500InternalServerError);
     }
 }

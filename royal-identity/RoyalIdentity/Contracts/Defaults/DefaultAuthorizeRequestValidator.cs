@@ -47,7 +47,7 @@ public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
         if (context.Response.HasProblem(out var problems))
             return new AuthorizationValidationResult()
             {
-                Error = new ValidationError()
+                Error = new ErrorDetails()
                 {
                     Error = problems.Title ?? AuthorizeErrors.InvalidRequest,
                     ErrorDescription = problems.Detail,

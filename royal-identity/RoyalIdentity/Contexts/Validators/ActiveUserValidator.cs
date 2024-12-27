@@ -34,7 +34,7 @@ public class ActiveUserValidator : IValidator<ITokenEndpointContextBase>
         if (!isActive)
         {
             logger.LogError(context, "User is not active.");
-            context.Error(OidcConstants.TokenErrors.InvalidGrant, "User is not active.");
+            context.InvalidGrant("User is not active.");
         }
     }
 }

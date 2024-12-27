@@ -37,14 +37,14 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (token.IsMissing())
         {
             logger.LogError(context, "Refresh token is missing");
-            context.Error(TokenErrors.InvalidRequest, "Refresh token is missing");
+            context.InvalidRequest("Refresh token is missing");
             return;
         }
 
         if (token.Length > options.InputLengthRestrictions.RefreshToken)
         {
             logger.LogError(context, "Refresh token too long");
-            context.Error(TokenErrors.InvalidGrant, "Refresh token too long");
+            context.InvalidRequest("Refresh token too long");
             return;
         }
 
@@ -52,7 +52,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (refreshToken is null)
         {
             logger.LogWarning("Invalid refresh token");
-            context.Error(TokenErrors.InvalidGrant, "Invalid refresh token");
+            context.InvalidGrant("Invalid refresh token");
             return;
         }
 
@@ -62,7 +62,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (refreshToken.CreationTime.HasExceeded(refreshToken.Lifetime, clock.GetUtcNow().DateTime))
         {
             logger.LogWarning("Refresh token has expired.");
-            context.Error(TokenErrors.InvalidGrant, "Refresh token has expired");
+            context.InvalidGrant("Refresh token has expired");
             return;
         }
 
@@ -72,7 +72,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (client.Id != refreshToken.ClientId)
         {
             logger.LogError("{ClientId} tries to refresh token belonging to {RefreshTokenClientId}", client.Id, refreshToken.ClientId);
-            context.Error(TokenErrors.InvalidGrant, "Invalid client");
+            context.InvalidGrant("Invalid client");
             return;
         }
 
@@ -82,7 +82,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (!client.AllowOfflineAccess)
         {
             logger.LogError("{ClientId} does not have access to offline_access scope anymore", client.Id);
-            context.Error(TokenErrors.InvalidGrant, "Invalid client");
+            context.InvalidGrant("Invalid client");
             return;
         }
 
@@ -98,7 +98,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
             if (doNotAcceptConsumedToken)
             {
                 logger.LogWarning("Rejecting refresh token because it has been consumed already.");
-                context.Error(TokenErrors.InvalidGrant, "Refresh token has been consumed already.");
+                context.InvalidGrant("Refresh token has been consumed already.");
                 return;
             }
         }
