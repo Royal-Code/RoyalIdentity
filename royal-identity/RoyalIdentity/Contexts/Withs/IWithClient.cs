@@ -16,6 +16,7 @@ public interface IWithClient : IEndpointContextBase
     /// Gets or sets the client claims for the current request.
     /// This value is initally read from the client configuration but can be modified in the request pipeline
     /// </summary>
+    [Redesign("Use only in ClientCredentialsContext --  remove")]
     public HashSet<Claim> ClientClaims { get; }
 
     [MemberNotNull(nameof(Client), nameof(ClientId))]

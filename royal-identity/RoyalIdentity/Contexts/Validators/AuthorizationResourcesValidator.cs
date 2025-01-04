@@ -7,14 +7,14 @@ using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class RequestedResourcesValidator : IValidator<IAuthorizationContextBase>
+public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextBase>
 {
     private readonly ServerOptions options;
     private readonly ILogger logger;
 
-    public RequestedResourcesValidator(
+    public AuthorizationResourcesValidator(
         IOptions<ServerOptions> options,
-        ILogger<RequestedResourcesValidator> logger)
+        ILogger<AuthorizationResourcesValidator> logger)
     {
         this.options = options.Value;
         this.logger = logger;

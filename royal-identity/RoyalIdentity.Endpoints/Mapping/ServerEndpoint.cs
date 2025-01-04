@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Endpoints.Defaults;

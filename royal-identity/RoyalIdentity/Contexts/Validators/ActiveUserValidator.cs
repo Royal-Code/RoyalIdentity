@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Validators;

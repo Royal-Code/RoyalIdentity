@@ -88,7 +88,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<PkceMatchValidator>();
         services.AddTransient<PkceValidator>();
         services.AddTransient<RedirectUriValidator>();
-        services.AddTransient<RequestedResourcesValidator>();
+        services.AddTransient<AuthorizationResourcesValidator>();
         services.AddTransient<RevocationValidator>();
 
         // Handlers

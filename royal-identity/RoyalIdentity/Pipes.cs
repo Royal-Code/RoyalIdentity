@@ -49,9 +49,10 @@ public static class Pipes
                 .UseDecorator<LoadClient>()
                 .UseValidator<RedirectUriValidator>()
                 .UseDecorator<ResourcesDecorator>()
+                .UseValidator<ResourcesValidator>()
                 .UseValidator<AuthorizeMainValidator>()
                 .UseValidator<PkceValidator>()
-                .UseValidator<RequestedResourcesValidator>()
+                .UseValidator<AuthorizationResourcesValidator>()
                 .UseDecorator<PromptLoginDecorator>()
                 .UseDecorator<ConsentDecorator>()
                 .UseDecorator<StateHashDecorator>();
@@ -70,7 +71,8 @@ public static class Pipes
                 .UseValidator<RedirectUriValidator>()
                 .UseValidator<AuthorizeMainValidator>()
                 .UseDecorator<ResourcesDecorator>()
-                .UseValidator<RequestedResourcesValidator>();
+                .UseValidator<ResourcesValidator>()
+                .UseValidator<AuthorizationResourcesValidator>();
 
             options.CustomizeAuthorizeValidateContext?.Invoke(authorizeValidateContextPipe);
 
@@ -82,6 +84,7 @@ public static class Pipes
             //////////////////////////////
             var authorizationCodeContextPipe = builder.For<AuthorizationCodeContext>()
                 .UseDecorator<EvaluateClient>()
+                .UseValidator<GrantTypeValidator>()
                 .UseValidator<RedirectUriValidator>()
                 .UseDecorator<LoadCode>()
                 .UseValidator<PkceMatchValidator>()
@@ -97,12 +100,26 @@ public static class Pipes
             //////////////////////////////
             var refreshTokenContextPipe = builder.For<RefreshTokenContext>()
                 .UseDecorator<EvaluateClient>()
+                .UseValidator<GrantTypeValidator>()
                 .UseDecorator<LoadRefreshToken>()
                 .UseValidator<ActiveUserValidator>();
 
             options.CustomizeRefreshTokenContext?.Invoke(refreshTokenContextPipe);
 
             refreshTokenContextPipe.UseHandler<RefreshTokenHandler>();
+
+
+            //////////////////////////////
+            //// RefreshTokenContext
+            //////////////////////////////
+            var clientCredentialsContextPipe = builder.For<ClientCredentialsContext>()
+                .UseDecorator<EvaluateClient>()
+                .UseValidator<GrantTypeValidator>()
+                .UseDecorator<ClientResourceDecorator>();
+
+            options.CustomizeClientCredentialsContext?.Invoke(clientCredentialsContextPipe);
+
+            clientCredentialsContextPipe.UseHandler<ClientResourceHandler>();
 
 
             //////////////////////////////
@@ -155,6 +172,8 @@ public class CustomOptions
     public Action<IPipelineConfigurationBuilder<AuthorizationCodeContext>>? CustomizeAuthorizationCodeContext { get; set; }
 
     public Action<IPipelineConfigurationBuilder<RefreshTokenContext>>? CustomizeRefreshTokenContext { get; set; }
+
+    public Action<IPipelineConfigurationBuilder<ClientCredentialsContext>>? CustomizeClientCredentialsContext { get; internal set; }
 
     public Action<IPipelineConfigurationBuilder<UserInfoContext>>? CustomizeUserInfoContext { get; set; }
 

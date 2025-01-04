@@ -37,11 +37,6 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         //////////////////////////////////////////////////////////
 
         var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.RequestedScopes, true, ct);
-        foreach (var scope in context.RequestedScopes)
-        {
-            if (!IsScopeValidAsync(context, context.Client, resourcesFromStore, scope))
-                return;
-        }
 
 
         //////////////////////////////////////////////////////////
@@ -61,65 +56,5 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         }
 
         await next();
-    }
-
-    private bool IsScopeValidAsync(IWithResources context, Client client, Resources resourcesFromStore, string requestedScope)
-    {
-        if (requestedScope == ServerConstants.StandardScopes.OfflineAccess)
-        {
-            if (client.AllowOfflineAccess)
-            {
-                context.Resources.OfflineAccess = true;
-            }
-            else
-            {
-                logger.LogError(options, "Offline access is not allowed for this client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                context.InvalidRequest(AuthorizeErrors.InvalidScope, "Offline access is not allowed for this client");
-                return false;
-            }
-        }
-        else
-        {
-            if (resourcesFromStore.TryFindIdentityResourceByName(requestedScope, out var identity))
-            {
-                if (client.AllowedScopes.Contains(identity.Name))
-                {
-                    context.Resources.IdentityResources.Add(identity);
-                }
-                else
-                {
-                    logger.LogError(options, "Identity Scope not allowed for the client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                    context.InvalidRequest(AuthorizeErrors.InvalidScope);
-                    return false;
-                }
-            }
-            else if (resourcesFromStore.TryFindApiScopeByName(requestedScope, out var apiScope))
-            {
-                if (client.AllowedScopes.Contains(apiScope.Name))
-                {
-                    context.Resources.ApiScopes.Add(apiScope);
-
-                    var apis = resourcesFromStore.FindApiResourceByScopeName(apiScope.Name);
-                    foreach (var api in apis)
-                    {
-                        context.Resources.ApiResources.Add(api);
-                    }
-                }
-                else
-                {
-                    logger.LogError(options, "Api Scope not allowed for the client", $"{requestedScope}, {client.Id}, {client.Name}", context);
-                    context.InvalidRequest(AuthorizeErrors.InvalidScope);
-                    return false;
-                }
-            }
-            else
-            {
-                logger.LogError(options, "Scope not found in store", requestedScope, context);
-                context.InvalidRequest(AuthorizeErrors.InvalidScope);
-                return false;
-            }
-        }
-
-        return true;
     }
 }

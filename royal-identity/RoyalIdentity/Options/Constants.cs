@@ -67,22 +67,22 @@ internal static class Constants
     }
 
 
-
-    public static readonly Dictionary<string, IEnumerable<string>> AllowedResponseModesForGrantType =
-        new()
-        {
-            {
-                GrantType.AuthorizationCode,
-                [
-                    ResponseModes.Query,
-                    ResponseModes.FormPost,
-                    ResponseModes.Fragment
-                ]
-            },
-            {
-                GrantType.Hybrid, [ ResponseModes.FormPost]
-            }
-        };
+    // TODO - not used -- remove
+    //public static readonly Dictionary<string, IEnumerable<string>> AllowedResponseModesForGrantType =
+    //    new()
+    //    {
+    //        {
+    //            GrantType.AuthorizationCode,
+    //            [
+    //                ResponseModes.Query,
+    //                ResponseModes.FormPost,
+    //                ResponseModes.Fragment
+    //            ]
+    //        },
+    //        {
+    //            GrantType.Hybrid, [ ResponseModes.FormPost]
+    //        }
+    //    };
 
     public static readonly List<string> SupportedResponseModes = new()
     {
@@ -359,16 +359,6 @@ internal static class Constants
 
 public static class OidcConstants
 {
-    public static class GrantType
-    {
-        public const string Hybrid = "hybrid";
-        public const string AuthorizationCode = "authorization_code";
-        public const string Implicit = "implicit";
-        public const string ClientCredentials = "client_credentials";
-        //public const string ResourceOwnerPassword = "password" --- Removido --- não será mais usado
-        public const string DeviceFlow = "urn:ietf:params:oauth:grant-type:device_code";
-    }
-
     public static class AuthorizeRequest
     {
         public const string Scope = "scope";
@@ -674,6 +664,7 @@ public static class OidcConstants
         public const string QueryStringPop = "pop_access_token";
     }
 
+    [Redesign("See: Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectGrantTypes")]
     public static class GrantTypes
     {
         public const string AuthorizationCode = "authorization_code";
