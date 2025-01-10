@@ -8,9 +8,9 @@ public interface IWithClient : IEndpointContextBase
 {
     public bool IsClientRequired { get; }
 
-    public Client? Client { get; }
-
     public string? ClientId { get; }
+
+    public Client? Client { get; }
 
     /// <summary>
     /// Gets or sets the client claims for the current request.

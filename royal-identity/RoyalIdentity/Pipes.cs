@@ -110,7 +110,7 @@ public static class Pipes
 
 
             //////////////////////////////
-            //// RefreshTokenContext
+            //// ClientCredentialsContext
             //////////////////////////////
             var clientCredentialsContextPipe = builder.For<ClientCredentialsContext>()
                 .UseDecorator<EvaluateClient>()
