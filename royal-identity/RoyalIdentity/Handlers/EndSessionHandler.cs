@@ -37,7 +37,7 @@ public class EndSessionHandler : IHandler<EndSessionContext>
             SessionId = sid,
             ShowSignoutPrompt = !canLogoutWithoutUserConfirmation,
             PostLogoutRedirectUri = context.PostLogoutRedirectUri,
-            ClientName = context.Client?.Name,
+            ClientName = context.ClientParameters.Client?.Name,
             State = context.State,
             UiLocales = context.UiLocales
         };
@@ -56,16 +56,16 @@ public class EndSessionHandler : IHandler<EndSessionContext>
 
     private async ValueTask<bool> CanLogoutWithoutUserConfirmation(EndSessionContext context, string sid, CancellationToken ct)
     {
-        if (context.IdToken is null || context.Client is null)
+        if (context.IdToken is null || context.ClientParameters.Client is null)
             return false;
 
-        if (!context.Client.AllowLogoutWithoutUserConfirmation)
+        if (!context.ClientParameters.Client.AllowLogoutWithoutUserConfirmation)
             return false;
 
         var userSession = await userSessionStore.GetUserSessionAsync(sid, ct);
         if (userSession is null)
             return false;
 
-        return userSession.Clients.Count == 1 && userSession.Clients[0] == context.Client.Id;
+        return userSession.Clients.Count == 1 && userSession.Clients[0] == context.ClientParameters.Client.Id;
     }
 }

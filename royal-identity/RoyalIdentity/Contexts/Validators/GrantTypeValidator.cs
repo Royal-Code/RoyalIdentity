@@ -15,9 +15,9 @@ public class GrantTypeValidator : IValidator<ITokenEndpointContextBase>
 
     public ValueTask Validate(ITokenEndpointContextBase context, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
-        if (context.Client.AllowedGrantTypes.Contains(context.GrantType))
+        if (context.ClientParameters.Client.AllowedGrantTypes.Contains(context.GrantType))
         {
             logger.LogError(context, "Client not authorized for code flow");
             context.InvalidGrant("Client not authorized for code flow");

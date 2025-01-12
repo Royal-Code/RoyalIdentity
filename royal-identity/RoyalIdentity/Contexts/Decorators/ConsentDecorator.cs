@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -25,7 +26,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
     {
         logger.LogDebug("Start authorize consent validation");
 
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         if (context.PromptModes.Count is not 0 &&
             !context.PromptModes.Contains(OidcConstants.PromptModes.None) &&
@@ -38,7 +39,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
             return;
         }
 
-        var consentRequired = await consent.RequiresConsentAsync(context.Subject, context.Client, context.Resources, ct);
+        var consentRequired = await consent.RequiresConsentAsync(context.Subject, context.ClientParameters.Client, context.Resources, ct);
 
         if (consentRequired && context.PromptModes.Contains(OidcConstants.PromptModes.None))
         {

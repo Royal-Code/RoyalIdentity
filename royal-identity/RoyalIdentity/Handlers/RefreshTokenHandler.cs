@@ -43,8 +43,9 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 
     public async Task Handle(RefreshTokenContext context, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
         context.AssertHasRefreshToken();
+        var client = context.ClientParameters.Client;
 
         logger.LogDebug("Processing refresh token request.");
 
@@ -64,7 +65,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             return;
         }
 
-        if (context.Client.UpdateAccessTokenClaimsOnRefresh)
+        if (client.UpdateAccessTokenClaimsOnRefresh)
         {
             logger.LogDebug("Creating a new access token");
 
@@ -75,7 +76,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             {
                 HttpContext = context.HttpContext,
                 User = context.GetSubject()!,
-                Client = context.Client,
+                Client = client,
                 Resources = resources,
                 Caller = nameof(RefreshTokenHandler),
             };
@@ -91,7 +92,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             newAccessToken = accessToken.Renew(
                 jti,
                 clock.GetUtcNow().DateTime,
-                context.Client.AccessTokenLifetime);
+                client.AccessTokenLifetime);
 
             if (newAccessToken.AccessTokenType == AccessTokenType.Jwt)
             {
@@ -113,8 +114,8 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             await refreshTokenStore.UpdateAsync(context.RefreshToken, ct);
         }
 
-        if (context.Client.RefreshTokenExpiration == Models.TokenExpiration.Sliding
-            && context.Client.RefreshTokenPostConsumedTimeTolerance == TimeSpan.MaxValue)
+        if (client.RefreshTokenExpiration == Models.TokenExpiration.Sliding
+            && client.RefreshTokenPostConsumedTimeTolerance == TimeSpan.MaxValue)
         {
             // just updates the current token
             logger.LogDebug("Updating Refresh Token");
@@ -133,7 +134,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             {
                 HttpContext = context.HttpContext,
                 Subject = subject,
-                Client = context.Client,
+                Client = client,
                 AccessToken = accessToken,
                 Caller = nameof(AuthorizationCodeHandler)
             };
@@ -154,7 +155,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             {
                 HttpContext = context.HttpContext,
                 User = subject,
-                Client = context.Client,
+                Client = client,
                 Resources = resources,
                 Caller = nameof(AuthorizationCodeHandler),
                 AccessTokenToHash = accessToken.Token,

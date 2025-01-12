@@ -18,9 +18,9 @@ public class ClientResourceDecorator : IDecorator<ClientCredentialsContext>
 
     public async Task Decorate(ClientCredentialsContext context, Func<Task> next, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
-        var client = context.Client;
+        var client = context.ClientParameters.Client;
 
         IEnumerable<string>? scopes;
 

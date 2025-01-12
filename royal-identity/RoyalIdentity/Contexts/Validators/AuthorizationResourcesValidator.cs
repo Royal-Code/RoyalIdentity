@@ -24,7 +24,7 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
     {
         logger.LogDebug("Start validating requested resources.");
 
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         //////////////////////////////////////////////////////////
         // check scope vs response_type plausibility

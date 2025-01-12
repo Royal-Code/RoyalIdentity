@@ -18,7 +18,7 @@ public class ActiveUserValidator : IValidator<ITokenEndpointContextBase>
 
     public async ValueTask Validate(ITokenEndpointContextBase context, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         var subject = context.GetSubject();
 
@@ -28,7 +28,7 @@ public class ActiveUserValidator : IValidator<ITokenEndpointContextBase>
             throw new InvalidOperationException("No subject found in the context.");
         }
 
-        var isActive = await profileService.IsActiveAsync(subject, context.Client, context.GrantType, ct);
+        var isActive = await profileService.IsActiveAsync(subject, context.ClientParameters.Client, context.GrantType, ct);
 
         if (!isActive)
         {

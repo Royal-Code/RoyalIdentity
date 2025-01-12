@@ -28,7 +28,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
 
     public async Task Decorate(IWithResources context, Func<Task> next, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         logger.LogDebug("Start processing requested resources.");
 

@@ -21,7 +21,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
 
     public ValueTask Validate(IWithCodeChallenge context, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         //////////////////////////////////////////////////////////
         // check if PKCE is required and validate parameters
@@ -40,7 +40,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         var codeChallenge = context.CodeChallenge;
         if (codeChallenge.IsMissing())
         {
-            if (context.Client.RequirePkce)
+            if (context.ClientParameters.Client.RequirePkce)
             {
                 logger.LogError(
                     options, 
@@ -82,7 +82,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         }
 
         // check if plain method is allowed
-        if (codeChallengeMethod == CodeChallengeMethods.Plain && !context.Client.AllowPlainTextPkce)
+        if (codeChallengeMethod == CodeChallengeMethods.Plain && !context.ClientParameters.Client.AllowPlainTextPkce)
         {
             logger.LogError(options, "The parameter code_challenge_method of plain is not allowed", codeChallengeMethod, context);
             context.InvalidRequest("Transform algorithm not supported", "code_challenge_method of plain is not allowed");

@@ -33,7 +33,7 @@ public class EndSessionDecorator : IDecorator<EndSessionContext>
             context.IdToken = result.Token;
 
             if (context.ClientId.IsMissing())
-                context.SetClient(result.Token.Client);
+                context.ClientParameters.SetClient(result.Token.Client);
         }
         else if (!context.IsAuthenticated)
         {

@@ -34,7 +34,7 @@ public class DefaultCodeFactory : ICodeFactory
     {
         logger.LogDebug("Creating Authorization Code.");
 
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
         context.AssertHasRedirectUri();
 
         var sid = context.Subject.GetSessionId();
@@ -42,11 +42,11 @@ public class DefaultCodeFactory : ICodeFactory
         var sessionState = sessionStateGenerator.GenerateSessionStateValue(context);
 
         var code = new AuthorizationCode(
-            context.Client.Id,
+            context.ClientParameters.Client.Id,
             context.Subject,
             sessionState,
             time.GetUtcNow().UtcDateTime,
-            context.Client.AuthorizationCodeLifetime,
+            context.ClientParameters.Client.AuthorizationCodeLifetime,
             context.Resources,
             context.RedirectUri)
         {

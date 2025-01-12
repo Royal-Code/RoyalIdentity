@@ -9,7 +9,7 @@ public class AuthorizationContext
 {
     public AuthorizationContext(AuthorizeValidateContext context)
     {
-        Client = context.Client!;
+        Client = context.ClientParameters.Client!;
         RedirectUri = context.RedirectUri!;
         DisplayMode = context.DisplayMode;
         UiLocales = context.UiLocales;

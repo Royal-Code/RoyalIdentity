@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contexts.Items;
+using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Endpoints.Abstractions;
@@ -49,7 +50,7 @@ public class EndSessionContext : EndpointContextBase, IWithClient
 
     public string? LogoutHint { get; }
 
-    public string? ClientId { get; set; }
+    
 
     public string? PostLogoutRedirectUri { get; }
 
@@ -59,31 +60,13 @@ public class EndSessionContext : EndpointContextBase, IWithClient
 
     public EvaluatedToken? IdToken { get; set; }
 
-    public Client? Client { get; private set; }
-
     public bool IsClientRequired => false;
 
-    public HashSet<Claim> ClientClaims { get; } = [];
+    public string? ClientId { get; set; }
 
-    public void SetClient(Client client)
-    {
-        Client = client;
-        ClientId = client.Id;
-        ClientClaims.AddRange(client.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)));
-    }
+    /// <summary>
+    /// Client parameters.
+    /// </summary>
+    public ClientParameters ClientParameters { get; } = new();
 
-#pragma warning disable CS8774
-
-    private bool hasClient;
-
-    [MemberNotNull(nameof(Client), nameof(ClientId))]
-    public void AssertHasClient()
-    {
-        if (hasClient)
-            return;
-
-        hasClient = Items.Get<Asserts>()?.HasClient ?? false;
-        if (!hasClient)
-            throw new InvalidOperationException("Client was required, but is missing");
-    }
 }

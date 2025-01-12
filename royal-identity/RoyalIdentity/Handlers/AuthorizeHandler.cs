@@ -35,7 +35,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
     {
         logger.LogDebug("Handle authorize context start");
 
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         string? codeValue = null;
         string? sessionState = null;
@@ -64,7 +64,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             {
                 HttpContext = context.HttpContext,
                 User = context.Subject,
-                Client = context.Client,
+                Client = context.ClientParameters.Client,
                 Resources = context.Resources,
                 Caller = ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken
             };
@@ -86,7 +86,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             {
                 HttpContext = context.HttpContext,
                 User = context.Subject,
-                Client = context.Client,
+                Client = context.ClientParameters.Client,
                 Resources = context.Resources,
                 Caller = ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
                 Nonce = context.Nonce,

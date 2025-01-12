@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Items;
+using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
@@ -42,20 +43,14 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public bool IsClientRequired => true;
 
     /// <summary>
-    /// Gets or sets the client model.
-    /// </summary>
-    public Client? Client { get; private set; }
-
-    /// <summary>
     /// Gets or sets the client id.
     /// </summary>
     public string? ClientId { get; private set; }
 
     /// <summary>
-    /// Gets or sets the client claims for the current request.
-    /// This value is initally read from the client configuration but can be modified in the request pipeline
+    /// Client parameters.
     /// </summary>
-    public HashSet<Claim> ClientClaims { get; } = [];
+    public ClientParameters ClientParameters { get; } = new();
 
     /// <summary>
     /// Gets or sets the redirect URI.
@@ -192,13 +187,6 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// </summary>
     public string? SessionId => Identity?.FindFirst(c => c.Type == JwtClaimTypes.SessionId)?.Value;
 
-    public void SetClient(Client client)
-    {
-        Client = client;
-        
-        ClientClaims.AddRange(client.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)));
-    }
-
     /// <summary>
     /// <para>
     ///     Use <see cref="EndpointContextBase.Raw"/> to call <see cref="Load(NameValueCollection, ILogger)"/>.
@@ -281,21 +269,9 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
 
 #pragma warning disable CS8774
 
-    private bool hasClient;
     private bool hasRedirectUri;
 
-    [MemberNotNull(nameof(Client), nameof(ClientId))]
-    public void AssertHasClient()
-    {
-        if (hasClient)
-            return;
-
-        hasClient = Items.Get<Asserts>()?.HasClient ?? false;
-        if (!hasClient)
-            throw new InvalidOperationException("Client was required, but is missing");
-    }
-
-    [MemberNotNull(nameof(RedirectUri), nameof(Client), nameof(ClientId))]
+    [MemberNotNull(nameof(RedirectUri), nameof(ClientId))]
     public void AssertHasRedirectUri()
     {
         if (hasRedirectUri)

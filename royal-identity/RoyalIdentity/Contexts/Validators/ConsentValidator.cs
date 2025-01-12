@@ -17,11 +17,11 @@ public class ConsentValidator : IValidator<AuthorizeValidateContext>
 
     public async ValueTask Validate(AuthorizeValidateContext context, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         logger.LogDebug("Start consent validation");
 
-        var concented = await consent.ValidateConsentAsync(context.Subject, context.Client, context.Resources, ct);
+        var concented = await consent.ValidateConsentAsync(context.Subject, context.ClientParameters.Client, context.Resources, ct);
 
         logger.LogDebug("Consent validation result: {Concented}", concented ? "Concented" : "concent required");
 

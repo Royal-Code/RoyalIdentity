@@ -27,7 +27,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
 
     public async Task Decorate(IWithPrompt context, Func<Task> next, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         if (context.PromptModes.Contains(OidcConstants.PromptModes.Login) ||
             context.PromptModes.Contains(OidcConstants.PromptModes.SelectAccount))
@@ -54,7 +54,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
         var isUserActive = identity.IsAuthenticated &&
             await profileService.IsActiveAsync(
                 principal,
-                context.Client,
+                context.ClientParameters.Client,
                 ServerConstants.ProfileIsActiveCallers.AuthorizeEndpoint,
                 ct);
 
@@ -107,7 +107,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
         // check local idp restrictions
         if (currentIdp == ServerConstants.LocalIdentityProvider)
         {
-            if (!context.Client.EnableLocalLogin)
+            if (!context.ClientParameters.Client.EnableLocalLogin)
             {
                 logger.LogInformation("Showing login: User logged in locally, but client does not allow local logins");
 
@@ -120,8 +120,8 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             }
         }
         // check external idp restrictions if user not using local idp
-        else if (context.Client.IdentityProviderRestrictions.Count is not 0 &&
-            !context.Client.IdentityProviderRestrictions.Contains(currentIdp))
+        else if (context.ClientParameters.Client.IdentityProviderRestrictions.Count is not 0 &&
+            !context.ClientParameters.Client.IdentityProviderRestrictions.Contains(currentIdp))
         {
             logger.LogInformation("Showing login: User is logged in with idp: {IdP}, but idp not in client restriction list.", currentIdp);
             context.Response = new InteractionResponse(context)
@@ -133,15 +133,15 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
         }
 
         // check client's user SSO timeout
-        if (context.Client.UserSsoLifetime.HasValue)
+        if (context.ClientParameters.Client.UserSsoLifetime.HasValue)
         {
             var authTimeEpoch = principal.GetAuthenticationTimeEpoch();
             var nowEpoch = time.GetUtcNow().ToUnixTimeSeconds();
 
             var diff = nowEpoch - authTimeEpoch;
-            if (diff > context.Client.UserSsoLifetime.Value)
+            if (diff > context.ClientParameters.Client.UserSsoLifetime.Value)
             {
-                logger.LogInformation("Showing login: User's auth session duration: {SessionDuration} exceeds client's user SSO lifetime: {UserSsoLifetime}.", diff, context.Client.UserSsoLifetime);
+                logger.LogInformation("Showing login: User's auth session duration: {SessionDuration} exceeds client's user SSO lifetime: {UserSsoLifetime}.", diff, context.ClientParameters.Client.UserSsoLifetime);
 
                 logger.LogInformation("Showing login: User is logged in with idp: {IdP}, but idp not in client restriction list.", currentIdp);
                 context.Response = new InteractionResponse(context)

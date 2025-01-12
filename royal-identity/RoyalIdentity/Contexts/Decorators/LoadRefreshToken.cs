@@ -25,10 +25,10 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
     {
         logger.LogDebug("Start loading refresh token");
 
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         var options = context.Items.GetOrCreate<ServerOptions>();
-        var client = context.Client;
+        var client = context.ClientParameters.Client;
         var token = context.Token;
 
         /////////////////////////////////////////////

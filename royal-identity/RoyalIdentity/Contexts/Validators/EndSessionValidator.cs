@@ -16,8 +16,8 @@ public class EndSessionValidator : IValidator<EndSessionContext>
         }
 
         // validate client_id in IdToken and client_id in request
-        if (context.IdToken is not null && context.Client is not null && 
-            context.IdToken.Client.Id != context.Client.Id)
+        if (context.IdToken is not null && context.ClientParameters.Client is not null && 
+            context.IdToken.Client.Id != context.ClientParameters.Client.Id)
         {
             context.InvalidRequest("Invalid client_id in id_token_hint.");
             return default;
@@ -27,14 +27,14 @@ public class EndSessionValidator : IValidator<EndSessionContext>
         if (context.PostLogoutRedirectUri.IsPresent())
         {
             // if client is not informed, then the request is invalid
-            if (context.Client is null)
+            if (context.ClientParameters.Client is null)
             {
                 context.InvalidRequest("Client is not informed.");
                 return default;
             }
 
             // if post_logout_redirect_uri is not in client's list of post_logout_redirect_uris, then the request is invalid
-            if (!context.Client.PostLogoutRedirectUris.Contains(context.PostLogoutRedirectUri))
+            if (!context.ClientParameters.Client.PostLogoutRedirectUris.Contains(context.PostLogoutRedirectUri))
             {
                 context.InvalidRequest("Invalid post_logout_redirect_uri.");
                 return default;

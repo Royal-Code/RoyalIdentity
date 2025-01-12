@@ -21,9 +21,9 @@ public class ResourcesValidator : IValidator<IWithResources>
     {
         logger.LogDebug("Start validation client allowed scopes");
 
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
-        var client = context.Client;
+        var client = context.ClientParameters.Client;
         var resources = context.Resources;
 
         if (resources.OfflineAccess)

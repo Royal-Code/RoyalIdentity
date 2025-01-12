@@ -27,7 +27,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
 
     public async ValueTask Validate(IWithRedirectUri context, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         if (context.RedirectUri.IsMissingOrTooLong(options.InputLengthRestrictions.RedirectUri))
         {
@@ -47,9 +47,9 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         //////////////////////////////////////////////////////////
         // check if client protocol type is oidc
         //////////////////////////////////////////////////////////
-        if (context.Client.ProtocolType is not ServerConstants.ProtocolTypes.OpenIdConnect)
+        if (context.ClientParameters.Client.ProtocolType is not ServerConstants.ProtocolTypes.OpenIdConnect)
         {
-            logger.LogError(options, "Invalid protocol type for OIDC authorize endpoint", context.Client.ProtocolType, context);
+            logger.LogError(options, "Invalid protocol type for OIDC authorize endpoint", context.ClientParameters.Client.ProtocolType, context);
             context.InvalidRequest(OidcConstants.AuthorizeErrors.UnauthorizedClient, "Invalid protocol");
 
             return;
@@ -58,7 +58,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         //////////////////////////////////////////////////////////
         // check if redirect_uri is valid
         //////////////////////////////////////////////////////////
-        if (!await uriValidator.IsRedirectUriValidAsync(context.RedirectUri, context.Client))
+        if (!await uriValidator.IsRedirectUriValidAsync(context.RedirectUri, context.ClientParameters.Client))
         {
             logger.LogError(options, "Invalid redirect_uri", context.RedirectUri, context);
             context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidRequest, "Invalid redirect_uri");

@@ -20,8 +20,8 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
 
     public ValueTask Validate(IAuthorizationContextBase context, CancellationToken ct)
     {
-        context.AssertHasClient();
-
+        context.ClientParameters.AssertHasClient();
+        var client = context.ClientParameters.Client;
 
         ////////////////////////////////////////////////////////////////////////////
         // response_type must be present and supported and allowed for the client
@@ -41,12 +41,12 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             return ValueTask.CompletedTask;
         }
 
-        if (!responseTypes.All(context.Client.AllowedResponseTypes.Contains))
+        if (!responseTypes.All(client.AllowedResponseTypes.Contains))
         {
             logger.LogError(
                 options, 
                 "Response type not allowed for the client",
-                $"{responseTypes.ToSpaceSeparatedString()} - {context.Client.Id} - {context.Client.Name}",
+                $"{responseTypes.ToSpaceSeparatedString()} - {client.Id} - {client.Name}",
                 context);
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not allowed");
             return ValueTask.CompletedTask;
@@ -183,8 +183,8 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         var idp = context.GetIdP();
         if (idp.IsPresent()
-            && context.Client.IdentityProviderRestrictions.Count is not 0
-            && !context.Client.IdentityProviderRestrictions.Contains(idp))
+            && client.IdentityProviderRestrictions.Count is not 0
+            && !client.IdentityProviderRestrictions.Contains(idp))
         {
             logger.LogError(options, "The parameter idp requested is not in client restriction list", idp, context);
             context.RemoveIdP();

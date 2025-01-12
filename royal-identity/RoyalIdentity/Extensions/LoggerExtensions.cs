@@ -106,10 +106,10 @@ public static class LoggerExtensions
             + context.HttpContext.Request.Host.ToString()
             + context.HttpContext.Request.Path.ToString();
 
-        if (context is IWithClient clientContext && clientContext.Client is not null)
+        if (context is IWithClient clientContext && clientContext.ClientParameters.Client is not null)
         {
-            dict["client_id"] = clientContext.Client.Id;
-            dict["client_name"] = clientContext.Client.Name;
+            dict["client_id"] = clientContext.ClientParameters.Client.Id;
+            dict["client_name"] = clientContext.ClientParameters.Client.Name;
         }
 
         return Serialize(dict);

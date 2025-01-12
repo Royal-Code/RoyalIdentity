@@ -16,12 +16,13 @@ public class StateHashDecorator : IDecorator<AuthorizeContext>
 
     public async Task Decorate(AuthorizeContext context, Func<Task> next, CancellationToken ct)
     {
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         if (context.State.IsPresent())
         {
-            var credential = await keyManager.GetSigningCredentialsAsync(context.Client.AllowedIdentityTokenSigningAlgorithms, ct)
-                    ?? throw new InvalidOperationException("No signing credential is configured.");
+            var credential = await keyManager.GetSigningCredentialsAsync(
+                context.ClientParameters.Client.AllowedIdentityTokenSigningAlgorithms,
+                ct) ?? throw new InvalidOperationException("No signing credential is configured.");
 
             var algorithm = credential.Algorithm;
             var stateHash = CryptoHelper.CreateHashClaimValue(context.State, algorithm);

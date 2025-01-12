@@ -116,6 +116,7 @@ public static class Pipes
                 .UseDecorator<EvaluateClient>()
                 .UseValidator<GrantTypeValidator>()
                 .UseDecorator<ClientResourceDecorator>();
+                //.UseValidator<ResourcesValidator>();
 
             options.CustomizeClientCredentialsContext?.Invoke(clientCredentialsContextPipe);
 

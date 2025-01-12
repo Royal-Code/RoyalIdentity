@@ -33,7 +33,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         logger.LogDebug("Handle authorization code context start");
 
         context.AssertHasCode();
-        context.AssertHasClient();
+        context.ClientParameters.AssertHasClient();
 
         AccessToken accessToken;
         RefreshToken? refreshToken = null;
@@ -47,8 +47,8 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             HttpContext = context.HttpContext,
             User = context.AuthorizationCode.Subject,
             Resources = context.Resources,
-            Client = context.Client,
-            Confirmation = context.ClientSecret.Confirmation,
+            Client = context.ClientParameters.Client,
+            Confirmation = context.ClientParameters.Confirmation,
             Caller = nameof(AuthorizationCodeHandler)
         };
 
@@ -64,7 +64,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             {
                 HttpContext = context.HttpContext,
                 Subject = context.AuthorizationCode.Subject,
-                Client = context.Client,
+                Client = context.ClientParameters.Client,
                 AccessToken = accessToken,
                 Caller = nameof(AuthorizationCodeHandler)
             };
@@ -81,7 +81,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             {
                 HttpContext = context.HttpContext,
                 User = context.AuthorizationCode.Subject,
-                Client = context.Client,
+                Client = context.ClientParameters.Client,
                 Resources = context.Resources,
                 Caller = nameof(AuthorizationCodeHandler),
                 Nonce = context.AuthorizationCode.Nonce,

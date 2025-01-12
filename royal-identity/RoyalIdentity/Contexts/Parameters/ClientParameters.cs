@@ -10,8 +10,6 @@ public class ClientParameters
 {
     public Client? Client { get; private set; }
 
-    public string? ClientId => Client?.Id;
-
     public EvaluatedCredential? ClientSecret { get; private set; }
 
     /// <summary>
@@ -30,17 +28,18 @@ public class ClientParameters
     public HashSet<Claim> ClientClaims { get; } = [];
 
 
-    [MemberNotNull(nameof(Client), nameof(ClientId))]
+    [MemberNotNull(nameof(Client))]
     public void AssertHasClient()
     {
-        if (Client is null || ClientId is null)
+        if (Client is null)
             throw new InvalidOperationException("Client was required, but is missing");
     }
 
-    [MemberNotNull(nameof(ClientSecret), nameof(Client), nameof(ClientId))]
+    [MemberNotNull(nameof(ClientSecret), nameof(Client))]
     public void AssertHasClientSecret()
     {
-        if (ClientSecret is null || Client is null || ClientId is null)
+        AssertHasClient();
+        if (ClientSecret is null)
             throw new InvalidOperationException("ClientSecret was required, but is missing");
     }
 
