@@ -1,6 +1,7 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
+using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Storage.InMemory;
 
@@ -68,30 +69,38 @@ public class ResourceStore : IResourceStore
         IEnumerable<string> scopeNames, bool onlyEnabled = false, CancellationToken ct = default)
     {
         Resources resources = new();
+        resources.RequestedScopes.AddRange(scopeNames);
 
         foreach (var scope in scopeNames)
         {
-            resources.RequestedScopes.Add(scope);
             if (scope is OidcConstants.StandardScopes.OfflineAccess)
+            {
                 resources.OfflineAccess = true;
+                continue;
+            }
 
             if (storage.IdentityResources.TryGetValue(scope, out var identityResource)
                 && (!onlyEnabled || identityResource.Enabled))
             {
                 resources.IdentityResources.Add(identityResource);
+                continue;
             }
 
             if (storage.ApiResources.TryGetValue(scope, out var apiResource)
                 && (!onlyEnabled || apiResource.Enabled))
             {
                 resources.ApiResources.Add(apiResource);
+                continue;
             }
 
             if (storage.ApiScopes.TryGetValue(scope, out var apiScope)
                 && (!onlyEnabled || apiScope.Enabled))
             {
                 resources.ApiScopes.Add(apiScope);
+                continue;
             }
+
+            resources.MissingScopes.Add(scope);
         }
 
         return Task.FromResult(resources);

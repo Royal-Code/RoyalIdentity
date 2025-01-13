@@ -8,7 +8,7 @@ using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Decorators;
 
-public class EvaluateClient : IDecorator<IWithClientCredentials>
+public class EvaluateClient : IDecorator<IWithClient>
 {
     private readonly IClientSecretChecker clientSecretChecker;
     private readonly ILogger logger;
@@ -19,7 +19,7 @@ public class EvaluateClient : IDecorator<IWithClientCredentials>
         this.logger = logger;
     }
 
-    public async Task Decorate(IWithClientCredentials context, Func<Task> next, CancellationToken ct)
+    public async Task Decorate(IWithClient context, Func<Task> next, CancellationToken ct)
     {
         logger.LogDebug("Start client evaluation");
 

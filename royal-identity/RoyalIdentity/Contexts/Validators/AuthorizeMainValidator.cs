@@ -95,14 +95,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         // scope must be present
         //////////////////////////////////////////////////////////
-        if (context.RequestedScopes.Count is 0)
+        if (context.Scope.IsMissing())
         {
             logger.LogError(options, "scope is missing", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope);
             return ValueTask.CompletedTask;
         }
 
-        if (context.RequestedScopes.Count > options.InputLengthRestrictions.Scope)
+        if (context.Scope.Length > options.InputLengthRestrictions.Scope)
         {
             logger.LogError(options, "Scopes too long", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "scopes too long");
@@ -122,7 +122,8 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 return ValueTask.CompletedTask;
             }
         }
-        else if (context.Resources.IsOpenId && context.ResponseTypes.Contains(ResponseTypes.Token))
+        else if (context.Resources.IsOpenId && 
+            context.ResponseTypes.Contains(ResponseTypes.Token))
         {
             logger.LogError(options, "Nonce required for implicit flow with openid scope", context);
             context.InvalidRequest("Invalid nonce", "required");

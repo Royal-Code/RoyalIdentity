@@ -17,10 +17,10 @@ public class GrantTypeValidator : IValidator<ITokenEndpointContextBase>
     {
         context.ClientParameters.AssertHasClient();
 
-        if (context.ClientParameters.Client.AllowedGrantTypes.Contains(context.GrantType))
+        if (!context.ClientParameters.Client.AllowedGrantTypes.Contains(context.GrantType))
         {
-            logger.LogError(context, "Client not authorized for code flow");
-            context.InvalidGrant("Client not authorized for code flow");
+            logger.LogError(context, "Client not authorized for flow", context.GrantType);
+            context.InvalidGrant($"Client not authorized for {context.GrantType} flow");
         }
 
         return default;

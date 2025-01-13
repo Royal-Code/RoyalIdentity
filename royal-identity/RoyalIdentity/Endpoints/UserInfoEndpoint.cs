@@ -37,7 +37,7 @@ public class UserInfoEndpoint : IEndpointHandler
         }
 
         // userinfo requires an access token on the request
-        var bearerTokenResult = await bearerTokenValidator.LocatorAsync(httpContext);
+        var bearerTokenResult = await bearerTokenValidator.LocateAsync(httpContext);
         if (!bearerTokenResult.TokenFound)
         {
             logger.LogError("No access token found.");

@@ -32,8 +32,10 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
     {
         logger.LogDebug("Handle authorization code context start");
 
-        context.AssertHasCode();
+        context.CodeParameters.AssertHasCode();
         context.ClientParameters.AssertHasClient();
+        var code = context.CodeParameters.AuthorizationCode;
+        var client = context.ClientParameters.Client;
 
         AccessToken accessToken;
         RefreshToken? refreshToken = null;
@@ -45,9 +47,9 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         var accessTokenRequest = new AccessTokenRequest
         {
             HttpContext = context.HttpContext,
-            User = context.AuthorizationCode.Subject,
-            Resources = context.Resources,
-            Client = context.ClientParameters.Client,
+            User = code.Subject,
+            Resources = code.Resources,
+            Client = client,
             Confirmation = context.ClientParameters.Confirmation,
             Caller = nameof(AuthorizationCodeHandler)
         };
@@ -57,14 +59,13 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
 
         logger.LogDebug("Access token issued");
 
-
-        if (context.Resources.OfflineAccess)
+        if (code.Resources.OfflineAccess)
         {
             var refreshTokenRequest = new RefreshTokenRequest()
             {
                 HttpContext = context.HttpContext,
-                Subject = context.AuthorizationCode.Subject,
-                Client = context.ClientParameters.Client,
+                Subject = code.Subject,
+                Client = client,
                 AccessToken = accessToken,
                 Caller = nameof(AuthorizationCodeHandler)
             };
@@ -75,16 +76,16 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             logger.LogDebug("Refresh token issued");
         }
 
-        if (context.AuthorizationCode.Resources.IsOpenId)
+        if (code.Resources.IsOpenId)
         {
             var idTokenRequest = new IdentityTokenRequest()
             {
                 HttpContext = context.HttpContext,
-                User = context.AuthorizationCode.Subject,
-                Client = context.ClientParameters.Client,
-                Resources = context.Resources,
+                User = code.Subject,
+                Client = client,
+                Resources = code.Resources,
                 Caller = nameof(AuthorizationCodeHandler),
-                Nonce = context.AuthorizationCode.Nonce,
+                Nonce = code.Nonce,
                 AccessTokenToHash = accessToken.Token,
             };
 
@@ -98,7 +99,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             accessToken, 
             refreshToken, 
             identityToken, 
-            context.AuthorizationCode.Resources.RequestedScopes.ToSpaceSeparatedString());
+            code.Resources.RequestedScopes.ToSpaceSeparatedString());
 
         await eventDispatcher.DispatchAsync(atEvent);
 

@@ -103,9 +103,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
             }
         }
 
-        context.RefreshToken = refreshToken;
-        context.TokenFirstConsumedAt = refreshToken.ConsumedTime;
-        context.Items.GetOrCreate<Asserts>().HasToken = true;
+        context.RefreshParameters.SetRefreshToken(refreshToken);
 
         await next();
     }

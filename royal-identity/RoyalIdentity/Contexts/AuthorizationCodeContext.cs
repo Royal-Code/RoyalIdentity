@@ -1,26 +1,25 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Models.Tokens;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using RoyalIdentity.Models;
 using static RoyalIdentity.Options.OidcConstants;
+using RoyalIdentity.Contexts.Parameters;
 
 namespace RoyalIdentity.Contexts;
 
-public class AuthorizationCodeContext : TokenEndpointContextBase, IWithRedirectUri
+public class AuthorizationCodeContext : TokenEndpointContextBase, IWithAuthorizationCode, IWithRedirectUri
 {
+    private bool redirectUriValidated;
+
     public AuthorizationCodeContext(
         HttpContext httpContext,
         NameValueCollection raw,
         string grantType,
         ContextItems? items = null) : base(httpContext, raw, grantType, items)
-    {
-    }
+    { }
 
     public string? RedirectUri { get; private set; }
 
@@ -28,14 +27,9 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithRedirectU
 
     public string? CodeVerifier { get; private set; }
 
-    public AuthorizationCode? AuthorizationCode { get; set; }
+    public CodeParameters CodeParameters { get; } = new();
 
-    public Resources? Resources { get; set; }
-
-    public override ClaimsPrincipal? GetSubject()
-    {
-        return AuthorizationCode?.Subject;
-    }
+    public override ClaimsPrincipal? GetSubject() => CodeParameters.AuthorizationCode?.Subject;
 
     public override void Load(ILogger logger)
     {
@@ -46,30 +40,12 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithRedirectU
         CodeVerifier = Raw.Get(TokenRequest.CodeVerifier);
     }
 
-#pragma warning disable CS8774
-
-    private bool hasCode;
-    private bool hasRedirectUri;
-
-    [MemberNotNull(nameof(Code), nameof(AuthorizationCode), nameof(Resources))]
-    public void AssertHasCode()
-    {
-        if (hasCode)
-            return;
-
-        hasCode = Items.Get<Asserts>()?.HasCode ?? false;
-        if (!hasCode)
-            throw new InvalidOperationException("Code was required, but is missing");
-    }
+    public void RedirectUriValidated() => redirectUriValidated = true;
 
     [MemberNotNull(nameof(RedirectUri))]
     public void AssertHasRedirectUri()
     {
-        if (hasRedirectUri)
-            return;
-
-        hasRedirectUri = Items.Get<Asserts>()?.HasRedirectUri ?? false;
-        if (!hasRedirectUri)
-            throw new InvalidOperationException("Redirect Uri was required, but is missing");
+        if (!redirectUriValidated || RedirectUri is null)
+            throw new InvalidOperationException("Redirect Uri was required, but is missing or not validated");
     }
 }

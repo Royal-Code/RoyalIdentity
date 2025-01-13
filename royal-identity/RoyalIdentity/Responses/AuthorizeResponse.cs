@@ -36,7 +36,7 @@ public class AuthorizeResponse : IResponseHandler
 
     public int? AccessTokenLifetime { get; }
 
-    public string? Scope => Context.RequestedScopes.ToSpaceSeparatedString();
+    public string? Scope => Context.Scope;
 
     public string? State => Context.State;
 

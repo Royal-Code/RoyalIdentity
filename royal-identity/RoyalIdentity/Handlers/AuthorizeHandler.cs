@@ -36,6 +36,8 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
         logger.LogDebug("Handle authorize context start");
 
         context.ClientParameters.AssertHasClient();
+        context.AssertHasRedirectUri();
+        context.AssertResourcesValidated();
 
         string? codeValue = null;
         string? sessionState = null;

@@ -67,6 +67,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPasswordProtector, DefaultPasswordProtector>();
 
         // Decorators
+        services.AddTransient<ClientResourceDecorator>();
         services.AddTransient<ConsentDecorator>();
         services.AddTransient<EndSessionDecorator>();
         services.AddTransient<EvaluateBearerToken>();
@@ -81,19 +82,22 @@ public static class ServiceCollectionExtensions
 
         // Validators
         services.AddTransient<ActiveUserValidator>();
+        services.AddTransient<AuthorizationResourcesValidator>();
         services.AddTransient<AuthorizeMainValidator>();
+        services.AddTransient<ClientCredentialsValidator>();
         services.AddTransient<ConsentValidator>();
         services.AddTransient<EndSessionValidator>();
         services.AddTransient<GrantTypeValidator>();
         services.AddTransient<PkceMatchValidator>();
         services.AddTransient<PkceValidator>();
         services.AddTransient<RedirectUriValidator>();
-        services.AddTransient<AuthorizationResourcesValidator>();
+        services.AddTransient<ResourcesValidator>();
         services.AddTransient<RevocationValidator>();
 
         // Handlers
         services.AddTransient<AuthorizationCodeHandler>();
         services.AddTransient<AuthorizeHandler>();
+        services.AddTransient<ClientResourceHandler>();
         services.AddTransient<DiscoveryHandler>();
         services.AddTransient<EndSessionHandler>();
         services.AddTransient<JwkHandler>();

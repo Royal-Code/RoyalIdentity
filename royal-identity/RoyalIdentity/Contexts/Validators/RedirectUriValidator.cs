@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
@@ -28,6 +27,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
     public async ValueTask Validate(IWithRedirectUri context, CancellationToken ct)
     {
         context.ClientParameters.AssertHasClient();
+        var client = context.ClientParameters.Client;
 
         if (context.RedirectUri.IsMissingOrTooLong(options.InputLengthRestrictions.RedirectUri))
         {
@@ -47,9 +47,9 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         //////////////////////////////////////////////////////////
         // check if client protocol type is oidc
         //////////////////////////////////////////////////////////
-        if (context.ClientParameters.Client.ProtocolType is not ServerConstants.ProtocolTypes.OpenIdConnect)
+        if (client.ProtocolType is not ServerConstants.ProtocolTypes.OpenIdConnect)
         {
-            logger.LogError(options, "Invalid protocol type for OIDC authorize endpoint", context.ClientParameters.Client.ProtocolType, context);
+            logger.LogError(options, "Invalid protocol type for OIDC authorize endpoint", client.ProtocolType, context);
             context.InvalidRequest(OidcConstants.AuthorizeErrors.UnauthorizedClient, "Invalid protocol");
 
             return;
@@ -58,7 +58,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         //////////////////////////////////////////////////////////
         // check if redirect_uri is valid
         //////////////////////////////////////////////////////////
-        if (!await uriValidator.IsRedirectUriValidAsync(context.RedirectUri, context.ClientParameters.Client))
+        if (!await uriValidator.IsRedirectUriValidAsync(context.RedirectUri, client))
         {
             logger.LogError(options, "Invalid redirect_uri", context.RedirectUri, context);
             context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidRequest, "Invalid redirect_uri");
@@ -66,6 +66,6 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
             return;
         }
 
-        context.Items.GetOrCreate<Asserts>().HasRedirectUri = true;
+        context.RedirectUriValidated();
     }
 }

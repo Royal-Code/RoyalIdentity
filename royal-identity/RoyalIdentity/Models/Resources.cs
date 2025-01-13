@@ -74,6 +74,11 @@ public class Resources
     public ICollection<ApiResource> ApiResources { get; } = [];
 
     /// <summary>
+    /// Scopes requested but not found or inactive.
+    /// </summary>
+    public HashSet<string> MissingScopes { get; } = [];
+
+    /// <summary>
     /// Copies the resources to the specified other.
     /// </summary>
     /// <param name="other"></param>
@@ -81,9 +86,6 @@ public class Resources
     {
         other.OfflineAccess = OfflineAccess;
         
-        other.RequestedScopes.Clear();
-        other.RequestedScopes.AddRange(RequestedScopes);
-
         other.IdentityResources.Clear();
         other.IdentityResources.AddRange(IdentityResources);
         
@@ -92,6 +94,9 @@ public class Resources
         
         other.ApiScopes.Clear();
         other.ApiScopes.AddRange(ApiScopes);
+
+        other.MissingScopes.Clear();
+        other.MissingScopes.AddRange(MissingScopes);
     }
 
     public bool TryFindIdentityResourceByName(string name, [NotNullWhen(true)] out IdentityResource? identityResource)
@@ -108,10 +113,20 @@ public class Resources
 
     public IEnumerable<ApiResource> FindApiResourceByScopeName(string name)
     {
-        return ApiResources.Where(r => r.Scopes.Contains(name));
+        return ApiResources.Where(r => r.Scopes.Any(s => s.Contains(name)));
     }
 
-    public bool Any() => RequestedScopes.Count is not 0;
+    /// <summary>
+    /// Count all load resources, except for resources not found or inactive.
+    /// </summary>
+    public int Count => (OfflineAccess ? 1 : 0) + IdentityResources.Count + ApiResources.Count + ApiScopes.Count;
 
-    public bool None() => RequestedScopes.Count is 0;
+    public bool IsValid => MissingScopes.Count is 0 && Count == RequestedScopes.Count;
+
+    public bool Any() => OfflineAccess ||
+        IdentityResources.Count is not 0 ||
+        ApiResources.Count is not 0 ||
+        ApiScopes.Count is not 0;
+
+    public bool None() => !Any();
 }

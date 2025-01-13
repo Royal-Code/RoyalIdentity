@@ -3,7 +3,6 @@ using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 using static RoyalIdentity.Options.OidcConstants;
@@ -36,8 +35,13 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         // check if scopes are valid/supported and check for resource scopes
         //////////////////////////////////////////////////////////
 
-        var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.RequestedScopes, true, ct);
-
+        var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.Resources.RequestedScopes, true, ct);
+        if (resourcesFromStore.MissingScopes.Count is not 0)
+        {
+            logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", string.Join(" ", resourcesFromStore.MissingScopes));
+            context.InvalidRequest(AuthorizeErrors.InvalidScope, "scopes requested are invalid or inactive");
+            return;
+        }
 
         //////////////////////////////////////////////////////////
         // once the requested scopes are validated, we can copy the resources to the context
@@ -48,7 +52,8 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         //////////////////////////////////////////////////////////
         // check for openid scope
         //////////////////////////////////////////////////////////
-        if (!context.Resources.IsOpenId && context.Resources.IdentityResources.Count is not 0)
+        if (!context.Resources.IsOpenId && 
+            context.Resources.IdentityResources.Count is not 0)
         {
             logger.LogError(options, "Identity related scope requests, but no openid scope", context);
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "Identity scopes requested, but openid scope is missing");

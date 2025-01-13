@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -39,7 +38,11 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
             return;
         }
 
-        var consentRequired = await consent.RequiresConsentAsync(context.Subject, context.ClientParameters.Client, context.Resources, ct);
+        var consentRequired = await consent.RequiresConsentAsync(
+            context.Subject, 
+            context.ClientParameters.Client,
+            context.Resources,
+            ct);
 
         if (consentRequired && context.PromptModes.Contains(OidcConstants.PromptModes.None))
         {

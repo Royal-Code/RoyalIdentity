@@ -15,6 +15,9 @@ namespace RoyalIdentity.Contexts;
 
 public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, IWithCodeChallenge
 {
+    private bool redirectUriValidated;
+    private bool resourcesValidated;
+
     public AuthorizeContext(
         HttpContext httpContext,
         NameValueCollection raw,
@@ -75,14 +78,6 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// The response mode.
     /// </value>
     public string? ResponseMode { get; set; }
-
-    /// <summary>
-    /// Gets or sets the requested scopes.
-    /// </summary>
-    /// <value>
-    /// The requested scopes.
-    /// </value>
-    public HashSet<string> RequestedScopes => Resources.RequestedScopes;
 
     /// <summary>
     /// Gets or sets the nonce.
@@ -178,6 +173,11 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public string? IdTokenHint { get; set; }
 
     /// <summary>
+    /// Gets ir sets the <c>scope</c>.
+    /// </summary>
+    public string? Scope { get; set; }
+
+    /// <summary>
     /// The resources of the result.
     /// </summary>
     public Resources Resources { get; } = new();
@@ -205,8 +205,8 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <param name="logger">The logger.</param>
     public virtual void Load(NameValueCollection raw, ILogger logger)
     {
-        var scope = raw.Get(OidcConstants.AuthorizeRequest.Scope);
-        RequestedScopes.AddRange(scope.FromSpaceSeparatedString());
+        Scope = raw.Get(OidcConstants.AuthorizeRequest.Scope);
+        Resources.RequestedScopes.AddRange(Scope.FromSpaceSeparatedString());
 
         var responseType = raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
         ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
@@ -235,7 +235,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
             var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (prompts.All(Constants.SupportedPromptModes.Contains))
             {
-                PromptModes = prompts.ToHashSet();
+                PromptModes = [.. prompts];
             }
             else
             {
@@ -267,18 +267,20 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
         CodeChallengeMethod = raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);
     }
 
-#pragma warning disable CS8774
-
-    private bool hasRedirectUri;
-
-    [MemberNotNull(nameof(RedirectUri), nameof(ClientId))]
+    [MemberNotNull(nameof(RedirectUri))]
     public void AssertHasRedirectUri()
     {
-        if (hasRedirectUri)
-            return;
+        if (!redirectUriValidated || RedirectUri is null)
+            throw new InvalidOperationException("RedirectUri was required, but is missing or invalid");
+    }
 
-        hasRedirectUri = Items.Get<Asserts>()?.HasRedirectUri ?? false;
-        if (!hasRedirectUri)
-            throw new InvalidOperationException("RedirectUri was required, but is missing");
+    public void RedirectUriValidated() => redirectUriValidated = true;
+
+    public void ResourcesValidated() => resourcesValidated = true;
+
+    public void AssertResourcesValidated()
+    {
+        if (!resourcesValidated)
+            throw new InvalidOperationException("Resources validated was required, but was not validated");
     }
 }

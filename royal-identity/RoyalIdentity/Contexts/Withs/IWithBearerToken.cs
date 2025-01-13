@@ -1,16 +1,14 @@
-﻿using RoyalIdentity.Contracts.Models;
+﻿using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Endpoints.Abstractions;
-using System.Diagnostics.CodeAnalysis;
 
 namespace RoyalIdentity.Contexts.Withs;
 
 public interface IWithBearerToken : IContextBase
 {
-
+    /// <summary>
+    /// The access token from the request.
+    /// </summary>
     public string Token { get; }
 
-    EvaluatedToken? EvaluatedToken { get; set; }
-
-    [MemberNotNull(nameof(EvaluatedToken))]
-    public void AssertHasToken();
+    public BearerParameters BearerParameters { get; }
 }

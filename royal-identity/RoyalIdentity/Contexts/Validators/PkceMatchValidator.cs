@@ -17,9 +17,10 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
 
     public ValueTask Validate(AuthorizationCodeContext context, CancellationToken ct)
     {
-        context.AssertHasCode();
+        context.CodeParameters.AssertHasCode();
+        var code = context.CodeParameters.AuthorizationCode;
 
-        if (context.AuthorizationCode.CodeChallenge.IsMissing())
+        if (code.CodeChallenge.IsMissing())
             return default;
 
         if (context.CodeVerifier.IsMissing())
@@ -30,13 +31,13 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         }
 
         bool equals;
-        switch (context.AuthorizationCode.CodeChallengeMethod)
+        switch (code.CodeChallengeMethod)
         {
             case OidcConstants.CodeChallengeMethods.Plain:
 
                 equals = TimeConstantComparer.IsEqual(
                     context.CodeVerifier.Sha256(),
-                    context.AuthorizationCode.CodeChallenge);
+                    code.CodeChallenge);
 
                 if (!equals)
                     context.InvalidGrant("Code verifier does not match code challenge");
@@ -49,7 +50,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
 
                 equals = TimeConstantComparer.IsEqual(
                     transformedCodeVerifier, 
-                    context.AuthorizationCode.CodeChallenge);
+                    code.CodeChallenge);
 
                 if (!equals)
                 {

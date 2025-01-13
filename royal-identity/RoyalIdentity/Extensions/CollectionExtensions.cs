@@ -7,7 +7,7 @@ using System.Text.Encodings.Web;
 
 namespace RoyalIdentity.Extensions;
 
-internal static class CollectionExtensions
+public static class CollectionExtensions
 {
     [DebuggerStepThrough]
     public static NameValueCollection AsNameValueCollection(this IEnumerable<KeyValuePair<string, StringValues>> collection)

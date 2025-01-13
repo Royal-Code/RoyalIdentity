@@ -7,7 +7,7 @@ using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contexts;
 
-public class RevocationContext : EndpointContextBase, IWithClientCredentials
+public class RevocationContext : EndpointContextBase, IWithClient
 {
     public RevocationContext(HttpContext httpContext, NameValueCollection raw, ContextItems items)
         : base(httpContext, raw, items)
@@ -22,7 +22,7 @@ public class RevocationContext : EndpointContextBase, IWithClientCredentials
 
     public bool IsClientRequired => true;
 
-    public string? ClientId { get; private set; }
+    public string? ClientId => ClientParameters.Client?.Id;
 
     public ClientParameters ClientParameters { get; } = new();
 

@@ -62,8 +62,7 @@ public class EvaluateBearerToken : IDecorator<IWithBearerToken>
             return;
         }
 
-        context.EvaluatedToken = evaluationResult.Token;
-        context.Items.GetOrCreate<Asserts>().HasToken = true;
+        context.BearerParameters.EvaluatedToken = evaluationResult.Token;
 
         await next();
     }

@@ -26,6 +26,13 @@ public class ResourcesValidator : IValidator<IWithResources>
         var client = context.ClientParameters.Client;
         var resources = context.Resources;
 
+        if (!resources.IsValid)
+        {
+            logger.LogError(context, "Resources are not load or invalid", context.Scope);
+            context.InvalidRequest(AuthorizeErrors.InvalidScope);
+            return default;
+        }
+
         if (resources.OfflineAccess)
         {
             if (client.AllowOfflineAccess)
@@ -59,6 +66,8 @@ public class ResourcesValidator : IValidator<IWithResources>
                 return default;
             }
         }
+
+        context.ResourcesValidated();
 
         return default;
     }

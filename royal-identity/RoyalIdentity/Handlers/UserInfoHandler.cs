@@ -29,15 +29,16 @@ public class UserInfoHandler : IHandler<UserInfoContext>
     {
         logger.LogDebug("Creating UserInfo response");
 
-        context.AssertHasToken();
+        context.BearerParameters.AssertHasToken();
+        var bearerToken = context.BearerParameters.EvaluatedToken;
 
-        var scopes = context.EvaluatedToken.Principal.Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
+        var scopes = bearerToken.Principal.Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
         var resources = await resourceStore.FindResourcesByScopeAsync(scopes);
 
         var request = new ProfileDataRequest(
             resources,
-            context.EvaluatedToken.Principal,
-            context.EvaluatedToken.Client,
+            bearerToken.Principal,
+            bearerToken.Client,
             nameof(UserInfoHandler),
             resources.RequestedIdentityClaimTypes());
 
@@ -66,9 +67,9 @@ public class UserInfoHandler : IHandler<UserInfoContext>
         var subClaim = outgoingClaims.SingleOrDefault(x => x.Type == JwtClaimTypes.Subject);
         if (subClaim is null)
         {
-            outgoingClaims.Add(new Claim(JwtClaimTypes.Subject, context.EvaluatedToken.Principal.GetSubjectId()));
+            outgoingClaims.Add(new Claim(JwtClaimTypes.Subject, bearerToken.Principal.GetSubjectId()));
         }
-        else if (subClaim.Value != context.EvaluatedToken.Principal.GetSubjectId())
+        else if (subClaim.Value != bearerToken.Principal.GetSubjectId())
         {
             logger.LogError(context, $"Profile service returned incorrect subject value: {subClaim}");
 

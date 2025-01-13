@@ -25,7 +25,7 @@ public class DefaultBearerTokenLocator : IBearerTokenLocator
     /// </summary>
     /// <param name="context">The context.</param>
     /// <returns></returns>
-    public async Task<BearerTokenResult> LocatorAsync(HttpContext context)
+    public async Task<BearerTokenResult> LocateAsync(HttpContext context)
     {
         var authorizationHeader = context.Request.Headers.Authorization.FirstOrDefault();
         if (authorizationHeader.IsPresent())
@@ -57,7 +57,7 @@ public class DefaultBearerTokenLocator : IBearerTokenLocator
     /// </summary>
     /// <param name="context">The context.</param>
     /// <returns></returns>
-    public BearerTokenResult LocatorAuthorizationHeader(string authorizationHeader)
+    private BearerTokenResult LocatorAuthorizationHeader(string authorizationHeader)
     {
         var header = authorizationHeader.Trim();
         if (header.StartsWith(OidcConstants.AuthenticationSchemes.AuthorizationHeaderBearer) && header.Length > 7)
@@ -82,7 +82,7 @@ public class DefaultBearerTokenLocator : IBearerTokenLocator
     /// </summary>
     /// <param name="context">The context.</param>
     /// <returns></returns>
-    public async Task<BearerTokenResult> LocatorPostBodyAsync(HttpContext context)
+    private async Task<BearerTokenResult> LocatorPostBodyAsync(HttpContext context)
     {
         var token = (await context.Request.ReadFormAsync())["access_token"].FirstOrDefault();
         if (token.IsPresent())

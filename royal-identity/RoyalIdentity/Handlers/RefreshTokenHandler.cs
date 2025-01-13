@@ -44,8 +44,9 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
     public async Task Handle(RefreshTokenContext context, CancellationToken ct)
     {
         context.ClientParameters.AssertHasClient();
-        context.AssertHasRefreshToken();
+        context.RefreshParameters.AssertHasRefreshToken();
         var client = context.ClientParameters.Client;
+        var refreshToken = context.RefreshParameters.RefreshToken;
 
         logger.LogDebug("Processing refresh token request.");
 
@@ -57,10 +58,10 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         // Access Token
         /////////////////////////////////////
 
-        var accessToken = await accessTokenStore.GetAsync(context.RefreshToken.AccessTokenId!, ct);
+        var accessToken = await accessTokenStore.GetAsync(refreshToken.AccessTokenId!, ct);
         if (accessToken is null)
         {
-            logger.LogError("Access token not found: {AccessTokenId}", context.RefreshToken.AccessTokenId);
+            logger.LogError("Access token not found: {AccessTokenId}", refreshToken.AccessTokenId);
             context.InvalidGrant("Invalid refresh token");
             return;
         }
@@ -108,10 +109,10 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         // Refresh Token
         /////////////////////////////////////
 
-        if (context.RefreshToken.ConsumedTime is null)
+        if (refreshToken.ConsumedTime is null)
         {
-            context.RefreshToken.ConsumedTime = clock.GetUtcNow().DateTime;
-            await refreshTokenStore.UpdateAsync(context.RefreshToken, ct);
+            refreshToken.ConsumedTime = clock.GetUtcNow().DateTime;
+            await refreshTokenStore.UpdateAsync(refreshToken, ct);
         }
 
         if (client.RefreshTokenExpiration == Models.TokenExpiration.Sliding
@@ -120,11 +121,11 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             // just updates the current token
             logger.LogDebug("Updating Refresh Token");
 
-            newRefreshToken = context.RefreshToken;
+            newRefreshToken = refreshToken;
             newRefreshToken.Claims.RemoveWhere(c => c.Type == JwtClaimTypes.JwtId);
             newRefreshToken.Claims.Add(new Claim(JwtClaimTypes.JwtId, accessToken.Id));
 
-            await refreshTokenStore.UpdateAsync(context.RefreshToken, ct);
+            await refreshTokenStore.UpdateAsync(refreshToken, ct);
         }
         else
         {

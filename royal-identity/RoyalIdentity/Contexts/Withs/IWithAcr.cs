@@ -1,7 +1,4 @@
-﻿using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
-
-namespace RoyalIdentity.Contexts.Withs;
+﻿namespace RoyalIdentity.Contexts.Withs;
 
 public interface IWithAcr : IEndpointContextBase
 {

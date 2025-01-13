@@ -4,7 +4,7 @@ using RoyalIdentity.Contexts.Withs;
 
 namespace RoyalIdentity.Contexts;
 
-public interface ITokenEndpointContextBase : IWithClientCredentials
+public interface ITokenEndpointContextBase : IWithClient
 {
     public string GrantType { get; }
 
