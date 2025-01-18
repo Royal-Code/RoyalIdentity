@@ -97,7 +97,7 @@ public static class ServiceCollectionExtensions
         // Handlers
         services.AddTransient<AuthorizationCodeHandler>();
         services.AddTransient<AuthorizeHandler>();
-        services.AddTransient<ClientResourceHandler>();
+        services.AddTransient<ClientCredentialsHandler>();
         services.AddTransient<DiscoveryHandler>();
         services.AddTransient<EndSessionHandler>();
         services.AddTransient<JwkHandler>();

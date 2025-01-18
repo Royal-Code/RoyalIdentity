@@ -45,11 +45,13 @@ public class Client
     /// <summary>
     /// Gets or sets a value indicating whether [allow offline access]. Defaults to <c>false</c>.
     /// </summary>
+    [Redesign("Incluir no Allowed Resources, ver abaixo")]
     public bool AllowOfflineAccess { get; set; } = false;
 
     /// <summary>
     /// Specifies the api scopes that the client is allowed to request. If empty, the client can't access any scope
     /// </summary>
+    [Redesign("Substituir por Allowed Resources, com divisão dos recursos permitidos por tipo")]
     public HashSet<string> AllowedScopes { get; } = [];
 
     /// <summary>

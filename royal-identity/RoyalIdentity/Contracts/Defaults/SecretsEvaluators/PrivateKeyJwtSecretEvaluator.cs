@@ -91,13 +91,13 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
         catch (Exception ex)
         {
             logger.LogError(context, ex, "Could not parse secrets");
-            return new EvaluatedClient(client, InvalidCredentials);
+            return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
         }
 
         if (!trustedKeys.Any())
         {
             logger.LogError(context, "There are no keys available to validate client assertion.");
-            return new EvaluatedClient(client, InvalidCredentials);
+            return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
         }
 
         var validAudiences = new[]
@@ -134,27 +134,27 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
             if (jwtToken.Subject != jwtToken.Issuer)
             {
                 logger.LogError(context, "Both 'sub' and 'iss' in the client assertion token must have a value of client_id.");
-                return new EvaluatedClient(client, InvalidCredentials);
+                return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
             }
 
             var exp = jwtToken.Payload.Expiration;
             if (!exp.HasValue)
             {
                 logger.LogError(context, "exp is missing.");
-                return new EvaluatedClient(client, InvalidCredentials);
+                return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
             }
 
             var jti = jwtToken.Payload.Jti;
             if (jti.IsMissing())
             {
                 logger.LogError(context, "jti is missing.");
-                return new EvaluatedClient(client, InvalidCredentials);
+                return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
             }
 
             if (await replayCache.ExistsAsync(nameof(PrivateKeyJwtSecretEvaluator), jti))
             {
                 logger.LogError(context, "jti is found in replay cache. Possible replay attack.");
-                return new EvaluatedClient(client, InvalidCredentials);
+                return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
             }
 
             await replayCache.AddAsync(nameof(PrivateKeyJwtSecretEvaluator), jti, DateTimeOffset.FromUnixTimeSeconds(exp.Value).AddMinutes(5));
@@ -162,9 +162,9 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
         catch (Exception e)
         {
             logger.LogError(e, "JWT token validation error");
-            return new EvaluatedClient(client, InvalidCredentials);
+            return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
         }
 
-        return new EvaluatedClient(client, new EvaluatedCredential(ServerConstants.ParsedSecretTypes.JwtBearer, true));
+        return new EvaluatedClient(client, new EvaluatedCredential(ServerConstants.ParsedSecretTypes.JwtBearer, true), AuthenticationMethod);
     }
 }

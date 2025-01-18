@@ -43,10 +43,11 @@ public class DefaultClientSecretChecker : IClientSecretChecker
         {
             var isValid = evaluation.Credential.IsValid ? "secret is valid" : "secret is not valid";
 
-            logger.LogDebug("Client evaluated: {Type}, {Name} ({Id}), {IsValid}", 
+            logger.LogDebug("Client evaluated: {Type}, {Name} ({Id}), {Method}, {IsValid}", 
                 evaluation.Credential.Type, 
                 evaluation.Client.Name,
                 evaluation.Client.Id,
+                evaluation.AuthenticationMethod,
                 isValid);
 
             return evaluation;

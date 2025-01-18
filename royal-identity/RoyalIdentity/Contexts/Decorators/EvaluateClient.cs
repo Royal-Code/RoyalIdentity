@@ -63,7 +63,7 @@ public class EvaluateClient : IDecorator<IWithClient>
             return;
         }
 
-        context.ClientParameters.SetClientAndSecret(evaluatedClient.Client, evaluatedClient.Credential);
+        context.ClientParameters.SetClientAndSecret(evaluatedClient.Client, evaluatedClient.Credential, evaluatedClient.AuthenticationMethod);
         context.Items.GetOrCreate<Asserts>().HasClient = true;
 
         await next();

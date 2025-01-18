@@ -7,14 +7,15 @@ namespace RoyalIdentity.Contracts.Models;
 /// </summary>
 public class EvaluatedClient
 {
-    public EvaluatedClient(Client client, EvaluatedCredential credential)
+    public EvaluatedClient(Client client, EvaluatedCredential credential, string authenticationMethod)
     {
         Client = client ?? throw new ArgumentNullException(nameof(client));
         Credential = credential ?? throw new ArgumentNullException(nameof(credential));
+        AuthenticationMethod = authenticationMethod ?? throw new ArgumentNullException(nameof(authenticationMethod));
     }
 
     /// <summary>
-    /// Gets or sets the identifier associated with this secret
+    /// Gets the identifier associated with this secret
     /// </summary>
     /// <value>
     /// The identifier.
@@ -22,10 +23,18 @@ public class EvaluatedClient
     public Client Client { get; }
 
     /// <summary>
-    /// Gets or sets the credential to verify the secret
+    /// Gets the credential to verify the secret
     /// </summary>
     /// <value>
     /// The credential.
     /// </value>
     public EvaluatedCredential Credential { get; }
+
+    /// <summary>
+    /// Gets the authentication method.
+    /// </summary>
+    /// <value>
+    /// The authentication method.
+    /// </value>
+    public string AuthenticationMethod { get; }
 }

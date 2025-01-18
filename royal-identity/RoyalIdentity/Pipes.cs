@@ -115,12 +115,12 @@ public static class Pipes
             var clientCredentialsContextPipe = builder.For<ClientCredentialsContext>()
                 .UseDecorator<EvaluateClient>()
                 .UseValidator<GrantTypeValidator>()
-                .UseDecorator<ClientResourceDecorator>();
-                //.UseValidator<ResourcesValidator>();
+                .UseDecorator<ClientResourceDecorator>()
+                .UseValidator<ResourcesValidator>();
 
             options.CustomizeClientCredentialsContext?.Invoke(clientCredentialsContextPipe);
 
-            clientCredentialsContextPipe.UseHandler<ClientResourceHandler>();
+            clientCredentialsContextPipe.UseHandler<ClientCredentialsHandler>();
 
 
             //////////////////////////////

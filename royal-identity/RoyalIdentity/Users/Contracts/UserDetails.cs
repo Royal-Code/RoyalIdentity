@@ -3,12 +3,13 @@ using System.Security.Claims;
 namespace RoyalIdentity.Users.Contracts;
 
 #nullable disable // POCO
+#pragma warning disable // POCO
 
 public class UserDetails
 {
     public string Username { get; set; }
 
-    public string PasswordHash { get; set; }
+    public string? PasswordHash { get; set; }
 
     public string DisplayName { get; set; }
 

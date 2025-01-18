@@ -82,12 +82,12 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
             catch (FormatException ex)
             {
                 logger.LogError(context, ex, $"Secret: {secretDescription} uses invalid hashing algorithm.");
-                return new EvaluatedClient(client, InvalidCredentials);
+                return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
             }
             catch (ArgumentNullException ex)
             {
                 logger.LogError(context, ex, $"Secret: {secretDescription} is null.");
-                return new EvaluatedClient(client, InvalidCredentials);
+                return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
             }
 
             switch (secretBytes.Length)
@@ -100,16 +100,16 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
                     break;
                 default:
                     logger.LogError(context, $"Secret: {secretDescription} uses invalid hashing algorithm.");
-                    return new EvaluatedClient(client, InvalidCredentials);
+                    return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
             }
 
             if (isValid)
             {
-                return new EvaluatedClient(client, new EvaluatedCredential(secretType, true, sharedSecret));
+                return new EvaluatedClient(client, new EvaluatedCredential(secretType, true, sharedSecret), AuthenticationMethod);
             }
         }
 
-        return new EvaluatedClient(client, InvalidCredentials);
+        return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
     }
 
 

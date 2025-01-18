@@ -78,7 +78,8 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
                 .Where(s => name.Equals(s.Value, StringComparison.Ordinal))
                 .Select(s => new EvaluatedClient(
                     client,
-                    new EvaluatedCredential(ServerConstants.ParsedSecretTypes.X509Certificate, true, s)))
+                    new EvaluatedCredential(ServerConstants.ParsedSecretTypes.X509Certificate, true, s),
+                    AuthenticationMethod))
                 .FirstOrDefault();
 
             if (result is not null)
@@ -96,7 +97,8 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
                         ServerConstants.ParsedSecretTypes.X509Certificate,
                         true,
                         secret,
-                        clientCertificate.CreateThumbprintCnf())))
+                        clientCertificate.CreateThumbprintCnf()),
+                    AuthenticationMethod))
                 .FirstOrDefault();
 
             if (result is not null)
@@ -105,7 +107,7 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
 
         logger.LogDebug("No x509 name secrets configured for client.");
         logger.LogWarning("No thumbprint found in X509 certificate.");
-        return new EvaluatedClient(client, InvalidCredentials);
+        return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
     }
 
 }

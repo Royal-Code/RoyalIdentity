@@ -37,6 +37,10 @@ public sealed class DefaultIdentityUser : IdentityUser
 
     public override async ValueTask<ValidateCredentialsResult> AuthenticateAndStartSessionAsync(string password, CancellationToken ct = default)
     {
+        // when does not have a password hash, password authentication is not allowed, then return false
+        if (details.PasswordHash is null)
+            return false;
+
         var isValid = await passwordProtector.VerifyPasswordAsync(password, details.PasswordHash, ct);
         if (!isValid)
         {

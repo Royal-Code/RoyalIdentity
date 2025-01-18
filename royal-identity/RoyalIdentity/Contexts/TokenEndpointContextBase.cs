@@ -4,6 +4,7 @@ using RoyalIdentity.Endpoints.Abstractions;
 using System.Collections.Specialized;
 using System.Security.Claims;
 using RoyalIdentity.Contexts.Parameters;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts;
 
@@ -32,4 +33,9 @@ public abstract class TokenEndpointContextBase : EndpointContextBase, ITokenEndp
 
     public abstract ClaimsPrincipal? GetSubject();
 
+    protected void LoadBase(ILogger logger)
+    {
+        ClientId = Raw.Get(TokenRequest.ClientId);
+        Scope = Raw.Get(TokenRequest.Scope);
+    }
 }

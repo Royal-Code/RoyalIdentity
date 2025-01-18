@@ -5,6 +5,7 @@ using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
@@ -61,7 +62,7 @@ public class NoSecretEvaluator : SecretEvaluatorBase
             return null;
         }
 
-        return new EvaluatedClient(client, new EvaluatedCredential(ServerConstants.ParsedSecretTypes.NoSecret, true));
+        return new EvaluatedClient(client, new EvaluatedCredential(ServerConstants.ParsedSecretTypes.NoSecret, true), string.Empty);
     }
 
 }

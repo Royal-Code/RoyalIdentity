@@ -33,8 +33,7 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithAuthoriza
 
     public override void Load(ILogger logger)
     {
-        ClientId = Raw.Get(TokenRequest.ClientId);
-        Scope = Raw.Get(TokenRequest.Scope);
+        LoadBase(logger);
         RedirectUri = Raw.Get(TokenRequest.RedirectUri);
         Code = Raw.Get(TokenRequest.Code);
         CodeVerifier = Raw.Get(TokenRequest.CodeVerifier);
