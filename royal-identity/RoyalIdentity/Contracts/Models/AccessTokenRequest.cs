@@ -1,6 +1,7 @@
 ﻿using RoyalIdentity.Models;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Models;
 
@@ -18,6 +19,15 @@ public class AccessTokenRequest
 
     public required Resources Resources { get; init; }
 
+    /// <summary>
+    /// Gets or sets the type of the identity.
+    /// </summary>
+    /// <value>
+    /// The type of the identity. Default values are defined in <see cref="Constants.IdentityProfileTypes"/>.
+    /// </value>
+    public required string IdentityType { get; set; }
+
+    [Obsolete]
     public required string Caller { get; init; }
 
     /// <summary>

@@ -183,6 +183,12 @@ internal static class Constants
             }
         };
 
+    public static class IdentityProfileTypes
+    {
+        public const string User = nameof(User);
+        public const string Client = nameof(Client);
+    }
+
     public static class UIConstants
     {
         // the limit after which old messages are purged

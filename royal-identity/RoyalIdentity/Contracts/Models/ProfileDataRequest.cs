@@ -23,12 +23,14 @@ public class ProfileDataRequest
         ClaimsPrincipal subject,
         Client client,
         string caller,
+        string identityType,
         IReadOnlyList<string> requestedClaimTypes)
     {
         RequestedResources = requestedResources;
         Subject = subject;
         Client = client;
         Caller = caller;
+        IdentityType = identityType;
         RequestedClaimTypes = requestedClaimTypes;
     }
 
@@ -71,6 +73,14 @@ public class ProfileDataRequest
     /// The caller.
     /// </value>
     public string Caller { get; }
+
+    /// <summary>
+    /// Gets or sets the identity type.
+    /// </summary>
+    /// <value>
+    /// The type of identity.
+    /// </value>
+    public string IdentityType { get; }
 
     /// <summary>
     /// Gets or sets the issued claims.

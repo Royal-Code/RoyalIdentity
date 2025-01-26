@@ -9,6 +9,7 @@ using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
+using static RoyalIdentity.Options.ServerConstants;
 
 namespace RoyalIdentity.Handlers;
 
@@ -39,7 +40,8 @@ public class UserInfoHandler : IHandler<UserInfoContext>
             resources,
             bearerToken.Principal,
             bearerToken.Client,
-            nameof(UserInfoHandler),
+            ProfileDataCallers.UserInfoEndpoint,
+
             resources.RequestedIdentityClaimTypes());
 
         await profileService.GetProfileDataAsync(request, ct);

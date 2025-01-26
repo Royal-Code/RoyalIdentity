@@ -42,7 +42,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
                 resources,
                 subject,
                 client,
-                ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
+                ServerConstants.ProfileDataCallers.ClaimsProviderIdentityToken,
                 resources.RequestedIdentityClaimTypes());
 
             await profileService.GetProfileDataAsync(profileDataRequest, ct);
@@ -105,6 +105,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             subject,
             client,
             ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
+
             resources.RequestedResourcesClaimTypes());
 
         await profileService.GetProfileDataAsync(profileDataRequest, ct);

@@ -19,5 +19,6 @@ public class RefreshTokenRequest
 
     public required AccessToken AccessToken { get; init; }
 
+    [Obsolete]
     public required string Caller { get; init; }
 }
