@@ -1,15 +1,13 @@
-using Polly;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Handlers;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
-using RoyalIdentity.Utils;
 using Tests.Host;
+using static RoyalIdentity.Options.OidcConstants;
 
 #pragma warning disable S1118 // public Program 
 #pragma warning disable S6966 // RunAsync() is not required
@@ -42,8 +40,8 @@ app.MapPost("account/login", async (HttpContext context, ISignInManager signInMa
     else
     {
         return Results.Problem(
-            statusCode: 400, 
-            type: "invalid-credentials", 
+            statusCode: 400,
+            type: "invalid-credentials",
             title: "Invalid credentials",
             detail: result.ErrorMessage);
     }
@@ -58,7 +56,7 @@ app.MapGet("account/profile", async (HttpContext context, IUserStore userManager
 app.MapGet("account/logout", async (HttpContext context, IMessageStore messageStore, ISignOutManager signOutManager) =>
 {
     var logoutId = context.Request.Query["logoutId"].FirstOrDefault()
-        ?? await signOutManager.CreateLogoutIdAsync(context.RequestAborted);
+                   ?? await signOutManager.CreateLogoutIdAsync(context.RequestAborted);
 
     if (logoutId is null)
     {
@@ -87,7 +85,7 @@ app.MapGet("account/logout", async (HttpContext context, IMessageStore messageSt
     return Results.Ok();
 });
 
-app.MapGet("account/token", async (HttpContext context, 
+app.MapGet("account/token", async (HttpContext context,
     IClientStore clients, IResourceStore resources, ITokenFactory tokenFactory) =>
 {
     var user = context.User;
@@ -101,6 +99,7 @@ app.MapGet("account/token", async (HttpContext context,
     {
         return Results.BadRequest("client_id is required");
     }
+
     var client = await clients.FindEnabledClientByIdAsync(clientId, context.RequestAborted);
     if (client is null)
     {
@@ -112,6 +111,7 @@ app.MapGet("account/token", async (HttpContext context,
     {
         return Results.BadRequest("scope is required");
     }
+
     var requestedResources = await resources.FindResourcesByScopeAsync(scope.Split(' '), true, context.RequestAborted);
     if (requestedResources is null)
     {
@@ -124,7 +124,7 @@ app.MapGet("account/token", async (HttpContext context,
         User = user,
         Resources = requestedResources,
         Client = client,
-        Caller = nameof(AuthorizationCodeHandler)
+        IdentityType = IdentityProfileTypes.User
     };
 
     var token = await tokenFactory.CreateAccessTokenAsync(accessTokenRequest, context.RequestAborted);
@@ -137,8 +137,7 @@ app.MapGet("account/token", async (HttpContext context,
             HttpContext = context,
             Subject = user,
             Client = client,
-            AccessToken = token,
-            Caller = nameof(AuthorizationCodeHandler)
+            AccessToken = token
         };
 
         refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, context.RequestAborted);
@@ -153,15 +152,14 @@ app.MapGet("account/token", async (HttpContext context,
             User = user,
             Client = client,
             Resources = requestedResources,
-            AccessTokenToHash = token.Token,
-            Caller = nameof(AuthorizationCodeHandler)
+            AccessTokenToHash = token.Token
         };
 
         idToken = await tokenFactory.CreateIdentityTokenAsync(idTokenRequest, context.RequestAborted);
     }
 
-    return Results.Ok(new 
-    { 
+    return Results.Ok(new
+    {
         access_token = token.Token,
         token_type = "Bearer",
         expires_in = token.Lifetime,
@@ -174,4 +172,6 @@ app.MapGet("account/token", async (HttpContext context,
 app.Run();
 
 
-public partial class Program { }
+public partial class Program
+{
+}

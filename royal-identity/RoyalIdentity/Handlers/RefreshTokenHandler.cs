@@ -79,7 +79,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
                 User = context.GetSubject()!,
                 Client = client,
                 Resources = resources,
-                Caller = nameof(RefreshTokenHandler),
+                IdentityType = IdentityProfileTypes.User,
             };
 
             newAccessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);
@@ -136,8 +136,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
                 HttpContext = context.HttpContext,
                 Subject = subject,
                 Client = client,
-                AccessToken = accessToken,
-                Caller = nameof(AuthorizationCodeHandler)
+                AccessToken = accessToken
             };
 
             newRefreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);
@@ -158,7 +157,6 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
                 User = subject,
                 Client = client,
                 Resources = resources,
-                Caller = nameof(AuthorizationCodeHandler),
                 AccessTokenToHash = accessToken.Token,
             };
 

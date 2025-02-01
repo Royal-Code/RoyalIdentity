@@ -18,9 +18,6 @@ public class IdentityTokenRequest
 
     public required Resources Resources { get; init; }
 
-    [Obsolete]
-    public required string Caller { get; init; }
-
     public string? Nonce { get; init; }
 
     public string? AccessTokenToHash { get; init; }

@@ -3,7 +3,7 @@ Decisões de Arquitetura
 
 ## 1. Introdução
 
-Este documento tem como objetivo apresentar as decisões de arquitetura tomadas durante o desenvolvimento do projeto.
+Este documento visa apresentar as decisões de arquitetura tomadas durante o desenvolvimento do projeto.
 
 ## 2. Metodologia
 

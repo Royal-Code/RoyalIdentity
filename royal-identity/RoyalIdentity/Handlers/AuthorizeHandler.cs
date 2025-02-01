@@ -68,7 +68,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
                 User = context.Subject,
                 Client = context.ClientParameters.Client,
                 Resources = context.Resources,
-                Caller = ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken
+                IdentityType = IdentityProfileTypes.User,
             };
 
             var accessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);
@@ -90,7 +90,6 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
                 User = context.Subject,
                 Client = context.ClientParameters.Client,
                 Resources = context.Resources,
-                Caller = ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
                 Nonce = context.Nonce,
                 AccessTokenToHash = accessTokenValue,
                 AuthorizationCodeToHash = codeValue,

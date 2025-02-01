@@ -5,6 +5,8 @@ using System.Xml.Linq;
 
 namespace RoyalIdentity.Utils;
 
+#nullable disable
+
 public class ECKeyHelper
 {
     /// <summary>
@@ -109,7 +111,7 @@ public class ECKeyHelper
         }
 
         public ECPointSerializable Q { get; set; }
-        public string? D { get; set; }
+        public string D { get; set; }
         public string CurveOid { get; set; }
 
         public ECParameters ToECParameters()

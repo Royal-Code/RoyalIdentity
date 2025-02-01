@@ -9,7 +9,7 @@ using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
-using static RoyalIdentity.Options.ServerConstants;
+using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Handlers;
 
@@ -34,14 +34,13 @@ public class UserInfoHandler : IHandler<UserInfoContext>
         var bearerToken = context.BearerParameters.EvaluatedToken;
 
         var scopes = bearerToken.Principal.Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
-        var resources = await resourceStore.FindResourcesByScopeAsync(scopes);
+        var resources = await resourceStore.FindResourcesByScopeAsync(scopes, ct: ct);
 
         var request = new ProfileDataRequest(
             resources,
             bearerToken.Principal,
             bearerToken.Client,
-            ProfileDataCallers.UserInfoEndpoint,
-
+            IdentityProfileTypes.User,
             resources.RequestedIdentityClaimTypes());
 
         await profileService.GetProfileDataAsync(request, ct);

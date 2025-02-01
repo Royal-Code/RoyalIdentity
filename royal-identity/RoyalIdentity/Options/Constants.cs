@@ -183,12 +183,6 @@ internal static class Constants
             }
         };
 
-    public static class IdentityProfileTypes
-    {
-        public const string User = nameof(User);
-        public const string Client = nameof(Client);
-    }
-
     public static class UIConstants
     {
         // the limit after which old messages are purged
@@ -217,6 +211,7 @@ internal static class Constants
         }
     }
 
+    [Redesign("Useless - Remove")]
     public static class EndpointNames
     {
         public const string Authorize = "Authorize";
@@ -365,6 +360,12 @@ internal static class Constants
 
 public static class OidcConstants
 {
+    public static class IdentityProfileTypes
+    {
+        public const string User = nameof(User);
+        public const string Client = nameof(Client);
+    }
+
     public static class AuthorizeRequest
     {
         public const string Scope = "scope";
@@ -1241,7 +1242,7 @@ public static class ServerConstants
         public const string JsonWebKey = "JWK";
     }
 
-    [Redesign("Ver onde chama e atualizar todos lugares para nomes melhores.")]
+    [Redesign("Remover, pois é usado o IdentityType")]
     public static class ProfileDataCallers
     {
         public const string UserInfoEndpoint = "UserInfoEndpoint";

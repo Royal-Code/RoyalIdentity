@@ -51,7 +51,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             Resources = code.Resources,
             Client = client,
             Confirmation = context.ClientParameters.Confirmation,
-            Caller = nameof(AuthorizationCodeHandler)
+            IdentityType = IdentityProfileTypes.Client,
         };
 
         accessToken = await tokenFactory.CreateAccessTokenAsync(accessTokenRequest, ct);
@@ -66,8 +66,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
                 HttpContext = context.HttpContext,
                 Subject = code.Subject,
                 Client = client,
-                AccessToken = accessToken,
-                Caller = nameof(AuthorizationCodeHandler)
+                AccessToken = accessToken
             };
 
             refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);
@@ -84,7 +83,6 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
                 User = code.Subject,
                 Client = client,
                 Resources = code.Resources,
-                Caller = nameof(AuthorizationCodeHandler),
                 Nonce = code.Nonce,
                 AccessTokenToHash = accessToken.Token,
             };

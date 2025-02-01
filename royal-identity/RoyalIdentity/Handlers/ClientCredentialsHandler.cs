@@ -4,6 +4,7 @@ using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
+using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Handlers;
@@ -31,7 +32,7 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
             User = context.GetSubject()!,
             Client = client,
             Resources = context.Resources,
-            Caller = nameof(ClientCredentialsHandler),
+            IdentityType = OidcConstants.IdentityProfileTypes.Client,
         };
 
 

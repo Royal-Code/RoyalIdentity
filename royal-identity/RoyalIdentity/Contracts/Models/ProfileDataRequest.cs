@@ -16,20 +16,18 @@ public class ProfileDataRequest
     /// <param name="requestedResources">The requested resources.</param>
     /// <param name="subject">The subject.</param>
     /// <param name="client">The client.</param>
-    /// <param name="caller">The caller.</param>
+    /// <param name="identityType">The caller.</param>
     /// <param name="requestedClaimTypes">The requested claim types.</param>
     public ProfileDataRequest(
         Resources requestedResources,
         ClaimsPrincipal subject,
         Client client,
-        string caller,
         string identityType,
         IReadOnlyList<string> requestedClaimTypes)
     {
         RequestedResources = requestedResources;
         Subject = subject;
         Client = client;
-        Caller = caller;
         IdentityType = identityType;
         RequestedClaimTypes = requestedClaimTypes;
     }
@@ -65,14 +63,6 @@ public class ProfileDataRequest
     /// The client id.
     /// </value>
     public Client Client { get; }
-
-    /// <summary>
-    /// Gets or sets the caller.
-    /// </summary>
-    /// <value>
-    /// The caller.
-    /// </value>
-    public string Caller { get; }
 
     /// <summary>
     /// Gets or sets the identity type.
