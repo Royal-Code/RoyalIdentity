@@ -51,6 +51,7 @@ public class DefaultTokenFactory : ITokenFactory
             request.User,
             request.Resources,
             request.Client,
+            request.IdentityType,
             ct));
 
         var jti = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex);

@@ -44,7 +44,7 @@ public class EndSessionHandler : IHandler<EndSessionContext>
 
         var messageId = await messageStore.WriteAsync(new Message<LogoutMessage>(logoutMessage), ct);
 
-        var redirect = options.UserInteraction.LogoutUrl;
+        var redirect = options.UserInteraction.LogoutPath;
 
         if (redirect.IsLocalUrl())
             redirect = context.HttpContext.GetServerRelativeUrl(redirect)!;

@@ -13,7 +13,7 @@ public class UserInteractionOptions
     /// <value>
     /// The login URL.
     /// </value>
-    public string LoginUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Login.EnsureLeadingSlash()!;
+    public string LoginPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Login.EnsureLeadingSlash()!;
 
     /// <summary>
     /// Gets or sets the login return URL parameter.
@@ -21,7 +21,7 @@ public class UserInteractionOptions
     /// <value>
     /// The login return URL parameter.
     /// </value>
-    public string LoginReturnUrlParameter { get; set; } = Constants.UIConstants.DefaultRoutePathParams.Login;
+    public string ReturnUrlParameter { get; set; } = Constants.UIConstants.DefaultRoutePathParams.Login;
 
     /// <summary>
     /// Gets or sets the logout URL. If a local URL, the value must start with a leading slash.
@@ -29,7 +29,7 @@ public class UserInteractionOptions
     /// <value>
     /// The logout URL.
     /// </value>
-    public string LogoutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Logout.EnsureLeadingSlash()!;
+    public string LogoutPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Logout.EnsureLeadingSlash()!;
 
     /// <summary>
     /// Gets or sets the logging out URL. If a local URL, the value must start with a leading slash.

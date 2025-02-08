@@ -42,7 +42,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
                 resources,
                 subject,
                 client,
-                ServerConstants.ProfileDataCallers.ClaimsProviderIdentityToken,
+                OidcConstants.IdentityProfileTypes.User,
                 resources.RequestedIdentityClaimTypes());
 
             await profileService.GetProfileDataAsync(profileDataRequest, ct);
@@ -67,6 +67,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         ClaimsPrincipal subject,
         Resources resources,
         Client client,
+        string identityType,
         CancellationToken ct)
     {
         logger.LogDebug("Getting claims for access token for client: {ClientId}", client.Id);
@@ -104,8 +105,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             resources,
             subject,
             client,
-            ServerConstants.ProfileDataCallers.ClaimsProviderAccessToken,
-
+            identityType,
             resources.RequestedResourcesClaimTypes());
 
         await profileService.GetProfileDataAsync(profileDataRequest, ct);

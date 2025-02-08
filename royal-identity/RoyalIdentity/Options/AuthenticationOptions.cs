@@ -1,4 +1,4 @@
-﻿using Microsoft.Net.Http.Headers;
+﻿using Microsoft.AspNetCore.Http;
 
 namespace RoyalIdentity.Options;
 
@@ -11,17 +11,22 @@ public class AuthenticationOptions
     /// Sets the cookie authentication scheme configured by the host used for interactive users. If not set, the scheme will inferred from the host's default authentication scheme.
     /// This setting is typically used when AddPolicyScheme is used in the host as the default scheme.
     /// </summary>
-    public string? CookieAuthenticationScheme { get; set; }
+    public string? CookieAuthenticationScheme { get; set; } = ServerConstants.DefaultCookieAuthenticationScheme;
 
     /// <summary>
-    /// Sets the cookie lifetime (only effective if the IdentityServer-provided cookie handler is used)
+    /// Gets or sets the cookie name used to persist the user's session details.
+    /// </summary>
+    public string CookieName { get; set; } = ServerConstants.DefaultCookieName;
+
+    /// <summary>
+    /// Sets the cookie lifetime
     /// </summary>
     public TimeSpan CookieLifetime { get; set; } = Constants.DefaultCookieTimeSpan;
 
     /// <summary>
     /// Specified if the cookie should be sliding or not (only effective if the built-in cookie middleware is used)
     /// </summary>
-    public bool CookieSlidingExpiration { get; set; } = false;
+    public bool CookieSlidingExpiration { get; set; } = true;
 
     /// <summary>
     /// Specifies the SameSite mode for the internal authentication and temp cookie

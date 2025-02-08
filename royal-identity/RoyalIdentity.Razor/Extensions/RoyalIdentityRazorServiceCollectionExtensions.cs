@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Options;
 using RoyalIdentity.Razor.Services;
 
 // ReSharper disable once CheckNamespace
@@ -19,12 +21,25 @@ public static class RoyalIdentityRazorServiceCollectionExtensions
         services.AddScoped<IdentityRedirectManager>();
         services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
-        // TODO: Requer configurar com "ServerOptions.Authentication"
         // authentication
-        services.AddAuthentication()
-            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+        services.AddAuthentication().AddCookie(ServerConstants.DefaultCookieAuthenticationScheme);
+        services.AddOptions<CookieAuthenticationOptions>(ServerConstants.DefaultCookieAuthenticationScheme)
+            .Configure<IOptions<ServerOptions>>((cookieOptions, serverOptions) =>
             {
-                options.Events.OnValidatePrincipal = async context =>
+                var authOptions = serverOptions.Value.Authentication;
+                var interactionOptions = serverOptions.Value.UserInteraction;
+                var cookie = cookieOptions.Cookie;
+
+                cookie.Name = authOptions.CookieName;
+                cookie.SameSite = authOptions.CookieSameSiteMode;
+                cookieOptions.ExpireTimeSpan = authOptions.CookieLifetime;
+                cookieOptions.SlidingExpiration = authOptions.CookieSlidingExpiration;
+
+                cookieOptions.LoginPath = interactionOptions.LoginPath;
+                cookieOptions.LogoutPath = interactionOptions.LogoutPath;
+                cookieOptions.ReturnUrlParameter = interactionOptions.ReturnUrlParameter;
+
+                cookieOptions.Events.OnValidatePrincipal = async context =>
                 {
                     if (context.Principal is null)
                         return;

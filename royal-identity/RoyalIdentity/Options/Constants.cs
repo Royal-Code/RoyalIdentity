@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.IdentityModel.Tokens;
 using Polly;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -13,7 +14,8 @@ internal static class Constants
     public const string ExternalAuthenticationMethod = "external";
     public const string DefaultHashAlgorithm = "SHA256";
 
-    public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(10);
+    [Redesign("Colocar em ServiceConstants, com os outros parâmetros de cookie")]
+    public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(1);
     public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(60);
 
     public static readonly HashSet<string> SupportedResponseTypes =
@@ -1175,14 +1177,17 @@ public static class ServerConstants
 {
     public const string LocalIdentityProvider = "local";
 
+    public const string CookiePrefix = ".roid.";
+
     // Cookies padrão do aspnetcore.
-    public const string DefaultCookieAuthenticationScheme = "idsrv";
-    public const string SignoutScheme = "idsrv";
-    public const string ExternalCookieAuthenticationScheme = "idsrv.external";
-    public const string DefaultCheckSessionCookieName = "idsrv.session";
+    public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    public const string SignoutScheme = DefaultCookieAuthenticationScheme;
+    public const string ExternalCookieAuthenticationScheme = $"{DefaultCookieAuthenticationScheme}.External";
+    public const string DefaultCookieName = $"{CookiePrefix}user";
+    public const string DefaultCheckSessionCookieName = $"{CookiePrefix}session";
     public const string AccessTokenAudience = "{0}resources";
 
-    public const string JwtRequestClientKey = "idsrv.jwtrequesturi.client";
+    public const string JwtRequestClientKey = "roid.jwtrequesturi.client";
 
     /// <summary>
     /// Constants for local RoyalIdentity access token authentication.
@@ -1242,14 +1247,7 @@ public static class ServerConstants
         public const string JsonWebKey = "JWK";
     }
 
-    [Redesign("Remover, pois é usado o IdentityType")]
-    public static class ProfileDataCallers
-    {
-        public const string UserInfoEndpoint = "UserInfoEndpoint";
-        public const string ClaimsProviderIdentityToken = "ClaimsProviderIdentityToken";
-        public const string ClaimsProviderAccessToken = "ClaimsProviderAccessToken";
-    }
-
+    [Redesign("Remover e usar outra abordagem se necessário, focada na função em vez do caller")]
     public static class ProfileIsActiveCallers
     {
         public const string AuthorizeEndpoint = "AuthorizeEndpoint";

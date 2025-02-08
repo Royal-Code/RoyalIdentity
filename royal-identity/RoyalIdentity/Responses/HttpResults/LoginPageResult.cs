@@ -29,7 +29,7 @@ public class LoginPageResult(IEndpointContextBase context) : IResult, IStatusCod
             returnUrl = returnUrl.AddQueryString(context.Raw.ToQueryString());
         }
 
-        var loginUrl = options.UserInteraction.LoginUrl;
+        var loginUrl = options.UserInteraction.LoginPath;
         if (!loginUrl.IsLocalUrl())
         {
             // this converts the relative redirect path to an absolute one if we're 
@@ -37,7 +37,7 @@ public class LoginPageResult(IEndpointContextBase context) : IResult, IStatusCod
             returnUrl = httpContext.GetServerHost().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
         }
 
-        var url = loginUrl.AddQueryString(options.UserInteraction.LoginReturnUrlParameter, returnUrl);
+        var url = loginUrl.AddQueryString(options.UserInteraction.ReturnUrlParameter, returnUrl);
         httpContext.Response.RedirectToAbsoluteUrl(url);
     }
 }
