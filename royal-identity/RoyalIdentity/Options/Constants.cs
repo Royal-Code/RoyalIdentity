@@ -68,24 +68,6 @@ internal static class Constants
         return requeriment;
     }
 
-
-    // TODO - not used -- remove
-    //public static readonly Dictionary<string, IEnumerable<string>> AllowedResponseModesForGrantType =
-    //    new()
-    //    {
-    //        {
-    //            GrantType.AuthorizationCode,
-    //            [
-    //                ResponseModes.Query,
-    //                ResponseModes.FormPost,
-    //                ResponseModes.Fragment
-    //            ]
-    //        },
-    //        {
-    //            GrantType.Hybrid, [ ResponseModes.FormPost]
-    //        }
-    //    };
-
     public static readonly List<string> SupportedResponseModes = new()
     {
         ResponseModes.FormPost,
@@ -196,7 +178,6 @@ internal static class Constants
             public const string Login = "returnUrl";
             public const string Consent = "returnUrl";
             public const string Logout = "logoutId";
-            public const string EndSessionCallback = "endSessionId"; // TODO: remove
             public const string Custom = "returnUrl";
             public const string UserCode = "userCode";
         }

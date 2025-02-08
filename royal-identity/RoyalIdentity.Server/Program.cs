@@ -1,6 +1,3 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.Components.Layout;
 using RoyalIdentity.Server;
@@ -37,4 +34,4 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(typeof(AccountLayout).Assembly);
 
-app.Run();
+await app.RunAsync();

@@ -16,6 +16,7 @@ public class CheckSessionResponse : IResponseHandler
 
     public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
     {
-        throw new NotImplementedException();
+        problem = null;
+        return false;
     }
 }
