@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Users.Contracts;
 
-namespace RoyalIdentity.Server.Services;
+namespace RoyalIdentity.Razor.Services;
 
 // This is a server-side AuthenticationStateProvider that revalidates the security stamp for the connected user
 // every 30 minutes an interactive circuit is connected.

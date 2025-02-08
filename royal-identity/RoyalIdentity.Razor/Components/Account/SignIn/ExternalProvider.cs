@@ -1,4 +1,4 @@
-﻿namespace RoyalIdentity.Server.Components.Account.SignIn;
+﻿namespace RoyalIdentity.Razor.Components.Account.SignIn;
 
 #nullable disable // POCO
 

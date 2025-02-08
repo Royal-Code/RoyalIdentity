@@ -1,7 +1,8 @@
-﻿using RoyalIdentity.Users;
+﻿using Microsoft.AspNetCore.Http;
+using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 
-namespace RoyalIdentity.Server.Services;
+namespace RoyalIdentity.Razor.Services;
 
 public class IdentityUserManager
 {

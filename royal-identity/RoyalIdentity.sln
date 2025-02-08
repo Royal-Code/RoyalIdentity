@@ -45,6 +45,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.Integration", "Tests.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.Host", "Tests.Host\Tests.Host.csproj", "{4680BB40-C43E-4054-B787-59376A66D98A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Razor", "RoyalIdentity.Razor\RoyalIdentity.Razor.csproj", "{FC79D48E-0400-47A1-B3BB-77246E712A8D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -95,6 +97,10 @@ Global
 		{4680BB40-C43E-4054-B787-59376A66D98A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4680BB40-C43E-4054-B787-59376A66D98A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4680BB40-C43E-4054-B787-59376A66D98A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC79D48E-0400-47A1-B3BB-77246E712A8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC79D48E-0400-47A1-B3BB-77246E712A8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC79D48E-0400-47A1-B3BB-77246E712A8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC79D48E-0400-47A1-B3BB-77246E712A8D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -112,6 +118,7 @@ Global
 		{071A853D-594E-486C-985F-4C433A1E2DB6} = {D067ACD1-856A-43B9-85DC-5ACDE6F09AA7}
 		{79B3F4EE-4C57-421B-92CC-5BF86473C9D1} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
 		{4680BB40-C43E-4054-B787-59376A66D98A} = {1F6EFB69-0F39-4B4B-B529-B583B801C845}
+		{FC79D48E-0400-47A1-B3BB-77246E712A8D} = {722691C4-EF38-489C-B03E-B53D3C941470}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A22735B7-0B63-4698-8CF5-359FC47E98DD}

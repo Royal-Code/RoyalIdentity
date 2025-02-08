@@ -5,7 +5,7 @@
 ///     A pipeline service for processing an endpoint context from the authentication server.
 /// </para>
 /// <para>
-///     For each configured endpoint, a context object is created via an <see cref="IEndpointHandler{TContext}"/>.
+///     For each configured endpoint, a context object is created via an <see cref="IEndpointHandler"/>.
 /// </para>
 /// <para>
 ///     The context created must be sent for processing through a pipeline, 

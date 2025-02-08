@@ -1,7 +1,8 @@
-using Microsoft.AspNetCore.Components;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http;
 
-namespace RoyalIdentity.Server.Services;
+namespace RoyalIdentity.Razor.Services;
 
 public class IdentityRedirectManager(NavigationManager navigationManager)
 {

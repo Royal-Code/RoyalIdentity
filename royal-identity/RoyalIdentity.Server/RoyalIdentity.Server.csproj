@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity.Razor\RoyalIdentity.Razor.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj" />
 		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
 	</ItemGroup>

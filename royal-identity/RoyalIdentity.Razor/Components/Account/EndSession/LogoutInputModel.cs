@@ -1,4 +1,4 @@
-﻿namespace RoyalIdentity.Server.Components.Account.EndSession;
+﻿namespace RoyalIdentity.Razor.Components.Account.EndSession;
 
 public class LogoutInputModel
 {

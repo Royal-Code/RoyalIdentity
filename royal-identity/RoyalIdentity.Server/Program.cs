@@ -1,4 +1,8 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Razor.Components.Layout;
 using RoyalIdentity.Server;
 using RoyalIdentity.Server.Components;
 
@@ -30,6 +34,7 @@ app.MapOpenIdConnectProviderEndpoints();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(typeof(AccountLayout).Assembly);
 
 app.Run();
