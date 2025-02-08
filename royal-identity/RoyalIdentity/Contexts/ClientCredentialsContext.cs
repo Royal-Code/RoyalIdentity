@@ -6,6 +6,7 @@ using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;
 using System.Security.Claims;
+using RoyalIdentity.Extensions;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts;
@@ -33,7 +34,7 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
 
         var identity = new ClaimsIdentity();
 
-        if (!client.AlwaysSendClientClaims || !client.Claims.Any(x => x.Type == JwtClaimTypes.Subject))
+        if (!client.AlwaysSendClientClaims || client.Claims.All(x => x.Type != JwtClaimTypes.Subject))
             identity.AddClaim(new Claim(JwtClaimTypes.Subject, client.Id));
 
         identity.AddClaim(new(JwtClaimTypes.AuthenticationTime, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
@@ -45,7 +46,11 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
         return principal;
     }
 
-    public override void Load(ILogger logger) => LoadBase(logger);
+    public override void Load(ILogger logger)
+    {
+        LoadBase(logger);
+        Resources.RequestedScopes.AddRange(Scope.FromSpaceSeparatedString());
+    }
 
     public void ResourcesValidated() => resourcesValidated = true;
 

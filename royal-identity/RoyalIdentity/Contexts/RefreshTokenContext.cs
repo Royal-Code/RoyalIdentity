@@ -16,8 +16,7 @@ public class RefreshTokenContext : TokenEndpointContextBase, IWithRefreshToken
     public RefreshTokenContext(
         HttpContext httpContext,
         NameValueCollection raw,
-        string grantType,
-        ContextItems? items = null) : base(httpContext, raw, grantType, items)
+        ContextItems? items = null) : base(httpContext, raw, GrantTypes.RefreshToken, items)
     { }
 
     public string? Token { get; private set; }

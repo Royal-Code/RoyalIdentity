@@ -71,7 +71,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
-        var refresh_token = tokens.RefreshToken!;
+        var refreshToken = tokens.RefreshToken!;
 
         // Act
         var response = await client.PostAsync("/connect/token",
@@ -79,7 +79,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
                 new Dictionary<string, string>
                 {
                     ["grant_type"] = "refresh_token",
-                    ["refresh_token"] = refresh_token,
+                    ["refresh_token"] = refreshToken,
                     ["client_id"] = "demo_client",
                 }));
 

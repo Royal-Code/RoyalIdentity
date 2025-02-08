@@ -60,8 +60,11 @@ public class DefaultTokenFactory : ITokenFactory
         }
 
         // add session id claim
-        var sid = request.User.GetSessionId();
-        claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
+        if (request.IdentityType == OidcConstants.IdentityProfileTypes.User)
+        {
+            var sid = request.User.GetSessionId();
+            claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
+        }
 
         // iat claim as required by JWT profile
         claims.Add(new Claim(JwtClaimTypes.IssuedAt, clock.GetUtcNow().ToUnixTimeSeconds().ToString(),

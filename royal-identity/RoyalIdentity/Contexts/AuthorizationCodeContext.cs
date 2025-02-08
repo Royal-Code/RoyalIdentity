@@ -17,8 +17,7 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithAuthoriza
     public AuthorizationCodeContext(
         HttpContext httpContext,
         NameValueCollection raw,
-        string grantType,
-        ContextItems? items = null) : base(httpContext, raw, grantType, items)
+        ContextItems? items = null) : base(httpContext, raw, GrantTypes.AuthorizationCode, items)
     { }
 
     public string? RedirectUri { get; private set; }

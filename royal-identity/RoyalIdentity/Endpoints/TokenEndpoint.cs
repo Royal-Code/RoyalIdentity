@@ -71,13 +71,13 @@ public class TokenEndpoint : IEndpointHandler
         switch (grantType)
         {
             case GrantTypes.AuthorizationCode:
-                context = new AuthorizationCodeContext(httpContext, parameters, grantType, items);
+                context = new AuthorizationCodeContext(httpContext, parameters, items);
                 break;
             case GrantTypes.RefreshToken:
-                context = new RefreshTokenContext(httpContext, parameters, grantType, items);
+                context = new RefreshTokenContext(httpContext, parameters, items);
                 break;
             case GrantTypes.ClientCredentials:
-
+                context = new ClientCredentialsContext(httpContext, parameters, items);
                 break;
             case GrantTypes.DeviceCode:
 
