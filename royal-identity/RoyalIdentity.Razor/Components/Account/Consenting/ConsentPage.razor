@@ -1,0 +1,177 @@
+@page "/account/consent"
+
+@using RoyalIdentity.Contracts.Models.Messages
+@using RoyalIdentity.Contracts.Storage
+@using RoyalIdentity.Extensions
+@using RoyalIdentity.Users
+@using RoyalIdentity.Users.Contexts
+
+@inject ISignInManager SignInManager
+@inject IMessageStore MessageStore
+@inject NavigationManager NavigationManager
+
+<PageTitle>Consent</PageTitle>
+
+<AccountContent>
+    <div class="lead">
+        @if (viewModel.ClientLogoUrl.IsPresent())
+        {
+            <div class="client-logo">
+                <img src="@viewModel.ClientLogoUrl" alt="Client Logo" />
+            </div>
+        }
+        <h1>
+            @viewModel.ClientName
+            <small class="text-muted">
+                is requesting your permission
+            </small>
+        </h1>
+        <p>
+            Uncheck the permissions you do not wish to grant.
+        </p>
+    </div>
+
+    <StatusMessage Message="@errorMessage" MessageClass="danger"/>
+
+    <EditForm Model="inputModel" method="post" OnValidSubmit="ConsentHandler" form-name="consent">
+        <DataAnnotationsValidator/>
+        <ValidationSummary class="text-danger" role="alert"/>
+
+        <InputText @bind-Value="inputModel.ReturnUrl" type="hidden" />
+
+        @if (inputModel.IdentityScopesConsent.Length is not 0)
+        {
+            <div class="form-floating mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="icon-user"></span>
+                        Personal Information
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        @for (int i = 0; i < inputModel.IdentityScopesConsent.Length; i++)
+                        {
+                            <Scope @bind-Value="inputModel.IdentityScopesConsent[i]" @key="inputModel.IdentityScopesConsent[i].Scope"/>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+
+        @if (inputModel.ApiScopesConsent.Length is not 0)
+        {
+            <div class="form-floating mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="icon-tasks"></span>
+                        Application Access
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        @for (int i = 0; i < inputModel.ApiScopesConsent.Length; i++)
+                        {
+                            <Scope @bind-Value="inputModel.ApiScopesConsent[i]" @key="inputModel.ApiScopesConsent[i].Scope"/>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+
+        <div class="form-floating mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <span class="glyphicon glyphicon-tasks"></span>
+                    Description
+                </div>
+                <div class="card-body">
+                    <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="Description or name of device" auto-focus/>
+                </div>
+            </div>
+            <ValidationMessage For="() => inputModel.Description" class="text-danger"/>
+        </div>
+
+        @if (viewModel.AllowRememberConsent)
+        {
+            <div class="form-floating mb-3">
+                <div class="form-check">
+                    <InputCheckbox @bind-Value="inputModel.RememberConsent" id="RememberConsent" class="darker-border-checkbox form-check-input"/>
+                    <label class="form-check-label" for="RememberConsent">
+                        <strong>Remember My Decision</strong>
+                    </label>
+                </div>
+            </div>
+        }
+
+        <div>
+            <button type="submit" name="button" value="yes" class="w-50 btn btn-lg btn-primary" autofocus>Yes, Allow</button>
+            <button type="submit" name="button" value="no" class="w-50 btn btn-lg btn-primary" autofocus>No, Do Not Allow</button>
+        </div>
+
+        @if (viewModel.ClientUrl.IsPresent())
+        {
+            <a class="btn btn-outline-info" href="@viewModel.ClientUrl">
+                <span class="icon-info-sign"></span>
+                <strong>@viewModel.ClientName</strong>
+            </a>
+        }
+
+    </EditForm>
+</AccountContent>
+
+@code {
+
+    private ConsentViewModel viewModel = null!;
+    private ConsentInputModel inputModel = null!;
+    private string? errorMessage;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromForm]
+    private ConsentInputModel? InputModel { get; set; }
+
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, CancellationToken.None);
+
+        if (context is null)
+        {
+            var error = new ErrorMessage()
+            {
+                ErrorDescription =  $"No consent request matching request: {ReturnUrl}"
+            };
+            var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
+
+            NavigationManager.NavigateTo($"/error?ErrorId={errorId}");
+        }
+
+        viewModel = CreateConsentViewModel(context!);
+
+        inputModel = InputModel ?? new ConsentInputModel()
+        {
+            RememberConsent = true,
+            IdentityScopesConsent = viewModel.CreateIdentityScopes(),
+            ApiScopesConsent = viewModel.CreateApiScopes(),
+            ReturnUrl = ReturnUrl!
+        };
+    }
+
+    private async Task ConsentHandler()
+    {
+        Console.Write(InputModel);
+    }
+
+    private ConsentViewModel CreateConsentViewModel(AuthorizationContext context)
+    {
+        return new ConsentViewModel
+        {
+            ClientName = context.Client.Name,
+            ClientUrl = context.Client.ClientUri,
+            ClientLogoUrl = context.Client.LogoUri,
+            AllowRememberConsent = context.Client.AllowRememberConsent,
+
+            IdentityScopes = context.Resources.IdentityResources,
+            ApiScopes = context.Resources.ApiResources
+        };
+    }
+}

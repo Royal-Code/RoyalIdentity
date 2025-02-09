@@ -39,9 +39,9 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, default);
+        var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, CancellationToken.None);
 
-        var returnUrl = ReturnUrl ?? "account/manage/user-panel";
+        var returnUrl = ReturnUrl ?? "/account/manage/user-panel";
 
         if (context?.IdP is not null && await SchemeProvider.GetSchemeAsync(context.IdP) is not null)
         {
@@ -57,7 +57,7 @@
 
             if (!local)
             {
-                model.ExternalProviders = new[] { new ExternalProvider { AuthenticationScheme = context.IdP } };
+                model.ExternalProviders = [new ExternalProvider { AuthenticationScheme = context.IdP }];
             }
 
             return;

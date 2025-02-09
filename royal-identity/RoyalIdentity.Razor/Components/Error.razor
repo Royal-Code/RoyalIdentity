@@ -1,4 +1,4 @@
-﻿@page "/Error"
+﻿@page "/error"
 
 @using System.Diagnostics
 @using RoyalIdentity.Contracts.Models.Messages
@@ -6,7 +6,7 @@
 @using RoyalIdentity.Extensions
 @using RoyalIdentity.Razor.Components.Account
 
-@inject IMessageStore messageStore
+@inject IMessageStore MessageStore
 
 <PageTitle>Error</PageTitle>
 
@@ -30,7 +30,11 @@
 
         @if (ShowRequestId)
         {
-            <div class="request-id">Request Id: RequestId</div>
+            <div class="request-id">
+                <label>Request Id:</label>
+                <br />
+                <strong>@RequestId</strong>
+            </div>
         }
     </ChildContent>
 </AccountContent>
@@ -61,7 +65,7 @@
         if (ErrorId.IsMissing())
             return;
 
-        var message = await messageStore.ReadAsync<ErrorMessage>(ErrorId, default);
+        var message = await MessageStore.ReadAsync<ErrorMessage>(ErrorId, CancellationToken.None);
         if (message is null)
             return;
 
@@ -70,7 +74,7 @@
         if (errorMessage?.RequestId is not null)
             RequestId = errorMessage.RequestId;
 
-        await messageStore.DeleteAsync(ErrorId, default);
+        await MessageStore.DeleteAsync(ErrorId, CancellationToken.None);
     }
 
     private string GetError() => errorMessage?.Error ?? ErrorType ?? "Error";

@@ -23,6 +23,17 @@ public class MemoryStorage
             AllowedScopes = { "openid", "profile", "email" },
             AllowedResponseTypes = { "code" },
             RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
+        },
+        ["demo_consent_client"] = new Client
+        {
+            Id = "demo_consent_client",
+            Name = "Demo Consent Client",
+            RequireClientSecret = false,
+            AllowOfflineAccess = true,
+            AllowedScopes = { "openid", "profile", "email", "api", "api:read", "api:write"  },
+            AllowedResponseTypes = { "code" },
+            RequireConsent = true,
+            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
         }
     };
 
@@ -74,6 +85,25 @@ public class MemoryStorage
             Description = "Access to the API",
             Required = true,
             Emphasize = false,
+            ShowInDiscoveryDocument = true
+        },
+        ["api:read"] = new ApiScope
+        {
+            Name = "api:read",
+            DisplayName = "API read",
+            Description = "Read values from the API",
+            Required = false,
+            Emphasize = false,
+            ShowInDiscoveryDocument = true
+        }
+        ,
+        ["api:write"] = new ApiScope
+        {
+            Name = "api:write",
+            DisplayName = "API write",
+            Description = "Write values from the API",
+            Required = false,
+            Emphasize = true,
             ShowInDiscoveryDocument = true
         }
     };

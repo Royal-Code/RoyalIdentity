@@ -20,6 +20,21 @@ public class Client
     public string Name { get; set; }
 
     /// <summary>
+    /// Description of the client.
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// URI to further information about client (used on consent screen)
+    /// </summary>
+    public string? ClientUri { get; set; }
+
+    /// <summary>
+    /// URI to client logo (used on consent screen)
+    /// </summary>
+    public string? LogoUri { get; set; }
+
+    /// <summary>
     /// Determines whether the client is enabled.
     /// </summary>
     public bool Enabled { get; set; } = true;

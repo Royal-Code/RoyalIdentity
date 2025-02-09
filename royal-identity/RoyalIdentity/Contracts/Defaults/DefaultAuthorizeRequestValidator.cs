@@ -38,6 +38,7 @@ public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
         }
 
         var context = new AuthorizeValidateContext(httpContext, request.Parameters);
+        context.Load(logger);
 
         await dispatcher.SendAsync(context, ct);
 

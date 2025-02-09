@@ -1,8 +1,16 @@
-﻿@inject NavigationManager NavigationManager
+﻿@using Microsoft.Extensions.Options
+@using RoyalIdentity.Options
+@inject NavigationManager NavigationManager
+
+@inject IOptions<ServerOptions> ServerOptions
 
 @code {
     protected override void OnInitialized()
     {
-        NavigationManager.NavigateTo($"Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
+        var interaction = ServerOptions.Value.UserInteraction;
+        var loginPath = interaction.LoginPath;
+        var loginParam = interaction.ReturnUrlParameter;
+
+        NavigationManager.NavigateTo($"{loginPath}?{loginParam}={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
     }
 }

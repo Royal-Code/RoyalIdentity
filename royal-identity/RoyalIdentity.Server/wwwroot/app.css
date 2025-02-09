@@ -28,38 +28,3 @@ h1:focus {
     border-color: #929292;
 }
 
-.account-page {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 100%;
-}
-
-.brand-header {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    background-color: #fff;
-}
-
-.brand-header img {
-    width: 3rem;
-    margin-top: 1.5rem;
-}
-
-.account-page main {
-    flex: 1 0 auto;
-    min-height: 0;
-    display: grid;
-    box-sizing: border-box;
-    grid-template-rows: [left-start center-start right-start] 1fr [left-end center-end right-end];
-    grid-template-columns: [left-start center-start] 1fr [left-end right-start] 1fr [center-end right-end];
-    align-items: center;
-    justify-content: center;
-    justify-items: center;
-    grid-column-gap: 160px;
-    column-gap: 160px;
-    padding: 80px;
-    width: 100%;
-}

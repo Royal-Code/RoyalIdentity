@@ -1,0 +1,36 @@
+
+@using RoyalIdentity.Extensions
+@inherits Editor<ScopeConsentInputModel>
+
+<li class="list-group-item">
+    <label>
+        <InputCheckbox @bind-Value="Value.Checked"
+                       class="consent-scopecheck"
+                       id="@Id"
+                       disabled="@Value.Required"/>
+
+        <strong>@Value.DisplayName</strong>
+
+        @if (Value.Emphasize)
+        {
+            <span class="icon-exclamation-sign"></span>
+        }
+    </label>
+
+    @if (Value.Required)
+    {
+        <span><em>(required)</em></span>
+    }
+
+    @if (Value.Description.IsPresent())
+    {
+        <div class="consent-description">
+            <label for="@Id">@Value.Description</label>
+        </div>
+    }
+</li>
+
+@code {
+
+    private string Id => $"scopes_{Value.Scope}";
+}

@@ -83,7 +83,8 @@ public static class HttpContextExtensions
     /// <returns></returns>
     public static string? GetServerBasePath(this HttpContext context)
     {
-        return context.Items[Constants.EnvironmentKeys.ServerBasePath] as string;
+        return context.Items[Constants.EnvironmentKeys.ServerBasePath] as string
+            ?? context.Request.PathBase.Value;
     }
 
     /// <summary>

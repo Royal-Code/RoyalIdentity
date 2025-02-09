@@ -69,9 +69,9 @@
 
     public async Task LoginUser()
     {
-        var context = await SignInManager.GetAuthorizationContextAsync(Input.ReturnUrl, default);
+        var context = await SignInManager.GetAuthorizationContextAsync(Input.ReturnUrl, CancellationToken.None);
 
-        var result = await SignInManager.AuthenticateUserAsync(Input.Username!, Input.Password!, default);
+        var result = await SignInManager.AuthenticateUserAsync(Input.Username!, Input.Password!, CancellationToken.None);
 
         if (!result.Success)
         {
@@ -85,7 +85,7 @@
         var evt2 = new UserLoginSuccessEvent(Input.Username!, user, context);
         await EventDispatcher.DispatchAsync(evt2);
 
-        await SignInManager.SignInAsync(user, result.Session, Input.RememberLogin, default);
+        await SignInManager.SignInAsync(user, result.Session, Input.RememberLogin, CancellationToken.None);
 
         if (context is not null)
         {
@@ -102,7 +102,7 @@
             {
                 // The client is native, so this change in how to
                 // return the response is for better UX for the end user.
-                NavigationManager.NavigateTo("/account/signedin?redirectUri=" + redirectUri);
+                NavigationManager.NavigateTo("/account/signedin".AddQueryString("returnUrl", Input.ReturnUrl!));
             }
 
             // we can trust in the redirectUri since GetAuthorizationContextAsync returned non-null

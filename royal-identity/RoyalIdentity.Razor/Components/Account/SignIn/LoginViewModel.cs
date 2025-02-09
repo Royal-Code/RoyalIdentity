@@ -16,8 +16,7 @@ public class LoginViewModel : LoginInputModel
     public ExternalProvider[] GetVisibleExternalProviders()
         => visibleExternalProviders ??= ExternalProviders.Where(static x => !string.IsNullOrWhiteSpace(x.DisplayName)).ToArray();
 
-
-    public bool IsExternalLoginOnly => !EnableLocalLogin && ExternalProviders?.Count() == 1;
+    public bool IsExternalLoginOnly => !EnableLocalLogin && ExternalProviders.Length is 1;
 
     public string? ExternalLoginScheme => IsExternalLoginOnly
         ? ExternalProviders?.SingleOrDefault()?.AuthenticationScheme
