@@ -3,11 +3,15 @@
 @inherits Editor<ScopeConsentInputModel>
 
 <li class="list-group-item">
+
+    <InputText @bind-Value="Value.Scope" type="hidden" name="@($"inputModel.IdentityScopesConsent[{Index}].Scope")" />
+
     <label>
         <InputCheckbox @bind-Value="Value.Checked"
                        class="consent-scopecheck"
                        id="@Id"
-                       disabled="@Value.Required"/>
+                       readonly="@Value.Required"
+                       name="@($"inputModel.IdentityScopesConsent[{Index}].Checked")" />
 
         <strong>@Value.DisplayName</strong>
 
@@ -33,4 +37,8 @@
 @code {
 
     private string Id => $"scopes_{Value.Scope}";
+
+    [Parameter]
+    public int Index { get; set; }
+
 }

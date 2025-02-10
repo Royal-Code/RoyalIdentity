@@ -16,7 +16,7 @@ public class ConsentViewModel
 
     public IEnumerable<ApiResource> ApiScopes { get; set; }
 
-    public ScopeConsentInputModel[] CreateIdentityScopes()
+    public ICollection<ScopeConsentInputModel> CreateIdentityScopes()
     {
         return IdentityScopes.Select(s => new ScopeConsentInputModel()
         {
@@ -25,11 +25,11 @@ public class ConsentViewModel
             DisplayName = s.DisplayName,
             Emphasize = s.Emphasize,
             Required = s.Required,
-            Checked = s.Required
+            Checked = true
         }).ToArray();
     }
 
-    public ScopeConsentInputModel[] CreateApiScopes()
+    public ICollection<ScopeConsentInputModel> CreateApiScopes()
     {
         return ApiScopes.Select(s => new ScopeConsentInputModel()
         {
@@ -38,7 +38,7 @@ public class ConsentViewModel
             DisplayName = s.DisplayName,
             Emphasize = false,
             Required = false,
-            Checked = false
+            Checked = true
         }).ToArray();
     }
 }

@@ -146,6 +146,11 @@ public class DefaultConsentService : IConsentService
             return true;
         }
 
+        if (!subject.IsAuthenticated())
+        {
+            return false;
+        }
+
         var consent = await userConsentStore.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
 
         if (consent is null)

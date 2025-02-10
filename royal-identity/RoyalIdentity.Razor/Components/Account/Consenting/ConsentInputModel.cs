@@ -2,9 +2,9 @@ namespace RoyalIdentity.Razor.Components.Account.Consenting;
 
 public class ConsentInputModel
 {
-    public ScopeConsentInputModel[] IdentityScopesConsent { get; set; }
+    public ICollection<ScopeConsentInputModel> IdentityScopesConsent { get; set; } = [];
 
-    public ScopeConsentInputModel[] ApiScopesConsent { get; set; }
+    public ICollection<ScopeConsentInputModel> ApiScopesConsent { get; set; } = [];
 
     public bool RememberConsent { get; set; }
 

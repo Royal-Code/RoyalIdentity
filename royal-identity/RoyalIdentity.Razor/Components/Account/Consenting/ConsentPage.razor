@@ -20,60 +20,33 @@
                 <img src="@viewModel.ClientLogoUrl" alt="Client Logo" />
             </div>
         }
-        <h1>
-            @viewModel.ClientName
+        <div class="text-center mb-2">
+            <strong class="fs-4">
+                @viewModel.ClientName
+            </strong>
+            <br />
             <small class="text-muted">
                 is requesting your permission
             </small>
-        </h1>
+        </div>
         <p>
-            Uncheck the permissions you do not wish to grant.
+            <small class="fw-light fs-6">
+                Uncheck the permissions you do not wish to grant.
+            </small>
         </p>
     </div>
 
     <StatusMessage Message="@errorMessage" MessageClass="danger"/>
 
-    <EditForm Model="inputModel" method="post" OnValidSubmit="ConsentHandler" form-name="consent">
+    <EditForm Enhance Model="inputModel" method="post" OnValidSubmit="ConsentHandler" FormName="consent">
         <DataAnnotationsValidator/>
         <ValidationSummary class="text-danger" role="alert"/>
 
         <InputText @bind-Value="inputModel.ReturnUrl" type="hidden" />
 
-        @if (inputModel.IdentityScopesConsent.Length is not 0)
-        {
-            <div class="form-floating mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <span class="icon-user"></span>
-                        Personal Information
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        @for (int i = 0; i < inputModel.IdentityScopesConsent.Length; i++)
-                        {
-                            <Scope @bind-Value="inputModel.IdentityScopesConsent[i]" @key="inputModel.IdentityScopesConsent[i].Scope"/>
-                        }
-                    </ul>
-                </div>
-            </div>
-        }
+        <Scopes @bind-Value="inputModel.IdentityScopesConsent" IconClass="icon-user" Description="Personal Information" />
 
-        @if (inputModel.ApiScopesConsent.Length is not 0)
-        {
-            <div class="form-floating mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <span class="icon-tasks"></span>
-                        Application Access
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        @for (int i = 0; i < inputModel.ApiScopesConsent.Length; i++)
-                        {
-                            <Scope @bind-Value="inputModel.ApiScopesConsent[i]" @key="inputModel.ApiScopesConsent[i].Scope"/>
-                        }
-                    </ul>
-                </div>
-            </div>
-        }
+        <Scopes @bind-Value="inputModel.ApiScopesConsent" IconClass="icon-tasks" Description="Application Access" />
 
         <div class="form-floating mb-3">
             <div class="card">
@@ -100,9 +73,9 @@
             </div>
         }
 
-        <div>
-            <button type="submit" name="button" value="yes" class="w-50 btn btn-lg btn-primary" autofocus>Yes, Allow</button>
-            <button type="submit" name="button" value="no" class="w-50 btn btn-lg btn-primary" autofocus>No, Do Not Allow</button>
+        <div class="d-flex justify-content-evenly">
+            <button type="submit" name="button" value="yes" class="btn btn btn-primary" autofocus>Yes, Allow</button>
+            <button type="submit" name="button" value="no" class="btn btn btn-secondary" autofocus>No, Do Not Allow</button>
         </div>
 
         @if (viewModel.ClientUrl.IsPresent())
