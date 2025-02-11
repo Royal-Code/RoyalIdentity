@@ -3,6 +3,7 @@
 @using RoyalIdentity.Contracts.Models.Messages
 @using RoyalIdentity.Contracts.Storage
 @using RoyalIdentity.Extensions
+@using RoyalIdentity.Razor.Components.Shared
 @using RoyalIdentity.Users
 @using RoyalIdentity.Users.Contexts
 
@@ -36,17 +37,23 @@
         </p>
     </div>
 
-    <StatusMessage Message="@errorMessage" MessageClass="danger"/>
+    <StatusMessage Message="@errorMessage" MessageClass="danger" />
 
     <EditForm Enhance Model="inputModel" method="post" OnValidSubmit="ConsentHandler" FormName="consent">
-        <DataAnnotationsValidator/>
-        <ValidationSummary class="text-danger" role="alert"/>
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" role="alert" />
 
         <InputText @bind-Value="inputModel.ReturnUrl" type="hidden" />
 
-        <Scopes @bind-Value="inputModel.IdentityScopesConsent" IconClass="icon-user" Description="Personal Information" />
+        <Scopes @bind-Value="inputModel.IdentityScopesConsent"
+                BindPrefix="inputModel.IdentityScopesConsent"
+                IconClass="icon-user" 
+                Description="Personal Information" />
 
-        <Scopes @bind-Value="inputModel.ApiScopesConsent" IconClass="icon-tasks" Description="Application Access" />
+        <Scopes @bind-Value="inputModel.ApiScopesConsent"
+                BindPrefix="inputModel.ApiScopesConsent"
+                IconClass="icon-tasks"
+                Description="Application Access" />
 
         <div class="form-floating mb-3">
             <div class="card">
@@ -55,17 +62,17 @@
                     Description
                 </div>
                 <div class="card-body">
-                    <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="Description or name of device" auto-focus/>
+                    <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="Description or name of device" auto-focus />
                 </div>
             </div>
-            <ValidationMessage For="() => inputModel.Description" class="text-danger"/>
+            <ValidationMessage For="() => inputModel.Description" class="text-danger" />
         </div>
 
         @if (viewModel.AllowRememberConsent)
         {
             <div class="form-floating mb-3">
                 <div class="form-check">
-                    <InputCheckbox @bind-Value="inputModel.RememberConsent" id="RememberConsent" class="darker-border-checkbox form-check-input"/>
+                    <InputCheckbox @bind-Value="inputModel.RememberConsent" id="RememberConsent" class="darker-border-checkbox form-check-input" />
                     <label class="form-check-label" for="RememberConsent">
                         <strong>Remember My Decision</strong>
                     </label>
@@ -110,9 +117,9 @@
         if (context is null)
         {
             var error = new ErrorMessage()
-            {
-                ErrorDescription =  $"No consent request matching request: {ReturnUrl}"
-            };
+                {
+                    ErrorDescription = $"No consent request matching request: {ReturnUrl}"
+                };
             var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
 
             NavigationManager.NavigateTo($"/error?ErrorId={errorId}");
@@ -121,12 +128,12 @@
         viewModel = CreateConsentViewModel(context!);
 
         inputModel = InputModel ?? new ConsentInputModel()
-        {
-            RememberConsent = true,
-            IdentityScopesConsent = viewModel.CreateIdentityScopes(),
-            ApiScopesConsent = viewModel.CreateApiScopes(),
-            ReturnUrl = ReturnUrl!
-        };
+            {
+                RememberConsent = true,
+                IdentityScopesConsent = viewModel.CreateIdentityScopes(),
+                ApiScopesConsent = viewModel.CreateApiScopes(),
+                ReturnUrl = ReturnUrl!
+            };
     }
 
     private async Task ConsentHandler()
@@ -137,14 +144,14 @@
     private ConsentViewModel CreateConsentViewModel(AuthorizationContext context)
     {
         return new ConsentViewModel
-        {
-            ClientName = context.Client.Name,
-            ClientUrl = context.Client.ClientUri,
-            ClientLogoUrl = context.Client.LogoUri,
-            AllowRememberConsent = context.Client.AllowRememberConsent,
+            {
+                ClientName = context.Client.Name,
+                ClientUrl = context.Client.ClientUri,
+                ClientLogoUrl = context.Client.LogoUri,
+                AllowRememberConsent = context.Client.AllowRememberConsent,
 
-            IdentityScopes = context.Resources.IdentityResources,
-            ApiScopes = context.Resources.ApiResources
-        };
+                IdentityScopes = context.Resources.IdentityResources,
+                ApiScopes = context.Resources.ApiResources
+            };
     }
 }

@@ -14,7 +14,7 @@
                 {
                     var scope = Value.ElementAt(i);
                     var id = $"scopes_{scope.Scope}";
-                    <Scope @bind-Value="scope" Index="i" @key="id" />
+                    <Scope @bind-Value="scope" Index="i" BindPrefix="@BindPrefix" @key="id" />
                 }
             </ul>
         </div>
@@ -28,4 +28,7 @@
 
     [Parameter, EditorRequired]
     public string Description { get; set; }
+
+    [Parameter, EditorRequired]
+    public string BindPrefix { get; set; }
 }

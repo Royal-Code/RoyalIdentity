@@ -4,14 +4,14 @@
 
 <li class="list-group-item">
 
-    <InputText @bind-Value="Value.Scope" type="hidden" name="@($"inputModel.IdentityScopesConsent[{Index}].Scope")" />
+    <InputText @bind-Value="Value.Scope" type="hidden" name="@($"{BindPrefix}[{Index}].Scope")" />
 
     <label>
         <InputCheckbox @bind-Value="Value.Checked"
                        class="consent-scopecheck"
                        id="@Id"
                        readonly="@Value.Required"
-                       name="@($"inputModel.IdentityScopesConsent[{Index}].Checked")" />
+                       name="@($"{BindPrefix}[{Index}].Checked")" />
 
         <strong>@Value.DisplayName</strong>
 
@@ -41,4 +41,6 @@
     [Parameter]
     public int Index { get; set; }
 
+    [Parameter]
+    public string BindPrefix { get; set; }
 }
