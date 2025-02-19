@@ -1,4 +1,3 @@
-
 @using RoyalIdentity.Extensions
 @inherits Editor<ScopeConsentInputModel>
 
@@ -6,23 +5,42 @@
 
     <InputText @bind-Value="Value.Scope" type="hidden" name="@($"{BindPrefix}[{Index}].Scope")" />
 
+    @if (Value.Emphasize)
+    {
+        <div class="icon-exclamation-sign ms-1">
+            <svg width="32" height="32" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="25" cy="25" r="23" fill="#FFC0CB" />
+                <text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" font-family="Roboto" font-size="30" font-weight="bold" fill="red">!</text>
+            </svg>
+        </div>
+    }
+
     <label>
-        <InputCheckbox @bind-Value="Value.Checked"
-                       class="consent-scopecheck"
-                       id="@Id"
-                       readonly="@Value.Required"
-                       name="@($"{BindPrefix}[{Index}].Checked")" />
+        @if (Value.Required)
+        {
+            <input type="checkbox"
+                   class="darker-border-checkbox form-check-input me-1"
+                   id="@Id"
+                   disabled="@Value.Required"
+                   checked="checked" />
+
+            <input type="hidden" value="@Value.Checked.ToString()" name="@($"{BindPrefix}[{Index}].Checked")" />
+        }
+        else
+        {
+            <InputCheckbox @bind-Value="Value.Checked"
+                           class="darker-border-checkbox form-check-input me-1"
+                           id="@Id"
+                           name="@($"{BindPrefix}[{Index}].Checked")" />
+        }
 
         <strong>@Value.DisplayName</strong>
 
-        @if (Value.Emphasize)
-        {
-            <span class="icon-exclamation-sign"></span>
-        }
     </label>
 
     @if (Value.Required)
     {
+        <br />
         <span><em>(required)</em></span>
     }
 

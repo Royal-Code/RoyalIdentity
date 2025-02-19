@@ -64,14 +64,14 @@ public class Consent
     }
 
     /// <summary>
-    /// It informs you that consent has been required during an authorisation.
+    /// It informs you that consent has been required during an authorization.
     /// Consents that have only been granted once can therefore be removed.
     /// </summary>
     /// <returns>
     /// If any consent was removed because it was 'just once', then it returns true. 
     /// If no consent was removed, it returns false.
     /// </returns>
-    public bool Required()
+    public bool RemoveTemporaryConsents()
     {
         if (Scopes is null)
             return false;
@@ -112,7 +112,7 @@ public class ConsentedScope
     /// <value>
     /// The creation time.
     /// </value>
-    public DateTime CreationTime { get; set; }
+    public DateTimeOffset CreationTime { get; set; }
 
     /// <summary>
     /// Gets or sets just once.

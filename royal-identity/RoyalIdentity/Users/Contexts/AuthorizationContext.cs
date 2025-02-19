@@ -2,6 +2,7 @@
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using System.Collections.Specialized;
+using System.Security.Claims;
 
 namespace RoyalIdentity.Users.Contexts;
 
@@ -10,6 +11,7 @@ public class AuthorizationContext
     public AuthorizationContext(AuthorizeValidateContext context)
     {
         Client = context.ClientParameters.Client!;
+        User = context.Subject!;
         RedirectUri = context.RedirectUri!;
         DisplayMode = context.DisplayMode;
         UiLocales = context.UiLocales;
@@ -45,6 +47,11 @@ public class AuthorizationContext
     /// The client.
     /// </summary>
     public Client Client { get; }
+
+    /// <summary>
+    /// The user.
+    /// </summary>
+    public ClaimsPrincipal User { get; set; }
 
     /// <summary>
     /// Gets or sets the redirect URI.

@@ -32,9 +32,9 @@ public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext is null)
         {
-            logger.LogInformation("Authorization validation request is not being executed in an http context");
+            logger.LogInformation("Authorization validation request is not being executed in an HTTP context");
 
-            throw new InvalidOperationException("AuthorizeRequestValidator requires execution under an http context.");
+            throw new InvalidOperationException("AuthorizeRequestValidator requires execution under an HTTP context.");
         }
 
         var context = new AuthorizeValidateContext(httpContext, request.Parameters);

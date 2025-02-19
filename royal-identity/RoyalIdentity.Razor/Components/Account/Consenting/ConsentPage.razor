@@ -1,14 +1,17 @@
 @page "/account/consent"
 
+@using RoyalIdentity.Contracts
 @using RoyalIdentity.Contracts.Models.Messages
 @using RoyalIdentity.Contracts.Storage
 @using RoyalIdentity.Extensions
+@using RoyalIdentity.Models
 @using RoyalIdentity.Razor.Components.Shared
 @using RoyalIdentity.Users
 @using RoyalIdentity.Users.Contexts
 
 @inject ISignInManager SignInManager
 @inject IMessageStore MessageStore
+@inject IConsentService ConsentService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Consent</PageTitle>
@@ -37,34 +40,26 @@
         </p>
     </div>
 
-    <StatusMessage Message="@errorMessage" MessageClass="danger" />
-
     <EditForm Enhance Model="inputModel" method="post" OnValidSubmit="ConsentHandler" FormName="consent">
         <DataAnnotationsValidator />
         <ValidationSummary class="text-danger" role="alert" />
+        <StatusMessage Message="@errorMessage" MessageClass="danger" />
 
         <InputText @bind-Value="inputModel.ReturnUrl" type="hidden" />
 
         <Scopes @bind-Value="inputModel.IdentityScopesConsent"
-                BindPrefix="inputModel.IdentityScopesConsent"
-                IconClass="icon-user" 
-                Description="Personal Information" />
+        BindPrefix="inputModel.IdentityScopesConsent"
+        IconClass="icon-user"
+        Description="Personal Information" />
 
         <Scopes @bind-Value="inputModel.ApiScopesConsent"
-                BindPrefix="inputModel.ApiScopesConsent"
-                IconClass="icon-tasks"
-                Description="Application Access" />
+        BindPrefix="inputModel.ApiScopesConsent"
+        IconClass="icon-tasks"
+        Description="Application Access" />
 
         <div class="form-floating mb-3">
-            <div class="card">
-                <div class="card-header">
-                    <span class="glyphicon glyphicon-tasks"></span>
-                    Description
-                </div>
-                <div class="card-body">
-                    <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="Description or name of device" auto-focus />
-                </div>
-            </div>
+            <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="Description or name of device" auto-focus />
+            <label for="Description" class="form-label">Description</label>
             <ValidationMessage For="() => inputModel.Description" class="text-danger" />
         </div>
 
@@ -80,9 +75,11 @@
             </div>
         }
 
+        <StatusMessage Message="@errorMessage" MessageClass="danger" />
+
         <div class="d-flex justify-content-evenly">
-            <button type="submit" name="button" value="yes" class="btn btn btn-primary" autofocus>Yes, Allow</button>
-            <button type="submit" name="button" value="no" class="btn btn btn-secondary" autofocus>No, Do Not Allow</button>
+            <button type="submit" name="button" value="yes" class="btn btn btn-primary">Yes, Allow</button>
+            <button type="submit" name="button" value="no" class="btn btn btn-secondary">No, Do Not Allow</button>
         </div>
 
         @if (viewModel.ClientUrl.IsPresent())
@@ -98,6 +95,7 @@
 
 @code {
 
+    private AuthorizationContext? authorizationContext;
     private ConsentViewModel viewModel = null!;
     private ConsentInputModel inputModel = null!;
     private string? errorMessage;
@@ -109,36 +107,124 @@
     private ConsentInputModel? InputModel { get; set; }
 
 
-
     protected override async Task OnParametersSetAsync()
     {
-        var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, CancellationToken.None);
-
-        if (context is null)
-        {
-            var error = new ErrorMessage()
-                {
-                    ErrorDescription = $"No consent request matching request: {ReturnUrl}"
-                };
-            var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
-
-            NavigationManager.NavigateTo($"/error?ErrorId={errorId}");
-        }
-
-        viewModel = CreateConsentViewModel(context!);
-
-        inputModel = InputModel ?? new ConsentInputModel()
-            {
-                RememberConsent = true,
-                IdentityScopesConsent = viewModel.CreateIdentityScopes(),
-                ApiScopesConsent = viewModel.CreateApiScopes(),
-                ReturnUrl = ReturnUrl!
-            };
+        var context = await GetAuthorizationContextAsync(ReturnUrl);
+        CreateModels(context);
     }
 
     private async Task ConsentHandler()
     {
-        Console.Write(InputModel);
+        ArgumentNullException.ThrowIfNull(InputModel);
+
+        inputModel = InputModel;
+        errorMessage = null;
+
+        var context = await GetAuthorizationContextAsync(InputModel.ReturnUrl);
+        viewModel = CreateConsentViewModel(context);
+
+        // Validate remember consent
+        if (InputModel.RememberConsent && !viewModel.AllowRememberConsent)
+        {
+            // User is trying to remember consent but client does not allow it
+            errorMessage = "Client does not allow consent to be remembered.";
+
+            InputModel.RememberConsent = false;
+
+            CreateModels(context);
+            return;
+        }
+
+        // validate required scopes
+        foreach (var scope in viewModel.IdentityScopes)
+        {
+            var inputModel = InputModel.IdentityScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
+            if (scope.Required && inputModel?.Checked is not true)
+            {
+                errorMessage = "Required scope not granted.";
+                CreateModels(context);
+                return;
+            }
+        }
+        foreach (var scope in viewModel.ApiScopes)
+        {
+            var inputModel = InputModel.ApiScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
+            if (scope.Required && inputModel?.Checked is not true)
+            {
+                errorMessage = "Required scope not granted.";
+                CreateModels(context);
+                return;
+            }
+        }
+
+        if (errorMessage is null)
+        {
+            var subject = context.User;
+            var client = context.Client;
+            var consentedScopes = new List<ConsentedScope>();
+
+            consentedScopes.AddRange(inputModel.IdentityScopesConsent
+                .Where(s => s.Checked)
+                .Select(s => new ConsentedScope()
+                    {
+                        Scope = s.Scope,
+                        Description = inputModel.Description,
+                        CreationTime = DateTimeOffset.UtcNow,
+                        JustOnce = !inputModel.RememberConsent
+                    }));
+
+            consentedScopes.AddRange(inputModel.ApiScopesConsent
+                .Where(s => s.Checked)
+                .Select(s => new ConsentedScope()
+                    {
+                        Scope = s.Scope,
+                        Description = inputModel.Description,
+                        CreationTime = DateTimeOffset.UtcNow,
+                        JustOnce = !inputModel.RememberConsent
+                    }));
+
+            await ConsentService.UpdateConsentAsync(subject, client, consentedScopes, CancellationToken.None);
+            
+            NavigationManager.NavigateTo(InputModel.ReturnUrl, true);
+        }
+
+        CreateModels(context);
+    }
+
+    private void CreateModels(AuthorizationContext context)
+    {
+        viewModel ??= CreateConsentViewModel(context);
+
+        if (inputModel is null)
+        {
+            inputModel = new ConsentInputModel()
+                {
+                    RememberConsent = true,
+                    IdentityScopesConsent = viewModel.CreateIdentityScopes(),
+                    ApiScopesConsent = viewModel.CreateApiScopes(),
+                    ReturnUrl = ReturnUrl!
+                };
+        }
+        else
+        {
+            var identityScopesConsent = viewModel.CreateIdentityScopes();
+            foreach (var scope in identityScopesConsent)
+            {
+                var inputScope = inputModel.IdentityScopesConsent.FirstOrDefault(s => s.Scope == scope.Scope);
+                if (inputScope is not null)
+                    scope.Checked = inputScope.Checked;
+            }
+            var apiScopesConsent = viewModel.CreateApiScopes();
+            foreach (var scope in apiScopesConsent)
+            {
+                var inputScope = inputModel.ApiScopesConsent.FirstOrDefault(s => s.Scope == scope.Scope);
+                if (inputScope is not null)
+                    scope.Checked = inputScope.Checked;
+            }
+
+            inputModel.IdentityScopesConsent = identityScopesConsent;
+            inputModel.ApiScopesConsent = apiScopesConsent;
+        }
     }
 
     private ConsentViewModel CreateConsentViewModel(AuthorizationContext context)
@@ -151,7 +237,26 @@
                 AllowRememberConsent = context.Client.AllowRememberConsent,
 
                 IdentityScopes = context.Resources.IdentityResources,
-                ApiScopes = context.Resources.ApiResources
+                ApiScopes = context.Resources.ApiScopes
             };
+    }
+
+    private async Task<AuthorizationContext> GetAuthorizationContextAsync(string? returnUrl)
+    {
+        if (authorizationContext is null)
+            authorizationContext = await SignInManager.GetAuthorizationContextAsync(returnUrl, CancellationToken.None);
+
+        if (authorizationContext is null)
+        {
+            var error = new ErrorMessage()
+                {
+                    ErrorDescription = $"No consent request matching request: {ReturnUrl}"
+                };
+            var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
+
+            NavigationManager.NavigateTo($"/error?ErrorId={errorId}", true);
+        }
+
+        return authorizationContext!;
     }
 }

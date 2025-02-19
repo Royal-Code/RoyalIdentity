@@ -13,7 +13,7 @@ public class DefaultConsentService : IConsentService
     private readonly TimeProvider clock;
 
     public DefaultConsentService(
-        IUserConsentStore userConsentStore, 
+        IUserConsentStore userConsentStore,
         TimeProvider clock,
         ILogger<DefaultConsentService> logger)
     {
@@ -80,7 +80,8 @@ public class DefaultConsentService : IConsentService
             requiresConsent = true;
         }
 
-        if (!requiresConsent && consent.Required())
+        // when not requiring consent, but has temporary consent, remove it and update the store
+        if (!requiresConsent && consent.RemoveTemporaryConsents())
         {
             await userConsentStore.StoreUserConsentAsync(consent, ct);
         }
@@ -90,46 +91,38 @@ public class DefaultConsentService : IConsentService
 
     public async Task UpdateConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<ConsentedScope> scopes, CancellationToken ct)
     {
-        if (client.AllowRememberConsent)
+        var subjectId = subject.GetSubjectId();
+        var clientId = client.Id;
+
+        if (scopes.None())
         {
-            var subjectId = subject.GetSubjectId();
-            var clientId = client.Id;
+            logger.LogDebug(
+                "No scopes provided. Removing consent from consent store for subject: {Subject}, {Client}",
+                subjectId,
+                clientId);
 
-            if (scopes.Any())
-            {
-                logger.LogDebug(
-                    "Client allows remembering consent, and consent given. Updating consent store for subject: {Subject}",
-                    subject.GetSubjectId());
-
-                var now = clock.GetUtcNow().UtcDateTime;
-
-                // tries to get an existing consent, if it doesn't exist then it creates
-                var consent = await userConsentStore.GetUserConsentAsync(subjectId, clientId, ct);
-                consent ??= new Consent
-                {
-                    CreationTime = now,
-                    SubjectId = subjectId,
-                    ClientId = clientId,
-                };
-
-                consent.AddScopes(scopes);
-
-                if (client.ConsentLifetime.HasValue)
-                {
-                    consent.Expiration = now.AddSeconds(client.ConsentLifetime.Value);
-                }
-
-                await userConsentStore.StoreUserConsentAsync(consent, ct);
-            }
-            else
-            {
-                logger.LogDebug(
-                    "Client allows remembering consent, and no scopes provided. Removing consent from consent store for subject: {Subject}", 
-                    subject.GetSubjectId());
-
-                await userConsentStore.RemoveUserConsentAsync(subjectId, clientId, ct);
-            }
+            await userConsentStore.RemoveUserConsentAsync(subjectId, clientId, ct);
         }
+
+        var now = clock.GetUtcNow().UtcDateTime;
+
+        // tries to get an existing consent, if it doesn't exist then it creates
+        var consent = await userConsentStore.GetUserConsentAsync(subjectId, clientId, ct);
+        consent ??= new Consent
+        {
+            CreationTime = now,
+            SubjectId = subjectId,
+            ClientId = clientId,
+        };
+
+        consent.AddScopes(scopes);
+
+        if (client.ConsentLifetime.HasValue)
+        {
+            consent.Expiration = now.AddSeconds(client.ConsentLifetime.Value);
+        }
+
+        await userConsentStore.StoreUserConsentAsync(consent, ct);
     }
 
     public async ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, Resources resources, CancellationToken ct)
@@ -173,13 +166,9 @@ public class DefaultConsentService : IConsentService
             consented = resources.RequestedScopes.Count == intersectCount;
 
             if (consented)
-            {
                 logger.LogDebug("Consent found in consent store is same as current request, consent validation success");
-            }
             else
-            {
                 logger.LogDebug("Consent found in consent store is different than current request, consent validation failure");
-            }
         }
         else
         {

@@ -23,7 +23,7 @@ public class ConsentValidator : IValidator<AuthorizeValidateContext>
 
         var concented = await consent.ValidateConsentAsync(context.Subject, context.ClientParameters.Client, context.Resources, ct);
 
-        logger.LogDebug("Consent validation result: {Concented}", concented ? "Concented" : "concent required");
+        logger.LogDebug("Consent validation result: {Consented}", concented ? "Consented" : "consent required");
 
         context.RequiredConsent = !concented;
     }
