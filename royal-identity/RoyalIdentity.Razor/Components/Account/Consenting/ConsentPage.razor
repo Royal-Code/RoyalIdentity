@@ -185,7 +185,8 @@
 
             await ConsentService.UpdateConsentAsync(subject, client, consentedScopes, CancellationToken.None);
             
-            NavigationManager.NavigateTo(InputModel.ReturnUrl, true);
+            var returnUrl = "/account/consented".AddQueryString("ReturnUrl", InputModel.ReturnUrl);
+            NavigationManager.NavigateTo(returnUrl, true);
         }
 
         CreateModels(context);

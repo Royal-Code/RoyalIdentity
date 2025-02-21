@@ -13,6 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".items", ".items", "{D067AC
 		..\ADR.md = ..\ADR.md
 		Directory.Build.props = Directory.Build.props
 		..\README.md = ..\README.md
+		redesign-todo.md = redesign-todo.md
 		tests.targets = tests.targets
 	EndProjectSection
 EndProject

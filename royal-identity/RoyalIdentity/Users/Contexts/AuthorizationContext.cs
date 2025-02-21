@@ -22,8 +22,6 @@ public class AuthorizationContext
         AcrValues = context.AcrValues;
         Resources = context.Resources;
         Parameters = context.Raw;
-        RequiredConsent = context.RequiredConsent;
-
         RequestObjectValues = null;
     }
 
@@ -34,14 +32,6 @@ public class AuthorizationContext
     /// The parameters.
     /// </value>
     public NameValueCollection Parameters { get; }
-
-    /// <summary>
-    /// Gets if consent is required.
-    /// </summary>
-    /// <value>
-    /// Is consent required?
-    /// </value>
-    public bool RequiredConsent { get; }
 
     /// <summary>
     /// The client.
@@ -78,7 +68,7 @@ public class AuthorizationContext
     public string? UiLocales { get; }
 
     /// <summary>
-    /// The expected username the user will use to login. This is requested from the client 
+    /// The expected user name the user will use to login. This is requested from the client 
     /// via the <c>login_hint</c> parameter on the authorize request.
     /// </summary>
     /// <value>
@@ -124,6 +114,7 @@ public class AuthorizationContext
     /// <value>
     /// The tenant.
     /// </value>
+    [Obsolete("Será tratado como REALMS")]
     public string? Tenant { get; }
 
     /// <summary>

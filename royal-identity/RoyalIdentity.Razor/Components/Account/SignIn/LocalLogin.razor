@@ -3,6 +3,7 @@
 @using RoyalIdentity.Events
 @using RoyalIdentity.Extensions;
 @using RoyalIdentity.Users
+@using RoyalIdentity.Users.Contexts
 
 @inject ISignInManager SignInManager
 @inject ILogger<LoginPage> Logger
@@ -70,7 +71,6 @@
     public async Task LoginUser()
     {
         var context = await SignInManager.GetAuthorizationContextAsync(Input.ReturnUrl, CancellationToken.None);
-
         var result = await SignInManager.AuthenticateUserAsync(Input.Username!, Input.Password!, CancellationToken.None);
 
         if (!result.Success)
@@ -81,16 +81,14 @@
             return;
         }
 
-        var user = result.User;
-        var evt2 = new UserLoginSuccessEvent(Input.Username!, user, context);
-        await EventDispatcher.DispatchAsync(evt2);
+        await EventDispatcher.DispatchAsync(new UserLoginSuccessEvent(Input.Username!, result.User, context));
 
-        await SignInManager.SignInAsync(user, result.Session, Input.RememberLogin, CancellationToken.None);
+        var user = await SignInManager.SignInAsync(result.User, result.Session, Input.RememberLogin, CancellationToken.None);
 
         if (context is not null)
         {
             // if consent is required, navigate to consent page
-            if (context.RequiredConsent)
+            if (await SignInManager.ConsentRequired(user, context.Client, context.Resources, CancellationToken.None))
             {
                 var consentUrl = "/account/consent".AddQueryString("returnUrl", Input.ReturnUrl!);
                 NavigationManager.NavigateTo(consentUrl);
@@ -106,7 +104,7 @@
             }
 
             // we can trust in the redirectUri since GetAuthorizationContextAsync returned non-null
-            NavigationManager.NavigateTo(context.RedirectUri);
+            NavigationManager.NavigateTo(Input.ReturnUrl!);
         }
 
         if (string.IsNullOrEmpty(Input.ReturnUrl))

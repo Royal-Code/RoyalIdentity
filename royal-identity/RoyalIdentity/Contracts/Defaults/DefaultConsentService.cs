@@ -2,6 +2,7 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -44,49 +45,15 @@ public class DefaultConsentService : IConsentService
 
         var consent = await userConsentStore.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
 
-        if (consent is null)
-        {
-            logger.LogDebug("Found no prior consent from consent store, consent is required");
-            return true;
-        }
+        bool consented = await Consented(consent, resources, ct);
 
-        if (consent.Expiration.HasExpired(clock.GetUtcNow().UtcDateTime))
-        {
-            logger.LogDebug("Consent found in consent store is expired, consent is required");
-            await userConsentStore.RemoveUserConsentAsync(consent.SubjectId, consent.ClientId, ct);
-            return true;
-        }
-
-        bool requiresConsent;
-        if (consent.Scopes is not null)
-        {
-            var intersectCount = resources.RequestedScopes.Intersect(consent.GetValidScopes()).Count();
-            var different = resources.RequestedScopes.Count != intersectCount;
-
-            if (different)
-            {
-                logger.LogDebug("Consent found in consent store is different than current request, consent is required");
-            }
-            else
-            {
-                logger.LogDebug("Consent found in consent store is same as current request, consent is not required");
-            }
-
-            requiresConsent = different;
-        }
-        else
-        {
-            logger.LogDebug("Consent found in consent store has no scopes, consent is required");
-            requiresConsent = true;
-        }
-
-        // when not requiring consent, but has temporary consent, remove it and update the store
-        if (!requiresConsent && consent.RemoveTemporaryConsents())
+        // when consented, but has temporary consent, remove it and update the store
+        if (consented && consent!.RemoveTemporaryConsents())
         {
             await userConsentStore.StoreUserConsentAsync(consent, ct);
         }
 
-        return requiresConsent;
+        return !consented;
     }
 
     public async Task UpdateConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<ConsentedScope> scopes, CancellationToken ct)
@@ -146,6 +113,11 @@ public class DefaultConsentService : IConsentService
 
         var consent = await userConsentStore.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
 
+        return await Consented(consent, resources, ct);
+    }
+
+    private async Task<bool> Consented([NotNullWhen(true)]Consent? consent, Resources resources, CancellationToken ct)
+    {
         if (consent is null)
         {
             logger.LogDebug("Consent not found from consent store, consent validation failure");
@@ -162,8 +134,7 @@ public class DefaultConsentService : IConsentService
         bool consented;
         if (consent.Scopes is not null)
         {
-            var intersectCount = resources.RequestedScopes.Intersect(consent.GetValidScopes()).Count();
-            consented = resources.RequestedScopes.Count == intersectCount;
+            consented = resources.IntersectConsentScopes(consent.GetValidScopes());
 
             if (consented)
                 logger.LogDebug("Consent found in consent store is same as current request, consent validation success");

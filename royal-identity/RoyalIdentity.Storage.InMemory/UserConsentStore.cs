@@ -15,7 +15,7 @@ public class UserConsentStore : IUserConsentStore
     public Task StoreUserConsentAsync(Consent consent, CancellationToken ct)
     {
         var key = consent.SubjectId + "." + consent.ClientId;
-        storage.Consents.TryAdd(key, consent);
+        storage.Consents.AddOrUpdate(key, _ => consent, (_,_) => consent);
         return Task.CompletedTask;
     }
 

@@ -1,0 +1,14 @@
+﻿@using Microsoft.AspNetCore.Components.Sections
+
+<SectionOutlet SectionName="PageScript" />
+
+<script type="module">
+    import { afterWebStarted } from './_content/RoyalIdentity.Razor/pagescript.js';
+    
+    console.log('Start page script outlet');
+
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOMContentLoaded');
+        afterWebStarted(window.Blazor);
+    });
+</script>

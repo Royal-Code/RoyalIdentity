@@ -104,6 +104,8 @@ internal static class Constants
     public static class KnownAcrValues
     {
         public const string HomeRealm = "idp:";
+
+        [Obsolete("Será tratado como REALMS")]
         public const string Tenant = "tenant:";
 
         public static readonly string[] All = [HomeRealm, Tenant];

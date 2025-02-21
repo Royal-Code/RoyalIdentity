@@ -72,7 +72,6 @@ public static class Pipes
                 .UseValidator<AuthorizeMainValidator>()
                 .UseDecorator<ResourcesDecorator>()
                 .UseValidator<ResourcesValidator>()
-                .UseValidator<ConsentValidator>()
                 .UseValidator<AuthorizationResourcesValidator>();
 
             options.CustomizeAuthorizeValidateContext?.Invoke(authorizeValidateContextPipe);

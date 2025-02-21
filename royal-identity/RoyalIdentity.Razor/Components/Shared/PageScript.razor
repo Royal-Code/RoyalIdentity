@@ -1,0 +1,11 @@
+﻿@using Microsoft.AspNetCore.Components.Sections;
+
+<SectionContent SectionName="PageScript">
+    <page-script src="@Src"></page-script>
+</SectionContent>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public string Src { get; set; } = default!;
+}

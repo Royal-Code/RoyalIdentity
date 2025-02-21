@@ -1,4 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿// Ignore Spelling: Api
+
+using System.Diagnostics.CodeAnalysis;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 
@@ -77,6 +79,20 @@ public class Resources
     /// Scopes requested but not found or inactive.
     /// </summary>
     public HashSet<string> MissingScopes { get; } = [];
+
+    /// <summary>
+    /// Intersects the consent scopes.
+    /// </summary>
+    /// <param name="scopes">The consent scopes.</param>
+    /// <returns>
+    ///     True if the consent scopes intersect with the requested scopes, otherwise false.
+    /// </returns>
+    public bool IntersectConsentScopes(IEnumerable<string> scopes)
+    {
+        var requestedScopes = IdentityResources.Select(s => s.Name).Concat(ApiScopes.Select(s => s.Name));
+        var intersect = requestedScopes.Intersect(scopes);
+        return intersect.Count() == requestedScopes.Count();
+    }
 
     /// <summary>
     /// Copies the resources to the specified other.

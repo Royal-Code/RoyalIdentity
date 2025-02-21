@@ -1,0 +1,48 @@
+﻿@page "/account/consented"
+@using RoyalIdentity.Razor.Components.Shared
+
+@inject NavigationManager NavigationManager
+
+<PageTitle>Consented</PageTitle>
+
+<PageScript Src="./_content/RoyalIdentity.Razor/Components/Account/Consenting/ConsentedPage.razor.js" />
+
+<AccountContent>
+
+    <div class="lead" id="consent-redirect" data-returnUrl="@ReturnUrl">
+        <div class="text-center mb-2">
+            <small class="text-muted">
+                The permissions have been granted
+            </small>
+            <br />
+            <small class="text-muted">
+                Redirecting to the application
+            </small>
+        </div>
+    </div>
+
+</AccountContent>
+
+@code {
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await Task.Delay(2000);
+        NavigateToReturnUrl();
+    }
+
+    private void NavigateToReturnUrl()
+    {
+        if (ReturnUrl is not null)
+        {
+            NavigationManager.NavigateTo(ReturnUrl);
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+}

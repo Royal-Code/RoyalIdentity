@@ -13,6 +13,4 @@ public class AuthorizeValidateContext : AuthorizeContext
         ClaimsPrincipal? subject = null,
         ContextItems? items = null) : base(httpContext, raw, subject, items)
     { }
-
-    public bool RequiredConsent { get; set; }
 }

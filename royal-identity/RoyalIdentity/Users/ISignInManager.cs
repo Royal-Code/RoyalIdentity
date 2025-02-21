@@ -1,4 +1,6 @@
-﻿using RoyalIdentity.Users.Contexts;
+﻿using RoyalIdentity.Models;
+using RoyalIdentity.Users.Contexts;
+using System.Security.Claims;
 
 namespace RoyalIdentity.Users;
 
@@ -28,7 +30,7 @@ public interface ISignInManager
     ///     a <see cref="CredentialsValidationResult"/> with the reason and the error message.
     /// </para>
     /// </summary>
-    /// <param name="username">The username.</param>
+    /// <param name="username">The user name.</param>
     /// <param name="password">The password.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>The credentials validation result.</returns>
@@ -48,5 +50,17 @@ public interface ISignInManager
     /// <param name="inputRememberLogin">Indicates if the user wants to be remembered.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A task representing the operation.</returns>
-    Task SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, CancellationToken ct);
+    Task<ClaimsPrincipal> SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, CancellationToken ct);
+
+    /// <summary>
+    /// <para>
+    ///     Verify if the user consent is required.
+    /// </para>
+    /// </summary>
+    /// <param name="user">The user.</param> 
+    /// <param name="client">The client.</param>
+    /// <param name="resources">The requested resources.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if the user consent is required, otherwise false.</returns>
+    Task<bool> ConsentRequired(ClaimsPrincipal user, Client client, Resources resources, CancellationToken ct);
 }

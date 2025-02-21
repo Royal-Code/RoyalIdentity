@@ -7,6 +7,7 @@ using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contexts;
 using RoyalIdentity.Users.Contracts;
@@ -19,6 +20,7 @@ public class DefaultSignInManager : ISignInManager
     private readonly IHttpContextAccessor httpContextAccessor;
     private readonly IAuthorizeParametersStore? authorizeParametersStore;
     private readonly IAuthorizeRequestValidator authorizeRequestValidator;
+    private readonly IConsentService consentService;
     private readonly IUserStore userStore;
     private readonly AccountOptions accountOptions;
     private readonly ILogger logger;
@@ -27,12 +29,14 @@ public class DefaultSignInManager : ISignInManager
         IHttpContextAccessor httpContextAccessor,
         IAuthorizeRequestValidator authorizeRequestValidator,
         IUserStore userStore,
+        IConsentService consentService,
         IOptions<AccountOptions> accountOptions,
         ILogger<DefaultSignInManager> logger,
         IAuthorizeParametersStore? authorizeParametersStore = null)
     {
         this.httpContextAccessor = httpContextAccessor;
         this.authorizeRequestValidator = authorizeRequestValidator;
+        this.consentService = consentService;
         this.userStore = userStore;
         this.accountOptions = accountOptions.Value;
         this.logger = logger;
@@ -105,13 +109,13 @@ public class DefaultSignInManager : ISignInManager
         return new CredentialsValidationResult(user, validationResult.Session);
     }
 
-    public async Task SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, CancellationToken ct)
+    public async Task<ClaimsPrincipal> SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, CancellationToken ct)
     {
         var httpContext = httpContextAccessor.HttpContext 
             ?? throw new InvalidOperationException("HttpContext is required for SignInAsync");
 
         // only set explicit expiration here if user chooses "remember me".
-        // otherwise we rely upon expiration configured in cookie middleware.
+        // otherwise we rely upon expiration configured in cookie middle-ware.
         AuthenticationProperties? props = null;
         if (inputRememberLogin && accountOptions.AllowRememberLogin)
         {
@@ -137,6 +141,13 @@ public class DefaultSignInManager : ISignInManager
         var authenticationScheme = await httpContext.GetCookieAuthenticationSchemeAsync();
         await httpContext.SignInAsync(authenticationScheme, principal, props);
 
-        logger.LogInformation("User logged in: {Username}, Session id: {SessionId}", user.UserName, sid.Value);
+        logger.LogInformation("User logged in: {UserName}, Session id: {SessionId}", user.UserName, sid.Value);
+
+        return principal;
+    }
+
+    public async Task<bool> ConsentRequired(ClaimsPrincipal user, Client client, Resources resources, CancellationToken ct)
+    {
+        return !await consentService.ValidateConsentAsync(user, client, resources, ct);
     }
 }

@@ -84,7 +84,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ActiveUserValidator>();
         services.AddTransient<AuthorizationResourcesValidator>();
         services.AddTransient<AuthorizeMainValidator>();
-        services.AddTransient<ConsentValidator>();
         services.AddTransient<EndSessionValidator>();
         services.AddTransient<GrantTypeValidator>();
         services.AddTransient<PkceMatchValidator>();

@@ -99,6 +99,7 @@ public static class AuthenticationExtensions
         context.RemovePrefixedAcrValue(Constants.KnownAcrValues.HomeRealm);
     }
 
+    [Obsolete("Será tratado como Realm")]
     public static string? GetTenant(this IWithAcr context)
     {
         return context.GetPrefixedAcrValue(Constants.KnownAcrValues.Tenant);
