@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
+﻿// Ignore Spelling: Pkce
+
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Storage.InMemory;
@@ -212,7 +214,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     }
 
     [Fact]
-    public async Task Get_WithouClientId_Must_BadRequest()
+    public async Task Get_WithoutClientId_Must_BadRequest()
     {
         // Arrange
         var client = factory.CreateClient();

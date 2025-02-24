@@ -1,3 +1,5 @@
+// Ignore Spelling: Pkce
+
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;

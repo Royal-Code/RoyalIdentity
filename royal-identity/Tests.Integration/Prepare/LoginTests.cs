@@ -19,7 +19,7 @@ public class LoginTests : IClassFixture<AppFactory>
 
         // Act
         await client.LoginAliceAsync();
-        var response = await client.GetAsync("account/profile");
+        var response = await client.GetAsync("test/account/profile");
 
         // Assert
         Assert.NotNull(response);
@@ -45,7 +45,7 @@ public class LoginTests : IClassFixture<AppFactory>
 
         // Act
         await LoginExtensions.LoginAliceAsync(client);
-        var response = await client.GetAsync("account/logout");
+        var response = await client.LogoutAsync();
 
         // Assert
         Assert.NotNull(response);

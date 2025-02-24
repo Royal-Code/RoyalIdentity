@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿// Ignore Spelling: Sha
+
 using System.Text;
 using System.Security.Cryptography;
 

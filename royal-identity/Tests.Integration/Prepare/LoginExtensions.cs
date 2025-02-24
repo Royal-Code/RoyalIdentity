@@ -15,7 +15,7 @@ internal static class LoginExtensions
             ["password"] = password
         });
 
-        var response = await client.PostAsync("account/login", content);
+        var response = await client.PostAsync("test/account/login", content);
         response.EnsureSuccessStatusCode();
     }
 
@@ -29,12 +29,19 @@ internal static class LoginExtensions
         await LoginAsync(client, "bob", "bob");
     }
 
+    public static async Task<HttpResponseMessage> LogoutAsync(this HttpClient client)
+    {
+        var response = await client.GetAsync("test/account/logout");
+        response.EnsureSuccessStatusCode();
+        return response;
+    }
+
     public static async Task<TokenEndpointParameters> GetTokensAsync(
         this HttpClient client,
         string clientId = "demo_client",
         string scope = "openid profile offline_access")
     {
-        var path = "account/token".AddQueryString("client_id", clientId).AddQueryString("scope", scope);
+        var path = "test/account/token".AddQueryString("client_id", clientId).AddQueryString("scope", scope);
 
         var response = await client.GetAsync(path);
         response.EnsureSuccessStatusCode();

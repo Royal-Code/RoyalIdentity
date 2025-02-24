@@ -22,7 +22,7 @@ public class MemoryStorage
             AllowOfflineAccess = true,
             AllowedScopes = { "openid", "profile", "email" },
             AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
+            RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" }
         },
         ["demo_consent_client"] = new Client
         {
@@ -33,7 +33,7 @@ public class MemoryStorage
             AllowedScopes = { "openid", "profile", "email", "api", "api:read", "api:write"  },
             AllowedResponseTypes = { "code" },
             RequireConsent = true,
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
+            RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" }
         }
     };
 
