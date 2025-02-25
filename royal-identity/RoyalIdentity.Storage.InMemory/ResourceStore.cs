@@ -2,6 +2,7 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Extensions;
+using static RoyalIdentity.Options.ServerConstants;
 
 namespace RoyalIdentity.Storage.InMemory;
 
@@ -73,7 +74,7 @@ public class ResourceStore : IResourceStore
 
         foreach (var scope in scopeNames)
         {
-            if (scope is OidcConstants.StandardScopes.OfflineAccess)
+            if (scope is StandardScopes.OfflineAccess)
             {
                 resources.OfflineAccess = true;
                 continue;

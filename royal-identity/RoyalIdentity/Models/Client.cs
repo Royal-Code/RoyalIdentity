@@ -1,4 +1,5 @@
-﻿using RoyalIdentity.Options;
+﻿using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using RoyalIdentity.Options;
 using System.Security.Claims;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -199,7 +200,7 @@ public class Client
     /// <summary>
     /// Specifies the allowed grant types (legal combinations of AuthorizationCode, Implicit, Hybrid, ResourceOwner, ClientCredentials).
     /// </summary>
-    public HashSet<string> AllowedGrantTypes { get; set; } = [GrantTypes.AuthorizationCode];
+    public HashSet<string> AllowedGrantTypes { get; set; } = [OpenIdConnectGrantTypes.AuthorizationCode];
 
     /// <summary>
     /// Absolute: the refresh token will expire on a fixed point in time (specified by the AbsoluteRefreshTokenLifetime)

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
@@ -198,14 +199,14 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         {
             List<string> standardGrantTypes =
             [
-                OidcConstants.GrantTypes.AuthorizationCode,
-                OidcConstants.GrantTypes.ClientCredentials,
-                OidcConstants.GrantTypes.RefreshToken
+                OpenIdConnectGrantTypes.AuthorizationCode,
+                OpenIdConnectGrantTypes.ClientCredentials,
+                OpenIdConnectGrantTypes.RefreshToken
             ];
 
             if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
             {
-                standardGrantTypes.Add(OidcConstants.GrantTypes.DeviceCode);
+                standardGrantTypes.Add(OpenIdConnectGrantTypes.DeviceCode);
             }
 
             var showGrantTypes = new List<string>(standardGrantTypes);

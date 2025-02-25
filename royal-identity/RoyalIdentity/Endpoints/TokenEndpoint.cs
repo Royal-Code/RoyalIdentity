@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Endpoints.Abstractions;
@@ -70,19 +71,19 @@ public class TokenEndpoint : IEndpointHandler
         ITokenEndpointContextBase? context = null;
         switch (grantType)
         {
-            case GrantTypes.AuthorizationCode:
+            case OpenIdConnectGrantTypes.AuthorizationCode:
                 context = new AuthorizationCodeContext(httpContext, parameters, items);
                 break;
-            case GrantTypes.RefreshToken:
+            case OpenIdConnectGrantTypes.RefreshToken:
                 context = new RefreshTokenContext(httpContext, parameters, items);
                 break;
-            case GrantTypes.ClientCredentials:
+            case OpenIdConnectGrantTypes.ClientCredentials:
                 context = new ClientCredentialsContext(httpContext, parameters, items);
                 break;
-            case GrantTypes.DeviceCode:
+            case OpenIdConnectGrantTypes.DeviceCode:
 
                 break;
-            case GrantTypes.TokenExchange:
+            case OpenIdConnectGrantTypes.TokenExchange:
 
                 break;
             default:

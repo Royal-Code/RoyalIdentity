@@ -37,7 +37,7 @@ public class UserInteractionOptions
     /// <value>
     /// The logout URL.
     /// </value>
-    public string LoggingOutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.LogginOut.EnsureLeadingSlash()!;
+    public string LoggingOutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.LoggingOut.EnsureLeadingSlash()!;
 
     /// <summary>
     /// Gets or sets the logged out URL. If a local URL, the value must start with a leading slash.
@@ -94,14 +94,6 @@ public class UserInteractionOptions
     /// The custom redirect return URL parameter.
     /// </value>
     public string CustomRedirectReturnUrlParameter { get; set; } = Constants.UIConstants.DefaultRoutePathParams.Custom;
-
-    /// <summary>
-    /// Gets or sets the cookie message threshold. This limits how many cookies are created, and older ones will be purged.
-    /// </summary>
-    /// <value>
-    /// The cookie message threshold.
-    /// </value>
-    public int CookieMessageThreshold { get; set; } = Constants.UIConstants.CookieMessageThreshold;
 
     /// <summary>
     /// Gets or sets the device verification URL.  If a local URL, the value must start with a leading slash.

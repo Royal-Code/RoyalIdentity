@@ -21,7 +21,7 @@ public class AuthenticationOptions
     /// <summary>
     /// Sets the cookie lifetime
     /// </summary>
-    public TimeSpan CookieLifetime { get; set; } = Constants.DefaultCookieTimeSpan;
+    public TimeSpan CookieLifetime { get; set; } = ServerConstants.DefaultCookieTimeSpan;
 
     /// <summary>
     /// Specified if the cookie should be sliding or not (only effective if the built-in cookie middleware is used)

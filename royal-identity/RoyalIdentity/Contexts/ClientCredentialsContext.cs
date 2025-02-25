@@ -7,7 +7,7 @@ using RoyalIdentity.Options;
 using System.Collections.Specialized;
 using System.Security.Claims;
 using RoyalIdentity.Extensions;
-using static RoyalIdentity.Options.OidcConstants;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace RoyalIdentity.Contexts;
 
@@ -19,7 +19,7 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
     public ClientCredentialsContext(
         HttpContext httpContext,
         NameValueCollection raw,
-        ContextItems items) : base(httpContext, raw, GrantTypes.ClientCredentials, items)
+        ContextItems items) : base(httpContext, raw, OpenIdConnectGrantTypes.ClientCredentials, items)
     { }
 
     public Resources Resources { get; } = new();

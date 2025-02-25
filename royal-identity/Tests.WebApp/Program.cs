@@ -1,12 +1,18 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Add open id connect authentication for autority https://localhost:7200
+// Add open id connect authentication for authority https://localhost:7200
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -28,6 +34,8 @@ builder.Services.AddAuthentication(options =>
         options.Scope.Add("api:write");
         options.SaveTokens = true;
         options.GetClaimsFromUserInfoEndpoint = true;
+        /*options.TokenValidationParameters.NameClaimType = OpenIdConnectParameterNames.
+        options.TokenValidationParameters.RoleClaimType = */
     });
 
 var app = builder.Build();

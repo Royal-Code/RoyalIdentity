@@ -1,5 +1,4 @@
 ﻿using RoyalIdentity.Contexts;
-using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using System.Collections.Specialized;
 using System.Security.Claims;
@@ -15,8 +14,6 @@ public class AuthorizationContext
         RedirectUri = context.RedirectUri!;
         DisplayMode = context.DisplayMode;
         UiLocales = context.UiLocales;
-        IdP = context.GetIdP();
-        Tenant = context.GetTenant();
         LoginHint = context.LoginHint;
         PromptModes = context.PromptModes;
         AcrValues = context.AcrValues;
@@ -105,17 +102,8 @@ public class AuthorizationContext
     /// <value>
     /// The external identity provider identifier.
     /// </value>
+    [Obsolete]
     public string? IdP { get; }
-
-    /// <summary>
-    /// The tenant requested. This is provided via the <c>"tenant:"</c> prefix to 
-    /// the <c>acr</c> parameter on the authorize request.
-    /// </summary>
-    /// <value>
-    /// The tenant.
-    /// </value>
-    [Obsolete("Será tratado como REALMS")]
-    public string? Tenant { get; }
 
     /// <summary>
     /// Gets the validated contents of the request object (if present)

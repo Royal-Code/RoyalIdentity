@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using static RoyalIdentity.Options.OidcConstants;
 using RoyalIdentity.Contexts.Parameters;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace RoyalIdentity.Contexts;
 
@@ -17,7 +18,7 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithAuthoriza
     public AuthorizationCodeContext(
         HttpContext httpContext,
         NameValueCollection raw,
-        ContextItems? items = null) : base(httpContext, raw, GrantTypes.AuthorizationCode, items)
+        ContextItems? items = null) : base(httpContext, raw, OpenIdConnectGrantTypes.AuthorizationCode, items)
     { }
 
     public string? RedirectUri { get; private set; }

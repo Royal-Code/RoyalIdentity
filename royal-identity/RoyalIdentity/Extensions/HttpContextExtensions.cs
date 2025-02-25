@@ -31,13 +31,6 @@ public static class HttpContextExtensions
         request.Host = new HostString(split[^1]);
     }
 
-    public static void SetServerBasePath(this HttpContext context, string value)
-    {
-        if (context == null) throw new ArgumentNullException(nameof(context));
-
-        context.Items[Constants.EnvironmentKeys.ServerBasePath] = value;
-    }
-
     public static string GetServerOrigin(this HttpContext context, ServerOptions options)
     {
         var request = context.Request;
@@ -51,18 +44,6 @@ public static class HttpContextExtensions
         }
 
         return $"{request.Scheme}://{request.Host.Value}";
-    }
-
-
-    internal static void SetSignOutCalled(this HttpContext? context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        context.Items[Constants.EnvironmentKeys.SignOutCalled] = "true";
-    }
-
-    internal static bool GetSignOutCalled(this HttpContext context)
-    {
-        return context.Items.ContainsKey(Constants.EnvironmentKeys.SignOutCalled);
     }
 
     /// <summary>
@@ -83,8 +64,7 @@ public static class HttpContextExtensions
     /// <returns></returns>
     public static string? GetServerBasePath(this HttpContext context)
     {
-        return context.Items[Constants.EnvironmentKeys.ServerBasePath] as string
-            ?? context.Request.PathBase.Value;
+        return context.Request.PathBase.Value;
     }
 
     /// <summary>

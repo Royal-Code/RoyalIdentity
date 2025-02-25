@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Endpoints.Abstractions;
@@ -16,7 +17,7 @@ public class RefreshTokenContext : TokenEndpointContextBase, IWithRefreshToken
     public RefreshTokenContext(
         HttpContext httpContext,
         NameValueCollection raw,
-        ContextItems? items = null) : base(httpContext, raw, GrantTypes.RefreshToken, items)
+        ContextItems? items = null) : base(httpContext, raw, OpenIdConnectGrantTypes.RefreshToken, items)
     { }
 
     public string? Token { get; private set; }

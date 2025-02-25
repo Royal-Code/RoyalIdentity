@@ -1,8 +1,6 @@
 ﻿using Microsoft.IdentityModel.Tokens;
-using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography;
 using System.Text;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Utils;
 
@@ -11,48 +9,6 @@ namespace RoyalIdentity.Utils;
 /// </summary>
 public static class CryptoHelper
 {
-    /// <summary>
-    /// Creates a new RSA security key.
-    /// </summary>
-    /// <returns></returns>
-    public static RsaSecurityKey CreateRsaSecurityKey(int keySize = 2048)
-    {
-        return new RsaSecurityKey(RSA.Create(keySize))
-        {
-            KeyId = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex)
-        };
-    }
-
-    /// <summary>
-    /// Creates an RSA security key.
-    /// </summary>
-    /// <param name="parameters">The parameters.</param>
-    /// <param name="id">The identifier.</param>
-    /// <returns></returns>
-    public static RsaSecurityKey CreateRsaSecurityKey(RSAParameters parameters, string id)
-    {
-        var key = new RsaSecurityKey(parameters)
-        {
-            KeyId = id
-        };
-
-        return key;
-    }
-
-    /// <summary>
-    /// Creates a new ECDSA security key.
-    /// </summary>
-    /// <param name="curve">The name of the curve as defined in
-    /// https://tools.ietf.org/html/rfc7518#section-6.2.1.1.</param>
-    /// <returns></returns>
-    public static ECDsaSecurityKey CreateECDsaSecurityKey(string curve = JsonWebKeyECTypes.P256)
-    {
-        return new ECDsaSecurityKey(ECDsa.Create(GetCurveFromCrvValue(curve)))
-        {
-            KeyId = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex)
-        };
-    }
-
     /// <summary>
     /// Creates the hash for the various hash claims (e.g. c_hash, at_hash or s_hash).
     /// </summary>
@@ -101,95 +57,5 @@ public static class CryptoHelper
             JsonWebKeyECTypes.P521 => ECCurve.NamedCurves.nistP521,
             _ => throw new InvalidOperationException($"Unsupported curve type of {crv}"),
         };
-    }
-
-    /// <summary>
-    /// Return the matching RFC 7518 crv value for curve
-    /// </summary>
-    internal static string GetCrvValueFromCurve(ECCurve curve)
-    {
-        return curve.Oid.Value switch
-        {
-            Constants.CurveOids.P256 => JsonWebKeyECTypes.P256,
-            Constants.CurveOids.P384 => JsonWebKeyECTypes.P384,
-            Constants.CurveOids.P521 => JsonWebKeyECTypes.P521,
-            _ => throw new InvalidOperationException($"Unsupported curve type of {curve.Oid.Value} - {curve.Oid.FriendlyName}"),
-        };
-    }
-
-    internal static bool IsValidCurveForAlgorithm(ECDsaSecurityKey key, string algorithm)
-    {
-        var parameters = key.ECDsa.ExportParameters(false);
-
-        if (algorithm == SecurityAlgorithms.EcdsaSha256 && parameters.Curve.Oid.Value != Constants.CurveOids.P256
-            || algorithm == SecurityAlgorithms.EcdsaSha384 && parameters.Curve.Oid.Value != Constants.CurveOids.P384
-            || algorithm == SecurityAlgorithms.EcdsaSha512 && parameters.Curve.Oid.Value != Constants.CurveOids.P521)
-        {
-            return false;
-        }
-
-        return true;
-    }
-    internal static bool IsValidCrvValueForAlgorithm(string crv)
-    {
-        return crv == JsonWebKeyECTypes.P256 ||
-               crv == JsonWebKeyECTypes.P384 ||
-               crv == JsonWebKeyECTypes.P521;
-    }
-
-    internal static string GetRsaSigningAlgorithmValue(ServerConstants.RsaSigningAlgorithm value)
-    {
-        return value switch
-        {
-            ServerConstants.RsaSigningAlgorithm.RS256 => SecurityAlgorithms.RsaSha256,
-            ServerConstants.RsaSigningAlgorithm.RS384 => SecurityAlgorithms.RsaSha384,
-            ServerConstants.RsaSigningAlgorithm.RS512 => SecurityAlgorithms.RsaSha512,
-
-            ServerConstants.RsaSigningAlgorithm.PS256 => SecurityAlgorithms.RsaSsaPssSha256,
-            ServerConstants.RsaSigningAlgorithm.PS384 => SecurityAlgorithms.RsaSsaPssSha384,
-            ServerConstants.RsaSigningAlgorithm.PS512 => SecurityAlgorithms.RsaSsaPssSha512,
-            _ => throw new ArgumentException("Invalid RSA signing algorithm value", nameof(value)),
-        };
-    }
-
-    internal static string GetECDsaSigningAlgorithmValue(ServerConstants.ECDsaSigningAlgorithm value)
-    {
-        return value switch
-        {
-            ServerConstants.ECDsaSigningAlgorithm.ES256 => SecurityAlgorithms.EcdsaSha256,
-            ServerConstants.ECDsaSigningAlgorithm.ES384 => SecurityAlgorithms.EcdsaSha384,
-            ServerConstants.ECDsaSigningAlgorithm.ES512 => SecurityAlgorithms.EcdsaSha512,
-            _ => throw new ArgumentException("Invalid ECDsa signing algorithm value", nameof(value)),
-        };
-    }
-
-    internal static X509Certificate2? FindCertificate(string name, StoreLocation location, NameType nameType)
-    {
-        X509Certificate2? certificate = null;
-
-        if (location == StoreLocation.LocalMachine)
-        {
-            if (nameType == NameType.SubjectDistinguishedName)
-            {
-                certificate = X509.LocalMachine.My.SubjectDistinguishedName.Find(name, validOnly: false).FirstOrDefault();
-            }
-            else if (nameType == NameType.Thumbprint)
-            {
-                certificate = X509.LocalMachine.My.Thumbprint.Find(name, validOnly: false).FirstOrDefault();
-            }
-        }
-        else
-        {
-            if (nameType == NameType.SubjectDistinguishedName)
-            {
-                certificate = X509.CurrentUser.My.SubjectDistinguishedName.Find(name, validOnly: false).FirstOrDefault();
-            }
-            else if (nameType == NameType.Thumbprint)
-            {
-                certificate = X509.CurrentUser.My.Thumbprint.Find(name, validOnly: false).FirstOrDefault();
-            }
-        }
-
-        return certificate;
     }
 }

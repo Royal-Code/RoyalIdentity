@@ -192,7 +192,7 @@ public static class PrincipalExtensions
     [DebuggerStepThrough]
     public static string GetIdentityProvider(this IPrincipal principal)
     {
-        return principal?.Identity?.GetIdentityProvider() ?? throw new InvalidOperationException("idp claim is missing");
+        return principal?.Identity?.GetIdentityProvider() ?? throw new InvalidOperationException("IdP claim is missing");
     }
 
     /// <summary>
@@ -200,7 +200,7 @@ public static class PrincipalExtensions
     /// </summary>
     /// <param name="identity">The identity.</param>
     /// <returns></returns>
-    /// <exception cref="System.InvalidOperationException">idp claim is missing</exception>
+    /// <exception cref="System.InvalidOperationException">IdP claim is missing</exception>
     [DebuggerStepThrough]
     public static string GetIdentityProvider(this IIdentity identity)
     {
@@ -211,7 +211,7 @@ public static class PrincipalExtensions
                 return claim.Value;
         }
 
-        throw new InvalidOperationException("idp claim is missing");
+        throw new InvalidOperationException("IdP claim is missing");
     }
 
     /// <summary>

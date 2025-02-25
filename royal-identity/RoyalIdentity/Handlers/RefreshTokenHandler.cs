@@ -146,7 +146,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         // Identity Token
         /////////////////////////////////////
 
-        if (newAccessToken.Scopes.Any(scope => scope.Contains(StandardScopes.OpenId)))
+        if (newAccessToken.Scopes.Any(scope => scope.Contains(ServerConstants.StandardScopes.OpenId)))
         {
             var scopes = newAccessToken.Scopes;
             var resources = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);

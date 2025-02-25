@@ -70,22 +70,8 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             return;
         }
 
-        // check current idp
+        // check current IdP
         var currentIdp = principal.GetIdentityProvider();
-
-        // check if idp login hint matches current provider
-        var idp = context.GetIdP();
-        if (idp.IsPresent() && idp != currentIdp)
-        {
-            logger.LogInformation("Showing login: Current IdP ({CurrentIdp}) is not the requested IdP ({IdP})", currentIdp, idp);
-
-            context.Response = new InteractionResponse(context)
-            {
-                IsLogin = true
-            };
-
-            return;
-        }
 
         // check authentication freshness
         if (context.MaxAge.HasValue)
@@ -104,7 +90,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             }
         }
 
-        // check local idp restrictions
+        // check local IdP restrictions
         if (currentIdp == ServerConstants.LocalIdentityProvider)
         {
             if (!context.ClientParameters.Client.EnableLocalLogin)
@@ -119,11 +105,11 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
                 return;
             }
         }
-        // check external idp restrictions if user not using local idp
+        // check external IdP restrictions if user not using local IdP
         else if (context.ClientParameters.Client.IdentityProviderRestrictions.Count is not 0 &&
             !context.ClientParameters.Client.IdentityProviderRestrictions.Contains(currentIdp))
         {
-            logger.LogInformation("Showing login: User is logged in with idp: {IdP}, but idp not in client restriction list.", currentIdp);
+            logger.LogInformation("Showing login: User is logged in with IdP: {IdP}, but IdP not in client restriction list.", currentIdp);
             context.Response = new InteractionResponse(context)
             {
                 IsLogin = true
@@ -143,7 +129,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             {
                 logger.LogInformation("Showing login: User's auth session duration: {SessionDuration} exceeds client's user SSO lifetime: {UserSsoLifetime}.", diff, context.ClientParameters.Client.UserSsoLifetime);
 
-                logger.LogInformation("Showing login: User is logged in with idp: {IdP}, but idp not in client restriction list.", currentIdp);
+                logger.LogInformation("Showing login: User is logged in with IdP: {IdP}, but IdP not in client restriction list.", currentIdp);
                 context.Response = new InteractionResponse(context)
                 {
                     IsLogin = true

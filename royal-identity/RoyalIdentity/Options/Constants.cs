@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+﻿// Ignore Spelling: Cors
+
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.IdentityModel.Tokens;
 using Polly;
 using static RoyalIdentity.Options.OidcConstants;
@@ -14,8 +16,7 @@ internal static class Constants
     public const string ExternalAuthenticationMethod = "external";
     public const string DefaultHashAlgorithm = "SHA256";
 
-    [Redesign("Colocar em ServiceConstants, com os outros parâmetros de cookie")]
-    public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(1);
+
     public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(60);
 
     public static readonly HashSet<string> SupportedResponseTypes =
@@ -27,47 +28,20 @@ internal static class Constants
 
     private static readonly Func<string, bool> ContainsSupportedResponseType = SupportedResponseTypes.Contains;
 
-    public static bool ResponseTypesIsSuported(ICollection<string> responseTypes)
+    [Redesign("Move to options")]
+    public static bool ResponseTypesIsSupported(ICollection<string> responseTypes)
     {
         return responseTypes.All(ContainsSupportedResponseType);
     }
 
+    [Redesign("Move to options")]
     public static readonly List<string> SupportedCodeChallengeMethods = new()
     {
         CodeChallengeMethods.Plain,
         CodeChallengeMethods.Sha256
     };
 
-    public enum ScopeRequirement
-    {
-        None,
-        ResourceOnly,
-        IdentityOnly,
-        Identity
-    }
-
-    public static ScopeRequirement GetResponseTypeScopeRequirement(IEnumerable<string> responseTypes)
-    {
-        var requeriment = ScopeRequirement.None;
-        foreach (var responseType in responseTypes)
-        {
-            switch (responseType)
-            {
-                case ResponseTypes.Token:
-                    requeriment = requeriment == ScopeRequirement.None 
-                        ? ScopeRequirement.ResourceOnly 
-                        : ScopeRequirement.Identity;
-                    break;
-                case ResponseTypes.IdToken:
-                    requeriment = requeriment == ScopeRequirement.None
-                        ? ScopeRequirement.IdentityOnly
-                        : ScopeRequirement.Identity;
-                    break;
-            }
-        }
-        return requeriment;
-    }
-
+    [Redesign("Move to options")]
     public static readonly List<string> SupportedResponseModes = new()
     {
         ResponseModes.FormPost,
@@ -75,16 +49,13 @@ internal static class Constants
         ResponseModes.Fragment
     };
 
+    [Redesign("Review usage in IS4")]
     public static readonly string[] SupportedSubjectTypes =
     {
         "pairwise", "public"
     };
 
-    public static class SigningAlgorithms
-    {
-        public const string RSA_SHA_256 = "RS256";
-    }
-
+    [Redesign("Move to options")]
     public static readonly List<string> SupportedDisplayModes =
     [
         DisplayModes.Page,
@@ -93,6 +64,7 @@ internal static class Constants
         DisplayModes.Wap
     ];
 
+    [Redesign("Move to options")]
     public static readonly List<string> SupportedPromptModes =
     [
         PromptModes.None,
@@ -101,24 +73,7 @@ internal static class Constants
         PromptModes.SelectAccount
     ];
 
-    public static class KnownAcrValues
-    {
-        public const string HomeRealm = "idp:";
-
-        [Obsolete("Será tratado como REALMS")]
-        public const string Tenant = "tenant:";
-
-        public static readonly string[] All = [HomeRealm, Tenant];
-    }
-
-    public static readonly Dictionary<string, int> ProtectedResourceErrorStatusCodes = new()
-    {
-        { ProtectedResourceErrors.InvalidToken, 401 },
-        { ProtectedResourceErrors.ExpiredToken, 401 },
-        { ProtectedResourceErrors.InvalidRequest, 400 },
-        { ProtectedResourceErrors.InsufficientScope, 403 }
-    };
-
+    [Redesign("Move to Init Load Defaults")]
     public static readonly Dictionary<string, IEnumerable<string>> ScopeToClaimsMapping =
         new()
         {
@@ -171,9 +126,6 @@ internal static class Constants
 
     public static class UIConstants
     {
-        // the limit after which old messages are purged
-        public const int CookieMessageThreshold = 2;
-
         public static class DefaultRoutePathParams
         {
             public const string Error = "errorId";
@@ -188,26 +140,12 @@ internal static class Constants
         {
             public const string Login = "/account/login";
             public const string Logout = "/account/logout";
-            public const string LogginOut = "/account/logout/processing";
+            public const string LoggingOut = "/account/logout/processing";
             public const string LoggedOut = "/account/logout/done";
             public const string Consent = "/account/consent";
             public const string Error = "/error";
             public const string DeviceVerification = "/device";
         }
-    }
-
-    [Redesign("Useless - Remove")]
-    public static class EndpointNames
-    {
-        public const string Authorize = "Authorize";
-        public const string Token = "Token";
-        public const string DeviceAuthorization = "DeviceAuthorization";
-        public const string Discovery = "Discovery";
-        public const string Introspection = "Introspection";
-        public const string Revocation = "Revocation";
-        public const string EndSession = "Endsession";
-        public const string CheckSession = "Checksession";
-        public const string UserInfo = "Userinfo";
     }
 
     public static class ProtocolRoutePaths
@@ -243,19 +181,13 @@ internal static class Constants
         ];
     }
 
-    [Redesign("Change consts values")]
-    public static class EnvironmentKeys
-    {
-        public const string ServerBasePath = "idsvr:ServerBasePath";
-        public const string SignOutCalled = "idsvr:ServerSignOutCalled";
-    }
-
     public static class TokenTypeHints
     {
         public const string RefreshToken = "refresh_token";
         public const string AccessToken = "access_token";
     }
 
+    [Redesign("Move to options")]
     public static readonly ICollection<string> SupportedTokenTypeHints =
     [
         TokenTypeHints.RefreshToken,
@@ -324,14 +256,10 @@ internal static class Constants
         ];
     }
 
-    public static class WsFedSignOut
-    {
-        public const string LogoutUriParameterName = "wa";
-        public const string LogoutUriParameterValue = "wsignoutcleanup1.0";
-    }
-
+    
     public static class AuthorizationParamsStore
     {
+        [Redesign("Rename")]
         public const string MessageStoreIdParameterName = "authzId";
     }
 
@@ -343,6 +271,7 @@ internal static class Constants
     }
 }
 
+[Redesign("Move all to Constants")]
 public static class OidcConstants
 {
     public static class IdentityProfileTypes
@@ -656,21 +585,6 @@ public static class OidcConstants
         public const string QueryStringPop = "pop_access_token";
     }
 
-    [Redesign("See: Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectGrantTypes")]
-    public static class GrantTypes
-    {
-        public const string AuthorizationCode = "authorization_code";
-        public const string ClientCredentials = "client_credentials";
-        public const string RefreshToken = "refresh_token";
-
-        public const string DeviceCode = "urn:ietf:params:oauth:grant-type:device_code";
-        public const string TokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange";
-
-        public const string Saml2Bearer = "urn:ietf:params:oauth:grant-type:saml2-bearer";
-        public const string JwtBearer = "urn:ietf:params:oauth:grant-type:jwt-bearer";
-        public const string Ciba = "urn:openid:params:grant-type:ciba";
-    }
-
     public static class ClientAssertionTypes
     {
         public const string JwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
@@ -680,7 +594,7 @@ public static class OidcConstants
     public static class ResponseTypes
     {
         public const string Code = "code";
-        public const string Token = "token"; // implicit flow - considered harmful in oauth2.1 -- remove?
+        public const string Token = "token"; // implicit flow - considered harmful in oauth2.1 -- remove? TODO: review implicit flow
         public const string IdToken = "id_token";
     }
 
@@ -885,27 +799,6 @@ public static class OidcConstants
     public static class BackChannelLogoutRequest
     {
         public const string LogoutToken = "logout_token";
-    }
-
-    public static class StandardScopes
-    {
-        /// <summary>REQUIRED. Informs the Authorization Server that the Client is making an OpenID Connect request. If the <c>openid</c> scope value is not present, the behavior is entirely unspecified.</summary>
-        public const string OpenId = "openid";
-
-        /// <summary>OPTIONAL. This scope value requests access to the End-User's default profile Claims, which are: <c>name</c>, <c>family_name</c>, <c>given_name</c>, <c>middle_name</c>, <c>nickname</c>, <c>preferred_username</c>, <c>profile</c>, <c>picture</c>, <c>website</c>, <c>gender</c>, <c>birthdate</c>, <c>zoneinfo</c>, <c>locale</c>, and <c>updated_at</c>.</summary>
-        public const string Profile = "profile";
-
-        /// <summary>OPTIONAL. This scope value requests access to the <c>email</c> and <c>email_verified</c> Claims.</summary>
-        public const string Email = "email";
-
-        /// <summary>OPTIONAL. This scope value requests access to the <c>address</c> Claim.</summary>
-        public const string Address = "address";
-
-        /// <summary>OPTIONAL. This scope value requests access to the <c>phone_number</c> and <c>phone_number_verified</c> Claims.</summary>
-        public const string Phone = "phone";
-
-        /// <summary>This scope value MUST NOT be used with the OpenID Connect Implicit Client Implementer's Guide 1.0. See the OpenID Connect Basic Client Implementer's Guide 1.0 (http://openid.net/specs/openid-connect-implicit-1_0.html#OpenID.Basic) for its usage in that subset of OpenID Connect.</summary>
-        public const string OfflineAccess = "offline_access";
     }
 
     public static class HttpHeaders
@@ -1169,6 +1062,8 @@ public static class ServerConstants
     public const string DefaultCookieName = $"{CookiePrefix}user";
     public const string DefaultCheckSessionCookieName = $"{CookiePrefix}session";
     public const string AccessTokenAudience = "{0}resources";
+    
+    public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(1);
 
     public const string JwtRequestClientKey = "roid.jwtrequesturi.client";
 
@@ -1244,6 +1139,8 @@ public static class ServerConstants
         public const string DeviceCodeValidation = "DeviceCodeValidation";
     }
 
+    [Redesign("Move to Options")]
+
     public static readonly ICollection<string> SupportedSigningAlgorithms =
     [
         SecurityAlgorithms.RsaSha256,
@@ -1262,24 +1159,6 @@ public static class ServerConstants
         SecurityAlgorithms.HmacSha384,
         SecurityAlgorithms.HmacSha512
     ];
-
-    public enum RsaSigningAlgorithm
-    {
-        RS256,
-        RS384,
-        RS512,
-
-        PS256,
-        PS384,
-        PS512
-    }
-
-    public enum ECDsaSigningAlgorithm
-    {
-        ES256,
-        ES384,
-        ES512
-    }
 
     public static class StandardScopes
     {
@@ -1300,21 +1179,6 @@ public static class ServerConstants
 
         /// <summary>This scope value MUST NOT be used with the OpenID Connect Implicit Client Implementer's Guide 1.0. See the OpenID Connect Basic Client Implementer's Guide 1.0 (http://openid.net/specs/openid-connect-implicit-1_0.html#OpenID.Basic) for its usage in that subset of OpenID Connect.</summary>
         public const string OfflineAccess = "offline_access";
-    }
-
-    public static class PersistedGrantTypes
-    {
-        public const string AuthorizationCode = "authorization_code";
-        public const string ReferenceToken = "reference_token";
-        public const string RefreshToken = "refresh_token";
-        public const string UserConsent = "user_consent";
-        public const string DeviceCode = "device_code";
-        public const string UserCode = "user_code";
-    }
-
-    public static class UserCodeTypes
-    {
-        public const string Numeric = "Numeric";
     }
 
     public static class HttpClients

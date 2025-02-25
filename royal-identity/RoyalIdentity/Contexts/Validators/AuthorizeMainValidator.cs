@@ -34,7 +34,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             return ValueTask.CompletedTask;
         }
 
-        if (!Constants.ResponseTypesIsSuported(responseTypes))
+        if (!Constants.ResponseTypesIsSupported(responseTypes))
         {
             logger.LogError(options, "Response type not supported", responseTypes.ToSpaceSeparatedString(), context);
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not supported");
@@ -176,19 +176,8 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 context.InvalidRequest("Invalid acr_values", "too long");
                 return ValueTask.CompletedTask;
             }
-        }
 
-
-        //////////////////////////////////////////////////////////
-        // check custom acr_values: idp
-        //////////////////////////////////////////////////////////
-        var idp = context.GetIdP();
-        if (idp.IsPresent()
-            && client.IdentityProviderRestrictions.Count is not 0
-            && !client.IdentityProviderRestrictions.Contains(idp))
-        {
-            logger.LogError(options, "The parameter idp requested is not in client restriction list", idp, context);
-            context.RemoveIdP();
+            // TODO: check acr_values, valide against future realm options
         }
 
         return ValueTask.CompletedTask;

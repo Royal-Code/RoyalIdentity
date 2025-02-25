@@ -60,48 +60,4 @@ public static class AuthenticationExtensions
 
         return false;
     }
-
-    public static string? GetPrefixedAcrValue(this IWithAcr context, string prefix)
-    {
-        var value = context.AcrValues.FirstOrDefault(x => x.StartsWith(prefix));
-
-        if (value is not null)
-            value = value.Substring(prefix.Length);
-
-
-        return value;
-    }
-
-    public static void RemovePrefixedAcrValue(this IWithAcr context, string prefix)
-    {
-        foreach (var acr in context.AcrValues.Where(acr => acr.StartsWith(prefix, StringComparison.Ordinal)))
-        {
-            context.AcrValues.Remove(acr);
-        }
-        var acr_values = context.AcrValues.ToSpaceSeparatedString();
-        if (acr_values.IsPresent())
-        {
-            context.Raw[OidcConstants.AuthorizeRequest.AcrValues] = acr_values;
-        }
-        else
-        {
-            context.Raw.Remove(OidcConstants.AuthorizeRequest.AcrValues);
-        }
-    }
-
-    public static string? GetIdP(this IWithAcr context)
-    {
-        return context.GetPrefixedAcrValue(Constants.KnownAcrValues.HomeRealm);
-    }
-
-    public static void RemoveIdP(this IWithAcr context)
-    {
-        context.RemovePrefixedAcrValue(Constants.KnownAcrValues.HomeRealm);
-    }
-
-    [Obsolete("Será tratado como Realm")]
-    public static string? GetTenant(this IWithAcr context)
-    {
-        return context.GetPrefixedAcrValue(Constants.KnownAcrValues.Tenant);
-    }
 }
