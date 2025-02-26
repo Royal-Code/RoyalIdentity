@@ -8,18 +8,12 @@ namespace RoyalIdentity.Options;
 public class AuthenticationOptions
 {
     /// <summary>
-    /// Sets the cookie authentication scheme configured by the host used for interactive users. If not set, the scheme will inferred from the host's default authentication scheme.
-    /// This setting is typically used when AddPolicyScheme is used in the host as the default scheme.
-    /// </summary>
-    public string? CookieAuthenticationScheme { get; set; } = ServerConstants.DefaultCookieAuthenticationScheme;
-
-    /// <summary>
     /// Gets or sets the cookie name used to persist the user's session details.
     /// </summary>
     public string CookieName { get; set; } = ServerConstants.DefaultCookieName;
 
     /// <summary>
-    /// Sets the cookie lifetime
+    /// Sets the cookie lifetime.
     /// </summary>
     public TimeSpan CookieLifetime { get; set; } = ServerConstants.DefaultCookieTimeSpan;
 
@@ -41,6 +35,7 @@ public class AuthenticationOptions
     /// <summary>
     /// Gets or sets the domain of the cookie used for the check session endpoint. Defaults to null.
     /// </summary>
+    [Redesign("Check in IS4 if this is still needed")]
     public string? CheckSessionCookieDomain { get; set; }
 
     /// <summary>
@@ -49,7 +44,7 @@ public class AuthenticationOptions
     public SameSiteMode CheckSessionCookieSameSiteMode { get; set; } = SameSiteMode.None;
 
     /// <summary>
-    /// If set, will require frame-src CSP headers being emitting on the end session callback endpoint which renders iframes to clients for front-channel signout notification.
+    /// If set, will require frame-src CSP headers being emitting on the end session callback endpoint which renders iframes to clients for front-channel sign out notification.
     /// </summary>
-    public bool RequireCspFrameSrcForSignout { get; set; } = true;
+    public bool RequireCspFrameSrcForSignOut { get; set; } = true;
 }

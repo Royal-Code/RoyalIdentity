@@ -18,6 +18,7 @@ public static class AuthenticationExtensions
         return context.RequestServices.GetRequiredService<TimeProvider>();
     }
 
+    [Obsolete("Realm required - must use the realm scheme")]
     internal static ValueTask<string> GetCookieAuthenticationSchemeAsync(this HttpContext context)
     {
         var options = context.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value;
@@ -26,10 +27,11 @@ public static class AuthenticationExtensions
 
     internal static async ValueTask<string> GetCookieAuthenticationSchemeAsync(this HttpContext context, ServerOptions options)
     {
-        if (options.Authentication.CookieAuthenticationScheme is not null)
-        {
-            return options.Authentication.CookieAuthenticationScheme;
-        }
+        // remove this when we have realms
+        ////if (options.Authentication.CookieAuthenticationScheme is not null)
+        ////{
+        ////    return options.Authentication.CookieAuthenticationScheme;
+        ////}
 
         var scheme = await context.RequestServices
             .GetRequiredService<IAuthenticationSchemeProvider>()

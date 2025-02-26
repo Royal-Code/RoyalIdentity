@@ -21,7 +21,7 @@ builder.Services.AddAuthentication(options =>
     .AddCookie()
     .AddOpenIdConnect(options =>
     {
-        options.Authority = "https://localhost:7200";
+        options.Authority = "https://localhost:7200/server";
         //options.ClientId = "demo_client"; -- This is the default client
         options.ClientId = "demo_consent_client";
         options.ResponseType = "code";

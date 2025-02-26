@@ -32,8 +32,10 @@ public static class ServerEndpoint<TEndpoint>
     /// </para>
     /// </summary>
     /// <param name="httpContext">The AspNetCore HttpContext.</param>
+    /// <param name="realm">The realm of the endpoint.</param>
     /// <param name="endpointHandler">The endpoint handler.</param>
     /// <param name="pipelineDispatcher">The pipeline dispatcher.</param>
+    /// <param name="logger">The logger.</param>
     /// <returns>
     ///     The result of processing the request.
     /// </returns>

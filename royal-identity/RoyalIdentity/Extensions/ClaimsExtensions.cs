@@ -45,7 +45,7 @@ internal static class ClaimsExtensions
     {
         var identity = new ClaimsIdentity(
             claims.Distinct(new ClaimComparer()),
-            Constants.ServerAuthenticationType,
+            Constants.ServerAuthenticationScheme,
             JwtClaimTypes.Subject,
             JwtClaimTypes.Role);
 

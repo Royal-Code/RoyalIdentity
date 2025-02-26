@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
@@ -64,7 +63,6 @@ public class EvaluateClient : IDecorator<IWithClient>
         }
 
         context.ClientParameters.SetClientAndSecret(evaluatedClient.Client, evaluatedClient.Credential, evaluatedClient.AuthenticationMethod);
-        context.Items.GetOrCreate<Asserts>().HasClient = true;
 
         await next();
     }

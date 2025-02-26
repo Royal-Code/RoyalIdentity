@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
@@ -25,6 +27,7 @@ public static class ServiceCollectionExtensions
         Action<CustomOptions>? customization = null)
     {
         services.AddHttpContextAccessor();
+        services.AddRoyalIdentityAuthentication();
 
         // Default Pipelines
         services.AddRoyalIdentityPipelines(customization);
@@ -123,5 +126,44 @@ public static class ServiceCollectionExtensions
             .AddPolicyHandler(ServerConstants.HttpClients.GetCircuitBreakerPolicy());
 
         return services;
+    }
+
+    private static void AddRoyalIdentityAuthentication(this IServiceCollection services)
+    {
+        services.AddAuthentication(options =>
+            {
+                options.DefaultScheme = Constants.ServerAuthenticationScheme;
+            })
+            .AddCookie(Constants.DefaultCookieAuthenticationScheme)
+            .AddPolicyScheme(Constants.ServerAuthenticationScheme, Constants.ServerAuthenticationName, options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    // try get the realm from the route
+                    if (context.Request.RouteValues.TryGetValue(Constants.RealmRouteKey, out var realm))
+                    {
+                        return $"{Constants.RealmAuthenticationNamePrefix}{realm}";
+                    }
+                    // try get realm from context items
+                    else if (context.Items.TryGetValue(Constants.RealmRouteKey, out var item) && item is string realmItem)
+                    {
+                        return $"{Constants.RealmAuthenticationNamePrefix}{realmItem}";
+                    }
+                    // else, use cookie authentication
+                    else
+                    {
+                        return Constants.DefaultCookieAuthenticationScheme;
+                    }
+                };
+            });
+
+        // Substituir o AuthenticationSchemeProvider para suportar *realms* dinâmicos
+        services.AddSingleton<IAuthenticationSchemeProvider, RealmsAuthenticationSchemeProvider>();
+
+        // Adicionar configuração dinâmica de cookies
+        services.ConfigureOptions<ConfigureRealmCookieAuthenticationOptions>();
+
+        // authorization
+        services.AddAuthorization();
     }
 }

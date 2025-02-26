@@ -13,7 +13,7 @@ public class DiscoveryContext : AbstractContextBase
         ContextItems? items = null) : base(httpContext, items)
     {
         Options = options;
-        BaseUrl = httpContext.GetServerBaseUrl().EnsureTrailingSlash();
+        BaseUrl = httpContext.GetRealmBaseUrl().EnsureTrailingSlash();
         IssuerUri = httpContext.GetServerIssuerUri(options);
     }
 

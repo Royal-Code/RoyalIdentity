@@ -32,6 +32,14 @@ public class UserInteractionOptions
     public string LogoutPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Logout.EnsureLeadingSlash()!;
 
     /// <summary>
+    /// Gets or sets the access denied URL. If a local URL, the value must start with a leading slash.
+    /// </summary>
+    /// <value>
+    /// The access denied URL.
+    /// </value>
+    public string AccessDeniedPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.AccessDenied.EnsureLeadingSlash()!;
+
+    /// <summary>
     /// Gets or sets the logging out URL. If a local URL, the value must start with a leading slash.
     /// </summary>
     /// <value>

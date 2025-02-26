@@ -12,9 +12,12 @@ namespace RoyalIdentity.Options;
 internal static class Constants
 {
     public const string ServerName = "RoyalIdentity";
-    public const string ServerAuthenticationType = ServerName;
+    public const string ServerAuthenticationScheme = ServerName;
+    public const string ServerAuthenticationName = ServerName;
+    public const string RealmAuthenticationNamePrefix = "Realm:";
+    public const string RealmRouteKey = "realm";
+    public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     public const string ExternalAuthenticationMethod = "external";
-    public const string DefaultHashAlgorithm = "SHA256";
 
 
     public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(60);
@@ -144,6 +147,7 @@ internal static class Constants
             public const string LoggedOut = "/account/logout/done";
             public const string Consent = "/account/consent";
             public const string Error = "/error";
+            public const string AccessDenied = "/account/accessdenied";
             public const string DeviceVerification = "/device";
         }
     }
@@ -1055,9 +1059,8 @@ public static class ServerConstants
 
     public const string CookiePrefix = ".roid.";
 
-    // Cookies padrão do aspnetcore.
+    // Cookies padrão do AspNetCore.
     public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    public const string SignoutScheme = DefaultCookieAuthenticationScheme;
     public const string ExternalCookieAuthenticationScheme = $"{DefaultCookieAuthenticationScheme}.External";
     public const string DefaultCookieName = $"{CookiePrefix}user";
     public const string DefaultCheckSessionCookieName = $"{CookiePrefix}session";

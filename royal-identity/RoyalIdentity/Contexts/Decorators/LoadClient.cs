@@ -48,7 +48,6 @@ public class LoadClient : IDecorator<IWithClient>
         }
 
         context.ClientParameters.SetClient(client);
-        context.Items.GetOrCreate<Asserts>().HasClient = true;
 
         await next();
     }

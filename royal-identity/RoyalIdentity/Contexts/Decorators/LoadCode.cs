@@ -79,7 +79,6 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         }
 
         context.CodeParameters.AuthorizationCode = authorizationCode;
-        context.Items.GetOrCreate<Asserts>().HasCode = true;
 
         await next();
     }

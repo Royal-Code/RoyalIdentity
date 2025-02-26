@@ -68,13 +68,36 @@ public static class HttpContextExtensions
     }
 
     /// <summary>
-    /// Gets the public base URL for IdentityServer.
+    /// Gets the realm path from the route values.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns></returns>
+    public static string? GetRealmPath(this HttpContext context)
+    {
+        return context.Request.RouteValues.TryGetValue("realm", out var realmValue)
+            ? realmValue as string : null;
+    }
+
+    /// <summary>
+    /// Gets the public base URL for the Server.
     /// </summary>
     /// <param name="context">The context.</param>
     /// <returns></returns>
     public static string GetServerBaseUrl(this HttpContext context)
     {
         return context.GetServerHost() + context.GetServerBasePath();
+    }
+
+    /// <summary>
+    /// Gets the public base URL for the realm.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <returns></returns>
+    public static string GetRealmBaseUrl(this HttpContext context)
+    {
+        var serverBaseurl = context.GetServerHost();
+        var realmPath = context.GetRealmPath();
+        return realmPath.IsPresent() ? $"{serverBaseurl.EnsureTrailingSlash()}{realmPath}" : serverBaseurl;
     }
 
     /// <summary>
@@ -126,6 +149,11 @@ public static class HttpContextExtensions
             return options.IssuerUri;
 
         var uri = $"{context.GetServerOrigin(options)}{context.GetServerBasePath()}";
+
+        var realm = context.GetRealmPath();
+        if (realm.IsPresent())
+            uri += uri.EnsureTrailingSlash() + realm;
+
         if (uri.EndsWith('/'))
             uri = uri[..^1];
         if (options.LowerCaseIssuerUri)

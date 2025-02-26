@@ -20,7 +20,7 @@ public class KeyOptions
     /// <summary>
     /// The signing credentials algorithms allowed.
     /// </summary>
-    public IEnumerable<string> SigningCredentialsAlgorithms { get; set; } = 
+    public HashSet<string> SigningCredentialsAlgorithms { get; } = 
     [
         OidcConstants.Algorithms.Asymmetric.RS256,
         OidcConstants.Algorithms.Asymmetric.RS384,
