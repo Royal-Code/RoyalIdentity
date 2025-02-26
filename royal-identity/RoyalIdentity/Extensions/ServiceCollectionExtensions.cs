@@ -49,6 +49,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IJwtFactory, DefaultJwtFactory>();
         services.AddTransient<IKeyManager, DefaultKeyManager>();
         services.AddTransient<IProfileService, DefaultProfileService>();
+        services.AddTransient<IRealmService, DefaultRealmService>();
         services.AddTransient<IRedirectUriValidator, DefaultRedirectUriValidator>();
         services.AddTransient<IReplayCache, DefaultReplayNoCache>();
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();

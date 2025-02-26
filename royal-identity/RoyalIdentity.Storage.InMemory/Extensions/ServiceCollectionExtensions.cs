@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IAuthorizationCodeStore, AuthorizationCodeStore>();
         services.AddTransient<IAuthorizeParametersStore, AuthorizeParametersStore>();
         services.AddTransient<IClientStore, ClientStore>();
+        services.AddTransient<IRealmStore, RealmStore>();
         services.AddTransient<IResourceStore, ResourceStore>();
         services.AddTransient<IUserConsentStore, UserConsentStore>();
         services.AddTransient<IUserStore, UserStore>();

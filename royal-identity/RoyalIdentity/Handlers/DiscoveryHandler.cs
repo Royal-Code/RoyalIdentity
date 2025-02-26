@@ -38,6 +38,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         var baseUrl = context.BaseUrl;
         var options = context.Options;
 
+
         var entries = new Dictionary<string, object>
         {
             { OidcConstants.Discovery.Issuer, issuerUri }

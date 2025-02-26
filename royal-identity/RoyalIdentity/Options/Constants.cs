@@ -16,6 +16,8 @@ internal static class Constants
     public const string ServerAuthenticationName = ServerName;
     public const string RealmAuthenticationNamePrefix = "Realm:";
     public const string RealmRouteKey = "realm";
+    public const string RealmOptionsKey = "realm.options";
+    public const string RealmCurrentKey = "realm.current";
     public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     public const string ExternalAuthenticationMethod = "external";
 

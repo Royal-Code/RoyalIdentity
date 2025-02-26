@@ -41,6 +41,11 @@ public class Client
     public bool Enabled { get; set; } = true;
 
     /// <summary>
+    /// The realm this client belongs to.
+    /// </summary>
+    public Realm Realm { get; set; }
+
+    /// <summary>
     /// Gets or sets the protocol type.
     /// </summary>
     /// <value>

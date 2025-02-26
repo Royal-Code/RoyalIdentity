@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿// Ignore Spelling: Jwk
+
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
@@ -18,7 +21,7 @@ public class JwkEndpoint : IEndpointHandler
         this.options = options.Value;
     }
 
-    public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
+    public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
         logger.LogDebug("Processing jwk discovery request.");
 
@@ -27,22 +30,24 @@ public class JwkEndpoint : IEndpointHandler
         {
             logger.LogWarning("JWK Discovery endpoint only supports GET requests");
 
-            // return a problem details of a MethodNotAllowed infoming the http method is not allowed
-            return new(EndpointErrorResults.MethodNotAllowed(httpContext));
+            // return a problem details of a MethodNotAllowed informing the http method is not allowed
+            return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
         logger.LogDebug("Start jwk discovery request");
 
-        if (!options.Discovery.ShowKeySet)
+        var realmOptions = await httpContext.GetRealmOptionsAsync();
+
+        if (!realmOptions.Discovery.ShowKeySet)
         {
             logger.LogDebug("JWK Discovery endpoint disabled. 404.");
 
-            return new(EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled"));
+            return EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled");
         }
 
         var items = ContextItems.From(options);
-        var context = new JwkContext(httpContext, options, items);
+        var context = new JwkContext(httpContext, realmOptions, items);
 
-        return ValueTask.FromResult(new EndpointCreationResult(context));
+        return new EndpointCreationResult(context);
     }
 }

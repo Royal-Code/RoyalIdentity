@@ -1,4 +1,6 @@
-﻿namespace RoyalIdentity.Options;
+﻿// Ignore Spelling: Jwt Tls Csp typ
+
+namespace RoyalIdentity.Options;
 
 /// <summary>
 /// All options for RoyalIdentity.
@@ -45,7 +47,7 @@ public class ServerOptions
     /// <value>
     /// The endpoints configuration.
     /// </value>
-    public EndpointsOptions Endpoints { get; set; } = new EndpointsOptions();
+    public EndpointsOptions Endpoints { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the Content Security Policy options.
@@ -58,7 +60,7 @@ public class ServerOptions
     public MutualTlsOptions MutualTls { get; set; } = new();
 
     /// <summary>
-    /// Gets or sets the Keys Options options.
+    /// Gets or sets the Keys Options.
     /// </summary>
     public KeyOptions Keys { get; set; } = new();
 
@@ -77,10 +79,10 @@ public class ServerOptions
     public bool LowerCaseIssuerUri { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets the value for the JWT typ header for access tokens.
+    /// Gets or sets the value for the JWT 'typ' header for access tokens.
     /// </summary>
     /// <value>
-    /// The JWT typ value.
+    /// The JWT type value.
     /// </value>
     public string AccessTokenJwtType { get; set; } = "at+jwt";
 

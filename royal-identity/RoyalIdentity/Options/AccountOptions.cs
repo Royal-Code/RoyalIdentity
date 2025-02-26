@@ -1,5 +1,6 @@
 namespace RoyalIdentity.Options;
 
+[Redesign("Merge with LoginOptions (AccountOptions is a better name)")]
 public class AccountOptions
 {
     public bool AllowLocalLogin { get; set; } = true;

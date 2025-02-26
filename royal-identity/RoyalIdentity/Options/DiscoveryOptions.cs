@@ -1,3 +1,5 @@
+// Ignore Spelling: Api
+
 namespace RoyalIdentity.Options;
 
 /// <summary>
@@ -61,7 +63,13 @@ public class DiscoveryOptions
     public bool ExpandRelativePathsInCustomEntries { get; set; } = true;
 
     /// <summary>
-    /// Sets the maxage value of the cache control header (in seconds) of the HTTP response. This gives clients a hint how often they should refresh their cached copy of the discovery document. If set to 0 no-cache headers will be set. Defaults to null, which does not set the header.
+    /// Sets the max age value of the cache control header (in seconds) of the HTTP response.
+    /// <br />
+    /// This gives clients a hint how often they should refresh their cached copy of the discovery document.
+    /// <br />
+    /// If set to 0 no-cache headers will be set. 
+    /// <br />
+    /// Defaults to null, which does not set the header.
     /// </summary>
     /// <value>
     /// The cache interval in seconds.

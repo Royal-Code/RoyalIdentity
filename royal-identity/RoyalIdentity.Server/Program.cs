@@ -1,3 +1,4 @@
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.Components.Layout;
 using RoyalIdentity.Server;
@@ -22,6 +23,10 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
+
+app.UseRouting();
+
+app.UseRealmDiscovery();
 
 app.UseAuthentication();
 app.UseAuthorization();

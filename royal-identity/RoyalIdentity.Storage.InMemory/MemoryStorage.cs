@@ -12,10 +12,56 @@ namespace RoyalIdentity.Storage.InMemory;
 
 public class MemoryStorage
 {
+    private static readonly Realm serverRealm = new()
+    {
+        Id = "server",
+        DisplayName = "RoyalIdentity Server",
+        Domain = "royalidentity.server",
+        Path = "server",
+        Enabled = true,
+        Internal = true
+    };
+
+    private static readonly Realm demoRealm = new()
+    {
+        Id = "demo_realm",
+        DisplayName = "Demo Realm",
+        Domain = "demo.com",
+        Path = "demo",
+        Enabled = true,
+    };
+
+    public ConcurrentDictionary<string, Realm> Reamls { get; } = new()
+    {
+        ["server"] = serverRealm,
+        ["account"] = new Realm
+        {
+            Id = "account",
+            DisplayName = "RoyalIdentity Account Realm",
+            Domain = "royalidentity.account",
+            Path = "account",
+            Enabled = false,
+            Internal = true
+        },
+        ["demo_realm"] = demoRealm
+    };
+
     public ConcurrentDictionary<string, Client> Clients { get; } = new()
     {
+        ["server_admin"] = new Client
+        {
+            Realm = serverRealm,
+            Id = "server_admin",
+            Name = "Administrative server portal",
+            RequireClientSecret = false,
+            AllowOfflineAccess = true,
+            AllowedScopes = { "openid", "profile", },
+            AllowedResponseTypes = { "code" },
+            RedirectUris = { "http://localhost:5200/**", "https://localhost:7200/**" }
+        },
         ["demo_client"] = new Client
         {
+            Realm = demoRealm,
             Id = "demo_client",
             Name = "Demo Client",
             RequireClientSecret = false,
@@ -26,6 +72,7 @@ public class MemoryStorage
         },
         ["demo_consent_client"] = new Client
         {
+            Realm = demoRealm,
             Id = "demo_consent_client",
             Name = "Demo Consent Client",
             RequireClientSecret = false,

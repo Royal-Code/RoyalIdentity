@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
@@ -18,7 +19,7 @@ public class DiscoveryEndpoint : IEndpointHandler
         this.options = options.Value;
     }
 
-    public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
+    public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
         logger.LogDebug("Processing discovery request.");
 
@@ -28,22 +29,24 @@ public class DiscoveryEndpoint : IEndpointHandler
             logger.LogWarning("Discovery endpoint only supports GET requests");
 
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return new(EndpointErrorResults.MethodNotAllowed(httpContext));
+            return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
         logger.LogDebug("Start discovery request");
 
-        if (!options.Endpoints.EnableDiscoveryEndpoint)
+        var realmOptions = await httpContext.GetRealmOptionsAsync();
+
+        if (!realmOptions.Endpoints.EnableDiscoveryEndpoint)
         {
             logger.LogInformation("Discovery endpoint disabled. 404.");
 
             // return a problem details of a NotFound informing the discovery endpoint is disabled
-            return ValueTask.FromResult(EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled"));
+            return EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled");
         }
 
         var items = ContextItems.From(options);
-        var context = new DiscoveryContext(httpContext, options, items);
+        var context = new DiscoveryContext(httpContext, realmOptions, items);
 
-        return ValueTask.FromResult(new EndpointCreationResult(context));
+        return new EndpointCreationResult(context);
     }
 }

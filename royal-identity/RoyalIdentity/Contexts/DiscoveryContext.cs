@@ -9,7 +9,7 @@ public class DiscoveryContext : AbstractContextBase
 {
     public DiscoveryContext(
         HttpContext httpContext,
-        ServerOptions options,
+        RealmOptions options,
         ContextItems? items = null) : base(httpContext, items)
     {
         Options = options;
@@ -17,7 +17,7 @@ public class DiscoveryContext : AbstractContextBase
         IssuerUri = httpContext.GetServerIssuerUri(options);
     }
 
-    public ServerOptions Options { get; }
+    public RealmOptions Options { get; }
 
     public string BaseUrl { get; }
 

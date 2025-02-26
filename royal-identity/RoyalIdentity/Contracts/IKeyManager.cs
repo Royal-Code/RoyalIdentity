@@ -24,7 +24,7 @@ public interface IKeyManager
     ValueTask<ValidationKeysInfo> GetValidationKeysAsync(CancellationToken ct);
 
     /// <summary>
-    /// Creates a new <see cref="SigningCredentials" /> for the current algoritm.
+    /// Creates a new <see cref="SigningCredentials" /> for the current algorithm.
     /// </summary>
     /// <param name="ct"></param>
     /// <returns></returns>

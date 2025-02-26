@@ -3,8 +3,13 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
+
+#pragma warning disable S3358 // Ternary operators should not be nested
 
 namespace RoyalIdentity.Extensions;
 
@@ -19,6 +24,49 @@ public static class HttpContextExtensions
         return (handler is IAuthenticationSignOutHandler);
     }
 
+    public static Realm? TryGetCurrentRealm(this HttpContext context)
+    {
+        return context.Items.TryGetValue(Constants.RealmCurrentKey, out var item) && item is Realm realm 
+            ? realm 
+            : null;
+    }
+
+    public static Realm GetCurrentRealm(this HttpContext context)
+    {
+        return context.TryGetCurrentRealm()
+            ?? throw new InvalidOperationException("Realm is not available.");
+    }
+
+    public static async Task<bool> SetCurrentRealmAsync(this HttpContext context, string realmPath)
+    {
+        var realmStore = context.RequestServices.GetRequiredService<IRealmStore>();
+        var realm = await realmStore.GetByPathAsync(realmPath, context.RequestAborted);
+        if (realm is null)
+            return false;
+
+        context.Items[Constants.RealmCurrentKey] = realm;
+        context.Items[Constants.RealmOptionsKey] = realm.Options;
+
+        return true;
+    }
+
+    public static async ValueTask<RealmOptions> GetRealmOptionsAsync(this HttpContext context)
+    {
+        if (context.Items.TryGetValue(Constants.RealmOptionsKey, out var item) && item is RealmOptions options)
+        {
+            return options;
+        }
+
+        var realmPath = context.GetRealmPath()
+            ?? throw new InvalidOperationException("Realm path is not available.");
+
+        var realmService = context.RequestServices.GetRequiredService<IRealmService>();
+        options = await realmService.GetOptionsAsync(realmPath, context.RequestAborted);
+        context.Items.Add(Constants.RealmOptionsKey, options);
+
+        return options;
+    }
+
     public static void SetServerOrigin(this HttpContext context, string value)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -31,7 +79,7 @@ public static class HttpContextExtensions
         request.Host = new HostString(split[^1]);
     }
 
-    public static string GetServerOrigin(this HttpContext context, ServerOptions options)
+    public static string GetServerOrigin(this HttpContext context, RealmOptions options)
     {
         var request = context.Request;
 
@@ -74,8 +122,11 @@ public static class HttpContextExtensions
     /// <returns></returns>
     public static string? GetRealmPath(this HttpContext context)
     {
-        return context.Request.RouteValues.TryGetValue("realm", out var realmValue)
-            ? realmValue as string : null;
+        return context.Request.RouteValues.TryGetValue(Constants.RealmRouteKey, out var realmValue)
+            ? realmValue as string 
+            : context.Items.TryGetValue(Constants.RealmRouteKey, out var realmItem)
+                ? realmItem as string
+                : null;
     }
 
     /// <summary>
@@ -125,9 +176,10 @@ public static class HttpContextExtensions
     /// <param name="options">The options.</param>
     /// <returns></returns>
     /// <exception cref="System.ArgumentNullException">context</exception>
+    [Obsolete("Use GetServerIssuerUri(this HttpContext context, RealmOptions options) instead.")]
     public static string GetServerIssuerUri(this HttpContext context)
     {
-        var options = context.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value;
+        var options = context.RequestServices.GetRequiredService<IOptions<RealmOptions>>().Value;
         return context.GetServerIssuerUri(options);
     }
 
@@ -138,7 +190,7 @@ public static class HttpContextExtensions
     /// <param name="options">The options.</param>
     /// <returns></returns>
     /// <exception cref="System.ArgumentNullException">context</exception>
-    public static string GetServerIssuerUri(this HttpContext context, ServerOptions options)
+    public static string GetServerIssuerUri(this HttpContext context, RealmOptions options)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(options);
@@ -150,9 +202,12 @@ public static class HttpContextExtensions
 
         var uri = $"{context.GetServerOrigin(options)}{context.GetServerBasePath()}";
 
-        var realm = context.GetRealmPath();
-        if (realm.IsPresent())
-            uri += uri.EnsureTrailingSlash() + realm;
+        if (options.IncludeRealmPathToIssuerUri)
+        {
+            var realm = context.GetRealmPath();
+            if (realm.IsPresent())
+                uri += uri.EnsureTrailingSlash() + realm;
+        }
 
         if (uri.EndsWith('/'))
             uri = uri[..^1];

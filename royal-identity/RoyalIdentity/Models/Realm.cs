@@ -1,4 +1,6 @@
-﻿namespace RoyalIdentity.Models;
+﻿using RoyalIdentity.Options;
+
+namespace RoyalIdentity.Models;
 
 /// <summary>
 /// <para>
@@ -36,4 +38,15 @@ public class Realm
     /// Determines if the realm is enabled.
     /// </summary>
     public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Determines if the realm is internal, managed by the server.
+    /// When is internal, the realm cannot be deleted or have its domain changed.
+    /// </summary>
+    public bool Internal { get; set; }
+
+    /// <summary>
+    /// The options for the realm.
+    /// </summary>
+    public RealmOptions Options { get; set; } = new();
 }

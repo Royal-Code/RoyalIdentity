@@ -38,7 +38,7 @@ public class EndpointsOptions
     /// Gets or sets a value indicating whether the discovery document endpoint is enabled.
     /// </summary>
     /// <value>
-    /// <c>true</c> if the disdovery document endpoint is enabled; otherwise, <c>false</c>.
+    /// <c>true</c> if the discovery document endpoint is enabled; otherwise, <c>false</c>.
     /// </value>
     public bool EnableDiscoveryEndpoint { get; set; } = true;
 
