@@ -8,6 +8,20 @@ namespace RoyalIdentity.Options;
 public class RealmOptions
 {
     /// <summary>
+    /// Creates a new instance of <see cref="RealmOptions"/>.
+    /// </summary>
+    /// <param name="serverOptions"></param>
+    public RealmOptions(ServerOptions serverOptions)
+    {
+        ServerOptions = serverOptions;
+    }
+
+    /// <summary>
+    /// The RoyalIdentity server options.
+    /// </summary>
+    public ServerOptions ServerOptions { get; }
+
+    /// <summary>
     /// Gets or sets the discovery options.
     /// </summary>
     public DiscoveryOptions Discovery { get; set; } = new();
@@ -24,6 +38,16 @@ public class RealmOptions
     /// Gets or sets the mutual TLS options.
     /// </summary>
     public MutualTlsOptions MutualTls { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the Keys Options.
+    /// </summary>
+    public KeyOptions Keys { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the caching options.
+    /// </summary>
+    public CacheOptions Caching { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the unique name of this server/realm instance, e.g. https://myissuer.com or https://myissuer.com/myrealm.

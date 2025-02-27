@@ -1,49 +1,47 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Models;
 using RoyalIdentity.Models.Keys;
-using RoyalIdentity.Options;
 using RoyalIdentity.Utils.Caching;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultKeyManager : IKeyManager
 {
-    private readonly IKeyStore store;
-    private readonly ServerOptions options;
-    private readonly KeyCache cache;
+    private readonly IStorage storage;
+    private readonly RealmCaching caching;
     private readonly ILogger logger;
 
-    private Func<CancellationToken, Task<IReadOnlyList<string>>>? getSigningKeyIds;
-    private Func<IReadOnlyList<string>, CancellationToken, Task<IReadOnlyList<SigningCredentials>>>? getSigningCredentials;
+    private static readonly Func<Arguments, Task<IReadOnlyList<string>>> getSigningKeyIds = GetSigningKeyIds;
+    private static readonly Func<IReadOnlyList<string>, Arguments, Task<IReadOnlyList<SigningCredentials>>> getSigningCredentials = GetSigningCredentials;
 
-    private Func<CancellationToken, Task<IReadOnlyList<string>>>? getValidationKeyIds;
-    private Func<IReadOnlyList<string>, CancellationToken, Task<ValidationKeysInfo>>? getValidationKeys;
+    private static readonly Func<Arguments, Task<IReadOnlyList<string>>> getValidationKeyIds = GetValidationKeyIds;
+    private static readonly Func<IReadOnlyList<string>, Arguments, Task<ValidationKeysInfo>> getValidationKeys = GetValidationKeys;
 
     public DefaultKeyManager(
-        IKeyStore store,
-        IOptions<ServerOptions> options,
-        KeyCache cache,
+        IStorage storage,
+        RealmCaching caching,
         ILogger<DefaultKeyManager> logger)
     {
-        this.store = store;
-        this.options = options.Value;
-        this.cache = cache;
+        this.storage = storage;
+        this.caching = caching;
         this.logger = logger;
     }
 
-    public ValueTask<IReadOnlyList<SigningCredentials>> GetAllSigningCredentialsAsync(CancellationToken ct)
+    public ValueTask<IReadOnlyList<SigningCredentials>> GetAllSigningCredentialsAsync(Realm realm, CancellationToken ct)
     {
-        getSigningKeyIds ??= GetSigningKeyIds;
-        getSigningCredentials ??= GetSigningCredentials;
-        return cache.SigningCredentials.GetOrCreateValue(getSigningKeyIds, getSigningCredentials, ct);
+        var cache = caching.GetKeyCache(realm);
+        var args = new Arguments(realm, storage, logger, ct);
+        return cache.SigningCredentials.GetOrCreateValue(getSigningKeyIds, getSigningCredentials, args);
     }
 
     public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(
-        ICollection<string> allowedIdentityTokenSigningAlgorithms, CancellationToken ct)
+        Realm realm, 
+        ICollection<string> allowedIdentityTokenSigningAlgorithms,
+        CancellationToken ct)
     {
-        var credentials = await GetAllSigningCredentialsAsync(ct);
+        var credentials = await GetAllSigningCredentialsAsync(realm, ct);
         if (credentials.Count is 0)
             return null;
 
@@ -54,71 +52,79 @@ public class DefaultKeyManager : IKeyManager
         return credential;
     }
 
-    public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(CancellationToken ct)
+    public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(Realm realm, CancellationToken ct)
     {
-        var credentials = await GetAllSigningCredentialsAsync(ct);
-        var alg = options.Keys.MainSigningCredentialsAlgorithm;
+        var credentials = await GetAllSigningCredentialsAsync(realm, ct);
+        var alg = realm.Options.Keys.MainSigningCredentialsAlgorithm;
         var credential = credentials.FirstOrDefault(x => alg == x.Algorithm);
         return credential;
     }
 
-    public ValueTask<ValidationKeysInfo> GetValidationKeysAsync(CancellationToken ct)
+    public ValueTask<ValidationKeysInfo> GetValidationKeysAsync(Realm realm, CancellationToken ct)
     {
-        getValidationKeyIds ??= GetValidationKeyIds;
-        getValidationKeys ??= GetValidationKeys;
-        return cache.ValidationKeys.GetOrCreateValue(getValidationKeyIds, getValidationKeys, ct);
+        var cache = caching.GetKeyCache(realm);
+        var args = new Arguments(realm, storage, logger, ct);
+        return cache.ValidationKeys.GetOrCreateValue(getValidationKeyIds, getValidationKeys, args);
     }
 
-    public async Task<SigningCredentials> CreateSigningCredentialsAsync(CancellationToken ct)
+    public async Task<SigningCredentials> CreateSigningCredentialsAsync(Realm realm, CancellationToken ct)
     {
         // create new key for SigningCredentials
-        var alg = options.Keys.MainSigningCredentialsAlgorithm;
-        var lifetime = options.Keys.DefaultSigningCredentialsLifetime;
-        var keySize = options.Keys.RsaKeySizeInBytes;
+        var keysOptions = realm.Options.Keys;
+        var alg = keysOptions.MainSigningCredentialsAlgorithm;
+        var lifetime = keysOptions.DefaultSigningCredentialsLifetime;
+        var keySize = keysOptions.RsaKeySizeInBytes;
         var key = KeyParameters.Create(alg, lifetime, keySize);
 
         // store the key
+        var store = storage.GetKeyStore(realm);
         await store.AddKeyAsync(key, ct);
 
         // updates the host's cache, other instances will update when the cache expires.
-        await cache.SigningCredentials.Update(GetSigningKeyIds, GetSigningCredentials, ct);
-        await cache.ValidationKeys.GetOrCreateValue(GetValidationKeyIds, GetValidationKeys, ct);
+        var cache = caching.GetKeyCache(realm);
+        var args = new Arguments(realm, storage, logger, ct);
+        await cache.SigningCredentials.Update(GetSigningKeyIds, GetSigningCredentials, args);
+        await cache.ValidationKeys.GetOrCreateValue(GetValidationKeyIds, GetValidationKeys, args);
 
         return key.CreateSigningCredentials();
     }
 
-    private async Task<IReadOnlyList<string>> GetSigningKeyIds(CancellationToken ct)
+    private static async Task<IReadOnlyList<string>> GetSigningKeyIds(Arguments args)
     {
-        logger.LogDebug("Obtendo nomes dos segredos das chaves de assinatura.");
+        args.Logger.LogDebug("Obtendo nomes dos segredos das chaves de assinatura.");
 
         // Gets all the secret names of the current keys,
         // which are fit for use on the specified day (today).
-        return await store.ListAllCurrentKeysIdsAsync(ct: ct);
+        var store = args.Storage.GetKeyStore(args.Realm);
+        return await store.ListAllCurrentKeysIdsAsync(ct: args.CancellationToken);
     }
 
-    private async Task<IReadOnlyList<string>> GetValidationKeyIds(CancellationToken ct)
+    private static async Task<IReadOnlyList<string>> GetValidationKeyIds(Arguments args)
     {
-        logger.LogDebug("Obtendo nomes dos segredos das chaves de validação.");
+        args.Logger.LogDebug("Obtendo nomes dos segredos das chaves de validação.");
 
         // Gets all the secret names of the current and expired keys,
         // just doesn't include future keys.
-        return await store.ListAllKeysIdsAsync(ct: ct);
+        var store = args.Storage.GetKeyStore(args.Realm);
+        return await store.ListAllKeysIdsAsync(ct: args.CancellationToken);
     }
 
-    private async Task<IReadOnlyList<SigningCredentials>> GetSigningCredentials(IReadOnlyList<string> keyNames, CancellationToken ct)
+    private static async Task<IReadOnlyList<SigningCredentials>> GetSigningCredentials(IReadOnlyList<string> keyNames, Arguments args)
     {
-        logger.LogDebug("Lendo as chaves de assinatura do banco de dados: {KeyNames}", keyNames);
+        args.Logger.LogDebug("Lendo as chaves de assinatura do banco de dados: {KeyNames}", keyNames);
 
-        var parameters = await store.GetKeysAsync(keyNames, ct);
+        var store = args.Storage.GetKeyStore(args.Realm);
+        var parameters = await store.GetKeysAsync(keyNames, args.CancellationToken);
 
         return parameters.Select(x => x.CreateSigningCredentials()).ToList();
     }
 
-    private async Task<ValidationKeysInfo> GetValidationKeys(IReadOnlyList<string> keyNames, CancellationToken ct)
+    private static async Task<ValidationKeysInfo> GetValidationKeys(IReadOnlyList<string> keyNames, Arguments args)
     {
-        logger.LogDebug("Lendo as chaves de validação do banco de dados: {KeyNames}", keyNames);
+        args.Logger.LogDebug("Lendo as chaves de validação do banco de dados: {KeyNames}", keyNames);
 
-        var parameters = await store.GetKeysAsync(keyNames, ct);
+        var store = args.Storage.GetKeyStore(args.Realm);
+        var parameters = await store.GetKeysAsync(keyNames, args.CancellationToken);
 
         var lists = parameters
             .Select(s => s.GetValidationKey())
@@ -135,5 +141,24 @@ public class DefaultKeyManager : IKeyManager
             Keys = lists.Item1,
             Jwks = lists.Item2
         };
+    }
+
+    private readonly struct Arguments
+    {
+        public Realm Realm { get; }
+
+        public IStorage Storage { get; }
+
+        public ILogger Logger { get; }
+
+        public CancellationToken CancellationToken { get; }
+
+        public Arguments(Realm realm, IStorage storage, ILogger logger, CancellationToken ct)
+        {
+            Realm = realm;
+            Storage = storage;
+            Logger = logger;
+            CancellationToken = ct;
+        }
     }
 }

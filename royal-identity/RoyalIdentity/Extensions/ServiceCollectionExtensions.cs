@@ -119,7 +119,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<UserInfoEndpoint>();
 
         // Others
-        services.AddSingleton<KeyCache>();
+        services.AddSingleton<RealmCaching>();
         services.AddTransient<JwtUtil>();
         services.AddHttpClient(ServerConstants.HttpClients.BackChannelLogoutHttpClient)
             .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(ServerConstants.HttpClients.DefaultTimeoutSeconds))

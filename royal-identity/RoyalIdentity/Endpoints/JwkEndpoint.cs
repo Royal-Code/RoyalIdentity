@@ -46,7 +46,7 @@ public class JwkEndpoint : IEndpointHandler
         }
 
         var items = ContextItems.From(options);
-        var context = new JwkContext(httpContext, realmOptions, items);
+        var context = new JwkContext(httpContext, items);
 
         return new EndpointCreationResult(context);
     }

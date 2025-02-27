@@ -34,7 +34,8 @@ public static class HttpContextExtensions
     public static Realm GetCurrentRealm(this HttpContext context)
     {
         return context.TryGetCurrentRealm()
-            ?? throw new InvalidOperationException("Realm is not available.");
+            ?? throw new InvalidOperationException(
+                "Realm is not available. Use the middleware 'UseRealmDiscovery' to set the current realm.");
     }
 
     public static async Task<bool> SetCurrentRealmAsync(this HttpContext context, string realmPath)
