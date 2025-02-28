@@ -1,9 +1,8 @@
 ﻿using RoyalIdentity.Contexts.Parameters;
-using RoyalIdentity.Endpoints.Abstractions;
 
 namespace RoyalIdentity.Contexts.Withs;
 
-public interface IWithBearerToken : IContextBase
+public interface IWithBearerToken : IEndpointContextBase
 {
     /// <summary>
     /// The access token from the request.

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
@@ -13,10 +12,10 @@ public class PostBodySecretEvaluator : SecretEvaluatorBase
     private static readonly EvaluatedCredential PostBodyInvalidCredentials =
         new (ServerConstants.ParsedSecretTypes.SharedSecret, false);
 
-    public PostBodySecretEvaluator(IClientStore clientStore,
-        IOptions<ServerOptions> options,
+    public PostBodySecretEvaluator(
+        IStorage storage,
         TimeProvider clock,
-        ILogger<PostBodySecretEvaluator> logger) : base(clientStore, options.Value, clock, logger)
+        ILogger<PostBodySecretEvaluator> logger) : base(storage, clock, logger)
     { }
 
     protected override EvaluatedCredential InvalidCredentials => PostBodyInvalidCredentials;

@@ -1,7 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
@@ -22,20 +23,20 @@ public class DefaultJwtFactory : IJwtFactory
     private readonly ILogger logger;
 
     public DefaultJwtFactory(
-        IOptions<ServerOptions> options, 
-        IKeyManager keys, 
-        TimeProvider clock, 
+        IStorage storage, 
+        IKeyManager keys,
+        TimeProvider clock,
         ILogger<DefaultJwtFactory> logger)
     {
-        this.options = options.Value;
+        options = storage.ServerOptions;
         this.keys = keys;
         this.clock = clock;
         this.logger = logger;
     }
 
-    public async Task CreateTokenAsync(TokenBase token, CancellationToken ct)
+    public async Task CreateTokenAsync(Realm realm, TokenBase token, CancellationToken ct)
     {
-        var header = await CreateHeaderAsync(token, ct);
+        var header = await CreateHeaderAsync(realm, token, ct);
         var payload = await CreatePayloadAsync(token, ct);
         var jst = new JwtSecurityToken(header, payload);
 
@@ -49,14 +50,14 @@ public class DefaultJwtFactory : IJwtFactory
     /// </summary>
     /// <param name="token">The token.</param>
     /// <returns>The JWT header</returns>
-    protected virtual async Task<JwtHeader> CreateHeaderAsync(TokenBase token, CancellationToken ct)
+    protected virtual async Task<JwtHeader> CreateHeaderAsync(Realm realm, TokenBase token, CancellationToken ct)
     {
-        var credential = await keys.GetSigningCredentialsAsync(token.AllowedSigningAlgorithms, ct)
+        var credential = await keys.GetSigningCredentialsAsync(realm, token.AllowedSigningAlgorithms, ct)
             ?? throw new InvalidOperationException("No signing credential is configured. Can't create JWT token");
 
         var header = new JwtHeader(credential)
         {
-            ["typ"] = options.AccessTokenJwtType
+            [JwtClaimTypes.TokenType] = options.AccessTokenJwtType
         };
 
         // emit x5t claim for backwards compatibility with v4 of MS JWT library
@@ -111,12 +112,14 @@ public class DefaultJwtFactory : IJwtFactory
     /// </exception>
     protected virtual JwtPayload CreateJwtPayload(TokenBase token)
     {
+        var now = clock.GetUtcNow().UtcDateTime;
+
         var payload = new JwtPayload(
             token.Issuer,
             null,
             null,
-            clock.GetUtcNow().UtcDateTime,
-            clock.GetUtcNow().UtcDateTime.AddSeconds(token.Lifetime));
+            now,
+            now.AddSeconds(token.Lifetime));
 
         foreach (var aud in token.Audiences)
         {
@@ -206,7 +209,7 @@ public class DefaultJwtFactory : IJwtFactory
 
             var unsupportedJsonTokens = jsonTokens.Except(jsonObjects).Except(jsonArrays).ToArray();
             var unsupportedJsonClaimTypes = unsupportedJsonTokens.Select(x => x.Type).Distinct().ToArray();
-            if (unsupportedJsonClaimTypes.Any())
+            if (unsupportedJsonClaimTypes.Length is not 0)
             {
                 throw new InvalidOperationException(
                     $"Unsupported JSON type for claim types: {unsupportedJsonClaimTypes.Aggregate((x, y) => x + ", " + y)}");

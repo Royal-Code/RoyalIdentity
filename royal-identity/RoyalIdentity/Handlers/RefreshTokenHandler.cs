@@ -97,7 +97,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 
             if (newAccessToken.AccessTokenType == AccessTokenType.Jwt)
             {
-                await jwtFactory.CreateTokenAsync(newAccessToken, ct);
+                await jwtFactory.CreateTokenAsync(context.Realm, newAccessToken, ct);
             }
 
             await accessTokenStore.StoreAsync(newAccessToken, ct);

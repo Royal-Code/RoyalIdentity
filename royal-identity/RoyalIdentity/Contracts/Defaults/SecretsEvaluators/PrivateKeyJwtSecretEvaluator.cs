@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
@@ -18,11 +17,10 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
     private readonly IReplayCache replayCache;
 
     public PrivateKeyJwtSecretEvaluator(
-        IClientStore clientStore,
-        IOptions<ServerOptions> options,
+        IStorage storage,
         TimeProvider clock,
         IReplayCache replayCache,
-        ILogger<PrivateKeyJwtSecretEvaluator> logger) : base(clientStore, options.Value, clock, logger)
+        ILogger<PrivateKeyJwtSecretEvaluator> logger) : base(storage, clock, logger)
     {
         this.replayCache = replayCache;
     }
@@ -75,6 +73,7 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
         }
 
         // load client
+        var clientStore = storage.GetClientStore(context.Realm);
         var client = await clientStore.FindEnabledClientByIdAsync(clientId, ct);
         if (client is null)
         {
@@ -104,7 +103,7 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
         {
             // token endpoint URL
             string.Concat(
-                context.HttpContext.GetServerIssuerUri(options).EnsureTrailingSlash(),
+                context.HttpContext.GetServerIssuerUri(context.Options).EnsureTrailingSlash(),
                 Constants.ProtocolRoutePaths.Token)
         };
 

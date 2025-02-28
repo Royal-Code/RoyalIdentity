@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using System.Security.Claims;
 
@@ -26,13 +27,13 @@ public class JwtUtil
     /// <param name="claims">The claims.</param>
     /// <returns></returns>
     /// <exception cref="System.ArgumentNullException">claims</exception>
-    public virtual async Task<string> IssueJwtAsync(string clientId, int lifetime, IEnumerable<Claim> claims)
+    public virtual async Task<string> IssueJwtAsync(Realm realm, string clientId, int lifetime, IEnumerable<Claim> claims)
     {
-        var issuer = accessor.HttpContext?.GetServerIssuerUri();
+        var issuer = accessor.HttpContext?.GetServerIssuerUri(realm.Options);
 
         var token = new Jwt(clientId, issuer!, clock.GetUtcNow().UtcDateTime, lifetime, claims);
 
-        await jwtFactory.CreateTokenAsync(token, default);
+        await jwtFactory.CreateTokenAsync(realm, token, default);
 
         return token.Token;
     }
@@ -45,11 +46,11 @@ public class JwtUtil
     /// <param name="claims">The claims.</param>
     /// <returns></returns>
     /// <exception cref="System.ArgumentNullException">claims</exception>
-    public virtual async Task<string> IssueJwtAsync(string clientId, int lifetime, string issuer, IEnumerable<Claim> claims)
+    public virtual async Task<string> IssueJwtAsync(Realm realm, string clientId, int lifetime, string issuer, IEnumerable<Claim> claims)
     {
         var token = new Jwt(clientId, issuer, clock.GetUtcNow().UtcDateTime, lifetime, claims);
 
-        await jwtFactory.CreateTokenAsync(token, default);
+        await jwtFactory.CreateTokenAsync(realm, token, default);
 
         return token.Token;
     }

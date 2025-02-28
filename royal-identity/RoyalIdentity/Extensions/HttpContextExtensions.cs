@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,17 +25,23 @@ public static class HttpContextExtensions
         return (handler is IAuthenticationSignOutHandler);
     }
 
-    public static Realm? TryGetCurrentRealm(this HttpContext context)
+    public static bool TryGetCurrentRealm(this HttpContext context,[NotNullWhen(true)] out Realm? realm)
     {
-        return context.Items.TryGetValue(Constants.RealmCurrentKey, out var item) && item is Realm realm 
-            ? realm 
-            : null;
+        if (context.Items.TryGetValue(Constants.RealmCurrentKey, out var item) && item is Realm realmItem)
+        {
+            realm = realmItem;
+            return true;
+        }
+
+        realm = null;
+        return false;
     }
 
     public static Realm GetCurrentRealm(this HttpContext context)
     {
-        return context.TryGetCurrentRealm()
-            ?? throw new InvalidOperationException(
+        return context.TryGetCurrentRealm(out var realm)
+            ? realm
+            : throw new InvalidOperationException(
                 "Realm is not available. Use the middleware 'UseRealmDiscovery' to set the current realm.");
     }
 

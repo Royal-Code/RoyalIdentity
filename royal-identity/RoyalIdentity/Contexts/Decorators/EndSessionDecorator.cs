@@ -21,7 +21,7 @@ public class EndSessionDecorator : IDecorator<EndSessionContext>
         // load IdToken if id_token_hint is present.
         if (context.IdTokenHint.IsPresent())
         {
-            var result = await tokenValidator.ValidateIdentityTokenAsync(context.IdTokenHint, context.ClientId, false, ct);
+            var result = await tokenValidator.ValidateIdentityTokenAsync(context.Realm, context.IdTokenHint, context.ClientId, false, ct);
             
             if (result.HasError)
             {

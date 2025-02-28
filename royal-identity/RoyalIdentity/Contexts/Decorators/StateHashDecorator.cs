@@ -21,7 +21,7 @@ public class StateHashDecorator : IDecorator<AuthorizeContext>
         if (context.State.IsPresent())
         {
             var credential = await keyManager.GetSigningCredentialsAsync(
-                context.ClientParameters.Client.AllowedIdentityTokenSigningAlgorithms,
+                context.ClientParameters.Client.Realm,
                 ct) ?? throw new InvalidOperationException("No signing credential is configured.");
 
             var algorithm = credential.Algorithm;

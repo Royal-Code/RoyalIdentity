@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
@@ -5,17 +6,15 @@ using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
 public class NoSecretEvaluator : SecretEvaluatorBase
 {
     public NoSecretEvaluator(
-        IClientStore clientStore,
-        IOptions<ServerOptions> options,
+        IStorage storage,
         TimeProvider clock,
-        ILogger<NoSecretEvaluator> logger) : base(clientStore, options.Value, clock, logger)
+        ILogger<NoSecretEvaluator> logger) : base(storage, clock, logger)
     { }
 
     public override string AuthenticationMethod => string.Empty;
@@ -49,6 +48,7 @@ public class NoSecretEvaluator : SecretEvaluatorBase
         }
 
         // load client
+        var clientStore = storage.GetClientStore(context.Realm);
         var client = await clientStore.FindEnabledClientByIdAsync(clientId, ct);
         if (client is null)
         {

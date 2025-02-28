@@ -34,6 +34,7 @@ public class EndSessionHandler : IHandler<EndSessionContext>
 
         var logoutMessage = new LogoutMessage()
         {
+            RealmId = context.Realm.Id,
             SessionId = sid,
             ShowSignoutPrompt = !canLogoutWithoutUserConfirmation,
             PostLogoutRedirectUri = context.PostLogoutRedirectUri,

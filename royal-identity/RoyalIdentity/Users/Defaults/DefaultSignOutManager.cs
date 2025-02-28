@@ -1,14 +1,12 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Options;
-using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Events;
 using Microsoft.AspNetCore.Authentication;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models.Messages;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contracts.Models;
 
 namespace RoyalIdentity.Users.Defaults;
@@ -16,41 +14,38 @@ namespace RoyalIdentity.Users.Defaults;
 public class DefaultSignOutManager : ISignOutManager
 {
     private readonly IHttpContextAccessor httpContextAccessor;
-    private readonly IUserSessionStore userSessionStore;
+    private readonly IStorage storage;
     private readonly IEventDispatcher eventDispatcher;
-    private readonly IClientStore clients;
     private readonly IBackChannelLogoutNotifier backChannelNotifier;
     private readonly IMessageStore messageStore;
-    private readonly AccountOptions accountOptions;
     private readonly ServerOptions serverOptions;
     private readonly ILogger logger;
 
     public DefaultSignOutManager(
         IHttpContextAccessor httpContextAccessor,
-        IUserSessionStore userSessionStore,
+        IStorage storage,
         IEventDispatcher eventDispatcher,
-        IClientStore clients,
         IBackChannelLogoutNotifier backChannelNotifier,
         IMessageStore messageStore,
-        IOptions<AccountOptions> accountOptions,
-        IOptions<ServerOptions> serverOptions,
         ILogger<DefaultSignOutManager> logger)
     {
         this.httpContextAccessor = httpContextAccessor;
-        this.userSessionStore = userSessionStore;
+        this.storage = storage;
         this.eventDispatcher = eventDispatcher;
         this.backChannelNotifier = backChannelNotifier;
-        this.clients = clients;
         this.messageStore = messageStore;
-        this.accountOptions = accountOptions.Value;
-        this.serverOptions = serverOptions.Value;
         this.logger = logger;
+
+        serverOptions = storage.ServerOptions;
     }
 
     public async Task<string?> CreateLogoutIdAsync(CancellationToken ct)
     {
         var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null || httpContext.User.Identity is null || !httpContext.User.Identity.IsAuthenticated)
+        if (httpContext is null 
+            || httpContext.User.Identity is null 
+            || !httpContext.User.Identity.IsAuthenticated
+            || !httpContext.TryGetCurrentRealm(out var realm))
         {
             return null;
         }
@@ -60,6 +55,7 @@ public class DefaultSignOutManager : ISignOutManager
 
         LogoutMessage message = new LogoutMessage()
         {
+            RealmId = realm.Id,
             SessionId = sid,
             ShowSignoutPrompt = true,
         };
@@ -75,6 +71,10 @@ public class DefaultSignOutManager : ISignOutManager
 
         logger.LogDebug("Start Sign Out, session: {SessionId}, post logout uri: {Uri}", sessionId, postLogoutRedirectUri);
 
+        var realm = await storage.Realms.GetByIdAsync(message.RealmId, ct)
+            ?? throw new InvalidOperationException("Invalid realm id");
+
+        var userSessionStore = storage.GetUserSessionStore(realm);
         var session = await userSessionStore.EndSessionAsync(sessionId, ct);
         
         if (session is null)
@@ -92,7 +92,7 @@ public class DefaultSignOutManager : ISignOutManager
             await eventDispatcher.DispatchAsync(
                 new UserLogoutSuccessEvent(httpContext.User.GetSubjectId(), session?.Id));
 
-            logger.LogDebug("User logout sucess");
+            logger.LogDebug("User logout success");
         }
         else
         {
@@ -108,13 +108,14 @@ public class DefaultSignOutManager : ISignOutManager
 
             foreach(var clientId in session.Clients)
             {
+                var clients = storage.GetClientStore(realm);
                 var client = await clients.FindClientByIdAsync(clientId, ct);
                 if (client is null || !client.Enabled)
                     continue;
 
                 foreach(var uri in client.FrontChannelLogoutUri)
                 {
-                    iss ??= httpContext.GetServerIssuerUri();
+                    iss ??= httpContext.GetServerIssuerUri(realm.Options);
 
                     var logoutUri = client.FrontChannelLogoutSessionRequired
                         ? uri.AddQueryString(JwtClaimTypes.Issuer, iss).AddQueryString(JwtClaimTypes.SessionId, session.Id)
@@ -125,10 +126,11 @@ public class DefaultSignOutManager : ISignOutManager
 
                 foreach (var uri in client.BackChannelLogoutUri)
                 {
-                    iss ??= httpContext.GetServerIssuerUri();
+                    iss ??= httpContext.GetServerIssuerUri(realm.Options);
 
                     backChannelLogout.Add(new LogoutBackChannelRequest()
                     {
+                        Realm = realm,
                         ClientId = clientId,
                         Issuer = iss,
                         Subject = session.User.UserName,
@@ -147,10 +149,10 @@ public class DefaultSignOutManager : ISignOutManager
         }
 
         // determine if it can directly redirect to post logout uri
-        // must have a post logout uri, no front channel logouts, and automatic redirect after signout
+        // must have a post logout uri, no front channel logouts, and automatic redirect after sign out
         var canRedirectToPostLogoutUri = postLogoutRedirectUri is not null &&
             frontChannelLogout.Count == 0 &&
-            accountOptions.AutomaticRedirectAfterSignOut;
+            realm.Options.Account.AutomaticRedirectAfterSignOut;
 
         if (canRedirectToPostLogoutUri)
         {
@@ -170,7 +172,7 @@ public class DefaultSignOutManager : ISignOutManager
             SessionId = session?.Id,
             State = state,
             UiLocales = message.UiLocales,
-            AutomaticRedirectAfterSignOut = accountOptions.AutomaticRedirectAfterSignOut
+            AutomaticRedirectAfterSignOut = realm.Options.Account.AutomaticRedirectAfterSignOut
         };
 
         var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(callbackMessage), ct);

@@ -2,6 +2,8 @@ namespace RoyalIdentity.Contracts.Models.Messages;
 
 public class LogoutMessage
 {
+    public required string RealmId { get; set; }
+
     public required string SessionId { get; init; }
 
     public string? PostLogoutRedirectUri { get; init; }

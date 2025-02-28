@@ -14,7 +14,7 @@ namespace RoyalIdentity.Contracts.Defaults;
 public class DefaultTokenValidator : ITokenValidator
 {
     private readonly IKeyManager keys;
-    private readonly IClientStore clients;
+    private readonly IStorage storage;
     private readonly IAccessTokenStore tokens;
     private readonly ILogger logger;
     private readonly ServerOptions options;
@@ -22,25 +22,24 @@ public class DefaultTokenValidator : ITokenValidator
 
     public DefaultTokenValidator(
         IKeyManager keys,
-        IClientStore clients,
+        IStorage storage,
         IAccessTokenStore tokens,
         ILogger<DefaultTokenValidator> logger,
-        IOptions<ServerOptions> options,
         TimeProvider clock)
     {
         this.keys = keys;
-        this.clients = clients;
+        this.storage = storage;
         this.tokens = tokens;
         this.logger = logger;
-        this.options = options.Value;
+        this.options = storage.ServerOptions;
         this.clock = clock;
     }
 
     public async Task<TokenEvaluationResult> ValidateJwtAccessTokenAsync(
-        string jwt, string? expectedScope = null, string? audience = null, CancellationToken ct = default)
+        Realm realm, string jwt, string? expectedScope = null, string? audience = null, CancellationToken ct = default)
     {
 
-        var (principal, securityToken, error) = await TryGetPrincipal(jwt, audience, true, ct);
+        var (principal, securityToken, error) = await TryGetPrincipal(realm, jwt, audience, true, ct);
 
         if (error is not null)
         {
@@ -64,7 +63,10 @@ public class DefaultTokenValidator : ITokenValidator
         Client? client = null;
         var clientId = principal!.FindFirst(JwtClaimTypes.ClientId);
         if (clientId is not null)
+        {
+            var clients = storage.GetClientStore(realm);
             client = await clients.FindEnabledClientByIdAsync(clientId.Value, ct);
+        }
 
         if (client is null)
         {
@@ -85,7 +87,7 @@ public class DefaultTokenValidator : ITokenValidator
         return new TokenEvaluationResult(evaluatedToken);
     }
 
-    public async Task<TokenEvaluationResult> ValidateReferenceAccessTokenAsync(string jti, CancellationToken ct = default)
+    public async Task<TokenEvaluationResult> ValidateReferenceAccessTokenAsync(Realm realm, string jti, CancellationToken ct = default)
     {
         var token = await tokens.GetAsync(jti, ct);
 
@@ -108,6 +110,7 @@ public class DefaultTokenValidator : ITokenValidator
         }
 
         // load the client that belongs to the client_id claim
+        var clients = storage.GetClientStore(realm);
         var client = await clients.FindEnabledClientByIdAsync(token.ClientId, ct);
         if (client is null)
         {
@@ -133,7 +136,7 @@ public class DefaultTokenValidator : ITokenValidator
     }
 
     public async Task<TokenEvaluationResult> ValidateIdentityTokenAsync(
-        string token, string? clientId = null, bool validateLifetime = true, CancellationToken ct = default)
+        Realm realm, string token, string? clientId = null, bool validateLifetime = true, CancellationToken ct = default)
     {
         logger.LogDebug("Start identity token validation");
 
@@ -158,6 +161,7 @@ public class DefaultTokenValidator : ITokenValidator
             });
         }
 
+        var clients = storage.GetClientStore(realm);
         var client = await clients.FindEnabledClientByIdAsync(clientId, ct);
         if (client == null)
         {
@@ -170,7 +174,7 @@ public class DefaultTokenValidator : ITokenValidator
 
         logger.LogDebug("Client found: {ClientId} / {ClientName}", client.Id, client.Name);
 
-        var (principal, _, error) = await TryGetPrincipal(token, clientId, validateLifetime, ct);
+        var (principal, _, error) = await TryGetPrincipal(realm, token, clientId, validateLifetime, ct);
 
         if (error is not null)
         {
@@ -204,12 +208,13 @@ public class DefaultTokenValidator : ITokenValidator
     }
 
     private async Task<(ClaimsPrincipal?, SecurityToken?, ErrorDetails?)> TryGetPrincipal(
+        Realm realm, 
         string jwt,
         string? audience,
         bool validateLifetime,
         CancellationToken ct)
     {
-        var validationsKeys = await keys.GetValidationKeysAsync(ct);
+        var validationsKeys = await keys.GetValidationKeysAsync(realm, ct);
 
         var handler = new JwtSecurityTokenHandler();
         handler.InboundClaimTypeMap.Clear();

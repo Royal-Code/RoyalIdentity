@@ -13,6 +13,16 @@ public class RealmStore : IRealmStore
         this.realms = realms;
     }
 
+    public async IAsyncEnumerable<Realm> GetAllAsync(CancellationToken ct)
+    {
+        foreach (var realm in realms.Values)
+        {
+            if (ct.IsCancellationRequested)
+                yield break;
+            yield return realm;
+        }
+    }
+
     public ValueTask<Realm?> GetByIdAsync(string id, CancellationToken ct)
     {
         realms.TryGetValue(id, out var realm);

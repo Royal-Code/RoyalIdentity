@@ -41,15 +41,14 @@ public class DefaultKeyManager : IKeyManager
         ICollection<string> allowedIdentityTokenSigningAlgorithms,
         CancellationToken ct)
     {
+        if (allowedIdentityTokenSigningAlgorithms.Count is 0)
+            return await GetSigningCredentialsAsync(realm, ct);
+
         var credentials = await GetAllSigningCredentialsAsync(realm, ct);
         if (credentials.Count is 0)
             return null;
 
-        var credential = allowedIdentityTokenSigningAlgorithms.Count is 0
-            ? credentials[0]
-            : credentials.FirstOrDefault(x => allowedIdentityTokenSigningAlgorithms.Contains(x.Algorithm));
-
-        return credential;
+        return credentials.FirstOrDefault(x => allowedIdentityTokenSigningAlgorithms.Contains(x.Algorithm));
     }
 
     public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(Realm realm, CancellationToken ct)

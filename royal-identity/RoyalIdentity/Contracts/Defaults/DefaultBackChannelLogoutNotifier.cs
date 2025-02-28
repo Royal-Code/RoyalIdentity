@@ -66,10 +66,10 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
         var claims = await CreateClaimsForTokenAsync(request);
         if (claims.Any(x => x.Type == JwtClaimTypes.Nonce))
         {
-            throw new InvalidOperationException("nonce claim is not allowed in the back-channel signout token.");
+            throw new InvalidOperationException("nonce claim is not allowed in the back-channel sign out token.");
         }
 
-        return await util.IssueJwtAsync(request.ClientId, defaultLogoutTokenLifetime, claims);
+        return await util.IssueJwtAsync(request.Realm, request.ClientId, defaultLogoutTokenLifetime, claims);
     }
 
     /// <summary>

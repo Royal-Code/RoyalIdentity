@@ -1,4 +1,5 @@
 ﻿using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Models;
 
 namespace RoyalIdentity.Contracts;
 
@@ -15,15 +16,15 @@ public interface ITokenValidator
     /// <param name="audience"></param>
     /// <param name="ct"></param>
     /// <returns></returns>
-    Task<TokenEvaluationResult> ValidateJwtAccessTokenAsync(string jwt, string? expectedScope = null, string? audience = null, CancellationToken ct = default);
+    Task<TokenEvaluationResult> ValidateJwtAccessTokenAsync(Realm realm, string jwt, string? expectedScope = null, string? audience = null, CancellationToken ct = default);
 
     /// <summary>
-    /// Validates a reference access token, not jwt.
+    /// Validates a reference access token, not JWT.
     /// </summary>
     /// <param name="tokenHandle"></param>
     /// <param name="ct"></param>
     /// <returns></returns>
-    Task<TokenEvaluationResult> ValidateReferenceAccessTokenAsync(string jti, CancellationToken ct = default);
+    Task<TokenEvaluationResult> ValidateReferenceAccessTokenAsync(Realm realm, string jti, CancellationToken ct = default);
 
     /// <summary>
     /// Validates an identity token.
@@ -32,5 +33,5 @@ public interface ITokenValidator
     /// <param name="clientId">The client identifier. Optional, if not informed, client will not be validated.</param>
     /// <param name="validateLifetime">if set to <c>true</c> the lifetime gets validated. Otherwise not.</param>
     /// <returns></returns>
-    Task<TokenEvaluationResult> ValidateIdentityTokenAsync(string token, string? clientId = null, bool validateLifetime = true, CancellationToken ct = default);
+    Task<TokenEvaluationResult> ValidateIdentityTokenAsync(Realm realm, string token, string? clientId = null, bool validateLifetime = true, CancellationToken ct = default);
 }

@@ -71,7 +71,7 @@ public class DefaultTokenFactory : ITokenFactory
         claims.Add(new Claim(JwtClaimTypes.IssuedAt, clock.GetUtcNow().ToUnixTimeSeconds().ToString(),
             ClaimValueTypes.Integer64));
 
-        var issuer = request.HttpContext.GetServerIssuerUri(options);
+        var issuer = request.HttpContext.GetServerIssuerUri(request.Client.Realm.Options);
 
         var token = new AccessToken(
             request.Client.Id,
@@ -119,7 +119,7 @@ public class DefaultTokenFactory : ITokenFactory
         {
             logger.LogDebug("Creating JWT access token");
 
-            await jwtFactory.CreateTokenAsync(token, ct);
+            await jwtFactory.CreateTokenAsync(request.Client.Realm, token, ct);
         }
 
         await accessTokenStore.StoreAsync(token, ct);
@@ -134,6 +134,7 @@ public class DefaultTokenFactory : ITokenFactory
         var client = request.Client;
 
         var credential = await keys.GetSigningCredentialsAsync(
+            client.Realm,
             client.AllowedIdentityTokenSigningAlgorithms, 
             ct)
             ?? throw new InvalidOperationException("No signing credential is configured.");
@@ -194,7 +195,7 @@ public class DefaultTokenFactory : ITokenFactory
             claims.Add(new Claim(JwtClaimTypes.Audience, client.Id));
         }
 
-        var issuer = request.HttpContext.GetServerIssuerUri(options);
+        var issuer = request.HttpContext.GetServerIssuerUri(request.Client.Realm.Options);
 
         var idToken = new IdentityToken(client.Id,
             issuer,
@@ -206,7 +207,7 @@ public class DefaultTokenFactory : ITokenFactory
 
         idToken.Claims.AddRange(claims);
 
-        await jwtFactory.CreateTokenAsync(idToken, ct);
+        await jwtFactory.CreateTokenAsync(request.Client.Realm, idToken, ct);
 
         return idToken;
     }
@@ -242,7 +243,7 @@ public class DefaultTokenFactory : ITokenFactory
             logger.LogDebug("Setting a sliding lifetime: {SlidingLifetime}", lifetime);
         }
 
-        var issuer = request.HttpContext.GetServerIssuerUri(options);
+        var issuer = request.HttpContext.GetServerIssuerUri(request.Client.Realm.Options);
         var tokenItSelf = CryptoRandom.CreateUniqueId();
         
         var refreshToken = new RefreshToken(

@@ -1,9 +1,13 @@
-﻿namespace RoyalIdentity.Contracts.Models;
+﻿using RoyalIdentity.Models;
+
+namespace RoyalIdentity.Contracts.Models;
 
 #nullable disable // POCO
 
 public class LogoutBackChannelRequest
 {
+    public required Realm Realm { get; set; }
+
     public string Uri { get; set; }
 
     public string Issuer { get; set; }

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
@@ -15,10 +14,9 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
         new(ServerConstants.ParsedSecretTypes.X509Certificate, false);
 
     public TlsClientAuthSecretEvaluator(
-        IClientStore clientStore,
-        IOptions<ServerOptions> options,
+        IStorage storage,
         TimeProvider clock,
-        ILogger<TlsClientAuthSecretEvaluator> logger) : base(clientStore, options.Value, clock, logger)
+        ILogger<TlsClientAuthSecretEvaluator> logger) : base(storage, clock, logger)
     { }
 
 
@@ -63,6 +61,7 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
         }
 
         // load client
+        var clientStore = storage.GetClientStore(context.Realm);
         var client = await clientStore.FindEnabledClientByIdAsync(clientId, ct);
         if (client is null)
         {
@@ -106,7 +105,7 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
         }
 
         logger.LogDebug("No x509 name secrets configured for client.");
-        logger.LogWarning("No thumbprint found in X509 certificate.");
+        logger.LogWarning("No thumb print found in X509 certificate.");
         return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
     }
 

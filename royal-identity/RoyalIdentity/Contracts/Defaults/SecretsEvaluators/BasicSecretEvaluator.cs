@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using System.Text;
 using RoyalIdentity.Options;
 using RoyalIdentity.Contracts.Storage;
-using Microsoft.Extensions.Options;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
@@ -15,10 +14,10 @@ public class BasicSecretEvaluator : SecretEvaluatorBase
     private static readonly EvaluatedCredential BasicInvalidCredentials =
         new (ServerConstants.ParsedSecretTypes.SharedSecret, false);
 
-    public BasicSecretEvaluator(IClientStore clientStore,
-        IOptions<ServerOptions> options,
+    public BasicSecretEvaluator(
+        IStorage storage,
         TimeProvider clock,
-        ILogger<BasicSecretEvaluator> logger) : base(clientStore, options.Value, clock, logger)
+        ILogger<BasicSecretEvaluator> logger) : base(storage, clock, logger)
     { }
 
     protected override EvaluatedCredential InvalidCredentials => BasicInvalidCredentials;

@@ -45,7 +45,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         };
 
         // jwks
-        if (options.Discovery.ShowKeySet && (await keys.GetValidationKeysAsync(ct)).Keys.Count is not 0)
+        if (options.Discovery.ShowKeySet && (await keys.GetValidationKeysAsync(context.Realm, ct)).Keys.Count is not 0)
         {
             entries.Add(OidcConstants.Discovery.JwksUri, baseUrl + Constants.ProtocolRoutePaths.DiscoveryWebKeys);
         }
@@ -244,7 +244,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
             entries.Add(OidcConstants.Discovery.TokenEndpointAuthenticationMethodsSupported, types);
         }
 
-        var signingCredentials = await keys.GetAllSigningCredentialsAsync(ct);
+        var signingCredentials = await keys.GetAllSigningCredentialsAsync(context.Realm, ct);
         if (signingCredentials.Count is not 0)
         {
             var signingAlgorithms = signingCredentials.Select(c => c.Algorithm).Distinct();

@@ -10,19 +10,18 @@ namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
 public abstract class SecretEvaluatorBase : IClientSecretEvaluator
 {
-    protected readonly IClientStore clientStore;
+    protected readonly IStorage storage;
     protected readonly ServerOptions options;
     protected readonly TimeProvider clock;
     protected readonly ILogger logger;
 
     protected SecretEvaluatorBase(
-        IClientStore clientStore,
-        ServerOptions options,
+        IStorage storage,
         TimeProvider clock,
         ILogger logger)
     {
-        this.clientStore = clientStore;
-        this.options = options;
+        this.storage = storage;
+        this.options = storage.ServerOptions;
         this.clock = clock;
         this.logger = logger;
     }
@@ -53,6 +52,7 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
         }
 
         // load client
+        var clientStore = storage.GetClientStore(context.Realm);
         var client = await clientStore.FindEnabledClientByIdAsync(clientId, ct);
         if (client is null)
         {

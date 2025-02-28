@@ -42,7 +42,7 @@ public class EvaluateBearerToken : IDecorator<IWithBearerToken>
                 return;
             }
 
-            evaluationResult = await tokenValidator.ValidateJwtAccessTokenAsync(token, null, null, ct);
+            evaluationResult = await tokenValidator.ValidateJwtAccessTokenAsync(context.Realm, token, null, null, ct);
         }
         else
         {
@@ -53,7 +53,7 @@ public class EvaluateBearerToken : IDecorator<IWithBearerToken>
                 return;
             }
 
-            evaluationResult = await tokenValidator.ValidateReferenceAccessTokenAsync(token, ct);
+            evaluationResult = await tokenValidator.ValidateReferenceAccessTokenAsync(context.Realm, token, ct);
         }
 
         if (evaluationResult.HasError)
