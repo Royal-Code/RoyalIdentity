@@ -19,7 +19,7 @@ public partial class MemoryStorage : IStorage
     public MemoryStorage(IPasswordProtector passwordProtector, TimeProvider clock, IHttpContextAccessor accessor)
     {
         realmMemoryStore.AddRange(
-            RealmsDictionary.Values.Select(
+            Realms.Values.Select(
                 r => new KeyValuePair<string, RealmMemoryStore>(
                     r.Id,
                     new RealmMemoryStore(r, r.Id == "server"))));
@@ -29,7 +29,17 @@ public partial class MemoryStorage : IStorage
         this.accessor = accessor;
     }
 
-    public IRealmStore Realms => new RealmStore(RealmsDictionary);
+    IRealmStore IStorage.Realms => new RealmStore(Realms);
+
+    IUserConsentStore IStorage.UserConsents => new UserConsentStore(Consents);
+
+    IAccessTokenStore IStorage.AccessTokens => new AccessTokenStore(AccessTokens);
+
+    IRefreshTokenStore IStorage.RefreshTokens => new RefreshTokenStore(RefreshTokens);
+
+    IAuthorizationCodeStore IStorage.AuthorizationCodes => new AuthorizationCodeStore(AuthorizationCodes);
+
+    IAuthorizeParametersStore IStorage.AuthorizeParameters => new AuthorizeParametersStore(AuthorizeParameters);
 
     public IClientStore GetClientStore(Realm realm)
     {

@@ -10,12 +10,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<MemoryStorage>();
         services.AddSingleton<IStorageProvider, StorageProvider>();
 
-        services.AddTransient<IAccessTokenStore, AccessTokenStore>();
-        services.AddTransient<IAuthorizationCodeStore, AuthorizationCodeStore>();
-        services.AddTransient<IAuthorizeParametersStore, AuthorizeParametersStore>();
-        services.AddTransient<IUserConsentStore, UserConsentStore>();
-        services.AddTransient<IRefreshTokenStore, RefreshTokenStore>();
-
         return services;
     }
 }

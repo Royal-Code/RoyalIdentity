@@ -44,7 +44,7 @@ public partial class MemoryStorage
 
     public ServerOptions ServerOptions => serverOptions;
 
-    public ConcurrentDictionary<string, Realm> RealmsDictionary { get; } = new()
+    public ConcurrentDictionary<string, Realm> Realms { get; } = new()
     {
         ["server"] = serverRealm,
         ["account"] = accountRealm,

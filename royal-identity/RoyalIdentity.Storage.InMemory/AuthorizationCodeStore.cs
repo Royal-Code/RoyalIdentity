@@ -1,32 +1,33 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models.Tokens;
+using System.Collections.Concurrent;
 
 namespace RoyalIdentity.Storage.InMemory;
 
 public class AuthorizationCodeStore : IAuthorizationCodeStore
 {
-    private readonly MemoryStorage storage;
+    private readonly ConcurrentDictionary<string, AuthorizationCode> authorizationCodes;
 
-    public AuthorizationCodeStore(MemoryStorage storage)
+    public AuthorizationCodeStore(ConcurrentDictionary<string, AuthorizationCode> authorizationCodes)
     {
-        this.storage = storage;
+        this.authorizationCodes = authorizationCodes;
     }
 
     public Task<string> StoreAuthorizationCodeAsync(AuthorizationCode code, CancellationToken ct)
     {
-        storage.AuthorizationCodes[code.Code] = code;
+        authorizationCodes[code.Code] = code;
         return Task.FromResult(code.Code);
     }
 
     public Task<AuthorizationCode?> GetAuthorizationCodeAsync(string code, CancellationToken ct)
     {
-        storage.AuthorizationCodes.TryGetValue(code, out var authorizationCode);
+        authorizationCodes.TryGetValue(code, out var authorizationCode);
         return Task.FromResult(authorizationCode);
     }
 
     public Task RemoveAuthorizationCodeAsync(string code, CancellationToken ct)
     {
-        storage.AuthorizationCodes.TryRemove(code, out _);
+        authorizationCodes.TryRemove(code, out _);
         return Task.CompletedTask;
     }
 }

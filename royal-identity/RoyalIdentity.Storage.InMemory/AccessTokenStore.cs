@@ -1,42 +1,43 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models.Tokens;
+using System.Collections.Concurrent;
 
 namespace RoyalIdentity.Storage.InMemory;
 
 public class AccessTokenStore : IAccessTokenStore
 {
-    private readonly MemoryStorage storage;
+    private readonly ConcurrentDictionary<string, AccessToken> accessTokens;
 
-    public AccessTokenStore(MemoryStorage storage)
+    public AccessTokenStore(ConcurrentDictionary<string, AccessToken> accessTokens)
     {
-        this.storage = storage;
+        this.accessTokens = accessTokens;
     }
 
     public Task<string> StoreAsync(AccessToken token, CancellationToken ct)
     {
-        storage.AccessTokens.TryAdd(token.Id, token);
+        accessTokens.TryAdd(token.Id, token);
         return Task.FromResult(token.Id);
     }
 
     public Task<AccessToken?> GetAsync(string jti, CancellationToken ct)
     {
-        storage.AccessTokens.TryGetValue(jti, out var token);
+        accessTokens.TryGetValue(jti, out var token);
         return Task.FromResult(token);
     }
 
     public Task RemoveAsync(string jti, CancellationToken ct)
     {
-        storage.AccessTokens.TryRemove(jti, out _);
+        accessTokens.TryRemove(jti, out _);
         return Task.CompletedTask;
     }
 
     public Task RemoveReferenceTokensAsync(string subjectId, string clientId, CancellationToken ct)
     {
-        storage.AccessTokens.Where(kvp => kvp.Value.AccessTokenType == AccessTokenType.Reference &&
-                                          kvp.Value.SubjectId == subjectId &&
-                                          kvp.Value.ClientId == clientId)
+        accessTokens.Where(kvp => kvp.Value.AccessTokenType == AccessTokenType.Reference &&
+                                  kvp.Value.SubjectId == subjectId &&
+                                  kvp.Value.ClientId == clientId)
             .ToList()
-            .ForEach(kvp => storage.AccessTokens.TryRemove(kvp.Key, out _));
+            .ForEach(kvp => accessTokens.TryRemove(kvp.Key, out _));
 
         return Task.CompletedTask;
     }
