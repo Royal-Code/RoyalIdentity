@@ -1,16 +1,21 @@
-﻿namespace RoyalIdentity.Options;
+﻿using Microsoft.IdentityModel.Tokens;
 
+namespace RoyalIdentity.Options;
+
+/// <summary>
+/// Options for key management.
+/// </summary>
 public class KeyOptions
 {
     /// <summary>
     /// The main signature credential algorithm
     /// </summary>
-    public string MainSigningCredentialsAlgorithm { get; set; } = OidcConstants.Algorithms.Asymmetric.RS256;
+    public string MainSigningCredentialsAlgorithm { get; set; } = SecurityAlgorithms.EcdsaSha256;
 
     /// <summary>
     /// Default lifetime for new signature credentials.
     /// </summary>
-    public TimeSpan DefaultSigningCredentialsLifetime { get; set; } = TimeSpan.FromDays(356);
+    public TimeSpan? DefaultSigningCredentialsLifetime { get; set; } = TimeSpan.FromDays(356);
 
     /// <summary>
     /// The size to create a new RSA signature credential.
@@ -22,17 +27,20 @@ public class KeyOptions
     /// </summary>
     public HashSet<string> SigningCredentialsAlgorithms { get; } = 
     [
-        OidcConstants.Algorithms.Asymmetric.RS256,
-        OidcConstants.Algorithms.Asymmetric.RS384,
-        OidcConstants.Algorithms.Asymmetric.RS512,
-        OidcConstants.Algorithms.Asymmetric.PS256,
-        OidcConstants.Algorithms.Asymmetric.PS384,
-        OidcConstants.Algorithms.Asymmetric.PS512,
-        OidcConstants.Algorithms.Asymmetric.ES256,
-        OidcConstants.Algorithms.Asymmetric.ES384,
-        OidcConstants.Algorithms.Asymmetric.ES512,
-        OidcConstants.Algorithms.Symmetric.HS256,
-        OidcConstants.Algorithms.Symmetric.HS384,
-        OidcConstants.Algorithms.Symmetric.HS512,
+        SecurityAlgorithms.RsaSha256,
+        SecurityAlgorithms.RsaSha384,
+        SecurityAlgorithms.RsaSha512,
+
+        SecurityAlgorithms.RsaSsaPssSha256,
+        SecurityAlgorithms.RsaSsaPssSha384,
+        SecurityAlgorithms.RsaSsaPssSha512,
+
+        SecurityAlgorithms.EcdsaSha256,
+        SecurityAlgorithms.EcdsaSha384,
+        SecurityAlgorithms.EcdsaSha512,
+
+        SecurityAlgorithms.HmacSha256,
+        SecurityAlgorithms.HmacSha384,
+        SecurityAlgorithms.HmacSha512,
     ];
 }

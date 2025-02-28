@@ -70,11 +70,7 @@ public class DefaultKeyManager : IKeyManager
     public async Task<SigningCredentials> CreateSigningCredentialsAsync(Realm realm, CancellationToken ct)
     {
         // create new key for SigningCredentials
-        var keysOptions = realm.Options.Keys;
-        var alg = keysOptions.MainSigningCredentialsAlgorithm;
-        var lifetime = keysOptions.DefaultSigningCredentialsLifetime;
-        var keySize = keysOptions.RsaKeySizeInBytes;
-        var key = KeyParameters.Create(alg, lifetime, keySize);
+        var key = KeyParameters.Create(realm.Options.Keys);
 
         // store the key
         var store = storage.GetKeyStore(realm);

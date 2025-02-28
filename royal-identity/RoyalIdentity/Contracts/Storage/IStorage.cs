@@ -12,15 +12,13 @@ public interface IStorage
     /// <summary>
     /// Gets the server options.
     /// </summary>
-    /// <returns>The server options.</returns>
-    ServerOptions GetServerOptions();
+    /// <value>The server options.</returns>
+    ServerOptions ServerOptions { get; }
 
     /// <summary>
     /// Gets the realm store.
     /// </summary>
-    /// <value>
-    /// The realm store.
-    /// </value>
+    /// <value>The realm store.</value>
     IRealmStore Realms { get; }
 
     /// <summary>

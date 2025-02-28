@@ -1,26 +1,27 @@
 ﻿using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models.Keys;
+using System.Collections.Concurrent;
 
 namespace RoyalIdentity.Storage.InMemory;
 
 public class KeyStore : IKeyStore
 {
-    private readonly MemoryStorage storage;
+    private readonly ConcurrentDictionary<string, KeyParameters> KeyParameters;
 
-    public KeyStore(MemoryStorage storage)
+    public KeyStore(ConcurrentDictionary<string, KeyParameters> KeyParameters)
     {
-        this.storage = storage;
+        this.KeyParameters = KeyParameters;
     }
 
     public Task AddKeyAsync(KeyParameters key, CancellationToken ct)
     {
-        storage.KeyParameters[key.KeyId] = key;
+        KeyParameters[key.KeyId] = key;
         return Task.CompletedTask;
     }
 
     public Task<KeyParameters> GetKeyAsync(string keyId, CancellationToken ct)
     {
-        storage.KeyParameters.TryGetValue(keyId, out var key);
+        KeyParameters.TryGetValue(keyId, out var key);
 
         if (key is null)
             throw new ArgumentException($"The key with the Id ‘{keyId}’ was not found", nameof(keyId));
@@ -46,7 +47,7 @@ public class KeyStore : IKeyStore
     {
         DateTime date = now ?? DateTime.UtcNow;
 
-        IReadOnlyList<string> keyNames = storage.KeyParameters.Values
+        IReadOnlyList<string> keyNames = KeyParameters.Values
             .Where(k => k.NotBefore == null || k.NotBefore <= date)
             .Where(k => k.Expires == null || k.Expires >= date)
             .OrderBy(k => k.Created)
@@ -60,7 +61,7 @@ public class KeyStore : IKeyStore
     {
         DateTime date = now ?? DateTime.UtcNow;
 
-        IReadOnlyList<string> keyNames = storage.KeyParameters.Values
+        IReadOnlyList<string> keyNames = KeyParameters.Values
             .Where(k => k.NotBefore == null || k.NotBefore <= date)
             .OrderBy(k => k.Created)
             .Select(k => k.KeyId)

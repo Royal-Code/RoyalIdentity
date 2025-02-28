@@ -676,33 +676,6 @@ public static class OidcConstants
         public const string WindowsIntegratedAuthentication = "wia";
     }
 
-    public static class Algorithms
-    {
-        public const string None = "none";
-
-        public static class Symmetric
-        {
-            public const string HS256 = "HS256";
-            public const string HS384 = "HS384";
-            public const string HS512 = "HS512";
-        }
-
-        public static class Asymmetric
-        {
-            public const string RS256 = "RS256";
-            public const string RS384 = "RS384";
-            public const string RS512 = "RS512";
-
-            public const string ES256 = "ES256";
-            public const string ES384 = "ES384";
-            public const string ES512 = "ES512";
-
-            public const string PS256 = "PS256";
-            public const string PS384 = "PS384";
-            public const string PS512 = "PS512";
-        }
-    }
-
     public static class Discovery
     {
         public const string Issuer = "issuer";
@@ -1143,27 +1116,6 @@ public static class ServerConstants
         public const string UserInfoRequestValidation = "UserInfoRequestValidation";
         public const string DeviceCodeValidation = "DeviceCodeValidation";
     }
-
-    [Redesign("Move to Options")]
-
-    public static readonly ICollection<string> SupportedSigningAlgorithms =
-    [
-        SecurityAlgorithms.RsaSha256,
-        SecurityAlgorithms.RsaSha384,
-        SecurityAlgorithms.RsaSha512,
-
-        SecurityAlgorithms.RsaSsaPssSha256,
-        SecurityAlgorithms.RsaSsaPssSha384,
-        SecurityAlgorithms.RsaSsaPssSha512,
-
-        SecurityAlgorithms.EcdsaSha256,
-        SecurityAlgorithms.EcdsaSha384,
-        SecurityAlgorithms.EcdsaSha512,
-
-        SecurityAlgorithms.HmacSha256,
-        SecurityAlgorithms.HmacSha384,
-        SecurityAlgorithms.HmacSha512
-    ];
 
     public static class StandardScopes
     {

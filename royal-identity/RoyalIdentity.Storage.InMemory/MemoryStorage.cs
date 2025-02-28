@@ -1,51 +1,58 @@
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
-using System.Security.Claims;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Tokens;
-using RoyalIdentity.Users;
-using RoyalIdentity.Users.Contracts;
-using RoyalIdentity.Utils;
+using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Storage.InMemory;
 
-public class MemoryStorage
+public partial class MemoryStorage
 {
-    private static readonly Realm serverRealm = new()
-    {
-        Id = "server",
-        DisplayName = "RoyalIdentity Server",
-        Domain = "royalidentity.server",
-        Path = "server",
-        Enabled = true,
-        Internal = true
-    };
+    private static readonly ServerOptions serverOptions = new();
 
-    private static readonly Realm demoRealm = new()
-    {
-        Id = "demo_realm",
-        DisplayName = "Demo Realm",
-        Domain = "demo.com",
-        Path = "demo",
-        Enabled = true,
-    };
+    private static readonly Realm serverRealm = new(
+        "server",
+        "royalidentity.server",
+        "server",
+        "RoyalIdentity Server", 
+        true, 
+        new RealmOptions(serverOptions));
 
-    public ConcurrentDictionary<string, Realm> Reamls { get; } = new()
+    private static readonly Realm accountRealm = new(
+        "account",
+        "royalidentity.account",
+        "account",
+        "RoyalIdentity Account Realm",
+        true,
+        new RealmOptions(serverOptions));
+
+    private static readonly Realm adminRealm = new(
+        "admin",
+        "royalidentity.admin",
+        "admin",
+        "RoyalIdentity Admin Realm",
+        true,
+        new RealmOptions(serverOptions));
+
+    private static readonly Realm demoRealm = new(
+        "demo_realm",
+        "demo.com",
+        "demo",
+        "Demo Realm",
+        false,
+        new RealmOptions(serverOptions));
+
+    public ServerOptions ServerOptions => serverOptions;
+
+    public ConcurrentDictionary<string, Realm> RealmsDictionary { get; } = new()
     {
         ["server"] = serverRealm,
-        ["account"] = new Realm
-        {
-            Id = "account",
-            DisplayName = "RoyalIdentity Account Realm",
-            Domain = "royalidentity.account",
-            Path = "account",
-            Enabled = false,
-            Internal = true
-        },
+        ["account"] = accountRealm,
+        ["admin"] = adminRealm,
         ["demo_realm"] = demoRealm
     };
 
+    [Obsolete("Use Realms instead")]
     public ConcurrentDictionary<string, Client> Clients { get; } = new()
     {
         ["server_admin"] = new Client
@@ -84,117 +91,6 @@ public class MemoryStorage
         }
     };
 
-    public ConcurrentDictionary<string, IdentityResource> IdentityResources { get; } = new()
-    {
-        ["openid"] = new IdentityResource
-        {
-            Name = "openid",
-            DisplayName = "Your user identifier",
-            Description = "Your user identifier",
-            Required = true,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true,
-            UserClaims = ["sub"]
-        },
-        ["profile"] = new IdentityResource
-        {
-            Name = "profile",
-            DisplayName = "Your profile data",
-            Description = "Your profile data",
-            Required = false,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true,
-            UserClaims = 
-            [
-                "name", 
-                "family_name", "given_name", "middle_name", "nickname", "preferred_username", 
-                "profile", "picture", "website" 
-            ]
-        },
-        ["email"] = new IdentityResource
-        {
-            Name = "email",
-            DisplayName = "Your email address",
-            Description = "Your email address",
-            Required = false,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true,
-            UserClaims = ["email", "email_verified"]
-        }
-    };
-
-    public ConcurrentDictionary<string, ApiScope> ApiScopes { get; } = new()
-    {
-        ["api"] = new ApiScope
-        {
-            Name = "api",
-            DisplayName = "API",
-            Description = "Access to the API",
-            Required = true,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true
-        },
-        ["api:read"] = new ApiScope
-        {
-            Name = "api:read",
-            DisplayName = "API read",
-            Description = "Read values from the API",
-            Required = false,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true
-        }
-        ,
-        ["api:write"] = new ApiScope
-        {
-            Name = "api:write",
-            DisplayName = "API write",
-            Description = "Write values from the API",
-            Required = false,
-            Emphasize = true,
-            ShowInDiscoveryDocument = true
-        }
-    };
-
-    public ConcurrentDictionary<string, ApiResource> ApiResources { get; } = new()
-    {
-        ["api"] = new ApiResource
-        {
-            Name = "api",
-            DisplayName = "API",
-            Scopes = { "api" }
-        }
-    };
-
-    public ConcurrentDictionary<string, UserDetails> UsersDetails { get; } = new()
-    {
-        ["alice"] = new UserDetails
-        {
-            Username = "alice",
-            PasswordHash = PasswordHash.Create("alice"),
-            DisplayName = "Alice",
-            IsActive = true,
-            Claims =
-            [
-                new Claim("email", "Alice@example.com"),
-                new Claim("role", "admin")
-            ]
-        },
-        ["bob"] = new UserDetails
-        {
-            Username = "bob",
-            PasswordHash = PasswordHash.Create("bob"),
-            DisplayName = "Bob",
-            IsActive = true,
-            Claims =
-            [
-                new Claim("email", "bob@example.com"),
-                new Claim("role", "admin")
-            ]
-        }
-    };
-
-    public ConcurrentDictionary<string, KeyParameters> KeyParameters { get; } = new();
-
     public ConcurrentDictionary<string, AccessToken> AccessTokens { get; } = new();
 
     public ConcurrentDictionary<string, AuthorizationCode> AuthorizationCodes { get; } = new();
@@ -202,8 +98,6 @@ public class MemoryStorage
     public ConcurrentDictionary<string, NameValueCollection> AuthorizeParameters { get; } = new();
 
     public ConcurrentDictionary<string, Consent> Consents { get; } = new();
-
-    public ConcurrentDictionary<string, IdentitySession> UserSessions { get; } = new();
 
     public ConcurrentDictionary<string, RefreshToken> RefreshTokens { get; } = new();
 }

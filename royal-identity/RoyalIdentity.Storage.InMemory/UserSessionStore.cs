@@ -3,29 +3,30 @@ using RoyalIdentity.Extensions;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Utils;
+using System.Collections.Concurrent;
 
 namespace RoyalIdentity.Storage.InMemory;
 
 public class UserSessionStore : IUserSessionStore
 {
-    private readonly MemoryStorage memoryStorage;
+    private readonly ConcurrentDictionary<string, IdentitySession> userSessions;
     private readonly TimeProvider clock;
     private readonly IHttpContextAccessor accessor;
 
-    public UserSessionStore(MemoryStorage memoryStorage, TimeProvider clock, IHttpContextAccessor accessor)
+    public UserSessionStore(
+        ConcurrentDictionary<string, IdentitySession> userSessions,
+        TimeProvider clock, 
+        IHttpContextAccessor accessor)
     {
-        this.memoryStorage = memoryStorage;
+        this.userSessions = userSessions;
         this.clock = clock;
         this.accessor = accessor;
     }
 
     public Task AddClientIdAsync(string sessionId, string clientId, CancellationToken ct = default)
     {
-        memoryStorage.UserSessions.TryGetValue(sessionId, out var session);
-        if (session is not null)
-        {
-            session.Clients.Add(clientId);
-        }
+        userSessions.TryGetValue(sessionId, out var session);
+        session?.Clients.Add(clientId);
         return Task.CompletedTask;
     }
 
@@ -41,7 +42,7 @@ public class UserSessionStore : IUserSessionStore
             StartedAt = clock.GetUtcNow().UtcDateTime,
         };
 
-        memoryStorage.UserSessions[sid] = session;
+        userSessions[sid] = session;
 
         return Task.FromResult(session);
     }
@@ -67,7 +68,7 @@ public class UserSessionStore : IUserSessionStore
 
     public ValueTask<IdentitySession?> GetUserSessionAsync(string sessionId, CancellationToken ct)
     {
-        memoryStorage.UserSessions.TryGetValue(sessionId, out var session);
+        userSessions.TryGetValue(sessionId, out var session);
         return new ValueTask<IdentitySession?>(session);
     }
 }

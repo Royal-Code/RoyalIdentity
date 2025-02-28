@@ -17,13 +17,13 @@ public sealed class DefaultIdentityUser : IdentityUser
 
     public DefaultIdentityUser(
         UserDetails details,
-        IOptions<AccountOptions> options,
+        AccountOptions options,
         IUserSessionStore sessionStore,
         IUserDetailsStore userStore,
         IPasswordProtector passwordProtector)
     {
         this.details = details;
-        this.options = options.Value;
+        this.options = options;
         this.sessionStore = sessionStore;
         this.userStore = userStore;
         this.passwordProtector = passwordProtector;

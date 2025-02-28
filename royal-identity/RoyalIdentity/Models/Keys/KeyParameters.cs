@@ -15,7 +15,7 @@ public class KeyParameters
     ///     Creates a new <see cref="KeyParameters"/> for the given algorithm.
     /// </para>
     /// </summary>
-    /// <param name="algorithm">Secutiry algorithm, see <see cref="SecurityAlgorithms"/>.</param>
+    /// <param name="algorithm">Security algorithm, see <see cref="SecurityAlgorithms"/>.</param>
     /// <param name="lifetime">Key lifetime.</param>
     /// <param name="keySize">For RSA keys, the key size must be entered. If not entered, 2048 will be used.</param>
     /// <returns>
@@ -24,13 +24,20 @@ public class KeyParameters
     /// <exception cref="NotSupportedException">
     ///     Occurs when the algorithm is not supported.
     /// </exception>
-    public static KeyParameters Create(string algorithm, TimeSpan? lifetime = null, int keySize = 0)
+    public static KeyParameters Create(
+        KeyOptions keyOptions,
+        string? algorithm = null, 
+        TimeSpan? lifetime = null, 
+        int keySize = 0)
     {
         // Validate if the algorithm is supported
-        if (!ServerConstants.SupportedSigningAlgorithms.Contains(algorithm))
+        if (algorithm is not null && !keyOptions.SigningCredentialsAlgorithms.Contains(algorithm))
         {
             throw new NotSupportedException($"The specified algorithm '{algorithm}' is not supported.");
         }
+
+        algorithm ??= keyOptions.MainSigningCredentialsAlgorithm;
+        lifetime ??= keyOptions.DefaultSigningCredentialsLifetime;
 
         // Generates key parameters and additional information based on the algorithm
         string keyId = Guid.NewGuid().ToString();
@@ -49,7 +56,7 @@ public class KeyParameters
             case SecurityAlgorithms.RsaSsaPssSha384:
             case SecurityAlgorithms.RsaSsaPssSha512:
 
-                var rsa = RSA.Create(keySize is 0 ? 2048 : keySize);
+                var rsa = RSA.Create(keySize is 0 ? keyOptions.RsaKeySizeInBytes : keySize);
                 var rsaParameters = rsa.ExportParameters(true);
                 key = SerializeToXml(rsaParameters);
 

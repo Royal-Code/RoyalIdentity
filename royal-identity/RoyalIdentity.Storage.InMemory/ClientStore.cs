@@ -1,26 +1,27 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
+using System.Collections.Concurrent;
 
 namespace RoyalIdentity.Storage.InMemory;
 
 public class ClientStore : IClientStore
 {
-    private readonly MemoryStorage storage;
+    private readonly ConcurrentDictionary<string, Client> clients;
 
-    public ClientStore(MemoryStorage storage)
+    public ClientStore(ConcurrentDictionary<string, Client> clients)
     {
-        this.storage = storage;
+        this.clients = clients;
     }
 
     public Task<Client?> FindClientByIdAsync(string clientId, CancellationToken ct)
     {
-        storage.Clients.TryGetValue(clientId, out var client);
+        clients.TryGetValue(clientId, out var client);
         return Task.FromResult(client);
     }
 
     public Task<Client?> FindEnabledClientByIdAsync(string clientId, CancellationToken ct)
     {
-        storage.Clients.TryGetValue(clientId, out var client);
+        clients.TryGetValue(clientId, out var client);
         return Task.FromResult(client?.Enabled is true ? client : null);
     }
 }

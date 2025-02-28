@@ -50,6 +50,11 @@ public class RealmOptions
     public CacheOptions Caching { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the account options.
+    /// </summary>
+    public AccountOptions Account { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the unique name of this server/realm instance, e.g. https://myissuer.com or https://myissuer.com/myrealm.
     /// If not set, the issuer name is inferred from the request
     /// </summary>
