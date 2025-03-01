@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿// Ignore Spelling: util
+
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Utils;

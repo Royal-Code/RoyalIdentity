@@ -10,12 +10,12 @@ namespace RoyalIdentity.Contracts.Defaults;
 public class DefaultRealmService : IRealmService
 {
     private readonly IHttpContextAccessor httpContextAccessor;
-    private readonly IRealmStore realmStore;
+    private readonly IStorage storage;
 
-    public DefaultRealmService(IHttpContextAccessor httpContextAccessor, IRealmStore realmStore)
+    public DefaultRealmService(IHttpContextAccessor httpContextAccessor, IStorage storage)
     {
         this.httpContextAccessor = httpContextAccessor;
-        this.realmStore = realmStore;
+        this.storage = storage;
     }
 
     public async ValueTask<RealmOptions> GetOptionsAsync()
@@ -39,7 +39,7 @@ public class DefaultRealmService : IRealmService
 
     public async ValueTask<RealmOptions> GetOptionsAsync(string realmPath, CancellationToken ct)
     {
-        var realm = await realmStore.GetByPathAsync(realmPath, ct)
+        var realm = await storage.Realms.GetByPathAsync(realmPath, ct)
             ?? throw new InvalidOperationException($"Realm not found: {realmPath}");
 
         return realm.Options;

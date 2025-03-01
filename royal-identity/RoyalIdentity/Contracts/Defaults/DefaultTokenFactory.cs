@@ -1,9 +1,10 @@
-﻿using Microsoft.Extensions.Logging;
+﻿// Ignore Spelling: jwt
+
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models;
@@ -13,30 +14,24 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultTokenFactory : ITokenFactory
 {
-    private readonly ServerOptions options;
     private readonly ITokenClaimsService tokenClaimsService;
     private readonly IJwtFactory jwtFactory;
-    private readonly IAccessTokenStore accessTokenStore;
-    private readonly IRefreshTokenStore refreshTokenStore;
+    private readonly IStorage storage;
     private readonly IKeyManager keys;
     private readonly TimeProvider clock;
     private readonly ILogger logger;
 
     public DefaultTokenFactory(
-        IOptions<ServerOptions> options,
         ITokenClaimsService tokenClaimsService,
         IJwtFactory jwtFactory,
-        IAccessTokenStore accessTokenStore,
-        IRefreshTokenStore refreshTokenStore,
+        IStorage storage,
         IKeyManager keys,
         TimeProvider clock,
         ILogger<DefaultTokenFactory> logger)
     {
-        this.options = options.Value;
         this.tokenClaimsService = tokenClaimsService;
         this.jwtFactory = jwtFactory;
-        this.accessTokenStore = accessTokenStore;
-        this.refreshTokenStore = refreshTokenStore;
+        this.storage = storage;
         this.keys = keys;
         this.clock = clock;
         this.logger = logger;
@@ -105,7 +100,7 @@ public class DefaultTokenFactory : ITokenFactory
         }
         else
         {
-            if (options.MutualTls.AlwaysEmitConfirmationClaim)
+            if (request.Client.Realm.Options.MutualTls.AlwaysEmitConfirmationClaim)
             {
                 var clientCertificate = await request.HttpContext.Connection.GetClientCertificateAsync(ct);
                 if (clientCertificate is not null)
@@ -122,7 +117,7 @@ public class DefaultTokenFactory : ITokenFactory
             await jwtFactory.CreateTokenAsync(request.Client.Realm, token, ct);
         }
 
-        await accessTokenStore.StoreAsync(token, ct);
+        await storage.AccessTokens.StoreAsync(token, ct);
 
         return token;
     }
@@ -257,7 +252,7 @@ public class DefaultTokenFactory : ITokenFactory
             lifetime, 
             tokenItSelf);
 
-        await refreshTokenStore.StoreAsync(refreshToken, ct);
+        await storage.RefreshTokens.StoreAsync(refreshToken, ct);
 
         return refreshToken;
     }

@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿// Ignore Spelling: Pkce
+
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Extensions;
@@ -43,10 +45,9 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
             if (context.ClientParameters.Client.RequirePkce)
             {
                 logger.LogError(
-                    options, 
+                    context, 
                     "The parameter code_challenge is missing", 
-                    context.ResponseTypes.ToSpaceSeparatedString(),
-                    context);
+                    context.ResponseTypes.ToSpaceSeparatedString());
 
                 context.InvalidRequest("Code challenge required");
             }
@@ -61,7 +62,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         if (codeChallenge.Length < options.InputLengthRestrictions.CodeChallengeMinLength ||
             codeChallenge.Length > options.InputLengthRestrictions.CodeChallengeMaxLength)
         {
-            logger.LogError(options, "The parameter code_challenge is either too short or too long", context);
+            logger.LogError(context, "The parameter code_challenge is either too short or too long");
             context.InvalidRequest("Invalid code_challenge", "too long");
 
             return default;
@@ -76,7 +77,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
 
         if (!Constants.SupportedCodeChallengeMethods.Contains(codeChallengeMethod))
         {
-            logger.LogError(options, "Unsupported code_challenge_method", codeChallengeMethod, context);
+            logger.LogError(context, "Unsupported code_challenge_method", codeChallengeMethod);
             context.InvalidRequest("Transform algorithm not supported", "unsupported code_challenge_method");
             return default;
         }
@@ -84,7 +85,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         // check if plain method is allowed
         if (codeChallengeMethod == CodeChallengeMethods.Plain && !context.ClientParameters.Client.AllowPlainTextPkce)
         {
-            logger.LogError(options, "The parameter code_challenge_method of plain is not allowed", codeChallengeMethod, context);
+            logger.LogError(context, "The parameter code_challenge_method of plain is not allowed", codeChallengeMethod);
             context.InvalidRequest("Transform algorithm not supported", "code_challenge_method of plain is not allowed");
         }
 

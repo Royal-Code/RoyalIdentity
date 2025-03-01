@@ -33,8 +33,8 @@ public class DefaultExtensionsGrantsProvider : IExtensionsGrantsProvider
         var grant = extensions.FirstOrDefault(v => v.GrantType.Equals(grantType, StringComparison.Ordinal));
         if (grant is null)
         {
-            logger.LogError("No validator found for grant type");
-            throw new InvalidOperationException("No validator found for grant type");
+            logger.LogError("No handler was found for the grant type");
+            throw new InvalidOperationException("No handler was found for the grant type");
         }
 
         return grant.CreateContextAsync(ct);

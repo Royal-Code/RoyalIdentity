@@ -1,9 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 using static RoyalIdentity.Options.OidcConstants;
 
@@ -11,17 +9,12 @@ namespace RoyalIdentity.Contexts.Decorators;
 
 public class ResourcesDecorator : IDecorator<IWithResources>
 {
-    private readonly ServerOptions options;
-    private readonly IResourceStore resourceStore;
+    private readonly IStorage storage;
     private readonly ILogger logger;
 
-    public ResourcesDecorator(
-        IOptions<ServerOptions> options,
-        IResourceStore resourceStore,
-        ILogger<ResourcesDecorator> logger)
+    public ResourcesDecorator(IStorage storage, ILogger<ResourcesDecorator> logger)
     {
-        this.options = options.Value;
-        this.resourceStore = resourceStore;
+        this.storage = storage;
         this.logger = logger;
     }
 
@@ -35,6 +28,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         // check if scopes are valid/supported and check for resource scopes
         //////////////////////////////////////////////////////////
 
+        var resourceStore = storage.GetResourceStore(context.Realm);
         var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.Resources.RequestedScopes, true, ct);
         if (resourcesFromStore.MissingScopes.Count is not 0)
         {
@@ -55,7 +49,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         if (!context.Resources.IsOpenId && 
             context.Resources.IdentityResources.Count is not 0)
         {
-            logger.LogError(options, "Identity related scope requests, but no openid scope", context);
+            logger.LogError(context, "Identity related scope requests, but no openid scope");
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "Identity scopes requested, but openid scope is missing");
             return;
         }

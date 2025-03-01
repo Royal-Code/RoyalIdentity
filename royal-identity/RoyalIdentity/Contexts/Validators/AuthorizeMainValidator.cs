@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
@@ -12,9 +12,10 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
     private readonly ServerOptions options;
     private readonly ILogger logger;
 
-    public AuthorizeMainValidator(IOptions<ServerOptions> options, ILogger<AuthorizeMainValidator> logger)
+    public AuthorizeMainValidator(IStorage storage, ILogger<AuthorizeMainValidator> logger)
     {
-        this.options = options.Value;
+        options = storage.ServerOptions;
+
         this.logger = logger;
     }
 
@@ -29,14 +30,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         var responseTypes = context.ResponseTypes;
         if (responseTypes.Count is 0)
         {
-            logger.LogError(options, "Missing response_type", context);
+            logger.LogError(context, "Missing response_type");
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Missing response_type");
             return ValueTask.CompletedTask;
         }
 
         if (!Constants.ResponseTypesIsSupported(responseTypes))
         {
-            logger.LogError(options, "Response type not supported", responseTypes.ToSpaceSeparatedString(), context);
+            logger.LogError(context, "Response type not supported", responseTypes.ToSpaceSeparatedString());
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not supported");
             return ValueTask.CompletedTask;
         }
@@ -44,11 +45,12 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (!responseTypes.All(client.AllowedResponseTypes.Contains))
         {
             logger.LogError(
-                options, 
+                context, 
                 "Response type not allowed for the client",
-                $"{responseTypes.ToSpaceSeparatedString()} - {client.Id} - {client.Name}",
-                context);
+                $"{responseTypes.ToSpaceSeparatedString()} - {client.Id} - {client.Name}");
+
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not allowed");
+            
             return ValueTask.CompletedTask;
         }
 
@@ -63,7 +65,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         {
             if (!Constants.SupportedResponseModes.Contains(responseMode))
             {
-                logger.LogError(options, "Unsupported response_mode", responseMode, context);
+                logger.LogError(context, "Unsupported response_mode", responseMode);
                 context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType);
                 return ValueTask.CompletedTask;
             }
@@ -72,10 +74,9 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             if (responseMode != ResponseModes.FormPost && responseTypes.Any(t => t != ResponseTypes.Code))
             {
                 logger.LogError(
-                    options,
+                    context,
                     "Invalid response_mode for response_type",
-                    $"{responseMode} - {responseTypes.ToSpaceSeparatedString()}",
-                    context);
+                    $"{responseMode} - {responseTypes.ToSpaceSeparatedString()}");
 
                 context.InvalidRequest(AuthorizeErrors.InvalidRequest, "Invalid response_mode for response_type");
 
@@ -97,14 +98,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         if (context.Scope.IsMissing())
         {
-            logger.LogError(options, "scope is missing", context);
+            logger.LogError(context, "scope is missing");
             context.InvalidRequest(AuthorizeErrors.InvalidScope);
             return ValueTask.CompletedTask;
         }
 
         if (context.Scope.Length > options.InputLengthRestrictions.Scope)
         {
-            logger.LogError(options, "Scopes too long", context);
+            logger.LogError(context, "Scopes too long");
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "scopes too long");
             return ValueTask.CompletedTask;
         }
@@ -117,7 +118,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         {
             if (context.Nonce.Length > options.InputLengthRestrictions.Nonce)
             {
-                logger.LogError(options, "Nonce too long", context);
+                logger.LogError(context, "Nonce too long");
                 context.InvalidRequest("Invalid nonce", "too long");
                 return ValueTask.CompletedTask;
             }
@@ -125,7 +126,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         else if (context.Resources.IsOpenId && 
             context.ResponseTypes.Contains(ResponseTypes.Token))
         {
-            logger.LogError(options, "Nonce required for implicit flow with openid scope", context);
+            logger.LogError(context, "Nonce required for implicit flow with openid scope");
             context.InvalidRequest("Invalid nonce", "required");
             return ValueTask.CompletedTask;
         }
@@ -136,7 +137,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         if (context.PromptModes.Count > 1 && context.PromptModes.Contains(PromptModes.None))
         {
-            logger.LogError(options, "The property prompt contains 'none' and other values. 'none' should be used by itself.", context);
+            logger.LogError(context, "The property prompt contains 'none' and other values. 'none' should be used by itself.");
             context.InvalidRequest("Invalid prompt");
             return ValueTask.CompletedTask;
         }
@@ -147,7 +148,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         if (context.UiLocales.IsPresent() && context.UiLocales.Length > options.InputLengthRestrictions.UiLocale)
         {
-            logger.LogError(options, "UI locale too long", context);
+            logger.LogError(context, "UI locale too long");
             context.InvalidRequest("Invalid ui_locales");
             return ValueTask.CompletedTask;
         }
@@ -158,7 +159,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         if (context.LoginHint.IsPresent() && context.LoginHint.Length > options.InputLengthRestrictions.LoginHint)
         {
-            logger.LogError(options, "Login hint too long", context);
+            logger.LogError(context, "Login hint too long");
             context.InvalidRequest("Invalid login_hint", "too long");
             return ValueTask.CompletedTask;
         }
@@ -172,7 +173,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             var acrValues = context.Raw.Get(AuthorizeRequest.AcrValues)!;
             if (acrValues.Length > options.InputLengthRestrictions.AcrValues)
             {
-                logger.LogError(options, "Acr values too long", context);
+                logger.LogError(context, "Acr values too long");
                 context.InvalidRequest("Invalid acr_values", "too long");
                 return ValueTask.CompletedTask;
             }

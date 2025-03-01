@@ -8,12 +8,12 @@ namespace RoyalIdentity.Contexts.Decorators;
 
 public class ClientResourceDecorator : IDecorator<ClientCredentialsContext>
 {
-    private readonly IResourceStore resourceStore;
+    private readonly IStorage storage;
     private readonly ILogger logger;
 
-    public ClientResourceDecorator(IResourceStore resourceStore, ILogger<ClientResourceDecorator> logger)
+    public ClientResourceDecorator(IStorage storage, ILogger<ClientResourceDecorator> logger)
     {
-        this.resourceStore = resourceStore;
+        this.storage = storage;
         this.logger = logger;
     }
 
@@ -36,6 +36,7 @@ public class ClientResourceDecorator : IDecorator<ClientCredentialsContext>
 
         if (scopes is not null)
         {
+            var resourceStore = storage.GetResourceStore(context.Realm);
             var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);
             if (resourcesFromStore.MissingScopes.Count is not 0)
             {

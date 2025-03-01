@@ -1,22 +1,20 @@
 ﻿using Microsoft.Extensions.Logging;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Decorators;
 
 public class LoadRefreshToken : IDecorator<RefreshTokenContext>
 {
-    private readonly IRefreshTokenStore store;
+    private readonly IStorage storage;
     private readonly TimeProvider clock;
     private readonly ILogger logger;
 
-    public LoadRefreshToken(IRefreshTokenStore store, TimeProvider clock, ILogger<LoadRefreshToken> logger)
+    public LoadRefreshToken(IStorage storage, TimeProvider clock, ILogger<LoadRefreshToken> logger)
     {
-        this.store = store;
+        this.storage = storage;
         this.clock = clock;
         this.logger = logger;
     }
@@ -48,7 +46,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
             return;
         }
 
-        var refreshToken = await store.GetAsync(token, ct);
+        var refreshToken = await storage.RefreshTokens.GetAsync(token, ct);
         if (refreshToken is null)
         {
             logger.LogWarning("Invalid refresh token");

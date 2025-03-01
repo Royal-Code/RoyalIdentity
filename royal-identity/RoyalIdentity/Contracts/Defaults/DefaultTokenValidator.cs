@@ -1,4 +1,6 @@
-﻿using RoyalIdentity.Extensions;
+﻿// Ignore Spelling: jti
+
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
@@ -7,7 +9,6 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models;
-using Microsoft.Extensions.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -15,7 +16,6 @@ public class DefaultTokenValidator : ITokenValidator
 {
     private readonly IKeyManager keys;
     private readonly IStorage storage;
-    private readonly IAccessTokenStore tokens;
     private readonly ILogger logger;
     private readonly ServerOptions options;
     private readonly TimeProvider clock;
@@ -29,7 +29,6 @@ public class DefaultTokenValidator : ITokenValidator
     {
         this.keys = keys;
         this.storage = storage;
-        this.tokens = tokens;
         this.logger = logger;
         this.options = storage.ServerOptions;
         this.clock = clock;
@@ -89,7 +88,7 @@ public class DefaultTokenValidator : ITokenValidator
 
     public async Task<TokenEvaluationResult> ValidateReferenceAccessTokenAsync(Realm realm, string jti, CancellationToken ct = default)
     {
-        var token = await tokens.GetAsync(jti, ct);
+        var token = await storage.AccessTokens.GetAsync(jti, ct);
 
         if (token is null)
         {
@@ -221,7 +220,7 @@ public class DefaultTokenValidator : ITokenValidator
 
         var parameters = new TokenValidationParameters
         {
-            ValidIssuer = options.IssuerUri,
+            ValidIssuer = realm.Options.IssuerUri,
             IssuerSigningKeys = validationsKeys.Keys,
             ValidateLifetime = validateLifetime
         };

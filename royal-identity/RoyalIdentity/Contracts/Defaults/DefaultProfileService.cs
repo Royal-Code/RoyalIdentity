@@ -1,31 +1,29 @@
 ﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
-using RoyalIdentity.Users.Contracts;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultProfileService : IProfileService
 {
-    private readonly IUserDetailsStore userDetailsStore;
-    private readonly IUserSessionStore userSessionStore;
+    private readonly IStorage storage;
     private readonly ILogger logger;
 
     public DefaultProfileService(
-        IUserDetailsStore userDetailsStore,
-        IUserSessionStore userSessionStore,
+        IStorage storage,
         ILogger<DefaultProfileService> logger)
     {
-        this.userDetailsStore = userDetailsStore;
-        this.userSessionStore = userSessionStore;
+        this.storage = storage;
         this.logger = logger;
     }
 
     public async ValueTask GetProfileDataAsync(ProfileDataRequest request, CancellationToken ct)
     {
+        var userDetailsStore = storage.GetUserDetailsStore(request.Client.Realm);
         var userDetails = await userDetailsStore.GetUserDetailsAsync(request.Subject.GetSubjectId(), ct);
         if (userDetails is null || !userDetails.IsActive)
             return;
@@ -55,10 +53,12 @@ public class DefaultProfileService : IProfileService
         logger.LogDebug("Start User is active: {Subject} - {Session}, Caller: {Caller}, Client: {Client}",
             subjectId, sessionId, caller, client.Id);
 
+        var userDetailsStore = storage.GetUserDetailsStore(client.Realm);
         var userDetails = await userDetailsStore.GetUserDetailsAsync(subjectId, ct);
         if (userDetails is null || !userDetails.IsActive)
             return false;
 
+        var userSessionStore = storage.GetUserSessionStore(client.Realm);
         var userSession = await userSessionStore.GetUserSessionAsync(sessionId, ct);
         if (userSession is not null && !userSession.IsActive)
             return false;

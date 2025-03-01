@@ -5,25 +5,26 @@ using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
-using RoyalIdentity.Contexts.Items;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contracts.Storage;
 
 namespace RoyalIdentity.Contexts.Decorators;
 
 public class EvaluateBearerToken : IDecorator<IWithBearerToken>
 {
     private readonly ITokenValidator tokenValidator;
-    private readonly ServerOptions options;
     private readonly ILogger logger;
+    private readonly ServerOptions options;
 
     public EvaluateBearerToken(
         ITokenValidator tokenValidator, 
-        IOptions<ServerOptions> options,
+        IStorage storage,
         ILogger<EvaluateBearerToken> logger)
     {
         this.tokenValidator = tokenValidator;
-        this.options = options.Value;
         this.logger = logger;
+
+        options = storage.ServerOptions;
     }
 
     public async Task Decorate(IWithBearerToken context, Func<Task> next, CancellationToken ct)

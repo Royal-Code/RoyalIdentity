@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
@@ -12,14 +11,15 @@ namespace RoyalIdentity.Contexts.Decorators;
 public class LoadClient : IDecorator<IWithClient>
 {
     private readonly ServerOptions options;
-    private readonly IClientStore clients;
+    private readonly IStorage storage;
     private readonly ILogger logger;
 
-    public LoadClient(IOptions<ServerOptions> options, IClientStore clients, ILogger<LoadClient> logger)
+    public LoadClient(IStorage storage, ILogger<LoadClient> logger)
     {
-        this.options = options.Value;
-        this.clients = clients;
+        this.storage = storage;
         this.logger = logger;
+
+        options = storage.ServerOptions;
     }
 
     public async Task Decorate(IWithClient context, Func<Task> next, CancellationToken ct)
@@ -34,15 +34,16 @@ public class LoadClient : IDecorator<IWithClient>
 
         if (clientId.IsMissingOrTooLong(options.InputLengthRestrictions.ClientId))
         {
-            logger.LogError(options, "The parameter client_id is missing or too long", context);
+            logger.LogError(context, "The parameter client_id is missing or too long");
             context.InvalidRequest("Invalid client_id");
             return;
         }
 
+        var clients = storage.GetClientStore(context.Realm);
         var client = await clients.FindEnabledClientByIdAsync(clientId, ct);
         if (client is null)
         {
-            logger.LogError(options, "Unknown client or not enabled", clientId, context);
+            logger.LogError(context, "Unknown client or not enabled", clientId);
             context.InvalidRequest(OidcConstants.AuthorizeErrors.UnauthorizedClient, "Unknown client or client not enabled");
             return;
         }

@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -9,16 +8,16 @@ namespace RoyalIdentity.Contexts.Decorators;
 
 public class LoadCode : IDecorator<AuthorizationCodeContext>
 {
-    private readonly IAuthorizationCodeStore codeStore;
+    private readonly IStorage storage;
     private readonly TimeProvider clock;
     private readonly ILogger logger;
 
     public LoadCode(
-        IAuthorizationCodeStore codeStore,
+        IStorage storage,
         TimeProvider clock,
         ILogger<LoadCode> logger)
     {
-        this.codeStore = codeStore;
+        this.storage = storage;
         this.clock = clock;
         this.logger = logger;
     }
@@ -45,7 +44,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         }
 
         // load the authorization code.
-        var authorizationCode = await codeStore.GetAuthorizationCodeAsync(code, ct);
+        var authorizationCode = await storage.AuthorizationCodes.GetAuthorizationCodeAsync(code, ct);
 
         if (authorizationCode == null)
         {
@@ -69,7 +68,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         }
 
         // Removes the authorization code.
-        await codeStore.RemoveAuthorizationCodeAsync(code, ct);
+        await storage.AuthorizationCodes.RemoveAuthorizationCodeAsync(code, ct);
 
         if (authorizationCode.CreationTime.HasExceeded(authorizationCode.Lifetime, clock.GetUtcNow().DateTime))
         {

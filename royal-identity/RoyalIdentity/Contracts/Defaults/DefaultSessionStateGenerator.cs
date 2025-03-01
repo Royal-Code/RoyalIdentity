@@ -1,4 +1,6 @@
-﻿using RoyalIdentity.Contexts;
+﻿// Ignore Spelling: Opuas
+
+using RoyalIdentity.Contexts;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 using System.Security.Cryptography;

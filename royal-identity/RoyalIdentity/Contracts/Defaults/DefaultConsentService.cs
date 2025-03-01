@@ -10,16 +10,16 @@ namespace RoyalIdentity.Contracts.Defaults;
 public class DefaultConsentService : IConsentService
 {
     private readonly ILogger logger;
-    private readonly IUserConsentStore userConsentStore;
+    private readonly IStorage storage;
     private readonly TimeProvider clock;
 
     public DefaultConsentService(
-        IUserConsentStore userConsentStore,
+        IStorage storage,
         TimeProvider clock,
         ILogger<DefaultConsentService> logger)
     {
         this.logger = logger;
-        this.userConsentStore = userConsentStore;
+        this.storage = storage;
         this.clock = clock;
     }
 
@@ -43,14 +43,14 @@ public class DefaultConsentService : IConsentService
             return true;
         }
 
-        var consent = await userConsentStore.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
+        var consent = await storage.UserConsents.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
 
         bool consented = await Consented(consent, resources, ct);
 
         // when consented, but has temporary consent, remove it and update the store
         if (consented && consent!.RemoveTemporaryConsents())
         {
-            await userConsentStore.StoreUserConsentAsync(consent, ct);
+            await storage.UserConsents.StoreUserConsentAsync(consent, ct);
         }
 
         return !consented;
@@ -68,13 +68,13 @@ public class DefaultConsentService : IConsentService
                 subjectId,
                 clientId);
 
-            await userConsentStore.RemoveUserConsentAsync(subjectId, clientId, ct);
+            await storage.UserConsents.RemoveUserConsentAsync(subjectId, clientId, ct);
         }
 
         var now = clock.GetUtcNow().UtcDateTime;
 
         // tries to get an existing consent, if it doesn't exist then it creates
-        var consent = await userConsentStore.GetUserConsentAsync(subjectId, clientId, ct);
+        var consent = await storage.UserConsents.GetUserConsentAsync(subjectId, clientId, ct);
         consent ??= new Consent
         {
             CreationTime = now,
@@ -89,7 +89,7 @@ public class DefaultConsentService : IConsentService
             consent.Expiration = now.AddSeconds(client.ConsentLifetime.Value);
         }
 
-        await userConsentStore.StoreUserConsentAsync(consent, ct);
+        await storage.UserConsents.StoreUserConsentAsync(consent, ct);
     }
 
     public async ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, Resources resources, CancellationToken ct)
@@ -111,7 +111,7 @@ public class DefaultConsentService : IConsentService
             return false;
         }
 
-        var consent = await userConsentStore.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
+        var consent = await storage.UserConsents.GetUserConsentAsync(subject.GetSubjectId(), client.Id, ct);
 
         return await Consented(consent, resources, ct);
     }
@@ -127,7 +127,7 @@ public class DefaultConsentService : IConsentService
         if (consent.Expiration.HasExpired(clock.GetUtcNow().UtcDateTime))
         {
             logger.LogDebug("Consent found in consent store is expired, consent validation failure");
-            await userConsentStore.RemoveUserConsentAsync(consent.SubjectId, consent.ClientId, ct);
+            await storage.UserConsents.RemoveUserConsentAsync(consent.SubjectId, consent.ClientId, ct);
             return false;
         }
 

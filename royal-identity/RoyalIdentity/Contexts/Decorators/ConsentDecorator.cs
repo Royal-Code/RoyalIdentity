@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -10,13 +9,11 @@ namespace RoyalIdentity.Contexts.Decorators;
 
 public class ConsentDecorator : IDecorator<AuthorizeContext>
 {
-    private readonly ServerOptions options;
     private readonly IConsentService consent;
     private readonly ILogger logger;
 
-    public ConsentDecorator(IOptions<ServerOptions> options, IConsentService consent, ILogger<ConsentDecorator> logger)
+    public ConsentDecorator(IConsentService consent, ILogger<ConsentDecorator> logger)
     {
-        this.options = options.Value;
         this.consent = consent;
         this.logger = logger;
     }
@@ -31,7 +28,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
             !context.PromptModes.Contains(OidcConstants.PromptModes.None) &&
             !context.PromptModes.Contains(OidcConstants.PromptModes.Consent))
         {
-            logger.LogError(options, "Invalid prompt mode", context.PromptModes.ToSpaceSeparatedString(), context);
+            logger.LogError(context, "Invalid prompt mode", context.PromptModes.ToSpaceSeparatedString());
 
             context.InvalidRequest("Invalid prompt mode", context.PromptModes.ToSpaceSeparatedString());
 
@@ -46,7 +43,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
 
         if (consentRequired && context.PromptModes.Contains(OidcConstants.PromptModes.None))
         {
-            logger.LogError(options, "Error: prompt=none requested, but consent is required.", context.PromptModes.ToSpaceSeparatedString(), context);
+            logger.LogError(context, "Error: prompt=none requested, but consent is required.", context.PromptModes.ToSpaceSeparatedString());
 
             context.InvalidRequest("Invalid prompt mode", "consent is required");
 

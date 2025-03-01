@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+﻿using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Events;
 using RoyalIdentity.Options;
 
@@ -9,9 +9,9 @@ public class DefaultEventDispatcher : IEventDispatcher
     private readonly ServerOptions options;
     private readonly IServiceProvider sp;
 
-    public DefaultEventDispatcher(IOptions<ServerOptions> options, IServiceProvider sp)
+    public DefaultEventDispatcher(IStorage storage, IServiceProvider sp)
     {
-        this.options = options.Value;
+        options = storage.ServerOptions;
         this.sp = sp;
     }
 

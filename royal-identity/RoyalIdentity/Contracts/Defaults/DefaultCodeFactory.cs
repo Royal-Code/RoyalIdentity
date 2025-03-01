@@ -3,8 +3,6 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Tokens;
-using RoyalIdentity.Users;
-using RoyalIdentity.Users.Contracts;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -12,21 +10,18 @@ public class DefaultCodeFactory : ICodeFactory
 {
     private readonly TimeProvider time;
     private readonly ISessionStateGenerator sessionStateGenerator;
-    private readonly IAuthorizationCodeStore codeStore;
-    private readonly IUserSessionStore userSessionStore;
+    private readonly IStorage storage;
     private readonly ILogger logger;
 
     public DefaultCodeFactory(
         TimeProvider time,
         ISessionStateGenerator sessionStateGenerator,
-        IAuthorizationCodeStore codeStore,
-        IUserSessionStore userSessionStore,
+        IStorage storage,
         ILogger<DefaultCodeFactory> logger)
     {
         this.time = time;
         this.sessionStateGenerator = sessionStateGenerator;
-        this.codeStore = codeStore;
-        this.userSessionStore = userSessionStore;
+        this.storage = storage;
         this.logger = logger;
     }
 
@@ -57,7 +52,9 @@ public class DefaultCodeFactory : ICodeFactory
             StateHash = context.StateHash,
         };
 
-        await codeStore.StoreAuthorizationCodeAsync(code, ct);
+        await storage.AuthorizationCodes.StoreAuthorizationCodeAsync(code, ct);
+
+        var userSessionStore = storage.GetUserSessionStore(context.Realm);
         await userSessionStore.AddClientIdAsync(sid, context.ClientId!, ct);
 
         logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, code.Code);
