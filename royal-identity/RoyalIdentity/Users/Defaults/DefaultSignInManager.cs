@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
@@ -10,7 +9,6 @@ using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contexts;
-using RoyalIdentity.Users.Contracts;
 using static RoyalIdentity.Users.CredentialsValidationResult.WellKnownReasons;
 
 namespace RoyalIdentity.Users.Defaults;
@@ -18,29 +16,23 @@ namespace RoyalIdentity.Users.Defaults;
 public class DefaultSignInManager : ISignInManager
 {
     private readonly IHttpContextAccessor httpContextAccessor;
-    private readonly IAuthorizeParametersStore? authorizeParametersStore;
+    private readonly IStorage storage;
     private readonly IAuthorizeRequestValidator authorizeRequestValidator;
     private readonly IConsentService consentService;
-    private readonly IUserStore userStore;
-    private readonly AccountOptions accountOptions;
     private readonly ILogger logger;
 
     public DefaultSignInManager(
         IHttpContextAccessor httpContextAccessor,
+        IStorage storage,
         IAuthorizeRequestValidator authorizeRequestValidator,
-        IUserStore userStore,
         IConsentService consentService,
-        IOptions<AccountOptions> accountOptions,
-        ILogger<DefaultSignInManager> logger,
-        IAuthorizeParametersStore? authorizeParametersStore = null)
+        ILogger<DefaultSignInManager> logger)
     {
         this.httpContextAccessor = httpContextAccessor;
+        this.storage = storage;
         this.authorizeRequestValidator = authorizeRequestValidator;
         this.consentService = consentService;
-        this.userStore = userStore;
-        this.accountOptions = accountOptions.Value;
         this.logger = logger;
-        this.authorizeParametersStore = authorizeParametersStore;
     }
 
     [Redesign("Disparar exception ou mudar para método Try com out do context e error")]
@@ -51,11 +43,9 @@ public class DefaultSignInManager : ISignInManager
             logger.LogDebug("returnUrl is valid");
 
             var parameters = returnUrl.ReadQueryStringAsNameValueCollection();
-            if (authorizeParametersStore is not null
-                && parameters.TryGet(Constants.AuthorizationParamsStore.MessageStoreIdParameterName,
-                    out var messageStoreId))
+            if (parameters.TryGet(Constants.AuthorizationParamsStore.MessageStoreIdParameterName, out var messageStoreId))
             {
-                parameters = await authorizeParametersStore.ReadAsync(messageStoreId, ct) ?? [];
+                parameters = await storage.AuthorizeParameters.ReadAsync(messageStoreId, ct) ?? [];
             }
 
             var authorizationRequest = new AuthorizationValidationRequest()
@@ -81,9 +71,12 @@ public class DefaultSignInManager : ISignInManager
     }
 
     /// <inheritdoc />
-    public async Task<CredentialsValidationResult> AuthenticateUserAsync(string username, string password,
+    public async Task<CredentialsValidationResult> AuthenticateUserAsync(Realm realm, string username, string password,
         CancellationToken ct)
     {
+        var accountOptions = realm.Options.Account;
+        var userStore = storage.GetUserStore(realm);
+
         var user = await userStore.GetUserAsync(username, ct);
         if (user is null)
         {
@@ -109,15 +102,22 @@ public class DefaultSignInManager : ISignInManager
         return new CredentialsValidationResult(user, validationResult.Session);
     }
 
-    public async Task<ClaimsPrincipal> SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, CancellationToken ct)
+    public async Task<ClaimsPrincipal> SignInAsync(
+        IdentityUser user,
+        IdentitySession? session, 
+        bool remember,
+        CancellationToken ct)
     {
         var httpContext = httpContextAccessor.HttpContext 
             ?? throw new InvalidOperationException("HttpContext is required for SignInAsync");
 
+        var realm = httpContext.GetCurrentRealm();
+        var accountOptions = realm.Options.Account;
+
         // only set explicit expiration here if user chooses "remember me".
         // otherwise we rely upon expiration configured in cookie middle-ware.
         AuthenticationProperties? props = null;
-        if (inputRememberLogin && accountOptions.AllowRememberLogin)
+        if (remember && accountOptions.AllowRememberLogin)
         {
             props = new AuthenticationProperties
             {
@@ -138,7 +138,7 @@ public class DefaultSignInManager : ISignInManager
         props ??= new();
         props.Items[JwtClaimTypes.SessionId] = sid.Value;
 
-        var authenticationScheme = await httpContext.GetCookieAuthenticationSchemeAsync();
+        var authenticationScheme = httpContext.GetRealmAuthenticationScheme();
         await httpContext.SignInAsync(authenticationScheme, principal, props);
 
         logger.LogInformation("User logged in: {UserName}, Session id: {SessionId}", user.UserName, sid.Value);

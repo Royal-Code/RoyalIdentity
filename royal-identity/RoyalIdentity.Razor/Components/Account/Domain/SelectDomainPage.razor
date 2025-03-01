@@ -1,0 +1,57 @@
+﻿@page "/account/domain"
+@using RoyalIdentity.Contracts.Storage
+
+@inject IStorage storage;
+
+<PageTitle>Select domain</PageTitle>
+
+<AccountContent>
+    <Title>
+        <h1>Select domain</h1>
+    </Title>
+    <ChildContent>
+        <StatusMessage Message="@errorMessage" MessageClass="danger" />
+        <EditForm Model="Input" method="post" OnValidSubmit="SelectDomain" FormName="select-domain">
+            <DataAnnotationsValidator/>
+            <ValidationSummary class="text-danger" role="alert"/>
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Domain" class="form-control" id="Domain" aria-required="true" placeholder="company.com" auto-focus />
+                <label for="Domain" class="form-label">Domain</label>
+                <ValidationMessage For="() => Input.Domain" class="text-danger" />
+            </div>
+
+            <div>
+                <button type="submit" class="w-100 btn btn-lg btn-primary">Continue</button>
+            </div>
+
+        </EditForm>
+
+    </ChildContent>
+</AccountContent>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    public DomainInput Input { get; set; }
+
+    public async Task SelectDomain()
+    {
+        if (Input.Domain is null)
+        {
+            errorMessage = "Please enter a domain.";
+            return;
+        }
+
+        var realm = await storage.Realms.GetByDomainAsync(Input.Domain);
+
+        if (realm is null)
+        {
+            errorMessage = "Domain not found.";
+            return;
+        }
+
+        return Task.CompletedTask;
+    }
+}

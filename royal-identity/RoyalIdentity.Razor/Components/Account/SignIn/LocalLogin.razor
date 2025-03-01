@@ -62,16 +62,29 @@
     [SupplyParameterFromForm]
     private LoginInputModel Input { get; set; } = new();
 
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
     protected override Task OnParametersSetAsync()
     {
+        if (HttpContext is null)
+            throw new InvalidOperationException("HttpContext is required.");
+
         Input.ReturnUrl = Model.ReturnUrl;
         return base.OnParametersSetAsync();
     }
 
     public async Task LoginUser()
     {
-        var context = await SignInManager.GetAuthorizationContextAsync(Input.ReturnUrl, CancellationToken.None);
-        var result = await SignInManager.AuthenticateUserAsync(Input.Username!, Input.Password!, CancellationToken.None);
+        var context = await HttpContext.GetAuthorizationContextAsync(Input.ReturnUrl);
+        if (context is null)
+        {
+            Logger.LogError("No authorization context found for return URL: {ReturnUrl}", Input.ReturnUrl);
+            NavigationManager.NavigateTo("/account/domain");
+            return;
+        }
+
+        var result = await SignInManager.AuthenticateUserAsync(context.Client.Realm, Input.Username!, Input.Password!, CancellationToken.None);
 
         if (!result.Success)
         {

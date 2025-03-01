@@ -30,11 +30,12 @@ public interface ISignInManager
     ///     a <see cref="CredentialsValidationResult"/> with the reason and the error message.
     /// </para>
     /// </summary>
+    /// <param name="realm">The realm.</param>
     /// <param name="username">The user name.</param>
     /// <param name="password">The password.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>The credentials validation result.</returns>
-    Task<CredentialsValidationResult> AuthenticateUserAsync(string username, string password, CancellationToken ct);
+    Task<CredentialsValidationResult> AuthenticateUserAsync(Realm realm, string username, string password, CancellationToken ct);
 
     /// <summary>
     /// <para>
@@ -47,10 +48,10 @@ public interface ISignInManager
     /// </summary>
     /// <param name="user">The authenticated user.</param>
     /// <param name="session">The session.</param>
-    /// <param name="inputRememberLogin">Indicates if the user wants to be remembered.</param>
+    /// <param name="remember">Indicates if the user wants to be remembered.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A task representing the operation.</returns>
-    Task<ClaimsPrincipal> SignInAsync(IdentityUser user, IdentitySession? session, bool inputRememberLogin, CancellationToken ct);
+    Task<ClaimsPrincipal> SignInAsync(IdentityUser user, IdentitySession? session, bool remember, CancellationToken ct);
 
     /// <summary>
     /// <para>
