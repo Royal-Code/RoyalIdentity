@@ -2,23 +2,19 @@
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
 
 public class JwkEndpoint : IEndpointHandler
 {
     private readonly ILogger logger;
-    private readonly ServerOptions options;
 
-    public JwkEndpoint(ILogger<JwkEndpoint> logger, IOptions<ServerOptions> options)
+    public JwkEndpoint(ILogger<JwkEndpoint> logger)
     {
         this.logger = logger;
-        this.options = options.Value;
     }
 
     public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
@@ -45,7 +41,8 @@ public class JwkEndpoint : IEndpointHandler
             return EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled");
         }
 
-        var items = ContextItems.From(options);
+        var serverOptions = realmOptions.ServerOptions;
+        var items = ContextItems.From(serverOptions);
         var context = new JwkContext(httpContext, items);
 
         return new EndpointCreationResult(context);

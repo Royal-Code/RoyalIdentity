@@ -72,4 +72,9 @@ public class RealmOptions
     /// Gets or sets a value indicating whether the realm path should be included in the issuer URI. Defaults to true.
     /// </summary>
     public bool IncludeRealmPathToIssuerUri { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether the authorization parameters should be stored when authorize endpoint requires user interaction.
+    /// </summary>
+    public bool StoreAuthorizationParameters { get; set; } = true;
 }

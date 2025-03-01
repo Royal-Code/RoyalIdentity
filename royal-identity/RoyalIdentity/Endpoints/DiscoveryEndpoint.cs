@@ -1,22 +1,18 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
 
 public class DiscoveryEndpoint : IEndpointHandler
 {
     private readonly ILogger logger;
-    private readonly ServerOptions options;
 
-    public DiscoveryEndpoint(ILogger<DiscoveryEndpoint> logger, IOptions<ServerOptions> options)
+    public DiscoveryEndpoint(ILogger<DiscoveryEndpoint> logger)
     {
         this.logger = logger;
-        this.options = options.Value;
     }
 
     public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
@@ -44,7 +40,8 @@ public class DiscoveryEndpoint : IEndpointHandler
             return EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled");
         }
 
-        var items = ContextItems.From(options);
+        var serverOptions = realmOptions.ServerOptions;
+        var items = ContextItems.From(serverOptions);
         var context = new DiscoveryContext(httpContext, realmOptions, items);
 
         return new EndpointCreationResult(context);

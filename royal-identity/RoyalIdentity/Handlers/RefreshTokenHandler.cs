@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿// Ignore Spelling: jwt
+
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
@@ -16,29 +18,23 @@ namespace RoyalIdentity.Handlers;
 public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 {
     private readonly ILogger logger;
-    private readonly IAccessTokenStore accessTokenStore;
-    private readonly IResourceStore resourceStore;
+    private readonly IStorage storage;
     private readonly ITokenFactory tokenFactory;
     private readonly TimeProvider clock;
     private readonly IJwtFactory jwtFactory;
-    private readonly IRefreshTokenStore refreshTokenStore;
 
     public RefreshTokenHandler(
         ILogger<RefreshTokenHandler> logger,
-        IAccessTokenStore accessTokenStore,
-        IResourceStore resourceStore,
+        IStorage storage,
         ITokenFactory tokenFactory,
         TimeProvider clock,
-        IJwtFactory jwtFactory,
-        IRefreshTokenStore refreshTokenStore)
+        IJwtFactory jwtFactory)
     {
         this.logger = logger;
-        this.accessTokenStore = accessTokenStore;
-        this.resourceStore = resourceStore;
+        this.storage = storage;
         this.tokenFactory = tokenFactory;
         this.clock = clock;
         this.jwtFactory = jwtFactory;
-        this.refreshTokenStore = refreshTokenStore;
     }
 
     public async Task Handle(RefreshTokenContext context, CancellationToken ct)
@@ -47,6 +43,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         context.RefreshParameters.AssertHasRefreshToken();
         var client = context.ClientParameters.Client;
         var refreshToken = context.RefreshParameters.RefreshToken;
+        var resourceStore = storage.GetResourceStore(context.Realm);
 
         logger.LogDebug("Processing refresh token request.");
 
@@ -58,7 +55,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         // Access Token
         /////////////////////////////////////
 
-        var accessToken = await accessTokenStore.GetAsync(refreshToken.AccessTokenId!, ct);
+        var accessToken = await storage.AccessTokens.GetAsync(refreshToken.AccessTokenId!, ct);
         if (accessToken is null)
         {
             logger.LogError("Access token not found: {AccessTokenId}", refreshToken.AccessTokenId);
@@ -70,6 +67,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         {
             logger.LogDebug("Creating a new access token");
 
+            
             var scopes = accessToken.Scopes;
             var resources = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);
 
@@ -100,7 +98,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
                 await jwtFactory.CreateTokenAsync(context.Realm, newAccessToken, ct);
             }
 
-            await accessTokenStore.StoreAsync(newAccessToken, ct);
+            await storage.AccessTokens.StoreAsync(newAccessToken, ct);
         }
 
         var subject = newAccessToken.CreatePrincipal();
@@ -112,7 +110,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         if (refreshToken.ConsumedTime is null)
         {
             refreshToken.ConsumedTime = clock.GetUtcNow().DateTime;
-            await refreshTokenStore.UpdateAsync(refreshToken, ct);
+            await storage.RefreshTokens.UpdateAsync(refreshToken, ct);
         }
 
         if (client.RefreshTokenExpiration == Models.TokenExpiration.Sliding
@@ -125,7 +123,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             newRefreshToken.Claims.RemoveWhere(c => c.Type == JwtClaimTypes.JwtId);
             newRefreshToken.Claims.Add(new Claim(JwtClaimTypes.JwtId, accessToken.Id));
 
-            await refreshTokenStore.UpdateAsync(refreshToken, ct);
+            await storage.RefreshTokens.UpdateAsync(refreshToken, ct);
         }
         else
         {

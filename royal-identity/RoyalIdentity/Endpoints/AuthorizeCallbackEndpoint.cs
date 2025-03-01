@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints.Abstractions;
@@ -12,18 +11,15 @@ namespace RoyalIdentity.Endpoints;
 
 public class AuthorizeCallbackEndpoint : IEndpointHandler
 {
-    private readonly ServerOptions options;
+    private readonly IStorage storage;
     private readonly ILogger logger;
-    private readonly IAuthorizeParametersStore? authorizationParametersStore;
 
     public AuthorizeCallbackEndpoint(
-        IOptions<ServerOptions> options,
-        ILogger<AuthorizeCallbackEndpoint> logger,
-        IAuthorizeParametersStore? authorizationParametersStore = null)
+        IStorage storage,
+        ILogger<AuthorizeCallbackEndpoint> logger)
     {
-        this.options = options.Value;
+        this.storage = storage;
         this.logger = logger;
-        this.authorizationParametersStore = authorizationParametersStore;
     }
 
     public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
@@ -34,20 +30,22 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP method for authorize endpoint.");
 
-            // return a problem details of a MethodNotAllowed infoming the http method is not allowed
+            // return a problem details of a MethodNotAllowed informing the http method is not allowed
             return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
         logger.LogDebug("Start authorize callback request");
 
+        var realm = httpContext.GetCurrentRealm();
+
         var parameters = httpContext.Request.Query.AsNameValueCollection();
-        if (authorizationParametersStore is not null)
+        if (realm.Options.StoreAuthorizationParameters)
         {
             var messageStoreId = parameters[Constants.AuthorizationParamsStore.MessageStoreIdParameterName];
             if (messageStoreId is not null)
             {
-                parameters = await authorizationParametersStore.ReadAsync(messageStoreId, httpContext.RequestAborted);
-                await authorizationParametersStore.DeleteAsync(messageStoreId, httpContext.RequestAborted);
+                parameters = await storage.AuthorizeParameters.ReadAsync(messageStoreId, httpContext.RequestAborted);
+                await storage.AuthorizeParameters.DeleteAsync(messageStoreId, httpContext.RequestAborted);
             }
         }
 
@@ -61,7 +59,7 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
             return EndpointErrorResults.BadRequest(httpContext, AuthorizeErrors.LoginRequired, "Login required");
         }
 
-        var items = ContextItems.From(options);
+        var items = ContextItems.From(realm.Options.ServerOptions);
         var context = new AuthorizeContext(httpContext, parameters, user, items);
 
         context.Load(logger);

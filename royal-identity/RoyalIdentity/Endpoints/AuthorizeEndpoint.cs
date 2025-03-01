@@ -1,31 +1,27 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using System.Collections.Specialized;
 
 namespace RoyalIdentity.Endpoints;
 
 /// <summary>
-/// Manipulates the 'authorize' endpoint specified by 'oauth', generating the context according to the input.
+/// Manipulates the 'authorize' endpoint specified by 'OAuth2', generating the context according to the input.
 /// </summary>
 public class AuthorizeEndpoint : IEndpointHandler
 {
-    private readonly ServerOptions options;
     private readonly ILogger logger;
 
-    public AuthorizeEndpoint(IOptions<ServerOptions> options, ILogger<AuthorizeEndpoint> logger)
+    public AuthorizeEndpoint(ILogger<AuthorizeEndpoint> logger)
     {
-        this.options = options.Value;
         this.logger = logger;
     }
 
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
-        logger.LogDebug("Start authorize enpoint");
+        logger.LogDebug("Start authorize endpoint");
 
         NameValueCollection values;
 
@@ -42,11 +38,12 @@ public class AuthorizeEndpoint : IEndpointHandler
         }
         else
         {
-            // return a problem details of a MethodNotAllowed infoming the http method is not allowed
+            // return a problem details of a MethodNotAllowed informing the http method is not allowed
             return new(EndpointErrorResults.MethodNotAllowed(httpContext));
         }
 
-        var items = ContextItems.From(options);
+        var serverOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
+        var items = ContextItems.From(serverOptions);
         var context = new AuthorizeContext(httpContext, values, httpContext.User, items);
 
         context.Load(logger);

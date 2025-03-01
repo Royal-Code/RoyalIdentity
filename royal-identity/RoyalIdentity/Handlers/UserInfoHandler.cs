@@ -15,13 +15,13 @@ namespace RoyalIdentity.Handlers;
 
 public class UserInfoHandler : IHandler<UserInfoContext>
 {
-    private readonly IResourceStore resourceStore;
+    private readonly IStorage storage;
     private readonly IProfileService profileService;
     private readonly ILogger logger;
 
-    public UserInfoHandler(IResourceStore resourceStore, IProfileService profileService, ILogger<UserInfoHandler> logger)
+    public UserInfoHandler(IStorage storage, IProfileService profileService, ILogger<UserInfoHandler> logger)
     {
-        this.resourceStore = resourceStore;
+        this.storage = storage;
         this.profileService = profileService;
         this.logger = logger;
     }
@@ -32,6 +32,7 @@ public class UserInfoHandler : IHandler<UserInfoContext>
 
         context.BearerParameters.AssertHasToken();
         var bearerToken = context.BearerParameters.EvaluatedToken;
+        var resourceStore = storage.GetResourceStore(context.Realm);
 
         var scopes = bearerToken.Principal.Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
         var resources = await resourceStore.FindResourcesByScopeAsync(scopes, ct: ct);

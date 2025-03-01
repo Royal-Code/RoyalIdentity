@@ -1,26 +1,18 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
 
 public class RevocationEndpoint : IEndpointHandler
 {
     private readonly ILogger logger;
-    private readonly ServerOptions options;
 
-    public RevocationEndpoint(
-        ILogger<RevocationEndpoint> logger,
-        IOptions<ServerOptions> options)
+    public RevocationEndpoint(ILogger<RevocationEndpoint> logger)
     {
         this.logger = logger;
-        this.options = options.Value;
     }
 
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
@@ -41,7 +33,8 @@ public class RevocationEndpoint : IEndpointHandler
             return new(EndpointErrorResults.UnsupportedMediaType(httpContext));
         }
 
-        var items = ContextItems.From(options);
+        var serverOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
+        var items = ContextItems.From(serverOptions);
         var parameters = httpContext.Request.Form.AsNameValueCollection();
         var context = new RevocationContext(httpContext, parameters, items);
 

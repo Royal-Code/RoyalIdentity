@@ -13,20 +13,20 @@ namespace RoyalIdentity.Handlers;
 public class DiscoveryHandler : IHandler<DiscoveryContext>
 {
     private readonly IKeyManager keys;
-    private readonly IResourceStore resourceStore;
+    private readonly IStorage storage;
     private readonly IClientSecretChecker clientSecretChecker;
     private readonly IExtensionsGrantsProvider extensionGrantsProvider;
     private readonly ILogger logger;
 
     public DiscoveryHandler(
         IKeyManager keys,
-        IResourceStore resourceStore,
+        IStorage storage,
         IClientSecretChecker clientSecretChecker,
         IExtensionsGrantsProvider extensionGrantsProvider,
         ILogger<DiscoveryHandler> logger)
     {
         this.keys = keys;
-        this.resourceStore = resourceStore;
+        this.storage = storage;
         this.clientSecretChecker = clientSecretChecker;
         this.extensionGrantsProvider = extensionGrantsProvider;
         this.logger = logger;
@@ -34,6 +34,8 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
 
     public async Task Handle(DiscoveryContext context, CancellationToken ct)
     {
+        logger.LogDebug("Handle discovery context start");
+
         var issuerUri = context.IssuerUri;
         var baseUrl = context.BaseUrl;
         var options = context.Options;
@@ -114,7 +116,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                     mtlsEndpoints.Add(OidcConstants.Discovery.DeviceAuthorizationEndpoint, ConstructMtlsEndpoint(Constants.ProtocolRoutePaths.DeviceAuthorization));
                 }
 
-                if (mtlsEndpoints.Any())
+                if (mtlsEndpoints.Count is not 0)
                 {
                     entries.Add(OidcConstants.Discovery.MtlsEndpointAliases, mtlsEndpoints);
                 }
@@ -128,7 +130,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                     }
 
                     // domain based
-                    if (options.MutualTls.DomainName.Contains("."))
+                    if (options.MutualTls.DomainName.Contains('.'))
                     {
                         return $"https://{options.MutualTls.DomainName}/{endpoint}";
                     }
@@ -156,7 +158,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
             options.Discovery.ShowApiScopes ||
             options.Discovery.ShowClaims)
         {
-            var resources = await resourceStore.GetAllEnabledResourcesAsync(ct);
+            var resources = await storage.GetResourceStore(context.Realm).GetAllEnabledResourcesAsync(ct);
             var scopes = new List<string>();
 
             // scopes
@@ -175,7 +177,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 scopes.Add(ServerConstants.StandardScopes.OfflineAccess);
             }
 
-            if (scopes.Any())
+            if (scopes.Count is not 0)
             {
                 entries.Add(OidcConstants.Discovery.ScopesSupported, scopes.ToArray());
             }

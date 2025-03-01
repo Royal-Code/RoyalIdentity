@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;

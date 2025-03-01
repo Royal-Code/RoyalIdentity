@@ -25,17 +25,12 @@ namespace RoyalIdentity.Handlers;
 public class RevocationHandler : IHandler<RevocationContext>
 {
     private readonly ILogger logger;
-    private readonly IAccessTokenStore accessTokenStore;
-    private readonly IRefreshTokenStore refreshTokenStore;
+    private readonly IStorage storage;
 
-    public RevocationHandler(
-        ILogger<RevocationHandler> logger,
-        IAccessTokenStore accessTokenStore,
-        IRefreshTokenStore refreshTokenStore)
+    public RevocationHandler(ILogger<RevocationHandler> logger, IStorage storage)
     {
         this.logger = logger;
-        this.accessTokenStore = accessTokenStore;
-        this.refreshTokenStore = refreshTokenStore;
+        this.storage = storage;
     }
 
     public async Task Handle(RevocationContext context, CancellationToken ct)
@@ -89,7 +84,7 @@ public class RevocationHandler : IHandler<RevocationContext>
     /// </summary>
     private async Task<bool> RevokeAccessTokenAsync(string token, string clientId, CancellationToken ct)
     {
-        var accessToken = await accessTokenStore.GetAsync(token, ct);
+        var accessToken = await storage.AccessTokens.GetAsync(token, ct);
 
         if (accessToken is null)
             return false;
@@ -98,7 +93,7 @@ public class RevocationHandler : IHandler<RevocationContext>
         {
             logger.LogDebug("Access token revoked");
 
-            await accessTokenStore.RemoveAsync(token, ct);
+            await storage.AccessTokens.RemoveAsync(token, ct);
         }
         else
         {
@@ -116,7 +111,7 @@ public class RevocationHandler : IHandler<RevocationContext>
     /// </summary>
     private async Task<bool> RevokeRefreshTokenAsync(string token, string clientId, CancellationToken ct)
     {
-        var refreshToken = await refreshTokenStore.GetAsync(token, ct);
+        var refreshToken = await storage.RefreshTokens.GetAsync(token, ct);
 
         if (refreshToken == null)
             return false;
@@ -125,8 +120,8 @@ public class RevocationHandler : IHandler<RevocationContext>
         {
             logger.LogDebug("Refresh token revoked");
 
-            await refreshTokenStore.RemoveAsync(token, ct);
-            await accessTokenStore.RemoveReferenceTokensAsync(refreshToken.SubjectId!, refreshToken.ClientId, ct);
+            await storage.RefreshTokens.RemoveAsync(token, ct);
+            await storage.AccessTokens.RemoveReferenceTokensAsync(refreshToken.SubjectId!, refreshToken.ClientId, ct);
         }
         else
         {

@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using System.Collections.Specialized;
 using RoyalIdentity.Contexts;
 
@@ -11,12 +9,10 @@ namespace RoyalIdentity.Endpoints;
 
 public class EndSessionEndpoint : IEndpointHandler
 {
-    private readonly ServerOptions options;
     private readonly ILogger logger;
 
-    public EndSessionEndpoint(IOptions<ServerOptions> options, ILogger<EndSessionEndpoint> logger)
+    public EndSessionEndpoint(ILogger<EndSessionEndpoint> logger)
     {
-        this.options = options.Value;
         this.logger = logger;
     }
 
@@ -47,7 +43,8 @@ public class EndSessionEndpoint : IEndpointHandler
             return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
-        var items = ContextItems.From(options);
+        var serverOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
+        var items = ContextItems.From(serverOptions);
         var context = new EndSessionContext(httpContext, parameters, httpContext.User, items);
 
         return new EndpointCreationResult(context);

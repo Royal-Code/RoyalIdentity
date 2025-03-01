@@ -1,33 +1,30 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints.Defaults;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using RoyalIdentity.Users.Contracts;
 
 namespace RoyalIdentity.Handlers;
 
 public class EndSessionHandler : IHandler<EndSessionContext>
 {
-    private readonly IUserSessionStore userSessionStore;
+    private readonly IStorage storage;
     private readonly IMessageStore messageStore;
-    private readonly ServerOptions options;
+    private readonly ILogger logger;
 
-    public EndSessionHandler(
-        IUserSessionStore userSessionStore,
-        IMessageStore messageStore,
-        IOptions<ServerOptions> options)
+    public EndSessionHandler(IStorage storage, IMessageStore messageStore, ILogger<EndSessionHandler> logger)
     {
-        this.userSessionStore = userSessionStore;
+        this.storage = storage;
         this.messageStore = messageStore;
-        this.options = options.Value;
+        this.logger = logger;
     }
 
     public async Task Handle(EndSessionContext context, CancellationToken ct)
     {
+        logger.LogDebug("End session request received");
+
         var sid = context.IdToken?.Principal.GetSessionId() ?? context.Principal.GetSessionId();
 
         var canLogoutWithoutUserConfirmation = await CanLogoutWithoutUserConfirmation(context, sid, ct);
@@ -45,12 +42,16 @@ public class EndSessionHandler : IHandler<EndSessionContext>
 
         var messageId = await messageStore.WriteAsync(new Message<LogoutMessage>(logoutMessage), ct);
 
+        var options = context.Options.ServerOptions;
+
         var redirect = options.UserInteraction.LogoutPath;
 
         if (redirect.IsLocalUrl())
             redirect = context.HttpContext.GetServerRelativeUrl(redirect)!;
 
         redirect = redirect.AddQueryString(options.UserInteraction.LogoutIdParameter, messageId);
+
+        logger.LogDebug("Redirecting to {Redirect}", redirect);
 
         context.Response = ResponseHandler.Redirect(redirect);
     }
@@ -63,6 +64,7 @@ public class EndSessionHandler : IHandler<EndSessionContext>
         if (!context.ClientParameters.Client.AllowLogoutWithoutUserConfirmation)
             return false;
 
+        var userSessionStore = storage.GetUserSessionStore(context.Realm);
         var userSession = await userSessionStore.GetUserSessionAsync(sid, ct);
         if (userSession is null)
             return false;

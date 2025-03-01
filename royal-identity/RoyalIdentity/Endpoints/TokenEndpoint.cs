@@ -1,28 +1,23 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;
 
 public class TokenEndpoint : IEndpointHandler
 {
-    private readonly ServerOptions options;
     private readonly IExtensionsGrantsProvider extensionsGrantsProvider;
     private readonly ILogger logger;
 
     public TokenEndpoint(
-        IOptions<ServerOptions> options,
         IExtensionsGrantsProvider extensionsGrantsProvider,
         ILogger<TokenEndpoint> logger)
     {
-        this.options = options.Value;
         this.extensionsGrantsProvider = extensionsGrantsProvider;
         this.logger = logger;
     }
@@ -30,6 +25,8 @@ public class TokenEndpoint : IEndpointHandler
     public async ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
         logger.LogDebug("Processing token request.");
+
+        var servierOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
 
         // validate HTTP method
         if (!HttpMethods.IsPost(httpContext.Request.Method))
@@ -59,7 +56,7 @@ public class TokenEndpoint : IEndpointHandler
             return EndpointErrorResults.InvalidRequest(httpContext, "Grant type parameter not found");
         }
 
-        if (grantType.Length > options.InputLengthRestrictions.GrantType)
+        if (grantType.Length > servierOptions.InputLengthRestrictions.GrantType)
         {
             logger.LogError("Grant type is too long");
 
@@ -67,7 +64,7 @@ public class TokenEndpoint : IEndpointHandler
         }
 
         // create the context
-        var items = ContextItems.From(options);
+        var items = ContextItems.From(servierOptions);
         ITokenEndpointContextBase? context = null;
         switch (grantType)
         {

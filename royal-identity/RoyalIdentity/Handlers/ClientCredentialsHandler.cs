@@ -5,8 +5,6 @@ using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Events;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Models;
-using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
