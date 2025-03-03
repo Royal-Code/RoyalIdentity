@@ -1,5 +1,7 @@
 ﻿@using Microsoft.Extensions.Logging
 @using RoyalIdentity.Contracts
+@using RoyalIdentity.Contracts.Models.Messages
+@using RoyalIdentity.Contracts.Storage
 @using RoyalIdentity.Events
 @using RoyalIdentity.Extensions;
 @using RoyalIdentity.Users
@@ -10,6 +12,7 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject IEventDispatcher EventDispatcher
+@inject IMessageStore MessageStore
 
 <StatusMessage Message="@errorMessage" MessageClass="danger"/>
 
@@ -127,10 +130,18 @@
 
         var uri = new Uri(Input.ReturnUrl!, UriKind.RelativeOrAbsolute);
 
-        // if it's an absolute URI, and it's not a local page (from the same host) it throws an exception
+        // if it's an absolute URI and it's not a local page (from the same host),
+        // it generate an error because no client was found to validate the URL.
         if (uri is { IsAbsoluteUri: true, IsLoopback: false })
         {
-            throw new Exception("invalid return URL");
+            var error = new ErrorMessage()
+                {
+                    ErrorDescription = $"No consent request matching request: {uri}"
+                };
+            var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
+
+            NavigationManager.NavigateTo($"/error?ErrorId={errorId}", true);
+            return;
         }
 
         // redirect to the return URL

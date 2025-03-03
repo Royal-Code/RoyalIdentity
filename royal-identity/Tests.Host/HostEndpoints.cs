@@ -16,12 +16,14 @@ public static class HostEndpoints
 {
     public static void MapTestHostEndpoints(this WebApplication app)
     {
-        app.MapPost("test/account/login", async (HttpContext context, ISignInManager signInManager) =>
+        app.MapPost("test/account/login/{realm}", async (HttpContext context, ISignInManager signInManager) =>
         {
             var username = context.Request.Form["username"].FirstOrDefault() ?? string.Empty;
             var password = context.Request.Form["password"].FirstOrDefault() ?? string.Empty;
 
-            var result = await signInManager.AuthenticateUserAsync(username, password, context.RequestAborted);
+            var realm = context.GetCurrentRealm();
+
+            var result = await signInManager.AuthenticateUserAsync(realm, username, password, context.RequestAborted);
 
             if (result.Success)
             {

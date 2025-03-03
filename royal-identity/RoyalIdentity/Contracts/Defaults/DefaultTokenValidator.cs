@@ -23,15 +23,14 @@ public class DefaultTokenValidator : ITokenValidator
     public DefaultTokenValidator(
         IKeyManager keys,
         IStorage storage,
-        IAccessTokenStore tokens,
         ILogger<DefaultTokenValidator> logger,
         TimeProvider clock)
     {
         this.keys = keys;
         this.storage = storage;
         this.logger = logger;
-        this.options = storage.ServerOptions;
         this.clock = clock;
+        options = storage.ServerOptions;
     }
 
     public async Task<TokenEvaluationResult> ValidateJwtAccessTokenAsync(

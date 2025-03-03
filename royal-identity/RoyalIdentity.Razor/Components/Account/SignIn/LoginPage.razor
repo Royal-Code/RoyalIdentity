@@ -1,12 +1,14 @@
 ﻿@page "/account/login"
+@page "/account/login/{realm}"
 
 @using Microsoft.Extensions.Options
+@using RoyalIdentity.Extensions
 @using RoyalIdentity.Options
 @using RoyalIdentity.Users
 
 @inject ISignInManager SignInManager
 @inject IAuthenticationSchemeProvider SchemeProvider
-@inject IOptions<AccountOptions> AccountOptions
+@inject NavigationManager NavigationManager
 
 <PageTitle>Log in</PageTitle>
 
@@ -19,12 +21,12 @@
         {
             if (model.EnableLocalLogin)
             {
-                <LocalLogin Model="model"/>
+                <LocalLogin Model="model" />
             }
 
             if (model.EnableExternalLogin)
             {
-                <ExternalLoginPicker ExternalProviders="model.GetVisibleExternalProviders()"/>
+                <ExternalLoginPicker ExternalProviders="model.GetVisibleExternalProviders()" />
             }
         }
     </ChildContent>
@@ -35,48 +37,41 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
     private LoginViewModel? model = null;
 
     protected override async Task OnParametersSetAsync()
     {
-        var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, CancellationToken.None);
+        if (HttpContext is null)
+            throw new InvalidOperationException("HttpContext is required.");
 
-        var returnUrl = ReturnUrl ?? "/account/manage/user-panel";
-
-        if (context?.IdP is not null && await SchemeProvider.GetSchemeAsync(context.IdP) is not null)
+        var realm = HttpContext.GetCurrentRealm();
+        if (realm is null)
         {
-            var local = context.IdP == ServerConstants.LocalIdentityProvider;
-
-            // this is meant to short circuit the UI and only trigger the one external IdP
-            model = new LoginViewModel
-            {
-                EnableLocalLogin = local,
-                ReturnUrl = returnUrl,
-                Username = context.LoginHint,
-            };
-
-            if (!local)
-            {
-                model.ExternalProviders = [new ExternalProvider { AuthenticationScheme = context.IdP }];
-            }
-
+            NavigationManager.NavigateTo("/account/domain");
             return;
         }
+
+        var context = await HttpContext.GetAuthorizationContextAsync(ReturnUrl);
+        var returnUrl = ReturnUrl ?? "/account/manage/user-panel";
 
         var schemes = await SchemeProvider.GetAllSchemesAsync();
 
         var providers = schemes
             .Where(x => x.DisplayName != null)
             .Select(x => new ExternalProvider
-            {
-                DisplayName = x.DisplayName ?? x.Name,
-                AuthenticationScheme = x.Name
-            });
+                {
+                    DisplayName = x.DisplayName ?? x.Name,
+                    AuthenticationScheme = x.Name
+                });
 
-        var allowLocal = true;
+        var accountOptions = realm.Options.Account;
+        var allowLocal = accountOptions.AllowLocalLogin;
         if (context is not null)
         {
-            allowLocal = context.Client.EnableLocalLogin;
+            allowLocal = allowLocal && context.Client.EnableLocalLogin;
 
             if (context.Client.IdentityProviderRestrictions.Any())
             {
@@ -86,13 +81,13 @@
         }
 
         model = new LoginViewModel
-        {
-            AllowRememberLogin = AccountOptions.Value.AllowRememberLogin,
-            EnableLocalLogin = allowLocal && AccountOptions.Value.AllowLocalLogin,
-            ReturnUrl = returnUrl,
-            Username = context?.LoginHint,
-            ExternalProviders = providers.ToArray()
-        };
+            {
+                AllowRememberLogin = accountOptions.AllowRememberLogin,
+                EnableLocalLogin = allowLocal,
+                ReturnUrl = returnUrl,
+                Username = context?.LoginHint,
+                ExternalProviders = providers.ToArray()
+            };
     }
 
 }

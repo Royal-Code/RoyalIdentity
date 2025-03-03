@@ -2,6 +2,7 @@
 @using RoyalIdentity.Contracts.Storage
 
 @inject IStorage storage;
+@inject NavigationManager NavigationManager
 
 <PageTitle>Select domain</PageTitle>
 
@@ -52,6 +53,7 @@
             return;
         }
 
-        return Task.CompletedTask;
+        // Redirect to the realm's login page
+        NavigationManager.NavigateTo($"/account/login/{realm.Path}");
     }
 }

@@ -47,8 +47,8 @@ public static class HttpContextExtensions
 
     public static async Task<bool> SetCurrentRealmAsync(this HttpContext context, string realmPath)
     {
-        var realmStore = context.RequestServices.GetRequiredService<IRealmStore>();
-        var realm = await realmStore.GetByPathAsync(realmPath, context.RequestAborted);
+        var storage = context.RequestServices.GetRequiredService<IStorage>();
+        var realm = await storage.Realms.GetByPathAsync(realmPath, context.RequestAborted);
         if (realm is null)
             return false;
 

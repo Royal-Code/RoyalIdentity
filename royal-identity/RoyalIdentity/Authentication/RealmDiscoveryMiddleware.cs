@@ -20,13 +20,20 @@ public class RealmDiscoveryMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         // check if the request has a route value for the realm
-        if (context.Request.RouteValues.TryGetValue(Constants.RealmRouteKey, out var value) 
-            && value is string realm 
-            && !await context.SetCurrentRealmAsync(realm))
+        if (context.Request.RouteValues.TryGetValue(Constants.RealmRouteKey, out var value) && value is string realm)
         {
-            // if realm is not found, return 404
-            // TODO: generate a proper error response and a event
-            context.Response.StatusCode = 404;
+            if (await context.SetCurrentRealmAsync(realm))
+            {
+                // after setting the realm, continue to the next middleware
+                await next(context);
+            }
+            else
+            {
+                // if realm is not found, return 404
+                // TODO: generate a proper error response and a event
+                context.Response.StatusCode = 404;
+            }
+
             return;
         }
 

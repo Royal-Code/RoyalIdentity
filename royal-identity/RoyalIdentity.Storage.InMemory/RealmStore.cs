@@ -23,6 +23,12 @@ public class RealmStore : IRealmStore
         }
     }
 
+    public ValueTask<Realm?> GetByDomainAsync(string domain, CancellationToken ct = default)
+    {
+        var realm = realms.Values.FirstOrDefault(r => r.Domain == domain);
+        return new ValueTask<Realm?>(realm);
+    }
+
     public ValueTask<Realm?> GetByIdAsync(string id, CancellationToken ct)
     {
         realms.TryGetValue(id, out var realm);
