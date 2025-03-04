@@ -44,7 +44,7 @@ public class EndSessionHandler : IHandler<EndSessionContext>
 
         var options = context.Options.ServerOptions;
 
-        var redirect = options.UserInteraction.LogoutPath;
+        var redirect = $"/{context.Realm.Path}{options.UserInteraction.LogoutPath}";
 
         if (redirect.IsLocalUrl())
             redirect = context.HttpContext.GetServerRelativeUrl(redirect)!;

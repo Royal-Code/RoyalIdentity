@@ -1,16 +1,28 @@
 ﻿@using Microsoft.Extensions.Options
+@using RoyalIdentity.Contracts.Storage
+@using RoyalIdentity.Extensions
 @using RoyalIdentity.Options
-@inject NavigationManager NavigationManager
 
-@inject IOptions<ServerOptions> ServerOptions
+@inject NavigationManager NavigationManager
+@inject IStorage Storage
 
 @code {
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
     protected override void OnInitialized()
     {
-        var interaction = ServerOptions.Value.UserInteraction;
-        var loginPath = interaction.LoginPath;
-        var loginParam = interaction.ReturnUrlParameter;
-
-        NavigationManager.NavigateTo($"{loginPath}?{loginParam}={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
+        if (HttpContext is not null && HttpContext.TryGetCurrentRealm(out var realm))
+        {
+            var interaction = realm.Options.ServerOptions.UserInteraction;
+            var loginUrl = $"/{realm.Path}{interaction.LoginPath}";
+            var url = loginUrl.AddQueryString(interaction.ReturnUrlParameter, NavigationManager.Uri);
+            NavigationManager.NavigateTo(url, forceLoad: true);
+        }
+        else
+        {
+            var interaction = Storage.ServerOptions.UserInteraction;
+            NavigationManager.NavigateTo(interaction.SelectDomainPath, forceLoad: true);
+        }
     }
 }

@@ -177,7 +177,7 @@ public class DefaultSignOutManager : ISignOutManager
 
         var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(callbackMessage), ct);
 
-        var url = serverOptions.UserInteraction.LoggingOutUrl;
+        var url = $"/{realm.Path}{serverOptions.UserInteraction.LoggingOutPath}";
 
         if (logoutCallbackId is not null)
         {

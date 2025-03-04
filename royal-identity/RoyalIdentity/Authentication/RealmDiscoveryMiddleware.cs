@@ -37,14 +37,19 @@ public class RealmDiscoveryMiddleware
             return;
         }
 
-        // every account page belongs to /account path.
-        // so, if the request path starts with /account,
-        // we can try to get the realm from AuthorizationContext
-        if (context.Request.Path.StartsWithSegments(pathString))
-        {
-            // By getting the authorization context, the realm is obtained and stored in the context (Items).
-            await context.GetAuthorizationContextAsync();
-        }
+        //// every account page belongs to /account path.
+        //// so, if the request path starts with /account,
+        //// we can try to get the realm from AuthorizationContext
+        //if (context.Request.Path.StartsWithSegments(pathString))
+        //{
+        //    // try get the domain from the query string
+        //    if (await context.TryLoadRealmFromDomain())
+        //    {
+        //        // if the realm is found by the domain, continue to the next middleware
+        //        await next(context);
+        //        return;
+        //    }
+        //}
 
         await next(context);
     }

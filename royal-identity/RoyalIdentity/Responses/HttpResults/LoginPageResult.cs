@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
@@ -14,14 +13,12 @@ public class LoginPageResult(IEndpointContextBase context) : IResult, IStatusCod
 
     public async Task ExecuteAsync(HttpContext httpContext)
     {
-        var authorizeParametersStore = httpContext.RequestServices.GetService<IAuthorizeParametersStore>();
-        var options = httpContext.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value;
+        var returnUrl = $"/{context.Realm.Path}/{Constants.ProtocolRoutePaths.AuthorizeCallback}";
 
-        var returnUrl = httpContext.GetServerBasePath().EnsureTrailingSlash() + Constants.ProtocolRoutePaths.AuthorizeCallback;
-
-        if (authorizeParametersStore is not null)
+        if (context.Realm.Options.StoreAuthorizationParameters)
         {
-            var id = await authorizeParametersStore.WriteAsync(context.Raw, httpContext.RequestAborted);
+            var storage = httpContext.RequestServices.GetRequiredService<IStorage>();
+            var id = await storage.AuthorizeParameters.WriteAsync(context.Raw, httpContext.RequestAborted);
             returnUrl = returnUrl.AddQueryString(Constants.AuthorizationParamsStore.MessageStoreIdParameterName, id);
         }
         else
@@ -29,15 +26,17 @@ public class LoginPageResult(IEndpointContextBase context) : IResult, IStatusCod
             returnUrl = returnUrl.AddQueryString(context.Raw.ToQueryString());
         }
 
-        var loginUrl = options.UserInteraction.LoginPath;
+        var interaction = context.Realm.Options.ServerOptions.UserInteraction;
+        var loginUrl = $"/{context.Realm.Path}{interaction.LoginPath}";
+
         if (!loginUrl.IsLocalUrl())
         {
             // this converts the relative redirect path to an absolute one if we're 
             // redirecting to a different server
-            returnUrl = httpContext.GetServerHost().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
+            returnUrl = httpContext.GetRealmPath().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
         }
 
-        var url = loginUrl.AddQueryString(options.UserInteraction.ReturnUrlParameter, returnUrl);
+        var url = loginUrl.AddQueryString(interaction.ReturnUrlParameter, returnUrl);
         httpContext.Response.RedirectToAbsoluteUrl(url);
     }
 }

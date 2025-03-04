@@ -35,7 +35,7 @@
     private string? errorMessage;
 
     [SupplyParameterFromForm]
-    public DomainInput Input { get; set; }
+    public DomainInput Input { get; set; } = new();
 
     public async Task SelectDomain()
     {

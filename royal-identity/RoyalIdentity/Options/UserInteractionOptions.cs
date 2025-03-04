@@ -13,7 +13,7 @@ public class UserInteractionOptions
     /// <value>
     /// The login URL.
     /// </value>
-    public string LoginPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Login.EnsureLeadingSlash()!;
+    public string LoginPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Login.EnsureLeadingSlash();
 
     /// <summary>
     /// Gets or sets the login return URL parameter.
@@ -29,7 +29,7 @@ public class UserInteractionOptions
     /// <value>
     /// The logout URL.
     /// </value>
-    public string LogoutPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Logout.EnsureLeadingSlash()!;
+    public string LogoutPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Logout.EnsureLeadingSlash();
 
     /// <summary>
     /// Gets or sets the access denied URL. If a local URL, the value must start with a leading slash.
@@ -37,7 +37,7 @@ public class UserInteractionOptions
     /// <value>
     /// The access denied URL.
     /// </value>
-    public string AccessDeniedPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.AccessDenied.EnsureLeadingSlash()!;
+    public string AccessDeniedPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.AccessDenied.EnsureLeadingSlash();
 
     /// <summary>
     /// Gets or sets the logging out URL. If a local URL, the value must start with a leading slash.
@@ -45,7 +45,7 @@ public class UserInteractionOptions
     /// <value>
     /// The logout URL.
     /// </value>
-    public string LoggingOutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.LoggingOut.EnsureLeadingSlash()!;
+    public string LoggingOutPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.LoggingOut.EnsureLeadingSlash();
 
     /// <summary>
     /// Gets or sets the logged out URL. If a local URL, the value must start with a leading slash.
@@ -53,7 +53,7 @@ public class UserInteractionOptions
     /// <value>
     /// The logout URL.
     /// </value>
-    public string LoggedOutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.LoggedOut.EnsureLeadingSlash()!;
+    public string LoggedOutPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.LoggedOut.EnsureLeadingSlash();
 
     /// <summary>
     /// Gets or sets the logout identifier parameter.
@@ -69,7 +69,7 @@ public class UserInteractionOptions
     /// <value>
     /// The consent URL.
     /// </value>
-    public string ConsentUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Consent.EnsureLeadingSlash()!;
+    public string ConsentPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Consent.EnsureLeadingSlash();
 
     /// <summary>
     /// Gets or sets the consent return URL parameter.
@@ -80,12 +80,17 @@ public class UserInteractionOptions
     public string ConsentReturnUrlParameter { get; set; } = Constants.UIConstants.DefaultRoutePathParams.Consent;
 
     /// <summary>
+    /// Gets or sets the select domain URL. If a local URL, the value must start with a leading slash.
+    /// </summary>
+    public string SelectDomainPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.SelectDomain.EnsureLeadingSlash();
+
+    /// <summary>
     /// Gets or sets the error URL. If a local URL, the value must start with a leading slash.
     /// </summary>
     /// <value>
     /// The error URL.
     /// </value>
-    public string ErrorUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Error.EnsureLeadingSlash()!;
+    public string ErrorPath { get; set; } = Constants.UIConstants.DefaultRoutePaths.Error.EnsureLeadingSlash();
 
     /// <summary>
     /// Gets or sets the error identifier parameter.
@@ -112,7 +117,7 @@ public class UserInteractionOptions
     public string DeviceVerificationUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.DeviceVerification;
 
     /// <summary>
-    /// Gets or sets the device verification user code paramater.
+    /// Gets or sets the device verification user code parameter.
     /// </summary>
     /// <value>
     /// The device verification user code parameter.

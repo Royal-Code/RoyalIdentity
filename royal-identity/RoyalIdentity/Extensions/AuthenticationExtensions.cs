@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contexts;
@@ -60,6 +61,25 @@ public static class AuthenticationExtensions
         }
 
         return authorizationContext;
+    }
+
+    public static async ValueTask<bool> TryLoadRealmFromDomain(this HttpContext context)
+    {
+        // try get the returnUrl from the query string
+        var domain = context.Request.Query[Constants.UIConstants.RealmPathParams.Domain].FirstOrDefault();
+        if (domain.IsMissing())
+            return false;
+
+        var storate = context.RequestServices.GetRequiredService<IStorage>();
+        var realm = await storate.Realms.GetByDomainAsync(domain);
+
+        if (realm is null)
+            return false;
+
+        context.Items[Constants.RealmCurrentKey] = realm;
+        context.Items[Constants.RealmRouteKey] = realm.Path;
+        context.Items[Constants.RealmOptionsKey] = realm.Options;
+        return true;
     }
 
     public static string GetRealmAuthenticationScheme(this HttpContext context)

@@ -25,11 +25,17 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         var cookie = options.Cookie;
 
         string? cookieName = null;
+        string? realmPath = null;
 
         if (name == DefaultCookieAuthenticationScheme)
+        {
             cookieName = authOptions.CookieName;
+        }
         else if (name.StartsWith(RealmAuthenticationNamePrefix))
-            cookieName = $"{authOptions.CookieName}.{name[RealmAuthenticationNamePrefix.Length..]}";
+        {
+            realmPath = name[RealmAuthenticationNamePrefix.Length..];
+            cookieName = $"{authOptions.CookieName}.{realmPath}";
+        }
 
         if (cookieName is null)
             return;
@@ -39,10 +45,20 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         options.ExpireTimeSpan = authOptions.CookieLifetime;
         options.SlidingExpiration = authOptions.CookieSlidingExpiration;
 
-        options.LoginPath = interactionOptions.LoginPath;
-        options.LogoutPath = interactionOptions.LogoutPath;
-        options.AccessDeniedPath = interactionOptions.AccessDeniedPath;
-        options.ReturnUrlParameter = interactionOptions.ReturnUrlParameter;
+        if (realmPath.IsPresent())
+        {
+            options.LoginPath = interactionOptions.LoginPath;
+            options.LogoutPath = interactionOptions.LogoutPath;
+            options.AccessDeniedPath = interactionOptions.AccessDeniedPath;
+            options.ReturnUrlParameter = interactionOptions.ReturnUrlParameter;
+        }
+        else
+        {
+            options.LoginPath = $"/{realmPath}{interactionOptions.LoginPath}";
+            options.LogoutPath = $"/{realmPath}{interactionOptions.LogoutPath}";
+            options.AccessDeniedPath = $"/{realmPath}{interactionOptions.AccessDeniedPath}";
+            options.ReturnUrlParameter = interactionOptions.ReturnUrlParameter;
+        }
 
         options.Events.OnValidatePrincipal = async context =>
         {

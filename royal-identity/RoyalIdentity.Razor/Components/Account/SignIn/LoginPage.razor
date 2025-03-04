@@ -1,5 +1,4 @@
-﻿@page "/account/login"
-@page "/account/login/{realm}"
+﻿@page "/{realm}/account/login"
 
 @using Microsoft.Extensions.Options
 @using RoyalIdentity.Extensions
@@ -33,6 +32,8 @@
 </AccountContent>
 
 @code {
+    [Parameter]
+    public string? Realm { get; set; }
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
@@ -47,15 +48,14 @@
         if (HttpContext is null)
             throw new InvalidOperationException("HttpContext is required.");
 
-        var realm = HttpContext.GetCurrentRealm();
-        if (realm is null)
+        if (!HttpContext.TryGetCurrentRealm(out var realm))
         {
             NavigationManager.NavigateTo("/account/domain");
             return;
         }
 
         var context = await HttpContext.GetAuthorizationContextAsync(ReturnUrl);
-        var returnUrl = ReturnUrl ?? "/account/manage/user-panel";
+        var returnUrl = ReturnUrl ?? $"/{realm.Path}/account/profile";
 
         var schemes = await SchemeProvider.GetAllSchemesAsync();
 

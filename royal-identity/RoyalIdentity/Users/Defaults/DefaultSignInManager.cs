@@ -48,8 +48,17 @@ public class DefaultSignInManager : ISignInManager
                 parameters = await storage.AuthorizeParameters.ReadAsync(messageStoreId, ct) ?? [];
             }
 
+            var httpContext = httpContextAccessor.HttpContext;
+            if (httpContext is null)
+            {
+                logger.LogInformation("Sign-in is not being executed in an HTTP context");
+
+                throw new InvalidOperationException("Sign-in requires execution under an HTTP context.");
+            }
+
             var authorizationRequest = new AuthorizationValidationRequest()
             {
+                HttpContext = httpContext,
                 Parameters = parameters
             };
             var authorizationResult = await authorizeRequestValidator.ValidateAsync(authorizationRequest, ct);
@@ -63,7 +72,7 @@ public class DefaultSignInManager : ISignInManager
         }
         else
         {
-            logger.LogDebug("returnUrl is not valid");
+            logger.LogDebug("The parameter 'returnUrl' is not valid: {ReturnUrl}", returnUrl);
         }
 
         logger.LogDebug("No AuthorizationRequest being returned");

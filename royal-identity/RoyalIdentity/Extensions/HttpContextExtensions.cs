@@ -184,20 +184,6 @@ public static class HttpContextExtensions
     /// <param name="options">The options.</param>
     /// <returns></returns>
     /// <exception cref="System.ArgumentNullException">context</exception>
-    [Obsolete("Use GetServerIssuerUri(this HttpContext context, RealmOptions options) instead.")]
-    public static string GetServerIssuerUri(this HttpContext context)
-    {
-        var options = context.RequestServices.GetRequiredService<IOptions<RealmOptions>>().Value;
-        return context.GetServerIssuerUri(options);
-    }
-
-    /// <summary>
-    /// Gets the identity server issuer URI.
-    /// </summary>
-    /// <param name="context">The context.</param>
-    /// <param name="options">The options.</param>
-    /// <returns></returns>
-    /// <exception cref="System.ArgumentNullException">context</exception>
     public static string GetServerIssuerUri(this HttpContext context, RealmOptions options)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -231,7 +217,8 @@ public static class HttpContextExtensions
     public static async Task<bool> ValidateUserSessionAsync(this HttpContext context, ClaimsPrincipal principal)
     {
         var sessionId = principal.GetSessionId();
-        var userSessionStore = context.RequestServices.GetRequiredService<IUserSessionStore>();
+        var storage = context.RequestServices.GetRequiredService<IStorage>();
+        var userSessionStore = storage.GetUserSessionStore(context.GetCurrentRealm());
         var currentSession = await userSessionStore.GetUserSessionAsync(sessionId, context.RequestAborted);
         return currentSession is { IsActive : true };
     }

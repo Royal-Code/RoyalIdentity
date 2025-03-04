@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Endpoints.Abstractions;
@@ -11,16 +10,13 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
 {
-    private readonly IHttpContextAccessor httpContextAccessor;
     private readonly IPipelineDispatcher dispatcher;
     private readonly ILogger logger;
 
     public DefaultAuthorizeRequestValidator(
-        IHttpContextAccessor httpContextAccessor,
         IPipelineDispatcher dispatcher,
         ILogger<DefaultAuthorizeRequestValidator> logger)
     {
-        this.httpContextAccessor = httpContextAccessor;
         this.dispatcher = dispatcher;
         this.logger = logger;
     }
@@ -29,15 +25,7 @@ public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
         AuthorizationValidationRequest request, 
         CancellationToken ct)
     {
-        var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null)
-        {
-            logger.LogInformation("Authorization validation request is not being executed in an HTTP context");
-
-            throw new InvalidOperationException("AuthorizeRequestValidator requires execution under an HTTP context.");
-        }
-
-        var context = new AuthorizeValidateContext(httpContext, request.Parameters);
+        var context = new AuthorizeValidateContext(request.HttpContext, request.Parameters);
         context.Load(logger);
 
         await dispatcher.SendAsync(context, ct);

@@ -16,6 +16,7 @@ internal static class Constants
     public const string ServerAuthenticationName = ServerName;
     public const string RealmAuthenticationNamePrefix = "Realm:";
     public const string RealmRouteKey = "realm";
+    [Obsolete("read options from current realm")]
     public const string RealmOptionsKey = "realm.options";
     public const string RealmCurrentKey = "realm.current";
     public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -141,6 +142,11 @@ internal static class Constants
             public const string UserCode = "userCode";
         }
 
+        public static class RealmPathParams
+        {
+            public const string Domain = "domain";
+        }
+
         public static class DefaultRoutePaths
         {
             public const string Login = "/account/login";
@@ -149,7 +155,8 @@ internal static class Constants
             public const string LoggedOut = "/account/logout/done";
             public const string Consent = "/account/consent";
             public const string Error = "/error";
-            public const string AccessDenied = "/account/accessdenied";
+            public const string AccessDenied = "/account/access-denied";
+            public const string SelectDomain = "/account/domain";
             public const string DeviceVerification = "/device";
         }
     }
