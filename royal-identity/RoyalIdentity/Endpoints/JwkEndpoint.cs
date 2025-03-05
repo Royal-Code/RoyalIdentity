@@ -32,7 +32,7 @@ public class JwkEndpoint : IEndpointHandler
 
         logger.LogDebug("Start jwk discovery request");
 
-        var realmOptions = await httpContext.GetRealmOptionsAsync();
+        var realmOptions = httpContext.GetRealmOptions();
 
         if (!realmOptions.Discovery.ShowKeySet)
         {

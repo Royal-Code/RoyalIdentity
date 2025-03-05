@@ -1,4 +1,5 @@
-﻿@page "/{realm}/account/logout/processing"
+﻿@attribute [Route(Routes.LoggingOut)]
+
 @using RoyalIdentity.Contracts.Models.Messages
 @using RoyalIdentity.Contracts.Storage
 @using RoyalIdentity.Extensions
@@ -19,12 +20,9 @@
         <div>
             Click <a class="@ClickCssClasses" href="@RedirectUrl">here</a> @ToReturnMessage
         </div>
-        @if (model is not null)
+        @if (model is not null && model.HasFrontChannel())
         {
-            if (model.HasFrontChannel())
-            {
-                <iframe width="0" height="0" class="sign-out" src="@model.SignOutIframeUrl.AddQueryString("callbackId", LogoutId!)"></iframe>
-            }
+            <iframe width="0" height="0" class="sign-out" src="@model.SignOutIframeUrl.AddQueryString("callbackId", LogoutId!)"></iframe>
         }
     </ChildContent>
 </AccountContent>
@@ -35,7 +33,7 @@
 
     private string ClickCssClasses => $"post-logout-redirect-uri{(AutomaticRedirect ? " automatic-redirect" : "")}";
 
-    private string RedirectUrl => model?.PostLogoutRedirectUri ?? "/account/logout/done";
+    private string RedirectUrl => model?.PostLogoutRedirectUri ?? Routes.BuildLoggedOutUrl(Realm);
 
     private string ToReturnMessage => HasClientName
         ? $"to return to the {model?.ClientName} application."
@@ -47,6 +45,9 @@
     private bool AutomaticRedirect => model?.AutomaticRedirectAfterSignOut ?? model is { PostLogoutRedirectUri: null };
 
     private bool HasClientName => model?.ClientName.IsPresent() ?? false;
+
+    [Parameter]
+    public string Realm { get; set; } = default!;
 
     [SupplyParameterFromQuery]
     private string? LogoutId { get; set; }
@@ -63,7 +64,7 @@
             };
 
             var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
-            var redirect = "/error".AddQueryString("errorId", errorId);
+            var redirect = Routes.BuildErrorUrl(errorId);
             NavigationManager.NavigateTo(redirect);
 
             return;
@@ -82,7 +83,7 @@
             };
 
             var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
-            var redirect = "/error".AddQueryString("errorId", errorId);
+            var redirect = Routes.BuildErrorUrl(errorId);
             NavigationManager.NavigateTo(redirect);
 
             return;

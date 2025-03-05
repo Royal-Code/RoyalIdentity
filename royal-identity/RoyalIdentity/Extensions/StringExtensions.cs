@@ -210,8 +210,10 @@ public static class StringExtensions
     }
 
     [DebuggerStepThrough]
-    public static string AddQueryString(this string url, string name, string value)
+    public static string AddQueryString(this string url, string name, string? value)
     {
+        if (value is null)
+            return url;
         return url.AddQueryString(name + "=" + UrlEncoder.Default.Encode(value));
     }
 

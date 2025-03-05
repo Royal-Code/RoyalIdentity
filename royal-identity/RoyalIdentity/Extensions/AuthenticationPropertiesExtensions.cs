@@ -7,6 +7,7 @@ namespace RoyalIdentity.Extensions;
 /// <summary>
 /// Extensions for AuthenticationProperties
 /// </summary>
+[Obsolete("Remove")]
 public static class AuthenticationPropertiesExtensions
 {
     internal const string SessionIdKey = "session_id";
@@ -111,8 +112,5 @@ public static class AuthenticationPropertiesExtensions
         var bytes = Encoding.UTF8.GetBytes(value);
         value = Base64Url.Encode(bytes);
         return value;
-
-    }
-
-    
+    }    
 }

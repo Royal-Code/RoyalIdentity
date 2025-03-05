@@ -7,7 +7,6 @@ using RoyalIdentity.Events;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using RoyalIdentity.Responses;
 
 namespace RoyalIdentity.Handlers;
 
@@ -51,7 +50,7 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
 
         logger.LogDebug("Access token issued");
 
-        context.Response = new TokenResponse(
+        context.Response = new Responses.TokenResponse(
             accessToken,
             null,
             null,

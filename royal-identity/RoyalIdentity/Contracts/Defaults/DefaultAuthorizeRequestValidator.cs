@@ -4,7 +4,6 @@ using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Users.Contexts;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contracts.Defaults;
 

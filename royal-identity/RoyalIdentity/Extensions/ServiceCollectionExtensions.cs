@@ -49,7 +49,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IJwtFactory, DefaultJwtFactory>();
         services.AddTransient<IKeyManager, DefaultKeyManager>();
         services.AddTransient<IProfileService, DefaultProfileService>();
-        services.AddTransient<IRealmService, DefaultRealmService>();
         services.AddTransient<IRedirectUriValidator, DefaultRedirectUriValidator>();
         services.AddTransient<IReplayCache, DefaultReplayNoCache>();
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
@@ -133,27 +132,27 @@ public static class ServiceCollectionExtensions
     {
         services.AddAuthentication(options =>
             {
-                options.DefaultScheme = Constants.ServerAuthenticationScheme;
+                options.DefaultScheme = ServerAuthenticationScheme;
             })
-            .AddCookie(Constants.DefaultCookieAuthenticationScheme)
-            .AddPolicyScheme(Constants.ServerAuthenticationScheme, Constants.ServerAuthenticationName, options =>
+            .AddCookie(DefaultCookieAuthenticationScheme)
+            .AddPolicyScheme(ServerAuthenticationScheme, ServerAuthenticationName, options =>
             {
                 options.ForwardDefaultSelector = context =>
                 {
                     // try get the realm from the route
-                    if (context.Request.RouteValues.TryGetValue(Constants.RealmRouteKey, out var realm))
+                    if (context.Request.RouteValues.TryGetValue(RealmRouteKey, out var realm))
                     {
-                        return $"{Constants.RealmAuthenticationNamePrefix}{realm}";
+                        return $"{RealmAuthenticationNamePrefix}{realm}";
                     }
                     // try get realm from context items
-                    else if (context.Items.TryGetValue(Constants.RealmRouteKey, out var item) && item is string realmItem)
+                    else if (context.Items.TryGetValue(RealmRouteKey, out var item) && item is string realmItem)
                     {
-                        return $"{Constants.RealmAuthenticationNamePrefix}{realmItem}";
+                        return $"{RealmAuthenticationNamePrefix}{realmItem}";
                     }
                     // else, use cookie authentication
                     else
                     {
-                        return Constants.DefaultCookieAuthenticationScheme;
+                        return DefaultCookieAuthenticationScheme;
                     }
                 };
             });

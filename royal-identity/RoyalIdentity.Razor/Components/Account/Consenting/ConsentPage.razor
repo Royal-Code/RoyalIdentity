@@ -1,4 +1,4 @@
-@page "/{realm}/account/consent"
+@attribute [Route(Routes.Consent)]
 
 @using RoyalIdentity.Contracts
 @using RoyalIdentity.Contracts.Models.Messages
@@ -100,12 +100,14 @@
     private ConsentInputModel inputModel = null!;
     private string? errorMessage;
 
+    [Parameter]
+    public string Realm { get; set; } = default!;
+
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
     [SupplyParameterFromForm]
     private ConsentInputModel? InputModel { get; set; }
-
 
     protected override async Task OnParametersSetAsync()
     {
@@ -185,7 +187,7 @@
 
             await ConsentService.UpdateConsentAsync(subject, client, consentedScopes, CancellationToken.None);
             
-            var returnUrl = "/account/consented".AddQueryString("ReturnUrl", InputModel.ReturnUrl);
+            var returnUrl = Routes.BuildConsentedUrl(Realm, InputModel.ReturnUrl);
             NavigationManager.NavigateTo(returnUrl, true);
         }
 
@@ -255,7 +257,7 @@
                 };
             var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
 
-            NavigationManager.NavigateTo($"/error?ErrorId={errorId}", true);
+            NavigationManager.NavigateTo(Routes.BuildErrorUrl(errorId), true);
         }
 
         return authorizationContext!;

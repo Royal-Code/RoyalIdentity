@@ -1,4 +1,3 @@
-using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 

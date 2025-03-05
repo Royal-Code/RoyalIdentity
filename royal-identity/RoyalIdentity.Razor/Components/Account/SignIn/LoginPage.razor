@@ -1,4 +1,4 @@
-﻿@page "/{realm}/account/login"
+﻿@attribute [Route(Routes.Login)]
 
 @using Microsoft.Extensions.Options
 @using RoyalIdentity.Extensions
@@ -50,16 +50,17 @@
 
         if (!HttpContext.TryGetCurrentRealm(out var realm))
         {
-            NavigationManager.NavigateTo("/account/domain");
+            NavigationManager.NavigateTo(Routes.SelectDomain);
             return;
         }
 
         var context = await HttpContext.GetAuthorizationContextAsync(ReturnUrl);
-        var returnUrl = ReturnUrl ?? $"/{realm.Path}/account/profile";
+        var returnUrl = ReturnUrl ?? Routes.BuildProfileUrl(realm.Path);
 
         var schemes = await SchemeProvider.GetAllSchemesAsync();
 
         var providers = schemes
+            .Where(x => x.Name != "RoyalIdentity")
             .Where(x => x.DisplayName != null)
             .Select(x => new ExternalProvider
                 {
@@ -89,5 +90,4 @@
                 ExternalProviders = providers.ToArray()
             };
     }
-
 }

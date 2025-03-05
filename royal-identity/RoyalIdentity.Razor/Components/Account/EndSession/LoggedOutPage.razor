@@ -1,4 +1,4 @@
-﻿@page "/{realm}/account/logout/done"
+﻿@attribute [Route(Routes.LoggedOut)]
 
 <AccountContent>
     <Title>
@@ -10,3 +10,8 @@
         </div>
     </ChildContent>
 </AccountContent>
+
+@code {
+    [Parameter]
+    public string Realm { get; set; } = default!;
+}

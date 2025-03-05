@@ -1,9 +1,8 @@
-@page "/{realm}/account/profile"
+@attribute [Route(Routes.Profile)]
+@attribute [Authorize]
 
 @using Microsoft.AspNetCore.Authorization
 @using RoyalIdentity.Extensions
-
-@attribute [Authorize]
 
 <PageTitle>User Panel</PageTitle>
 
@@ -28,6 +27,7 @@
 </AuthorizeView>
 
 @code {
-
+    [Parameter]
+    public string Realm { get; set; } = default!;
 
 }

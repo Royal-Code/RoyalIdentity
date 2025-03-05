@@ -204,21 +204,21 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <param name="logger">The logger.</param>
     public virtual void Load(NameValueCollection raw, ILogger logger)
     {
-        Scope = raw.Get(OidcConstants.AuthorizeRequest.Scope);
+        Scope = raw.Get(AuthorizeRequest.Scope);
         Resources.RequestedScopes.AddRange(Scope.FromSpaceSeparatedString());
 
-        var responseType = raw.Get(OidcConstants.AuthorizeRequest.ResponseType);
+        var responseType = raw.Get(AuthorizeRequest.ResponseType);
         ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
-        ClientId = raw.Get(OidcConstants.AuthorizeRequest.ClientId);
-        RedirectUri = raw.Get(OidcConstants.AuthorizeRequest.RedirectUri);
-        State = raw.Get(OidcConstants.AuthorizeRequest.State);
-        ResponseMode = raw.Get(OidcConstants.AuthorizeRequest.ResponseMode);
-        Nonce = raw.Get(OidcConstants.AuthorizeRequest.Nonce);
+        ClientId = raw.Get(AuthorizeRequest.ClientId);
+        RedirectUri = raw.Get(AuthorizeRequest.RedirectUri);
+        State = raw.Get(AuthorizeRequest.State);
+        ResponseMode = raw.Get(AuthorizeRequest.ResponseMode);
+        Nonce = raw.Get(AuthorizeRequest.Nonce);
 
-        var display = raw.Get(OidcConstants.AuthorizeRequest.Display);
+        var display = raw.Get(AuthorizeRequest.Display);
         if (display.IsPresent())
         {
-            if (Constants.SupportedDisplayModes.Contains(display))
+            if (SupportedDisplayModes.Contains(display))
             {
                 DisplayMode = display;
             }
@@ -228,21 +228,21 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
             }
         }
 
-        var prompt = raw.Get(OidcConstants.AuthorizeRequest.Prompt);
+        var prompt = raw.Get(AuthorizeRequest.Prompt);
         if (prompt.IsPresent())
         {
             var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (prompts.All(Constants.SupportedPromptModes.Contains))
+            if (prompts.All(SupportedPromptModes.Contains))
             {
                 PromptModes = [.. prompts];
             }
             else
             {
-                logger.LogDebug("Unsupported prompt mode - ignored: {Promp}", prompt);
+                logger.LogDebug("Unsupported prompt mode - ignored: {Prompt}", prompt);
             }
         }
 
-        var maxAge = raw.Get(OidcConstants.AuthorizeRequest.MaxAge);
+        var maxAge = raw.Get(AuthorizeRequest.MaxAge);
         if (maxAge.IsPresent())
         {
             if (int.TryParse(maxAge, out var seconds) && seconds >= 0)
@@ -255,15 +255,15 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
             }
         }
 
-        UiLocales = raw.Get(OidcConstants.AuthorizeRequest.UiLocales);
-        IdTokenHint = raw.Get(OidcConstants.AuthorizeRequest.IdTokenHint);
-        LoginHint = raw.Get(OidcConstants.AuthorizeRequest.LoginHint);
+        UiLocales = raw.Get(AuthorizeRequest.UiLocales);
+        IdTokenHint = raw.Get(AuthorizeRequest.IdTokenHint);
+        LoginHint = raw.Get(AuthorizeRequest.LoginHint);
 
-        var acrValues = raw.Get(OidcConstants.AuthorizeRequest.AcrValues);
+        var acrValues = raw.Get(AuthorizeRequest.AcrValues);
         AcrValues.AddRange(acrValues.FromSpaceSeparatedString());
 
-        CodeChallenge = raw.Get(OidcConstants.AuthorizeRequest.CodeChallenge);
-        CodeChallengeMethod = raw.Get(OidcConstants.AuthorizeRequest.CodeChallengeMethod);
+        CodeChallenge = raw.Get(AuthorizeRequest.CodeChallenge);
+        CodeChallengeMethod = raw.Get(AuthorizeRequest.CodeChallengeMethod);
     }
 
     [MemberNotNull(nameof(RedirectUri))]

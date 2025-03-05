@@ -1,4 +1,5 @@
-﻿@page "/{realm}/account/consented"
+﻿@attribute [Route(Routes.Consented)]
+
 @using RoyalIdentity.Razor.Components.Shared
 
 @inject NavigationManager NavigationManager
@@ -25,6 +26,9 @@
 
 @code {
 
+    [Parameter]
+    public string Realm { get; set; } = default!;
+
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
@@ -42,7 +46,7 @@
         }
         else
         {
-            NavigationManager.NavigateTo("/");
+            NavigationManager.NavigateTo(Routes.Profile);
         }
     }
 }

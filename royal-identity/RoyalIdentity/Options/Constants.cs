@@ -142,11 +142,6 @@ internal static class Constants
             public const string UserCode = "userCode";
         }
 
-        public static class RealmPathParams
-        {
-            public const string Domain = "domain";
-        }
-
         public static class DefaultRoutePaths
         {
             public const string Login = "/account/login";

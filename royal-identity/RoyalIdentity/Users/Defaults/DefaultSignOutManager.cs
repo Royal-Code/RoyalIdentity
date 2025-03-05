@@ -85,8 +85,9 @@ public class DefaultSignOutManager : ISignOutManager
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext is not null && httpContext.User.IsAuthenticated())
         {
-            // delete local authentication cookie
-            await httpContext.SignOutAsync();
+            // delete local realm authentication cookie
+            var authenticationScheme = httpContext.GetRealmAuthenticationScheme();
+            await httpContext.SignOutAsync(authenticationScheme);
 
             // raise the logout event
             await eventDispatcher.DispatchAsync(
@@ -159,7 +160,7 @@ public class DefaultSignOutManager : ISignOutManager
             var redirectUri = postLogoutRedirectUri!;
 
             if (state.IsPresent())
-                redirectUri = redirectUri.AddQueryString(OidcConstants.EndSessionRequest.State, state);
+                redirectUri = redirectUri.AddQueryString(EndSessionRequest.State, state);
 
             return new Uri(redirectUri);
         }

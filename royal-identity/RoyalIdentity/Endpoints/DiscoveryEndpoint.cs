@@ -30,7 +30,7 @@ public class DiscoveryEndpoint : IEndpointHandler
 
         logger.LogDebug("Start discovery request");
 
-        var realmOptions = await httpContext.GetRealmOptionsAsync();
+        var realmOptions = httpContext.GetRealmOptions();
 
         if (!realmOptions.Endpoints.EnableDiscoveryEndpoint)
         {

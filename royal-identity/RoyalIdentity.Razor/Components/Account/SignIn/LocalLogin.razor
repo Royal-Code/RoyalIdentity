@@ -79,14 +79,16 @@
     public async Task LoginUser()
     {
         var context = await HttpContext.GetAuthorizationContextAsync(Input.ReturnUrl);
-        if (context is null)
+        if (context is null || Input.ReturnUrl is null)
         {
             Logger.LogError("No authorization context found for return URL: {ReturnUrl}", Input.ReturnUrl);
-            NavigationManager.NavigateTo("/account/domain");
+            NavigationManager.NavigateTo(Routes.SelectDomain);
             return;
         }
 
-        var result = await SignInManager.AuthenticateUserAsync(context.Client.Realm, Input.Username!, Input.Password!, CancellationToken.None);
+        var realm = context.Client.Realm;
+
+        var result = await SignInManager.AuthenticateUserAsync(realm, Input.Username!, Input.Password!, CancellationToken.None);
 
         if (!result.Success)
         {
@@ -105,7 +107,7 @@
             // if consent is required, navigate to consent page
             if (await SignInManager.ConsentRequired(user, context.Client, context.Resources, CancellationToken.None))
             {
-                var consentUrl = "/account/consent".AddQueryString("returnUrl", Input.ReturnUrl!);
+                var consentUrl = Routes.BuildConsentUrl(realm.Path, Input.ReturnUrl);
                 NavigationManager.NavigateTo(consentUrl);
             }
 
@@ -115,16 +117,18 @@
             {
                 // The client is native, so this change in how to
                 // return the response is for better UX for the end user.
-                NavigationManager.NavigateTo("/account/signedin".AddQueryString("returnUrl", Input.ReturnUrl!));
+
+
+                NavigationManager.NavigateTo(Routes.BuildSignedInUrl(realm.Path, Input.ReturnUrl));
             }
 
             // we can trust in the redirectUri since GetAuthorizationContextAsync returned non-null
-            NavigationManager.NavigateTo(Input.ReturnUrl!);
+            NavigationManager.NavigateTo(Input.ReturnUrl);
         }
 
-        if (string.IsNullOrEmpty(Input.ReturnUrl))
+        if (Input.ReturnUrl.IsMissing())
         {
-            NavigationManager.NavigateTo("/", true);
+            NavigationManager.NavigateTo(Routes.BuildProfileUrl(realm.Path), true);
         }
 
         var uri = new Uri(Input.ReturnUrl!, UriKind.RelativeOrAbsolute);
@@ -139,7 +143,7 @@
                 };
             var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
 
-            NavigationManager.NavigateTo($"/error?ErrorId={errorId}", true);
+            NavigationManager.NavigateTo(Routes.BuildErrorUrl(errorId), true);
             return;
         }
 

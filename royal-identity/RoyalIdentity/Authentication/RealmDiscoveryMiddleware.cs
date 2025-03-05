@@ -10,7 +10,6 @@ namespace RoyalIdentity.Authentication;
 public class RealmDiscoveryMiddleware
 {
     private readonly RequestDelegate next;
-    private readonly PathString pathString = new("/account");
 
     public RealmDiscoveryMiddleware(RequestDelegate next)
     {
@@ -36,20 +35,6 @@ public class RealmDiscoveryMiddleware
 
             return;
         }
-
-        //// every account page belongs to /account path.
-        //// so, if the request path starts with /account,
-        //// we can try to get the realm from AuthorizationContext
-        //if (context.Request.Path.StartsWithSegments(pathString))
-        //{
-        //    // try get the domain from the query string
-        //    if (await context.TryLoadRealmFromDomain())
-        //    {
-        //        // if the realm is found by the domain, continue to the next middleware
-        //        await next(context);
-        //        return;
-        //    }
-        //}
 
         await next(context);
     }

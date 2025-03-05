@@ -3,12 +3,9 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
-using RoyalIdentity.Users.Contracts;
 
 #pragma warning disable S3358 // Ternary operators should not be nested
 
@@ -52,27 +49,14 @@ public static class HttpContextExtensions
         if (realm is null)
             return false;
 
-        context.Items[Constants.RealmCurrentKey] = realm;
-        context.Items[Constants.RealmOptionsKey] = realm.Options;
+        context.Items[RealmCurrentKey] = realm;
 
         return true;
     }
 
-    public static async ValueTask<RealmOptions> GetRealmOptionsAsync(this HttpContext context)
+    public static RealmOptions GetRealmOptions(this HttpContext context)
     {
-        if (context.Items.TryGetValue(Constants.RealmOptionsKey, out var item) && item is RealmOptions options)
-        {
-            return options;
-        }
-
-        var realmPath = context.GetRealmPath()
-            ?? throw new InvalidOperationException("Realm path is not available.");
-
-        var realmService = context.RequestServices.GetRequiredService<IRealmService>();
-        options = await realmService.GetOptionsAsync(realmPath, context.RequestAborted);
-        context.Items.Add(Constants.RealmOptionsKey, options);
-
-        return options;
+        return context.GetCurrentRealm().Options;
     }
 
     public static void SetServerOrigin(this HttpContext context, string value)
