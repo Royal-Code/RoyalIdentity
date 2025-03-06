@@ -1,3 +1,4 @@
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.Components.Layout;
 using Tests.Host;
@@ -14,8 +15,10 @@ builder.Services.AddHostServices();
 var app = builder.Build();
 
 app.UseStaticFiles();
+app.UseExceptionHandler("/Exception", createScopeForErrors: true);
 
-app.UseExceptionHandler("/Error", createScopeForErrors: true);
+app.UseRealmDiscovery();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();

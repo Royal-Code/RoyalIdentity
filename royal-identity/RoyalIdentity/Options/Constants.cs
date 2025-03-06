@@ -1,23 +1,221 @@
 ﻿// Ignore Spelling: Cors
-
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.IdentityModel.Tokens;
 using Polly;
-using static RoyalIdentity.Options.OidcConstants;
+using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Options;
 
 #pragma warning disable S3218 // 
 
-internal static class Constants
+public static partial class Constants
+{
+    public static class Server
+    {
+        public const string Name = "RoyalIdentity";
+        public const string AuthenticationScheme = ServerName;
+        public const string AuthenticationName = ServerName;
+
+        public const string RealmAuthenticationNamePrefix = "Realm:";
+        public const string RealmRouteKey = "realm";
+        public const string RealmCurrentKey = "realm.current";
+
+        public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        public const string ExternalAuthenticationMethod = "external";
+
+        public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(10);
+
+        public static readonly IReadOnlyCollection<string> SupportedResponseTypes =
+        [
+            ResponseTypes.Code,
+            ResponseTypes.Token,
+            ResponseTypes.IdToken
+        ];
+    }
+
+    public static class UI
+    {
+        public static class Routes
+        {
+            public const string Login = $"/{{realm}}/{Names.Account}/{Names.Login}";
+
+            public const string SignedIn = $"/{{realm}}/{Names.Account}/{Names.SignedIn}";
+
+            public const string SelectDomain = $"/{Names.Account}/{Names.Domain}";
+
+            public const string Consent = $"/{{realm}}/{Names.Account}/{Names.Consent}";
+
+            public const string Consented = $"/{{realm}}/{Names.Account}/{Names.Consented}";
+
+            public const string Logout = $"/{{realm}}/{Names.Account}/{Names.Logout}";
+
+            public const string LoggingOut = $"/{{realm}}/{Names.Account}/{Names.LoggingOut}";
+
+            public const string LoggedOut = $"/{{realm}}/{Names.Account}/{Names.LoggedOut}";
+
+            public const string Profile = $"/{{realm}}/{Names.Account}/{Names.Profile}";
+
+            public const string Error = "/error";
+
+            private static class Names
+            {
+                public const string Account = "account";
+                public const string Login = "login";
+                public const string SignedIn = "signedin";
+                public const string Domain = "domain";
+                public const string Consent = "consent";
+                public const string Consented = "consented";
+                public const string Logout = "logout";
+                public const string LoggingOut = "logout/processing";
+                public const string LoggedOut = "logout/done";
+                public const string Profile = "profile";
+            }
+
+            public static class Params
+            {
+                public const string ReturnUrl = "returnUrl";
+
+                public const string LogoutId = "logoutId";
+
+                public const string ErrorId = "errorId";
+            }
+
+            public static string BuildLoginUrl(string realm, string returnUrl)
+                => $"/{realm}/{Names.Account}/{Names.Login}".AddQueryString(Params.ReturnUrl, returnUrl);
+
+            public static string BuildSignedInUrl(string realm, string returnUrl)
+                => $"/{realm}/{Names.Account}/{Names.SignedIn}".AddQueryString(Params.ReturnUrl, returnUrl);
+
+            public static string BuildConsentUrl(string realm, string returnUrl)
+                => $"/{realm}/{Names.Account}/{Names.Consent}".AddQueryString(Params.ReturnUrl, returnUrl);
+
+            public static string BuildConsentedUrl(string realm, string returnUrl)
+                => $"/{realm}/{Names.Account}/{Names.Consented}".AddQueryString(Params.ReturnUrl, returnUrl);
+
+            public static string BuildLogoutUrl(string realm, string logoutId)
+                => $"/{realm}/{Names.Account}/{Names.Logout}".AddQueryString(Params.LogoutId, logoutId);
+
+            public static string BuildLoggingOutUrl(string realm, string logoutId)
+                => $"/{realm}/{Names.Account}/{Names.LoggingOut}".AddQueryString(Params.LogoutId, logoutId);
+
+            public static string BuildLoggedOutUrl(string realm)
+                => $"/{realm}/{Names.Account}/{Names.LoggedOut}";
+
+            public static string BuildProfileUrl(string realm)
+                => $"/{realm}/{Names.Account}/{Names.Profile}";
+
+            public static string BuildErrorUrl(string errorId)
+                => Error.AddQueryString(Params.ErrorId, errorId);
+        }
+    }
+
+    public static class Oidc
+    {
+        public static class Routes
+        {
+            private class Names
+            {
+                public const string OidcConnect = "connect";
+                public const string Callback = $"callback";
+                public const string WellKnown = ".well-known";
+                public const string Mtls = "mtls";
+
+                public const string Authorize = "authorize";
+                public const string DiscoveryConfiguration = "openid-configuration";
+                public const string DiscoveryWebKeys = "jwks";
+                public const string Token = "token";
+                public const string Revocation = "revocation";
+                public const string UserInfo = "userinfo";
+                public const string Introspection = "introspect";
+                public const string EndSession = "endsession";
+                public const string CheckSession = "checksession";
+                public const string DeviceAuthorization = "deviceauthorization";
+            }
+
+            public const string Authorize = $"{{realm}}/{Names.OidcConnect}/{Names.Authorize}";
+            public const string AuthorizeCallback = $"{{realm}}/{Names.OidcConnect}/{Names.Authorize}/{Names.Callback}";
+            public const string DiscoveryConfiguration = $"{{realm}}/{Names.WellKnown}/{Names.DiscoveryConfiguration}";
+            public const string DiscoveryWebKeys = $"{{realm}}/{Names.WellKnown}/{Names.DiscoveryConfiguration}/{Names.DiscoveryWebKeys}";
+            public const string Token = $"{{realm}}/{Names.OidcConnect}/{Names.Token}";
+            public const string Revocation = $"{{realm}}/{Names.OidcConnect}/{Names.Revocation}";
+            public const string UserInfo = $"{{realm}}/{Names.OidcConnect}/{Names.UserInfo}";
+            public const string Introspection = $"{{realm}}/{Names.OidcConnect}/{Names.Introspection}";
+            public const string EndSession = $"{{realm}}/{Names.OidcConnect}/{Names.EndSession}";
+            public const string EndSessionCallback = $"{{realm}}/{Names.OidcConnect}/{Names.EndSession}/{Names.Callback}";
+            public const string CheckSession = $"{{realm}}/{Names.OidcConnect}/{Names.CheckSession}";
+            public const string DeviceAuthorization = $"{{realm}}/{Names.OidcConnect}/{Names.DeviceAuthorization}";
+
+            public const string MtlsToken = $"{{realm}}/{Names.OidcConnect}/{Names.Mtls}/{Names.Token}";
+            public const string MtlsRevocation = $"{{realm}}/{Names.OidcConnect}/{Names.Mtls}/{Names.Revocation}";
+            public const string MtlsIntrospection = $"{{realm}}/{Names.OidcConnect}/{Names.Mtls}/{Names.Introspection}";
+            public const string MtlsDeviceAuthorization = $"{{realm}}/{Names.OidcConnect}/{Names.Mtls}/{Names.DeviceAuthorization}";
+
+            public static readonly string[] CorsPaths =
+            [
+                DiscoveryConfiguration,
+                DiscoveryWebKeys,
+                Token,
+                UserInfo,
+                Revocation
+            ];
+
+            public static string BuildAuthorizeUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Authorize}";
+
+            public static string BuildAuthorizeCallbackUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Authorize}/{Names.Callback}";
+
+            public static string BuildDiscoveryConfigurationUrl(string realm)
+                => $"{realm}/{Names.WellKnown}/{Names.DiscoveryConfiguration}";
+
+            public static string BuildDiscoveryWebKeysUrl(string realm)
+                => $"{realm}/{Names.WellKnown}/{Names.DiscoveryConfiguration}/{Names.DiscoveryWebKeys}";
+
+            public static string BuildTokenUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Token}";
+
+            public static string BuildRevocationUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Revocation}";
+
+            public static string BuildUserInfoUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.UserInfo}";
+
+            public static string BuildIntrospectionUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Introspection}";
+
+            public static string BuildEndSessionUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.EndSession}";
+
+            public static string BuildEndSessionCallbackUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.EndSession}/{Names.Callback}";
+
+            public static string BuildCheckSessionUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.CheckSession}";
+
+            public static string BuildDeviceAuthorizationUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.DeviceAuthorization}";
+
+            public static string BuildMtlsTokenUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Mtls}/{Names.Token}";
+
+            public static string BuildMtlsRevocationUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Mtls}/{Names.Revocation}";
+
+            public static string BuildMtlsIntrospectionUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Mtls}/{Names.Introspection}";
+
+            public static string BuildMtlsDeviceAuthorizationUrl(string realm)
+                => $"{realm}/{Names.OidcConnect}/{Names.Mtls}/{Names.DeviceAuthorization}";
+        }
+    }
+}
+
+public static partial class Constants
 {
     public const string ServerName = "RoyalIdentity";
     public const string ServerAuthenticationScheme = ServerName;
     public const string ServerAuthenticationName = ServerName;
     public const string RealmAuthenticationNamePrefix = "Realm:";
     public const string RealmRouteKey = "realm";
-    [Obsolete("read options from current realm")]
-    public const string RealmOptionsKey = "realm.options";
     public const string RealmCurrentKey = "realm.current";
     public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     public const string ExternalAuthenticationMethod = "external";
@@ -25,7 +223,7 @@ internal static class Constants
 
     public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(60);
 
-    public static readonly HashSet<string> SupportedResponseTypes =
+    public static readonly IReadOnlyCollection<string> SupportedResponseTypes =
     [
         ResponseTypes.Code,
         ResponseTypes.Token,
@@ -130,8 +328,10 @@ internal static class Constants
             }
         };
 
+    [Obsolete("Use Constants.UI.Routes")]
     public static class UIConstants
     {
+        [Obsolete("Use Constants.UI.Routes")]
         public static class DefaultRoutePathParams
         {
             public const string Error = "errorId";
@@ -142,6 +342,7 @@ internal static class Constants
             public const string UserCode = "userCode";
         }
 
+        [Obsolete("Use Constants.UI.Routes")]
         public static class DefaultRoutePaths
         {
             public const string Login = "/account/login";
@@ -156,6 +357,7 @@ internal static class Constants
         }
     }
 
+    [Obsolete("Use Constants.Oidc.Routes")]
     public static class ProtocolRoutePaths
     {
         public const string ConnectPathPrefix = "connect";
@@ -264,7 +466,7 @@ internal static class Constants
         ];
     }
 
-    
+
     public static class AuthorizationParamsStore
     {
         [Redesign("Rename")]
@@ -1042,7 +1244,7 @@ public static class ServerConstants
     public const string DefaultCookieName = $"{CookiePrefix}user";
     public const string DefaultCheckSessionCookieName = $"{CookiePrefix}session";
     public const string AccessTokenAudience = "{0}resources";
-    
+
     public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(1);
 
     public const string JwtRequestClientKey = "roid.jwtrequesturi.client";

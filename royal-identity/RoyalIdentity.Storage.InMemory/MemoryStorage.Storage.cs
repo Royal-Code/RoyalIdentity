@@ -29,6 +29,17 @@ public partial class MemoryStorage : IStorage
         this.accessor = accessor;
     }
 
+    public RealmMemoryStore GetRealmMemoryStore(Realm realm)
+    {
+        if (realmMemoryStore.TryGetValue(realm.Id, out var store))
+            return store;
+        throw RealmNotFound(realm);
+    }
+
+    public RealmMemoryStore GetServerRealmStore() => GetRealmMemoryStore(ServerRealm);
+
+    public RealmMemoryStore GetDemoRealmStore() => GetRealmMemoryStore(DemoRealm);
+
     IRealmStore IStorage.Realms => new RealmStore(Realms);
 
     IUserConsentStore IStorage.UserConsents => new UserConsentStore(Consents);

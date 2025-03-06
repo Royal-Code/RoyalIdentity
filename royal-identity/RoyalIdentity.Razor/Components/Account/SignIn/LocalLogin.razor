@@ -4,6 +4,7 @@
 @using RoyalIdentity.Contracts.Storage
 @using RoyalIdentity.Events
 @using RoyalIdentity.Extensions;
+@using RoyalIdentity.Models
 @using RoyalIdentity.Users
 @using RoyalIdentity.Users.Contexts
 
@@ -78,16 +79,23 @@
 
     public async Task LoginUser()
     {
+        Realm? realm;
+
         var context = await HttpContext.GetAuthorizationContextAsync(Input.ReturnUrl);
-        if (context is null || Input.ReturnUrl is null)
+        if (context is null)
         {
-            Logger.LogError("No authorization context found for return URL: {ReturnUrl}", Input.ReturnUrl);
-            NavigationManager.NavigateTo(Routes.SelectDomain);
-            return;
+            if (!HttpContext.TryGetCurrentRealm(out realm))
+            {
+                Logger.LogError("No authorization context found for return URL: {ReturnUrl}", Input.ReturnUrl);
+                NavigationManager.NavigateTo(Routes.SelectDomain);
+                return;
+            }
         }
-
-        var realm = context.Client.Realm;
-
+        else
+        {
+            realm = context.Client.Realm;
+        }
+        
         var result = await SignInManager.AuthenticateUserAsync(realm, Input.Username!, Input.Password!, CancellationToken.None);
 
         if (!result.Success)
@@ -118,12 +126,11 @@
                 // The client is native, so this change in how to
                 // return the response is for better UX for the end user.
 
-
                 NavigationManager.NavigateTo(Routes.BuildSignedInUrl(realm.Path, Input.ReturnUrl));
             }
 
             // we can trust in the redirectUri since GetAuthorizationContextAsync returned non-null
-            NavigationManager.NavigateTo(Input.ReturnUrl);
+            NavigationManager.NavigateTo(Input.ReturnUrl!);
         }
 
         if (Input.ReturnUrl.IsMissing())

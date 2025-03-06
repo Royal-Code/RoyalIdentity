@@ -28,7 +28,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -56,7 +56,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
         var client = factory.CreateClient(options);
         await client.LoginAliceAsync();
 
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -87,7 +87,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize";
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
         var response = await client.GetAsync(path);
@@ -101,7 +101,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var storage = factory.Services.GetService<MemoryStorage>()!;
-        storage.Clients.TryAdd("client_with_secret", new RoyalIdentity.Models.Client()
+        storage.GetDemoRealmStore().Clients.TryAdd("client_with_secret", new RoyalIdentity.Models.Client()
         {
             Id = "client_with_secret",
             Name = "Client with Secret",
@@ -119,7 +119,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "client_with_secret")
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
             .AddQueryString("response_type", "code")
@@ -137,7 +137,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
             .AddQueryString("response_type", "code")
@@ -155,7 +155,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -176,7 +176,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -197,7 +197,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -218,7 +218,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -239,7 +239,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -260,7 +260,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -281,7 +281,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -306,7 +306,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("scope", "openid profile")
@@ -331,7 +331,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -356,7 +356,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")

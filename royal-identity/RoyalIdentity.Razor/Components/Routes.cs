@@ -49,22 +49,22 @@ public static class Routes
         public const string ErrorId = "errorId";
     }
 
-    public static string BuildLoginUrl(string realm, string returnUrl)
+    public static string BuildLoginUrl(string realm, string? returnUrl)
         => $"/{realm}/{Names.Account}/{Names.Login}".AddQueryString(Params.ReturnUrl, returnUrl);
 
-    public static string BuildSignedInUrl(string realm, string returnUrl)
+    public static string BuildSignedInUrl(string realm, string? returnUrl)
         => $"/{realm}/{Names.Account}/{Names.SignedIn}".AddQueryString(Params.ReturnUrl, returnUrl);
 
-    public static string BuildConsentUrl(string realm, string returnUrl)
+    public static string BuildConsentUrl(string realm, string? returnUrl)
         => $"/{realm}/{Names.Account}/{Names.Consent}".AddQueryString(Params.ReturnUrl, returnUrl);
 
-    public static string BuildConsentedUrl(string realm, string returnUrl)
+    public static string BuildConsentedUrl(string realm, string? returnUrl)
         => $"/{realm}/{Names.Account}/{Names.Consented}".AddQueryString(Params.ReturnUrl, returnUrl);
 
-    public static string BuildLogoutUrl(string realm, string logoutId)
+    public static string BuildLogoutUrl(string realm, string? logoutId)
         => $"/{realm}/{Names.Account}/{Names.Logout}".AddQueryString(Params.LogoutId, logoutId);
 
-    public static string BuildLoggingOutUrl(string realm, string logoutId)
+    public static string BuildLoggingOutUrl(string realm, string? logoutId)
         => $"/{realm}/{Names.Account}/{Names.LoggingOut}".AddQueryString(Params.LogoutId, logoutId);
 
     public static string BuildLoggedOutUrl(string realm)

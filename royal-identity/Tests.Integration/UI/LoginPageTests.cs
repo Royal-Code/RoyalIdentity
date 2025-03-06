@@ -21,7 +21,7 @@ public class LoginPageTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
 
         // will redirect to login page
-        var loginPage = await client.GetAsync("/test/protected-resource");
+        var loginPage = await client.GetAsync("/demo/test/protected-resource");
         var content = await loginPage.Content.ReadAsStringAsync();
 
         var doc = new HtmlDocument();
@@ -55,7 +55,7 @@ public class LoginPageTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
 
         // will redirect to login page
-        var loginPage = await client.GetAsync("/test/protected-resource");
+        var loginPage = await client.GetAsync("/demo/test/protected-resource");
         var content = await loginPage.Content.ReadAsStringAsync();
 
         var doc = new HtmlDocument();

@@ -17,9 +17,10 @@ public class DiscoveryTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.GetAsync("/.well-known/openid-configuration");
+        var response = await client.GetAsync(url);
 
         // Assert
         Assert.NotNull(response);

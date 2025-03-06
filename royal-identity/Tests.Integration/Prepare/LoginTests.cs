@@ -19,7 +19,7 @@ public class LoginTests : IClassFixture<AppFactory>
 
         // Act
         await client.LoginAliceAsync();
-        var response = await client.GetAsync("test/account/profile");
+        var response = await client.GetAsync("demo/test/account/profile");
 
         // Assert
         Assert.NotNull(response);

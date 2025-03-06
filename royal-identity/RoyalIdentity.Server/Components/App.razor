@@ -30,24 +30,8 @@
 </html>
 
 @code {
-    private static readonly PathString pathString = new("/*/account");
-
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
     private IComponentRenderMode? RenderModeForPage => HttpContext.IsAccountPages() ? null : InteractiveServer;
-
-    // private bool IsAccountPages()
-    // {
-    //     if (HttpContext.Request.Path.Value is string path &&
-    //         HttpContext.Request.RouteValues.TryGetValue("realm", out var realmValue) && 
-    //         realmValue is string realm &&
-    //         path.Length > realm.Length + 2 &&
-    //         path.Substring(realm.Length + 2).StartsWith("account/", StringComparison.OrdinalIgnoreCase))
-    //     {
-    //         return true;
-    //     }
-
-    //     return false;
-    // }
 }

@@ -7,7 +7,7 @@ namespace Tests.Integration.Prepare;
 
 internal static class LoginExtensions
 {
-    public static async Task LoginAsync(this HttpClient client, string username, string password)
+    public static async Task LoginAsync(this HttpClient client, string username, string password, string reaml = "demo")
     {
         var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
@@ -15,7 +15,7 @@ internal static class LoginExtensions
             ["password"] = password
         });
 
-        var response = await client.PostAsync("test/account/login", content);
+        var response = await client.PostAsync($"{reaml}/test/account/login", content);
         response.EnsureSuccessStatusCode();
     }
 
@@ -29,9 +29,9 @@ internal static class LoginExtensions
         await LoginAsync(client, "bob", "bob");
     }
 
-    public static async Task<HttpResponseMessage> LogoutAsync(this HttpClient client)
+    public static async Task<HttpResponseMessage> LogoutAsync(this HttpClient client, string reaml = "demo")
     {
-        var response = await client.GetAsync("test/account/logout");
+        var response = await client.GetAsync($"{reaml}/test/account/logout");
         response.EnsureSuccessStatusCode();
         return response;
     }
@@ -39,9 +39,12 @@ internal static class LoginExtensions
     public static async Task<TokenEndpointParameters> GetTokensAsync(
         this HttpClient client,
         string clientId = "demo_client",
-        string scope = "openid profile offline_access")
+        string scope = "openid profile offline_access",
+        string reaml = "demo")
     {
-        var path = "test/account/token".AddQueryString("client_id", clientId).AddQueryString("scope", scope);
+        var path = $"{reaml}/test/account/token"
+            .AddQueryString("client_id", clientId)
+            .AddQueryString("scope", scope);
 
         var response = await client.GetAsync(path);
         response.EnsureSuccessStatusCode();
@@ -54,9 +57,10 @@ internal static class LoginExtensions
         this HttpClient client,
         string clientId = "demo_client",
         string scope = "openid profile offline_access",
-        string redirectUri = "http://localhost:5000/callback")
+        string redirectUri = "http://localhost:5000/callback",
+        string reaml = "demo")
     {
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(reaml)
             .AddQueryString("client_id", clientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")

@@ -40,6 +40,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "adrs", "adrs", "{071A853D-594E-486C-985F-4C433A1E2DB6}"
 	ProjectSection(SolutionItems) = preProject
 		..\adrs\ADR-001.md = ..\adrs\ADR-001.md
+		ADR-002.md = ADR-002.md
+		ADR-003.md = ADR-003.md
+		ADR-004.md = ADR-004.md
+		ADR-005.md = ADR-005.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests.Integration", "Tests.Integration\Tests.Integration.csproj", "{79B3F4EE-4C57-421B-92CC-5BF86473C9D1}"

@@ -20,9 +20,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var access_token = tokens.AccessToken;
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -45,9 +46,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var refresh_token = tokens.RefreshToken!;
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -71,9 +73,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var access_token = tokens.AccessToken;
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -96,9 +99,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var refresh_token = tokens.RefreshToken!;
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -121,9 +125,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var access_token = tokens.AccessToken;
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -146,9 +151,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var refresh_token = tokens.RefreshToken!;
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -169,9 +175,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         // Arrange
         var client = factory.CreateClient();
         var access_token = "AAA";
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -191,9 +198,10 @@ public class RevocationTests : IClassFixture<AppFactory>
         // Arrange
         var client = factory.CreateClient();
         var refresh_token = "AAA";
+        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/revocation",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {

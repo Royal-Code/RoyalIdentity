@@ -10,7 +10,7 @@ public partial class MemoryStorage
 {
     private static readonly ServerOptions serverOptions = new();
 
-    private static readonly Realm serverRealm = new(
+    public static Realm ServerRealm { get; } = new(
         "server",
         "royalidentity.server",
         "server",
@@ -18,7 +18,7 @@ public partial class MemoryStorage
         true, 
         new RealmOptions(serverOptions));
 
-    private static readonly Realm accountRealm = new(
+    public static Realm AccountRealm { get; } = new(
         "account",
         "royalidentity.account",
         "account",
@@ -26,7 +26,7 @@ public partial class MemoryStorage
         true,
         new RealmOptions(serverOptions));
 
-    private static readonly Realm adminRealm = new(
+    public static Realm AdminRealm { get; } = new(
         "admin",
         "royalidentity.admin",
         "admin",
@@ -34,7 +34,7 @@ public partial class MemoryStorage
         true,
         new RealmOptions(serverOptions));
 
-    private static readonly Realm demoRealm = new(
+    public static Realm DemoRealm { get; } = new(
         "demo_realm",
         "demo.com",
         "demo",
@@ -46,49 +46,10 @@ public partial class MemoryStorage
 
     public ConcurrentDictionary<string, Realm> Realms { get; } = new()
     {
-        ["server"] = serverRealm,
-        ["account"] = accountRealm,
-        ["admin"] = adminRealm,
-        ["demo_realm"] = demoRealm
-    };
-
-    [Obsolete("Use Realms instead")]
-    public ConcurrentDictionary<string, Client> Clients { get; } = new()
-    {
-        ["server_admin"] = new Client
-        {
-            Realm = serverRealm,
-            Id = "server_admin",
-            Name = "Administrative server portal",
-            RequireClientSecret = false,
-            AllowOfflineAccess = true,
-            AllowedScopes = { "openid", "profile", },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5200/**", "https://localhost:7200/**" }
-        },
-        ["demo_client"] = new Client
-        {
-            Realm = demoRealm,
-            Id = "demo_client",
-            Name = "Demo Client",
-            RequireClientSecret = false,
-            AllowOfflineAccess = true,
-            AllowedScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" }
-        },
-        ["demo_consent_client"] = new Client
-        {
-            Realm = demoRealm,
-            Id = "demo_consent_client",
-            Name = "Demo Consent Client",
-            RequireClientSecret = false,
-            AllowOfflineAccess = true,
-            AllowedScopes = { "openid", "profile", "email", "api", "api:read", "api:write"  },
-            AllowedResponseTypes = { "code" },
-            RequireConsent = true,
-            RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" }
-        }
+        ["server"] = ServerRealm,
+        ["account"] = AccountRealm,
+        ["admin"] = AdminRealm,
+        ["demo_realm"] = DemoRealm
     };
 
     public ConcurrentDictionary<string, AccessToken> AccessTokens { get; } = new();

@@ -30,7 +30,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
         var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
 
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -78,8 +78,10 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
                     ["code_verifier"] = codeVerifier
                 });
 
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
         // Act 2
-        var tokenResponse = await client.PostAsync("/connect/token", tokenContent);
+        var tokenResponse = await client.PostAsync(tokenUrl, tokenContent);
         var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
 
         // Assert 2
@@ -109,7 +111,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
         var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
 
-        var path = "/connect/authorize"
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("client_id", "demo_consent_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -192,8 +194,10 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
                     ["code_verifier"] = codeVerifier
                 });
 
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
         // Act 3
-        var tokenResponse = await client.PostAsync("/connect/token", tokenContent);
+        var tokenResponse = await client.PostAsync(tokenUrl, tokenContent);
         var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
 
         // Assert 3

@@ -17,9 +17,10 @@ public class JwkTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildDiscoveryWebKeysUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.GetAsync("/.well-known/openid-configuration/jwks");
+        var response = await client.GetAsync(url);
 
         // Assert
         Assert.NotNull(response);

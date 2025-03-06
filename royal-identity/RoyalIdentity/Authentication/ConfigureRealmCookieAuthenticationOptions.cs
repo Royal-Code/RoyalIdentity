@@ -45,7 +45,7 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         options.ExpireTimeSpan = authOptions.CookieLifetime;
         options.SlidingExpiration = authOptions.CookieSlidingExpiration;
 
-        if (realmPath.IsPresent())
+        if (realmPath.IsMissing())
         {
             options.LoginPath = interactionOptions.LoginPath;
             options.LogoutPath = interactionOptions.LogoutPath;

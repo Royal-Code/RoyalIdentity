@@ -3,7 +3,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Utils;
 using System.Net;
 using System.Net.Http.Json;
@@ -27,8 +26,9 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidCode_Must_GenerateToken()
     {
         // Arrange
-        var codeStore = factory.Services.GetRequiredService<IAuthorizationCodeStore>();
-        var resourcesStore = factory.Services.GetRequiredService<IResourceStore>();
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var codeStore = storage.AuthorizationCodes;
+        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
@@ -43,9 +43,10 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         await codeStore.StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/token", 
+        var response = await client.PostAsync(url, 
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -72,8 +73,9 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidCode_WithPkce_Must_GenerateToken()
     {
         // Arrange
-        var codeStore = factory.Services.GetRequiredService<IAuthorizationCodeStore>();
-        var resourcesStore = factory.Services.GetRequiredService<IResourceStore>();
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var codeStore = storage.AuthorizationCodes;
+        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var codeVerifier = CryptoRandom.CreateUniqueId();
@@ -95,9 +97,10 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         await codeStore.StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -126,8 +129,9 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenNotValidCode_WithPkce_Must_BadRequest()
     {
         // Arrange
-        var codeStore = factory.Services.GetRequiredService<IAuthorizationCodeStore>();
-        var resourcesStore = factory.Services.GetRequiredService<IResourceStore>();
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var codeStore = storage.AuthorizationCodes;
+        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var codeVerifier = CryptoRandom.CreateUniqueId();
@@ -149,9 +153,10 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         await codeStore.StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -170,8 +175,9 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenNotValidCode_Must_BadRequest()
     {
         // Arrange
-        var codeStore = factory.Services.GetRequiredService<IAuthorizationCodeStore>();
-        var resourcesStore = factory.Services.GetRequiredService<IResourceStore>();
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var codeStore = storage.AuthorizationCodes;
+        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
 
@@ -187,9 +193,10 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         await codeStore.StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -207,15 +214,17 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidCode_WithClientSecret_Must_GenerateToken()
     {
         // Arrange
-        var codeStore = factory.Services.GetRequiredService<IAuthorizationCodeStore>();
-        var resourcesStore = factory.Services.GetRequiredService<IResourceStore>();
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var codeStore = storage.AuthorizationCodes;
+        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var clientId = "code_grant_type_client_1";
         var clientSecret = CryptoRandom.CreateUniqueId();
         var secretHash = clientSecret.Sha512();
-        storage.Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        memoryStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
         {
+            Realm = MemoryStorage.DemoRealm,
             Id = clientId,
             Name = "Client with Secret",
             RequireClientSecret = true,
@@ -240,9 +249,10 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         await codeStore.StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -271,15 +281,17 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidCode_AndNoSecret_WithClientSecret_Must_BadRequest()
     {
         // Arrange
-        var codeStore = factory.Services.GetRequiredService<IAuthorizationCodeStore>();
-        var resourcesStore = factory.Services.GetRequiredService<IResourceStore>();
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var codeStore = storage.AuthorizationCodes;
+        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var clientId = "code_grant_type_client_2";
         var clientSecret = CryptoRandom.CreateUniqueId();
         var secretHash = clientSecret.Sha512();
-        storage.Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        memoryStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
         {
+            Realm = MemoryStorage.DemoRealm,
             Id = clientId,
             Name = "Client with Secret",
             RequireClientSecret = true,
@@ -304,9 +316,10 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         await codeStore.StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {

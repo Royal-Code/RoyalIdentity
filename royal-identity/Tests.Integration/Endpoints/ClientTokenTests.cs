@@ -25,8 +25,9 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         var clientId = "client_credentials_client_1";
         var clientSecret = "client_credentials_client_1_secret";
         var secretHash = clientSecret.Sha512();
-        storage.Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
         {
+            Realm = MemoryStorage.DemoRealm,
             Id = clientId,
             Name = "Demo Client",
             RequireClientSecret = true,
@@ -39,9 +40,10 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         });
 
         var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
 
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {

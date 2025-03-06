@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Utils;
 using System.Net;
 using System.Net.Http.Json;
@@ -24,8 +23,9 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
 
         var clientId = "refresh_grant_type_client_3";
-        storage.Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
         {
+            Realm = MemoryStorage.DemoRealm,
             Id = clientId,
             Name = "Demo Client",
             RequireClientSecret = false,
@@ -41,8 +41,10 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -73,8 +75,10 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync();
         var refreshToken = tokens.RefreshToken!;
 
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -102,8 +106,9 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var clientId = "refresh_grant_type_client_1";
         var clientSecret = CryptoRandom.CreateUniqueId();
         var secretHash = clientSecret.Sha512();
-        storage.Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
         {
+            Realm = MemoryStorage.DemoRealm,
             Id = clientId,
             Name = "Client with Secret",
             RequireClientSecret = true,
@@ -121,8 +126,10 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {
@@ -147,8 +154,9 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var clientId = "refresh_grant_type_client_2";
         var clientSecret = CryptoRandom.CreateUniqueId();
         var secretHash = clientSecret.Sha512();
-        storage.Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
         {
+            Realm = MemoryStorage.DemoRealm,
             Id = clientId,
             Name = "Client with Secret",
             RequireClientSecret = true,
@@ -166,8 +174,10 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
         // Act
-        var response = await client.PostAsync("/connect/token",
+        var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
                 {

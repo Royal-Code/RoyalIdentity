@@ -2,7 +2,6 @@
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Storage.InMemory;
 using System.Net;
 using System.Web;
 using Tests.Integration.Prepare;
@@ -33,7 +32,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();
 
         // Act
-        var path = "/connect/endsession"
+        var path = Oidc.Routes.BuildEndSessionUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("id_token_hint", idToken);
 
         var response = await client.GetAsync(path);
@@ -74,8 +73,10 @@ public class EndSessionTests : IClassFixture<AppFactory>
 
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();
 
+        var url = Oidc.Routes.BuildEndSessionUrl(MemoryStorage.DemoRealm.Path);
+
         // Act
-        var response = await client.GetAsync("/connect/endsession");
+        var response = await client.GetAsync(url);
 
         // Assert
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
@@ -108,8 +109,9 @@ public class EndSessionTests : IClassFixture<AppFactory>
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
 
         var clientId = "endsession_client_1";
-        storage.Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
         {
+            Realm = MemoryStorage.DemoRealm,
             Id = clientId,
             Name = "Client Allow Logout Without User Confirmation",
             AllowLogoutWithoutUserConfirmation = true,
@@ -134,7 +136,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();
 
         // Act
-        var path = "/connect/endsession"
+        var path = Oidc.Routes.BuildEndSessionUrl(MemoryStorage.DemoRealm.Path)
             .AddQueryString("id_token_hint", idToken)
             .AddQueryString("client_id", clientId)
             .AddQueryString("post_logout_redirect_uri", "https://localhost:5001/signout-callback");

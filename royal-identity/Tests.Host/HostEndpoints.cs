@@ -3,7 +3,6 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Users;
-using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Models;
@@ -16,14 +15,16 @@ public static class HostEndpoints
 {
     public static void MapTestHostEndpoints(this WebApplication app)
     {
-        app.MapPost("test/account/login/{realm}", async (HttpContext context, ISignInManager signInManager) =>
+        app.MapPost("{realm}/test/account/login", async (HttpContext context,
+            ISignInManager signInManager, 
+            string realm) =>
         {
             var username = context.Request.Form["username"].FirstOrDefault() ?? string.Empty;
             var password = context.Request.Form["password"].FirstOrDefault() ?? string.Empty;
 
-            var realm = context.GetCurrentRealm();
+            var currentRealm = context.GetCurrentRealm();
 
-            var result = await signInManager.AuthenticateUserAsync(realm, username, password, context.RequestAborted);
+            var result = await signInManager.AuthenticateUserAsync(currentRealm, username, password, context.RequestAborted);
 
             if (result.Success)
             {
@@ -40,13 +41,20 @@ public static class HostEndpoints
             }
         });
 
-        app.MapGet("test/account/profile", async (HttpContext context, IUserStore userManager) =>
+        app.MapGet("{realm}/test/account/profile", async (HttpContext context, 
+            IStorage storage, 
+            string realm) =>
         {
-            var user = await userManager.GetUserAsync(context.User.GetSubjectId(), context.RequestAborted);
+            var currentRealm = context.GetCurrentRealm();
+            var users = storage.GetUserStore(currentRealm);
+            var user = await users.GetUserAsync(context.User.GetSubjectId(), context.RequestAborted);
             return Results.Ok(user);
         }).RequireAuthorization();
 
-        app.MapGet("test/account/logout", async (HttpContext context, IMessageStore messageStore, ISignOutManager signOutManager) =>
+        app.MapGet("{realm}/test/account/logout", async (HttpContext context,
+            IMessageStore messageStore,
+            ISignOutManager signOutManager,
+            string realm) =>
         {
             var logoutId = context.Request.Query["logoutId"].FirstOrDefault()
                            ?? await signOutManager.CreateLogoutIdAsync(context.RequestAborted);
@@ -78,9 +86,13 @@ public static class HostEndpoints
             return Results.Ok();
         });
 
-        app.MapGet("test/account/token", async (HttpContext context,
-            IClientStore clients, IResourceStore resources, ITokenFactory tokenFactory) =>
+        app.MapGet("{realm}/test/account/token", async (HttpContext context,
+            IStorage storage,
+            ITokenFactory tokenFactory,
+            string realm) =>
         {
+            var currentRealm = context.GetCurrentRealm();
+
             var user = context.User;
             if (user.Identity?.IsAuthenticated != true)
             {
@@ -93,6 +105,7 @@ public static class HostEndpoints
                 return Results.BadRequest("client_id is required");
             }
 
+            var clients = storage.GetClientStore(currentRealm);
             var client = await clients.FindEnabledClientByIdAsync(clientId, context.RequestAborted);
             if (client is null)
             {
@@ -105,6 +118,7 @@ public static class HostEndpoints
                 return Results.BadRequest("scope is required");
             }
 
+            var resources = storage.GetResourceStore(currentRealm);
             var requestedResources = await resources.FindResourcesByScopeAsync(scope.Split(' '), true, context.RequestAborted);
             if (requestedResources is null)
             {
@@ -162,7 +176,7 @@ public static class HostEndpoints
             });
         });
 
-        app.MapGet("test/protected-resource", async (HttpContext context) =>
+        app.MapGet("{realm}/test/protected-resource", async (HttpContext context) =>
         {
             await Task.Delay(10, context.RequestAborted);
 

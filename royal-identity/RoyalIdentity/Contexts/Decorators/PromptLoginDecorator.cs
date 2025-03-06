@@ -29,8 +29,8 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
     {
         context.ClientParameters.AssertHasClient();
 
-        if (context.PromptModes.Contains(OidcConstants.PromptModes.Login) ||
-            context.PromptModes.Contains(OidcConstants.PromptModes.SelectAccount))
+        if (context.PromptModes.Contains(PromptModes.Login) ||
+            context.PromptModes.Contains(PromptModes.SelectAccount))
         {
             logger.LogInformation(
                 "Showing login: request contains prompt={PromptModes}", 
@@ -38,7 +38,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
 
             // remove prompt so when we redirect back in from login page
             // we won't think we need to force a prompt again
-            context.Raw.Remove(OidcConstants.AuthorizeRequest.Prompt);
+            context.Raw.Remove(AuthorizeRequest.Prompt);
 
             context.Response = new InteractionResponse(context)
             {
