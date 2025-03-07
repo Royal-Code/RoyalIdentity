@@ -1,5 +1,4 @@
-﻿using FluentAssertions;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Utils;
 using System.Security.Cryptography;
@@ -31,21 +30,20 @@ public class KeyParametersTests
         var rsaSecurityKey = keyParameters.CreateRsaSecurityKey();
 
         // Assert
-        rsaSecurityKey.Should().NotBeNull();
-        rsaSecurityKey.CanComputeJwkThumbprint().Should().BeTrue();
-        rsaSecurityKey.PrivateKeyStatus.Should().Be(PrivateKeyStatus.Exists);
-        rsaSecurityKey.Rsa.Should().NotBeNull();
+        Assert.NotNull(rsaSecurityKey);
+        Assert.True(rsaSecurityKey.CanComputeJwkThumbprint());
+        Assert.Equal(PrivateKeyStatus.Exists, rsaSecurityKey.PrivateKeyStatus);
+        Assert.NotNull(rsaSecurityKey.Rsa);
 
         var newParameters = rsaSecurityKey.Rsa.ExportParameters(true);
-        newParameters.D.Should().BeEquivalentTo(rsaParameters.D);
-        newParameters.DP.Should().BeEquivalentTo(rsaParameters.DP);
-        newParameters.DQ.Should().BeEquivalentTo(rsaParameters.DQ);
-        newParameters.Exponent.Should().BeEquivalentTo(rsaParameters.Exponent);
-        newParameters.InverseQ.Should().BeEquivalentTo(rsaParameters.InverseQ);
-        newParameters.Modulus.Should().BeEquivalentTo(rsaParameters.Modulus);
-        newParameters.P.Should().BeEquivalentTo(rsaParameters.P);
-        newParameters.Q.Should().BeEquivalentTo(rsaParameters.Q);
-
+        Assert.Equal(rsaParameters.D, newParameters.D);
+        Assert.Equal(rsaParameters.DP, newParameters.DP);
+        Assert.Equal(rsaParameters.DQ, newParameters.DQ);
+        Assert.Equal(rsaParameters.Exponent, newParameters.Exponent);
+        Assert.Equal(rsaParameters.InverseQ, newParameters.InverseQ);
+        Assert.Equal(rsaParameters.Modulus, newParameters.Modulus);
+        Assert.Equal(rsaParameters.P, newParameters.P);
+        Assert.Equal(rsaParameters.Q, newParameters.Q);
     }
 
     private static string SerializeToXml(RSAParameters rsaParameters)
@@ -55,7 +53,6 @@ public class KeyParametersTests
         xmlSerializer.Serialize(stringWriter, rsaParameters);
         return stringWriter.ToString();
     }
-
 
     [Fact]
     public void CreateECDsaSecurityKey_ShouldCreateKeyCorrectly()
@@ -76,11 +73,10 @@ public class KeyParametersTests
         var ecdsaSecurityKey = keyParameters.CreateECDsaSecurityKey();
 
         // Assert
-        ecdsaSecurityKey.Should().NotBeNull();
-        ecdsaSecurityKey.CanComputeJwkThumbprint().Should().BeTrue();
-        ecdsaSecurityKey.PrivateKeyStatus.Should().NotBe(PrivateKeyStatus.DoesNotExist);
-
-        ecdsaSecurityKey.ECDsa.Should().NotBeNull();
+        Assert.NotNull(ecdsaSecurityKey);
+        Assert.True(ecdsaSecurityKey.CanComputeJwkThumbprint());
+        Assert.NotEqual(PrivateKeyStatus.DoesNotExist, ecdsaSecurityKey.PrivateKeyStatus);
+        Assert.NotNull(ecdsaSecurityKey.ECDsa);
     }
 
     [Fact]
@@ -103,8 +99,8 @@ public class KeyParametersTests
         var symmetricSecurityKey = keyParameters.CreateSymmetricSecurityKey();
 
         // Assert
-        symmetricSecurityKey.Should().NotBeNull();
-        symmetricSecurityKey.Key.Should().BeEquivalentTo(keyBytes);
+        Assert.NotNull(symmetricSecurityKey);
+        Assert.Equal(keyBytes, symmetricSecurityKey.Key);
     }
 
     [Fact]
@@ -132,7 +128,7 @@ public class KeyParametersTests
         bool isVerified = verificationKey.Rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
         // Assert that the signature is verified correctly
-        isVerified.Should().BeTrue();
+        Assert.True(isVerified);
     }
 
     [Fact]
@@ -157,7 +153,7 @@ public class KeyParametersTests
         bool isVerified = verificationKey.ECDsa.VerifyData(data, signature, HashAlgorithmName.SHA256);
 
         // Assert that the signature is verified correctly
-        isVerified.Should().BeTrue();
+        Assert.True(isVerified);
     }
 
     [Fact]
@@ -184,6 +180,6 @@ public class KeyParametersTests
         byte[] verificationSignature = hmacVerification.ComputeHash(data);
 
         // Assert that the signatures match
-        signature.Should().BeEquivalentTo(verificationSignature);
+        Assert.Equal(signature, verificationSignature);
     }
 }

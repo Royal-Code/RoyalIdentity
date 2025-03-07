@@ -37,11 +37,11 @@ public abstract class IdentityUser
     public abstract ValueTask<ValidateCredentialsResult> AuthenticateAndStartSessionAsync(string password, CancellationToken ct = default);
 
     /// <summary>
-    /// Verifies if the user is blocked.
+    /// Verifies if the user is locked out.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>True if the user is blocked, otherwise false.</returns>
-    public abstract ValueTask<bool> IsBlockedAsync(CancellationToken ct = default);
+    /// <returns>True if the user is locked out, otherwise false.</returns>
+    public abstract ValueTask<bool> IsLockoutAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Creates a new principal for the user.

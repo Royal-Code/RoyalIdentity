@@ -2,7 +2,6 @@ using System.Security.Claims;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Users.Defaults;
 
@@ -13,19 +12,22 @@ public sealed class DefaultIdentityUser : IdentityUser
     private readonly IUserSessionStore sessionStore;
     private readonly IUserDetailsStore userStore;
     private readonly IPasswordProtector passwordProtector;
+    private readonly TimeProvider clock;
 
     public DefaultIdentityUser(
         UserDetails details,
         AccountOptions options,
         IUserSessionStore sessionStore,
         IUserDetailsStore userStore,
-        IPasswordProtector passwordProtector)
+        IPasswordProtector passwordProtector,
+        TimeProvider clock)
     {
         this.details = details;
         this.options = options;
         this.sessionStore = sessionStore;
         this.userStore = userStore;
         this.passwordProtector = passwordProtector;
+        this.clock = clock;
     }
 
     public override string UserName => details.Username;
@@ -44,6 +46,7 @@ public sealed class DefaultIdentityUser : IdentityUser
         if (!isValid)
         {
             details.LoginAttemptsWithPasswordErrors++;
+            details.LastPasswordError = clock.GetUtcNow();
             await userStore.SaveUserDetailsAsync(details, ct);
             return false;
         }
@@ -51,6 +54,7 @@ public sealed class DefaultIdentityUser : IdentityUser
         if (details.LoginAttemptsWithPasswordErrors is not 0)
         {
             details.LoginAttemptsWithPasswordErrors = 0;
+            details.LastPasswordError = null;
             await userStore.SaveUserDetailsAsync(details, ct);
         }
 
@@ -60,10 +64,24 @@ public sealed class DefaultIdentityUser : IdentityUser
         return session;
     }
 
-    public override ValueTask<bool> IsBlockedAsync(CancellationToken ct = default)
+    public override ValueTask<bool> IsLockoutAsync(CancellationToken ct = default)
     {
-        var isBlock = details.LoginAttemptsWithPasswordErrors >= options.UserBlockingAttempts;
-        return new ValueTask<bool>(isBlock);
+        if (options.PasswordOptions.MaxFailedAccessAttempts is 0)
+            return new(false);
+
+        var isLockout = details.LoginAttemptsWithPasswordErrors >= options.PasswordOptions.MaxFailedAccessAttempts;
+
+        if (isLockout && 
+            options.PasswordOptions.AccountLockoutDurationMinutes is not 0 && 
+            details.LastPasswordError is not null)
+        {
+            var now = clock.GetUtcNow();
+            var lockoutDuration = now.Subtract(details.LastPasswordError.Value).TotalMinutes;
+
+            isLockout = lockoutDuration <= options.PasswordOptions.AccountLockoutDurationMinutes;
+        }
+
+        return new(isLockout);
     }
 
     public override async ValueTask<ClaimsPrincipal> CreatePrincipalAsync(

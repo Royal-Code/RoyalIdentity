@@ -21,7 +21,7 @@ Active development happens on the main branch.
 
 ## How to build
 
-* [Install](https://www.microsoft.com/net/download/core#/current) the latest .NET 9 SDK
+* [Install](https://www.microsoft.com/net/download/core#/current) the latest .NET SDK
 * Install Git
 * Clone this repo
 * Open RoyalIdentity Solution, build and run.
@@ -38,4 +38,4 @@ Royal Identity is built using the following great open source projects and free 
 
 * [ASP.NET Core](https://github.com/dotnet/aspnetcore)
 * [XUnit](https://xunit.github.io/)
-* [Fluent Assertions](http://www.fluentassertions.com/)
+* [HtmlAgilityPack](https://html-agility-pack.net/)

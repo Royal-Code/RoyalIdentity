@@ -97,7 +97,7 @@ public class DefaultSignInManager : ISignInManager
             return new CredentialsValidationResult(Inactive, accountOptions.InactiveUserErrorMessage);
         }
 
-        if (await user.IsBlockedAsync(ct))
+        if (await user.IsLockoutAsync(ct))
         {
             return new CredentialsValidationResult(Blocked, accountOptions.BlockedUserErrorMessage);
         }
@@ -131,6 +131,7 @@ public class DefaultSignInManager : ISignInManager
             props = new AuthenticationProperties
             {
                 IsPersistent = true,
+                // TODO: Use TimeProvider and change the RememberMeLoginDuration to RememberMeLoginDurationIsDays
                 ExpiresUtc = DateTimeOffset.UtcNow.Add(accountOptions.RememberMeLoginDuration)
             };
         }
