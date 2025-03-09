@@ -75,7 +75,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
             codeChallengeMethod = CodeChallengeMethods.Plain;
         }
 
-        if (!Constants.SupportedCodeChallengeMethods.Contains(codeChallengeMethod))
+        if (!context.Options.Discovery.CodeChallengeMethodIsSupported(codeChallengeMethod))
         {
             logger.LogError(context, "Unsupported code_challenge_method", codeChallengeMethod);
             context.InvalidRequest("Transform algorithm not supported", "unsupported code_challenge_method");

@@ -1,5 +1,6 @@
 ﻿using RoyalIdentity.Models;
 using RoyalIdentity.Models.Keys;
+using RoyalIdentity.Options;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Utils;
@@ -26,40 +27,82 @@ public class RealmMemoryStore
 
     public ConcurrentDictionary<string, IdentityResource> IdentityResources { get; } = new()
     {
-        ["openid"] = new IdentityResource
+        [ServerConstants.StandardScopes.OpenId] = new IdentityResource
         {
-            Name = "openid",
+            Name = ServerConstants.StandardScopes.OpenId,
             DisplayName = "Your user identifier",
             Description = "Your user identifier",
             Required = true,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
-            UserClaims = ["sub"]
+            UserClaims = [JwtClaimTypes.Subject]
         },
-        ["profile"] = new IdentityResource
+        [ServerConstants.StandardScopes.Profile] = new IdentityResource
         {
-            Name = "profile",
+            Name = ServerConstants.StandardScopes.Profile,
             DisplayName = "Your profile data",
-            Description = "Your profile data",
+            Description = "Your profile data, which are: name, family_name, given_name, middle_name, nickname, preferred_username, profile, picture, website, gender, birthdate, zoneinfo, locale, and updated_at.",
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
             UserClaims =
             [
-                "name",
-                "family_name", "given_name", "middle_name", "nickname", "preferred_username",
-                "profile", "picture", "website"
+                JwtClaimTypes.Name,
+                JwtClaimTypes.FamilyName,
+                JwtClaimTypes.GivenName,
+                JwtClaimTypes.MiddleName,
+                JwtClaimTypes.NickName,
+                JwtClaimTypes.PreferredUserName,
+                JwtClaimTypes.Profile,
+                JwtClaimTypes.Picture,
+                JwtClaimTypes.WebSite,
+                JwtClaimTypes.Gender,
+                JwtClaimTypes.BirthDate,
+                JwtClaimTypes.ZoneInfo,
+                JwtClaimTypes.Locale,
+                JwtClaimTypes.UpdatedAt
             ]
         },
-        ["email"] = new IdentityResource
+        [ServerConstants.StandardScopes.Email] = new IdentityResource
         {
-            Name = "email",
+            Name = ServerConstants.StandardScopes.Email,
             DisplayName = "Your email address",
             Description = "Your email address",
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
-            UserClaims = ["email", "email_verified"]
+            UserClaims = 
+            [
+                JwtClaimTypes.Email,
+                JwtClaimTypes.EmailVerified
+            ]
+        },
+        [ServerConstants.StandardScopes.Address] = new IdentityResource
+        {
+            Name = ServerConstants.StandardScopes.Address,
+            DisplayName = "Your address",
+            Description = "Your address",
+            Required = false,
+            Emphasize = false,
+            ShowInDiscoveryDocument = true,
+            UserClaims =
+            [
+                JwtClaimTypes.Address
+            ]
+        },
+        [ServerConstants.StandardScopes.Phone] = new IdentityResource
+        {
+            Name = ServerConstants.StandardScopes.Phone,
+            DisplayName = "Your phone number",
+            Description = "Your phone number",
+            Required = false,
+            Emphasize = false,
+            ShowInDiscoveryDocument = true,
+            UserClaims =
+            [
+                JwtClaimTypes.PhoneNumber,
+                JwtClaimTypes.PhoneNumberVerified
+            ]
         }
     };
 

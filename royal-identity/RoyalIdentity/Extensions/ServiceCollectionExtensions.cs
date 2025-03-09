@@ -132,27 +132,27 @@ public static class ServiceCollectionExtensions
     {
         services.AddAuthentication(options =>
             {
-                options.DefaultScheme = ServerAuthenticationScheme;
+                options.DefaultScheme = Server.AuthenticationScheme;
             })
-            .AddCookie(DefaultCookieAuthenticationScheme)
-            .AddPolicyScheme(ServerAuthenticationScheme, ServerAuthenticationName, options =>
+            .AddCookie(Server.DefaultCookieAuthenticationScheme)
+            .AddPolicyScheme(Server.AuthenticationScheme, Server.AuthenticationName, options =>
             {
                 options.ForwardDefaultSelector = context =>
                 {
                     // try get the realm from the route
-                    if (context.Request.RouteValues.TryGetValue(RealmRouteKey, out var realm))
+                    if (context.Request.RouteValues.TryGetValue(Server.RealmRouteKey, out var realm))
                     {
-                        return $"{RealmAuthenticationNamePrefix}{realm}";
+                        return $"{Server.RealmAuthenticationNamePrefix}{realm}";
                     }
                     // try get realm from context items
-                    else if (context.Items.TryGetValue(RealmRouteKey, out var item) && item is string realmItem)
+                    else if (context.Items.TryGetValue(Server.RealmRouteKey, out var item) && item is string realmItem)
                     {
-                        return $"{RealmAuthenticationNamePrefix}{realmItem}";
+                        return $"{Server.RealmAuthenticationNamePrefix}{realmItem}";
                     }
                     // else, use cookie authentication
                     else
                     {
-                        return DefaultCookieAuthenticationScheme;
+                        return Server.DefaultCookieAuthenticationScheme;
                     }
                 };
             });

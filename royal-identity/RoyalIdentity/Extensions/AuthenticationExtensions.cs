@@ -22,7 +22,7 @@ public static class AuthenticationExtensions
         }
 
         // try get the returnUrl from the query string
-        var returnUrl = context.Request.Query[UIConstants.DefaultRoutePathParams.Login].FirstOrDefault();
+        var returnUrl = context.Request.Query[UI.Routes.Params.ReturnUrl].FirstOrDefault();
         if (returnUrl.IsMissing())
             return null;
 
@@ -61,11 +61,11 @@ public static class AuthenticationExtensions
     public static string GetRealmAuthenticationScheme(this HttpContext context)
     {
         if (context.TryGetCurrentRealm(out var realm))
-            return $"{RealmAuthenticationNamePrefix}{realm.Path}";
+            return $"{Server.RealmAuthenticationNamePrefix}{realm.Path}";
 
         var realmPath = context.GetRealmPath();
         if (realmPath is not null)
-            return $"{RealmAuthenticationNamePrefix}{realmPath}";
+            return $"{Server.RealmAuthenticationNamePrefix}{realmPath}";
 
         throw new InvalidOperationException("Realm is not available. Use the middleware 'UseRealmDiscovery' to set the current realm.");
     }

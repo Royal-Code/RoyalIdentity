@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
-using static RoyalIdentity.Options.Constants;
 
 namespace RoyalIdentity.Authentication;
 
@@ -27,13 +26,13 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         string? cookieName = null;
         string? realmPath = null;
 
-        if (name == DefaultCookieAuthenticationScheme)
+        if (name == Server.DefaultCookieAuthenticationScheme)
         {
             cookieName = authOptions.CookieName;
         }
-        else if (name.StartsWith(RealmAuthenticationNamePrefix))
+        else if (name.StartsWith(Server.RealmAuthenticationNamePrefix))
         {
-            realmPath = name[RealmAuthenticationNamePrefix.Length..];
+            realmPath = name[Server.RealmAuthenticationNamePrefix.Length..];
             cookieName = $"{authOptions.CookieName}.{realmPath}";
         }
 

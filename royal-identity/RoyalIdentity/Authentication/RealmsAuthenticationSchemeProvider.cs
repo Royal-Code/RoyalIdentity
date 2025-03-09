@@ -16,7 +16,7 @@ public class RealmsAuthenticationSchemeProvider : AuthenticationSchemeProvider
 
     public override async Task<AuthenticationScheme?> GetSchemeAsync(string name)
     {
-        return name.StartsWith(RealmAuthenticationNamePrefix)
+        return name.StartsWith(Server.RealmAuthenticationNamePrefix)
             ? new AuthenticationScheme(name, name, typeof(CookieAuthenticationHandler))
             : await base.GetSchemeAsync(name);
     }
@@ -26,8 +26,8 @@ public class RealmsAuthenticationSchemeProvider : AuthenticationSchemeProvider
         var baseSchemes = await base.GetAllSchemesAsync();
 
         return baseSchemes.Concat([new AuthenticationScheme(
-            ServerAuthenticationScheme,
-            ServerAuthenticationName,
+            Server.AuthenticationScheme,
+            Server.AuthenticationName,
             typeof(CookieAuthenticationHandler))]);
     }
 }

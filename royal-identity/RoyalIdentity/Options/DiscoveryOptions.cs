@@ -80,4 +80,78 @@ public class DiscoveryOptions
     /// Adds custom entries to the discovery document
     /// </summary>
     public Dictionary<string, object> CustomEntries { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the supported response types.
+    /// </summary>
+    public HashSet<string> SupportedResponseTypes { get; } =
+    [
+        ResponseTypes.Code,
+        ResponseTypes.Token,
+        ResponseTypes.IdToken
+    ];
+
+    public HashSet<string> CodeChallengeMethodsSupported { get; } =
+    [
+        CodeChallengeMethods.Plain,
+        CodeChallengeMethods.Sha256
+    ];
+
+    public HashSet<string> SupportedResponseModes { get; } =
+    [
+        ResponseModes.FormPost,
+        ResponseModes.Fragment,
+        ResponseModes.Query
+    ];
+
+    public HashSet<string> SupportedSubjectTypes { get; } =
+    [
+        SubjectTypes.Public
+    ];
+
+    public HashSet<string> SupportedDisplayModes { get; } =
+    [
+        DisplayModes.Page,
+        DisplayModes.Popup,
+        DisplayModes.Touch,
+        DisplayModes.Wap
+    ];
+
+    public HashSet<string> SupportedPromptModes { get; } =
+    [
+        PromptModes.None,
+        PromptModes.Login,
+        PromptModes.Consent,
+        PromptModes.SelectAccount
+    ];
+
+    public bool ResponseTypesIsSupported(ICollection<string> responseTypes)
+    {
+        return responseTypes.All(SupportedResponseTypes.Contains);
+    }
+
+    public bool CodeChallengeMethodIsSupported(string codeChallengeMethod)
+    {
+        return CodeChallengeMethodsSupported.Contains(codeChallengeMethod);
+    }
+
+    public bool ResponseModeIsSupported(string responseMode)
+    {
+        return SupportedResponseModes.Contains(responseMode);
+    }
+
+    public bool SubjectTypeIsSupported(string subjectType)
+    {
+        return SupportedSubjectTypes.Contains(subjectType);
+    }
+
+    public bool DisplayModeIsSupported(string displayMode)
+    {
+        return SupportedDisplayModes.Contains(displayMode);
+    }
+
+    public bool PromptModeIsSupported(string promptMode)
+    {
+        return SupportedPromptModes.Contains(promptMode);
+    }
 }

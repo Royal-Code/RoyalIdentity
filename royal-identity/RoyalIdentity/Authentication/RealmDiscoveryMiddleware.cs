@@ -19,7 +19,7 @@ public class RealmDiscoveryMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         // check if the request has a route value for the realm
-        if (context.Request.RouteValues.TryGetValue(Constants.RealmRouteKey, out var value) && value is string realm)
+        if (context.Request.RouteValues.TryGetValue(Server.RealmRouteKey, out var value) && value is string realm)
         {
             if (await context.SetCurrentRealmAsync(realm))
             {

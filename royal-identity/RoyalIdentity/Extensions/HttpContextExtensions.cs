@@ -24,7 +24,7 @@ public static class HttpContextExtensions
 
     public static bool TryGetCurrentRealm(this HttpContext context,[NotNullWhen(true)] out Realm? realm)
     {
-        if (context.Items.TryGetValue(Constants.RealmCurrentKey, out var item) && item is Realm realmItem)
+        if (context.Items.TryGetValue(Server.RealmCurrentKey, out var item) && item is Realm realmItem)
         {
             realm = realmItem;
             return true;
@@ -49,7 +49,7 @@ public static class HttpContextExtensions
         if (realm is null)
             return false;
 
-        context.Items[RealmCurrentKey] = realm;
+        context.Items[Server.RealmCurrentKey] = realm;
 
         return true;
     }
@@ -114,9 +114,9 @@ public static class HttpContextExtensions
     /// <returns></returns>
     public static string? GetRealmPath(this HttpContext context)
     {
-        return context.Request.RouteValues.TryGetValue(Constants.RealmRouteKey, out var realmValue)
+        return context.Request.RouteValues.TryGetValue(Server.RealmRouteKey, out var realmValue)
             ? realmValue as string 
-            : context.Items.TryGetValue(Constants.RealmRouteKey, out var realmItem)
+            : context.Items.TryGetValue(Server.RealmRouteKey, out var realmItem)
                 ? realmItem as string
                 : null;
     }

@@ -218,7 +218,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
         var display = raw.Get(AuthorizeRequest.Display);
         if (display.IsPresent())
         {
-            if (SupportedDisplayModes.Contains(display))
+            if (Options.Discovery.DisplayModeIsSupported(display))
             {
                 DisplayMode = display;
             }
@@ -232,13 +232,16 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
         if (prompt.IsPresent())
         {
             var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (prompts.All(SupportedPromptModes.Contains))
+            foreach(var p in prompts)
             {
-                PromptModes = [.. prompts];
-            }
-            else
-            {
-                logger.LogDebug("Unsupported prompt mode - ignored: {Prompt}", prompt);
+                if (Options.Discovery.PromptModeIsSupported(p))
+                {
+                    PromptModes.Add(p);
+                }
+                else
+                {
+                    logger.LogDebug("Unsupported prompt mode - ignored: {Prompt}", p);
+                }
             }
         }
 

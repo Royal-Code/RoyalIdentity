@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Encodings.Web;
-using static RoyalIdentity.Options.Constants;
 
 namespace RoyalIdentity.Authentication;
 
@@ -30,20 +29,20 @@ public class RealmAuthenticationHandler : AuthenticationHandler<AuthenticationSc
         string authenticationScheme;
 
         // try get the realm from the route
-        if (Request.RouteValues.TryGetValue(RealmRouteKey, out var realm))
+        if (Request.RouteValues.TryGetValue(Server.RealmRouteKey, out var realm))
         {
-            authenticationScheme = $"{RealmAuthenticationNamePrefix}{realm}";
+            authenticationScheme = $"{Server.RealmAuthenticationNamePrefix}{realm}";
         }
         // try get realm from context items
-        else if (Context.Items.TryGetValue(RealmRouteKey, out var item) && item is string realmItem)
+        else if (Context.Items.TryGetValue(Server.RealmRouteKey, out var item) && item is string realmItem)
         {
             realm = realmItem;
-            authenticationScheme = $"{RealmAuthenticationNamePrefix}{realmItem}";
+            authenticationScheme = $"{Server.RealmAuthenticationNamePrefix}{realmItem}";
         }
         // else, use cookie authentication
         else
         {
-            authenticationScheme = DefaultCookieAuthenticationScheme;
+            authenticationScheme = Server.DefaultCookieAuthenticationScheme;
         }
 
         var result = await Context.AuthenticateAsync(authenticationScheme);

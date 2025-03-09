@@ -35,7 +35,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             return ValueTask.CompletedTask;
         }
 
-        if (!Constants.ResponseTypesIsSupported(responseTypes))
+        if (!context.Options.Discovery.ResponseTypesIsSupported(responseTypes))
         {
             logger.LogError(context, "Response type not supported", responseTypes.ToSpaceSeparatedString());
             context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not supported");
@@ -63,7 +63,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         var responseMode = context.ResponseMode;
         if (responseMode.IsPresent())
         {
-            if (!Constants.SupportedResponseModes.Contains(responseMode))
+            if (!context.Options.Discovery.CodeChallengeMethodIsSupported(responseMode))
             {
                 logger.LogError(context, "Unsupported response_mode", responseMode);
                 context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType);

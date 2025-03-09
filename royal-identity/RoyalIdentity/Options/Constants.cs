@@ -12,8 +12,8 @@ public static partial class Constants
     public static class Server
     {
         public const string Name = "RoyalIdentity";
-        public const string AuthenticationScheme = ServerName;
-        public const string AuthenticationName = ServerName;
+        public const string AuthenticationScheme = Name;
+        public const string AuthenticationName = Name;
 
         public const string RealmAuthenticationNamePrefix = "Realm:";
         public const string RealmRouteKey = "realm";
@@ -211,123 +211,6 @@ public static partial class Constants
 
 public static partial class Constants
 {
-    public const string ServerName = "RoyalIdentity";
-    public const string ServerAuthenticationScheme = ServerName;
-    public const string ServerAuthenticationName = ServerName;
-    public const string RealmAuthenticationNamePrefix = "Realm:";
-    public const string RealmRouteKey = "realm";
-    public const string RealmCurrentKey = "realm.current";
-    public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    public const string ExternalAuthenticationMethod = "external";
-
-
-    public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(60);
-
-    public static readonly IReadOnlyCollection<string> SupportedResponseTypes =
-    [
-        ResponseTypes.Code,
-        ResponseTypes.Token,
-        ResponseTypes.IdToken
-    ];
-
-    private static readonly Func<string, bool> ContainsSupportedResponseType = SupportedResponseTypes.Contains;
-
-    [Redesign("Move to options")]
-    public static bool ResponseTypesIsSupported(ICollection<string> responseTypes)
-    {
-        return responseTypes.All(ContainsSupportedResponseType);
-    }
-
-    [Redesign("Move to options")]
-    public static readonly List<string> SupportedCodeChallengeMethods = new()
-    {
-        CodeChallengeMethods.Plain,
-        CodeChallengeMethods.Sha256
-    };
-
-    [Redesign("Move to options")]
-    public static readonly List<string> SupportedResponseModes = new()
-    {
-        ResponseModes.FormPost,
-        ResponseModes.Query,
-        ResponseModes.Fragment
-    };
-
-    [Redesign("Review usage in IS4")]
-    public static readonly string[] SupportedSubjectTypes =
-    {
-        "pairwise", "public"
-    };
-
-    [Redesign("Move to options")]
-    public static readonly List<string> SupportedDisplayModes =
-    [
-        DisplayModes.Page,
-        DisplayModes.Popup,
-        DisplayModes.Touch,
-        DisplayModes.Wap
-    ];
-
-    [Redesign("Move to options")]
-    public static readonly List<string> SupportedPromptModes =
-    [
-        PromptModes.None,
-        PromptModes.Login,
-        PromptModes.Consent,
-        PromptModes.SelectAccount
-    ];
-
-    [Redesign("Move to Init Load Defaults")]
-    public static readonly Dictionary<string, IEnumerable<string>> ScopeToClaimsMapping =
-        new()
-        {
-            {
-                ServerConstants.StandardScopes.Profile,
-                [
-                    JwtClaimTypes.Name,
-                    JwtClaimTypes.FamilyName,
-                    JwtClaimTypes.GivenName,
-                    JwtClaimTypes.MiddleName,
-                    JwtClaimTypes.NickName,
-                    JwtClaimTypes.PreferredUserName,
-                    JwtClaimTypes.Profile,
-                    JwtClaimTypes.Picture,
-                    JwtClaimTypes.WebSite,
-                    JwtClaimTypes.Gender,
-                    JwtClaimTypes.BirthDate,
-                    JwtClaimTypes.ZoneInfo,
-                    JwtClaimTypes.Locale,
-                    JwtClaimTypes.UpdatedAt
-                ]
-            },
-            {
-                ServerConstants.StandardScopes.Email,
-                [
-                    JwtClaimTypes.Email,
-                    JwtClaimTypes.EmailVerified
-                ]
-            },
-            {
-                ServerConstants.StandardScopes.Address,
-                [
-                    JwtClaimTypes.Address
-                ]
-            },
-            {
-                ServerConstants.StandardScopes.Phone,
-                [
-                    JwtClaimTypes.PhoneNumber,
-                    JwtClaimTypes.PhoneNumberVerified
-                ]
-            },
-            {
-                ServerConstants.StandardScopes.OpenId,
-                [
-                    JwtClaimTypes.Subject
-                ]
-            }
-        };
-
     [Obsolete("Use Constants.UI.Routes")]
     public static class UIConstants
     {
@@ -813,6 +696,12 @@ public static class OidcConstants
         public const string FormPost = "form_post";
         public const string Query = "query";
         public const string Fragment = "fragment";
+    }
+
+    public static class SubjectTypes
+    {
+        public const string Pairwise = "pairwise";
+        public const string Public = "public";
     }
 
     public static class DisplayModes
@@ -1323,22 +1212,43 @@ public static class ServerConstants
 
     public static class StandardScopes
     {
-        /// <summary>REQUIRED. Informs the Authorization Server that the Client is making an OpenID Connect request. If the <c>openid</c> scope value is not present, the behavior is entirely unspecified.</summary>
+        /// <summary>
+        /// REQUIRED. 
+        /// Informs the Authorization Server that the Client is making an OpenID Connect request. 
+        /// If the <c>openid</c> scope value is not present, the behavior is entirely unspecified.
+        /// </summary>
         public const string OpenId = "openid";
 
-        /// <summary>OPTIONAL. This scope value requests access to the End-User's default profile Claims, which are: <c>name</c>, <c>family_name</c>, <c>given_name</c>, <c>middle_name</c>, <c>nickname</c>, <c>preferred_username</c>, <c>profile</c>, <c>picture</c>, <c>website</c>, <c>gender</c>, <c>birthdate</c>, <c>zoneinfo</c>, <c>locale</c>, and <c>updated_at</c>.</summary>
+        /// <summary>
+        /// OPTIONAL. 
+        /// This scope value requests access to the End-User's default profile Claims, which are: 
+        /// <c>name</c>, <c>family_name</c>, <c>given_name</c>, <c>middle_name</c>, 
+        /// <c>nickname</c>, <c>preferred_username</c>, <c>profile</c>, <c>picture</c>, 
+        /// <c>website</c>, <c>gender</c>, <c>birthdate</c>, <c>zoneinfo</c>, <c>locale</c>, and <c>updated_at</c>.
+        /// </summary>
         public const string Profile = "profile";
 
-        /// <summary>OPTIONAL. This scope value requests access to the <c>email</c> and <c>email_verified</c> Claims.</summary>
+        /// <summary>
+        /// OPTIONAL. This scope value requests access to the <c>email</c> and <c>email_verified</c> Claims.
+        /// </summary>
         public const string Email = "email";
 
-        /// <summary>OPTIONAL. This scope value requests access to the <c>address</c> Claim.</summary>
+        /// <summary>
+        /// OPTIONAL. This scope value requests access to the <c>address</c> Claim.
+        /// </summary>
         public const string Address = "address";
 
-        /// <summary>OPTIONAL. This scope value requests access to the <c>phone_number</c> and <c>phone_number_verified</c> Claims.</summary>
+        /// <summary>
+        /// OPTIONAL. This scope value requests access to the <c>phone_number</c> and <c>phone_number_verified</c> Claims.
+        /// </summary>
         public const string Phone = "phone";
 
-        /// <summary>This scope value MUST NOT be used with the OpenID Connect Implicit Client Implementer's Guide 1.0. See the OpenID Connect Basic Client Implementer's Guide 1.0 (http://openid.net/specs/openid-connect-implicit-1_0.html#OpenID.Basic) for its usage in that subset of OpenID Connect.</summary>
+        /// <summary>
+        /// This scope value MUST NOT be used with the OpenID Connect Implicit Client Implementer's Guide 1.0.
+        /// See the OpenID Connect Basic Client Implementer's Guide 1.0
+        /// (http://openid.net/specs/openid-connect-implicit-1_0.html#OpenID.Basic) 
+        /// for its usage in that subset of OpenID Connect.
+        /// </summary>
         public const string OfflineAccess = "offline_access";
     }
 
