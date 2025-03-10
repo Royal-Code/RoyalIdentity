@@ -63,10 +63,10 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         var responseMode = context.ResponseMode;
         if (responseMode.IsPresent())
         {
-            if (!context.Options.Discovery.CodeChallengeMethodIsSupported(responseMode))
+            if (!context.Options.Discovery.ResponseModeIsSupported(responseMode))
             {
                 logger.LogError(context, "Unsupported response_mode", responseMode);
-                context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType);
+                context.InvalidRequest(AuthorizeErrors.UnsupportedResponseMode);
                 return ValueTask.CompletedTask;
             }
 

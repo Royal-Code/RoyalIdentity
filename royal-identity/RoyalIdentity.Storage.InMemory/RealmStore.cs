@@ -35,6 +35,11 @@ public class RealmStore : IRealmStore
         return new ValueTask<Realm?>(realm);
     }
 
+    public Realm? GetByPath(string path)
+    {
+        return realms.Values.FirstOrDefault(r => r.Path == path);
+    }
+
     public ValueTask<Realm?> GetByPathAsync(string path, CancellationToken ct)
     {
         var realm = realms.Values.FirstOrDefault(r => r.Path == path);

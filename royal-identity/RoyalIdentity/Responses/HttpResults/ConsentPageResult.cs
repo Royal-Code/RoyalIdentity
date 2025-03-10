@@ -26,8 +26,7 @@ public class ConsentPageResult(IEndpointContextBase context) : IResult, IStatusC
             returnUrl = returnUrl.AddQueryString(context.Raw.ToQueryString());
         }
 
-        var interaction = context.Realm.Options.ServerOptions.UserInteraction;
-        var consentUrl = $"/{context.Realm.Path}{interaction.ConsentPath}";
+        var consentUrl = context.Realm.Routes.ConsentPath;
 
         if (!consentUrl.IsLocalUrl())
         {
@@ -36,7 +35,7 @@ public class ConsentPageResult(IEndpointContextBase context) : IResult, IStatusC
             returnUrl = httpContext.GetRealmPath().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
         }
 
-        var url = consentUrl.AddQueryString(interaction.ConsentReturnUrlParameter, returnUrl);
+        var url = consentUrl.AddQueryString(context.Realm.Options.UI.ConsentParameter, returnUrl);
         httpContext.Response.RedirectToAbsoluteUrl(url);
     }
 }

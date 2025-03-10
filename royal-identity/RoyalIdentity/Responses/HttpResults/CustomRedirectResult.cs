@@ -25,7 +25,7 @@ public class CustomRedirectResult(IEndpointContextBase context, string redirectU
             returnUrl = httpContext.GetServerBaseUrl().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
         }
 
-        var url = redirectUrl.AddQueryString(options.UserInteraction.CustomRedirectReturnUrlParameter, returnUrl);
+        var url = redirectUrl.AddQueryString(options.UI.CustomRedirectParameter, returnUrl);
         httpContext.Response.RedirectToAbsoluteUrl(url);
 
         return Task.CompletedTask;

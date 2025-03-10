@@ -14,14 +14,14 @@
     {
         if (HttpContext is not null && HttpContext.TryGetCurrentRealm(out var realm))
         {
-            var interaction = realm.Options.ServerOptions.UserInteraction;
-            var loginUrl = $"/{realm.Path}{interaction.LoginPath}";
-            var url = loginUrl.AddQueryString(interaction.ReturnUrlParameter, NavigationManager.Uri);
+            var interaction = realm.Options.ServerOptions.UI;
+            var loginUrl = realm.Routes.LoginPath;
+            var url = loginUrl.AddQueryString(realm.Options.UI.LoginParameter, NavigationManager.Uri);
             NavigationManager.NavigateTo(url, forceLoad: true);
         }
         else
         {
-            var interaction = Storage.ServerOptions.UserInteraction;
+            var interaction = Storage.ServerOptions.UI;
             NavigationManager.NavigateTo(interaction.SelectDomainPath, forceLoad: true);
         }
     }

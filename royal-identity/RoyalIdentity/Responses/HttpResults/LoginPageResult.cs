@@ -26,8 +26,7 @@ public class LoginPageResult(IEndpointContextBase context) : IResult, IStatusCod
             returnUrl = returnUrl.AddQueryString(context.Raw.ToQueryString());
         }
 
-        var interaction = context.Realm.Options.ServerOptions.UserInteraction;
-        var loginUrl = $"/{context.Realm.Path}{interaction.LoginPath}";
+        var loginUrl = context.Realm.Routes.LoginPath;
 
         if (!loginUrl.IsLocalUrl())
         {
@@ -36,7 +35,7 @@ public class LoginPageResult(IEndpointContextBase context) : IResult, IStatusCod
             returnUrl = httpContext.GetRealmPath().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
         }
 
-        var url = loginUrl.AddQueryString(interaction.ReturnUrlParameter, returnUrl);
+        var url = loginUrl.AddQueryString(context.Realm.Options.UI.LoginParameter, returnUrl);
         httpContext.Response.RedirectToAbsoluteUrl(url);
     }
 }

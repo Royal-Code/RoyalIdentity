@@ -29,7 +29,7 @@ public class ServerOptions
     /// <value>
     /// The user interaction options.
     /// </value>
-    public UserInteractionOptions UserInteraction { get; set; } = new();
+    public ServerUIOptions UI { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the logging options

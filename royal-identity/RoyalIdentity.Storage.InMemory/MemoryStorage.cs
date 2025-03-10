@@ -11,26 +11,26 @@ public partial class MemoryStorage
     private static readonly ServerOptions serverOptions = new();
 
     public static Realm ServerRealm { get; } = new(
-        "server",
-        "royalidentity.server",
-        "server",
-        "RoyalIdentity Server", 
+        Constants.Server.Realms.ServerRealm,
+        Constants.Server.Realms.ServerDomain,
+        Constants.Server.Realms.ServerRealm,
+        Constants.Server.Realms.ServerDisplayName, 
         true, 
         new RealmOptions(serverOptions));
 
     public static Realm AccountRealm { get; } = new(
-        "account",
-        "royalidentity.account",
-        "account",
-        "RoyalIdentity Account Realm",
+        Constants.Server.Realms.AccountRealm,
+        Constants.Server.Realms.AccountDomain,
+        Constants.Server.Realms.AccountRealm,
+        Constants.Server.Realms.AccountDisplayName,
         true,
         new RealmOptions(serverOptions));
 
     public static Realm AdminRealm { get; } = new(
-        "admin",
-        "royalidentity.admin",
-        "admin",
-        "RoyalIdentity Admin Realm",
+        Constants.Server.Realms.AdminRealm,
+        Constants.Server.Realms.AdminDomain,
+        Constants.Server.Realms.AdminRealm,
+        Constants.Server.Realms.AdminDisplayName,
         true,
         new RealmOptions(serverOptions));
 

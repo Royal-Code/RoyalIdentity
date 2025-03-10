@@ -3,7 +3,6 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Storage.InMemory;
 using System.Net;
 using System.Web;
 using Tests.Integration.Prepare;

@@ -51,6 +51,4 @@ public class AccountOptions
 
     [Redesign("Usar Resource")]
     public string BlockedUserErrorMessage { get; set; } = "Invalid username or password";
-
-    public int UserBlockingAttempts { get; set; } = 3;
 }

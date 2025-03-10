@@ -80,7 +80,7 @@ public partial class MemoryStorage : IStorage
     public IUserDetailsStore GetUserDetailsStore(Realm realm)
     {
         if (realmMemoryStore.TryGetValue(realm.Id, out var store))
-            return new UserStore(store.UsersDetails, realm.Options.Account, GetUserSessionStore(realm), passwordProtector);
+            return new UserStore(store.UsersDetails, realm.Options.Account, GetUserSessionStore(realm), passwordProtector, clock);
 
         throw RealmNotFound(realm);
     }
@@ -96,7 +96,7 @@ public partial class MemoryStorage : IStorage
     public IUserStore GetUserStore(Realm realm)
     {
         if (realmMemoryStore.TryGetValue(realm.Id, out var store))
-            return new UserStore(store.UsersDetails, realm.Options.Account, GetUserSessionStore(realm), passwordProtector);
+            return new UserStore(store.UsersDetails, realm.Options.Account, GetUserSessionStore(realm), passwordProtector, clock);
 
         throw RealmNotFound(realm);
     }

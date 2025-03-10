@@ -7,6 +7,8 @@ public interface IRealmStore
 
     public ValueTask<Realm?> GetByPathAsync(string path, CancellationToken ct);
 
+    public Realm? GetByPath(string path);
+
     public ValueTask<Realm?> GetByIdAsync(string id, CancellationToken ct);
 
     public ValueTask<Realm?> GetByDomainAsync(string domain, CancellationToken ct = default);

@@ -1,4 +1,5 @@
-﻿using RoyalIdentity.Options;
+﻿using RoyalIdentity.Extensions;
+using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Models;
 
@@ -31,6 +32,8 @@ public class Realm
         Enabled = true;
         Internal = @internal;
         Options = options;
+
+        Routes = new RealmRoutes(this);
     }
 
     /// <summary>
@@ -69,4 +72,56 @@ public class Realm
     /// The options for the realm.
     /// </summary>
     public RealmOptions Options { get; set; }
+
+    /// <summary>
+    /// The routes for the realm.
+    /// </summary>
+    public RealmRoutes Routes { get; }
+}
+
+public class RealmRoutes
+{
+    private readonly Realm realm;
+
+    private string? loginPath;
+    private string? logoutPath;
+    private string? loggingOutPath;
+    private string? loggedOutPath;
+    private string? consentPath;
+    private string? deviceVerificationPath;
+
+    public RealmRoutes(Realm realm)
+    {
+        this.realm = realm;
+    }
+
+    /// <summary>
+    /// Gets the login Path (Url) for the realm.
+    /// </summary>
+    public string LoginPath => loginPath ??= realm.Options.UI.LoginPath.ReplaceRealmRouterParameter(realm.Path);
+
+    /// <summary>
+    /// Gets the logout Path (Url) for the realm.
+    /// </summary>
+    public string LogoutPath => logoutPath ??= realm.Options.UI.LogoutPath.ReplaceRealmRouterParameter(realm.Path);
+
+    /// <summary>
+    /// Gets the logging out Path (Url) for the realm.
+    /// </summary>
+    public string LoggingOutPath => loggingOutPath ??= realm.Options.UI.LoggingOutPath.ReplaceRealmRouterParameter(realm.Path);
+
+    /// <summary>
+    /// Gets the logged out Path (Url) for the realm.
+    /// </summary>
+    public string LoggedOutPath => loggedOutPath ??= realm.Options.UI.LoggedOutPath.ReplaceRealmRouterParameter(realm.Path);
+
+    /// <summary>
+    /// Gets the consent Path (Url) for the realm.
+    /// </summary>
+    public string ConsentPath => consentPath ??= realm.Options.UI.ConsentPath.ReplaceRealmRouterParameter(realm.Path);
+
+    /// <summary>
+    /// Gets the device verification Path (Url) for the realm.
+    /// </summary>
+    public string DeviceVerificationPath => deviceVerificationPath ??= realm.Options.UI.DeviceVerificationPath.ReplaceRealmRouterParameter(realm.Path);
 }

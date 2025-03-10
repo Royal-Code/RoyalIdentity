@@ -109,6 +109,12 @@ public static class StringExtensions
         return url;
     }
 
+    public static string ReplaceRealmRouterParameter(this string path, string realmPath)
+    {
+        // lookup for UI.Routes.RealmRouteParameter and replace it with the realmPath
+        return path.Replace(UI.Routes.RealmRouteParameter, realmPath);
+    }
+
     [DebuggerStepThrough]
     [return: NotNullIfNotNull(nameof(url))]
     public static string? RemoveLeadingSlash(this string? url)

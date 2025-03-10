@@ -75,7 +75,7 @@ public class DefaultTokenFactory : ITokenFactory
             clock.GetUtcNow().UtcDateTime,
             request.Client.AccessTokenLifetime,
             jti,
-            OidcConstants.TokenResponse.BearerTokenType)
+            TokenResponse.BearerTokenType)
         {
             AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
         };

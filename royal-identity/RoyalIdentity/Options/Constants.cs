@@ -30,44 +30,68 @@ public static partial class Constants
             ResponseTypes.Token,
             ResponseTypes.IdToken
         ];
+
+        public static class Realms
+        {
+            public const string ServerRealm = "server";
+            public const string ServerDomain = "royalidentity.server";
+            public const string ServerDisplayName = "RoyalIdentity Server";
+
+            public const string AccountRealm = "account";
+            public const string AccountDomain = "royalidentity.account";
+            public const string AccountDisplayName = "RoyalIdentity Account Realm";
+
+            public const string AdminRealm = "admin";
+            public const string AdminDomain = "royalidentity.admin";
+            public const string AdminDisplayName = "RoyalIdentity Administrative Realm";
+        }
     }
 
     public static class UI
     {
         public static class Routes
         {
-            public const string Login = $"/{{realm}}/{Names.Account}/{Names.Login}";
+            public const string RealmRouteParameter = $"{{{Server.RealmRouteKey}}}";
 
-            public const string SignedIn = $"/{{realm}}/{Names.Account}/{Names.SignedIn}";
+            public const string Login = $"/{RealmRouteParameter}/{Names.Account}/{Names.Login}";
+
+            public const string SignedIn = $"/{RealmRouteParameter}/{Names.Account}/{Names.SignedIn}";
+
+            public const string Consent = $"/{RealmRouteParameter}/{Names.Account}/{Names.Consent}";
+
+            public const string Consented = $"/{RealmRouteParameter}/{Names.Account}/{Names.Consented}";
+
+            public const string Logout = $"/{RealmRouteParameter}/{Names.Account}/{Names.Logout}";
+
+            public const string LoggingOut = $"/{RealmRouteParameter}/{Names.Account}/{Names.LoggingOut}";
+
+            public const string LoggedOut = $"/{RealmRouteParameter}/{Names.Account}/{Names.LoggedOut}";
+
+            public const string DeviceVerification = $"/{RealmRouteParameter}/{Names.Account}/{Names.Device}";
+
+            public const string Profile = $"/{RealmRouteParameter}/{Names.Account}/{Names.Profile}";
 
             public const string SelectDomain = $"/{Names.Account}/{Names.Domain}";
 
-            public const string Consent = $"/{{realm}}/{Names.Account}/{Names.Consent}";
+            public const string AccessDenied = $"/{Names.Account}/{Names.AccessDenied}";
 
-            public const string Consented = $"/{{realm}}/{Names.Account}/{Names.Consented}";
-
-            public const string Logout = $"/{{realm}}/{Names.Account}/{Names.Logout}";
-
-            public const string LoggingOut = $"/{{realm}}/{Names.Account}/{Names.LoggingOut}";
-
-            public const string LoggedOut = $"/{{realm}}/{Names.Account}/{Names.LoggedOut}";
-
-            public const string Profile = $"/{{realm}}/{Names.Account}/{Names.Profile}";
-
-            public const string Error = "/error";
+            public const string Error = $"/{Names.Error}";
 
             private static class Names
             {
                 public const string Account = "account";
                 public const string Login = "login";
                 public const string SignedIn = "signedin";
-                public const string Domain = "domain";
                 public const string Consent = "consent";
                 public const string Consented = "consented";
                 public const string Logout = "logout";
                 public const string LoggingOut = "logout/processing";
                 public const string LoggedOut = "logout/done";
+                public const string Device = "device";
                 public const string Profile = "profile";
+                public const string Domain = "domain";
+                public const string AccessDenied = "access-denied";
+                public const string Error = "error";
             }
 
             public static class Params
@@ -77,6 +101,8 @@ public static partial class Constants
                 public const string LogoutId = "logoutId";
 
                 public const string ErrorId = "errorId";
+
+                public const string UserCode = "userCode";
             }
 
             public static string BuildLoginUrl(string realm, string returnUrl)
@@ -211,35 +237,6 @@ public static partial class Constants
 
 public static partial class Constants
 {
-    [Obsolete("Use Constants.UI.Routes")]
-    public static class UIConstants
-    {
-        [Obsolete("Use Constants.UI.Routes")]
-        public static class DefaultRoutePathParams
-        {
-            public const string Error = "errorId";
-            public const string Login = "returnUrl";
-            public const string Consent = "returnUrl";
-            public const string Logout = "logoutId";
-            public const string Custom = "returnUrl";
-            public const string UserCode = "userCode";
-        }
-
-        [Obsolete("Use Constants.UI.Routes")]
-        public static class DefaultRoutePaths
-        {
-            public const string Login = "/account/login";
-            public const string Logout = "/account/logout";
-            public const string LoggingOut = "/account/logout/processing";
-            public const string LoggedOut = "/account/logout/done";
-            public const string Consent = "/account/consent";
-            public const string Error = "/error";
-            public const string AccessDenied = "/account/access-denied";
-            public const string SelectDomain = "/account/domain";
-            public const string DeviceVerification = "/device";
-        }
-    }
-
     [Obsolete("Use Constants.Oidc.Routes")]
     public static class ProtocolRoutePaths
     {
@@ -404,6 +401,7 @@ public static class OidcConstants
         public const string UnauthorizedClient = "unauthorized_client";
         public const string AccessDenied = "access_denied";
         public const string UnsupportedResponseType = "unsupported_response_type";
+        public const string UnsupportedResponseMode = "unsupported_response_mode";
         public const string InvalidScope = "invalid_scope";
         public const string ServerError = "server_error";
         public const string TemporarilyUnavailable = "temporarily_unavailable";

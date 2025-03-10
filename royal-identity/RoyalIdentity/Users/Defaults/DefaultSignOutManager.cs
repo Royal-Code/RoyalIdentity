@@ -18,7 +18,6 @@ public class DefaultSignOutManager : ISignOutManager
     private readonly IEventDispatcher eventDispatcher;
     private readonly IBackChannelLogoutNotifier backChannelNotifier;
     private readonly IMessageStore messageStore;
-    private readonly ServerOptions serverOptions;
     private readonly ILogger logger;
 
     public DefaultSignOutManager(
@@ -35,8 +34,6 @@ public class DefaultSignOutManager : ISignOutManager
         this.backChannelNotifier = backChannelNotifier;
         this.messageStore = messageStore;
         this.logger = logger;
-
-        serverOptions = storage.ServerOptions;
     }
 
     public async Task<string?> CreateLogoutIdAsync(CancellationToken ct)
@@ -53,7 +50,7 @@ public class DefaultSignOutManager : ISignOutManager
         var identity = httpContext.User.Identity;
         var sid = identity.GetSessionId();
 
-        LogoutMessage message = new LogoutMessage()
+        LogoutMessage message = new()
         {
             RealmId = realm.Id,
             SessionId = sid,
@@ -178,11 +175,11 @@ public class DefaultSignOutManager : ISignOutManager
 
         var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(callbackMessage), ct);
 
-        var url = $"/{realm.Path}{serverOptions.UserInteraction.LoggingOutPath}";
+        var url = realm.Routes.LoggingOutPath;
 
         if (logoutCallbackId is not null)
         {
-            url = url.AddQueryString(serverOptions.UserInteraction.LogoutIdParameter, logoutCallbackId);
+            url = url.AddQueryString(realm.Options.UI.LogoutParameter, logoutCallbackId);
         }
 
         return new Uri(url, UriKind.RelativeOrAbsolute);

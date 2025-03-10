@@ -10,7 +10,7 @@ public class RealmOptions
     /// <summary>
     /// Creates a new instance of <see cref="RealmOptions"/>.
     /// </summary>
-    /// <param name="serverOptions"></param>
+    /// <param name="serverOptions">The RoyalIdentity server options.</param>
     public RealmOptions(ServerOptions serverOptions)
     {
         ServerOptions = serverOptions;
@@ -25,6 +25,11 @@ public class RealmOptions
     /// Gets or sets the discovery options.
     /// </summary>
     public DiscoveryOptions Discovery { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the UI options.
+    /// </summary>
+    public RealmUIOptions UI { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the endpoint configuration.

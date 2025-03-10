@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 
@@ -7,11 +8,11 @@ namespace RoyalIdentity.Authentication;
 
 public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<CookieAuthenticationOptions>
 {
-    private readonly ServerOptions serverOptions;
+    private readonly IStorage storage;
 
-    public ConfigureRealmCookieAuthenticationOptions(IOptions<ServerOptions> serverOptions)
+    public ConfigureRealmCookieAuthenticationOptions(IStorage storage)
     {
-        this.serverOptions = serverOptions.Value;
+        this.storage = storage;
     }
 
     public void Configure(string? name, CookieAuthenticationOptions options)
@@ -19,8 +20,7 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         if (string.IsNullOrEmpty(name))
             return;
 
-        var authOptions = serverOptions.Authentication;
-        var interactionOptions = serverOptions.UserInteraction;
+        var authOptions = storage.ServerOptions.Authentication;
         var cookie = options.Cookie;
 
         string? cookieName = null;
@@ -45,20 +45,18 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         options.SlidingExpiration = authOptions.CookieSlidingExpiration;
 
         if (realmPath.IsMissing())
-        {
-            options.LoginPath = interactionOptions.LoginPath;
-            options.LogoutPath = interactionOptions.LogoutPath;
-            options.AccessDeniedPath = interactionOptions.AccessDeniedPath;
-            options.ReturnUrlParameter = interactionOptions.ReturnUrlParameter;
-        }
-        else
-        {
-            options.LoginPath = $"/{realmPath}{interactionOptions.LoginPath}";
-            options.LogoutPath = $"/{realmPath}{interactionOptions.LogoutPath}";
-            options.AccessDeniedPath = $"/{realmPath}{interactionOptions.AccessDeniedPath}";
-            options.ReturnUrlParameter = interactionOptions.ReturnUrlParameter;
-        }
+            realmPath = Server.Realms.ServerRealm;
 
+        var realm = storage.Realms.GetByPath(realmPath);
+
+        if (realm is not null)
+        {
+            options.LoginPath = realm.Routes.LoginPath;
+            options.LogoutPath = realm.Routes.LogoutPath;
+            options.AccessDeniedPath = storage.ServerOptions.UI.AccessDeniedPath;
+            options.ReturnUrlParameter = realm.Options.UI.LoginParameter;
+        }
+        
         options.Events.OnValidatePrincipal = async context =>
         {
             if (context.Principal is null)

@@ -42,14 +42,12 @@ public class EndSessionHandler : IHandler<EndSessionContext>
 
         var messageId = await messageStore.WriteAsync(new Message<LogoutMessage>(logoutMessage), ct);
 
-        var options = context.Options.ServerOptions;
-
-        var redirect = $"/{context.Realm.Path}{options.UserInteraction.LogoutPath}";
+        var redirect = context.Realm.Routes.LogoutPath;
 
         if (redirect.IsLocalUrl())
             redirect = context.HttpContext.GetServerRelativeUrl(redirect)!;
 
-        redirect = redirect.AddQueryString(options.UserInteraction.LogoutIdParameter, messageId);
+        redirect = redirect.AddQueryString(context.Realm.Options.UI.LogoutParameter, messageId);
 
         logger.LogDebug("Redirecting to {Redirect}", redirect);
 
