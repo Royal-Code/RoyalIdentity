@@ -70,20 +70,25 @@ public static class AuthenticationExtensions
         throw new InvalidOperationException("Realm is not available. Use the middleware 'UseRealmDiscovery' to set the current realm.");
     }
    
-    public static bool IsValidReturnUrl([NotNullWhen(true)] this string? returnUrl)
+    public static bool IsValidReturnUrl([NotNullWhen(true)] this string? returnUrl, string realm)
     {
         if (returnUrl.IsLocalUrl())
         {
             var index = returnUrl.IndexOf('?');
             if (index >= 0)
             {
-                returnUrl = returnUrl.Substring(0, index);
+                returnUrl = returnUrl[..index];
             }
 
-            if (returnUrl.EndsWith(ProtocolRoutePaths.Authorize, StringComparison.Ordinal) ||
-                returnUrl.EndsWith(ProtocolRoutePaths.AuthorizeCallback, StringComparison.Ordinal))
+            var authorizePath = Oidc.Routes.BuildAuthorizeUrl(realm);
+            if (returnUrl.EndsWith(authorizePath, StringComparison.Ordinal))
             {
+                return true;
+            }
 
+            var authorizeCallbackPath = Oidc.Routes.BuildAuthorizeCallbackUrl(realm);
+            if (returnUrl.EndsWith(authorizeCallbackPath, StringComparison.Ordinal))
+            {
                 return true;
             }
         }

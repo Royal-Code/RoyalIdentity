@@ -22,7 +22,7 @@
         </div>
         @if (model is not null && model.HasFrontChannel())
         {
-            <iframe width="0" height="0" class="sign-out" src="@model.SignOutIframeUrl.AddQueryString("callbackId", LogoutId!)"></iframe>
+            <iframe width="0" height="0" class="sign-out" src="@model.SignOutIframeUrl.AddQueryString(Oidc.Routes.Params.CallbackId, LogoutId!)"></iframe>
         }
     </ChildContent>
 </AccountContent>

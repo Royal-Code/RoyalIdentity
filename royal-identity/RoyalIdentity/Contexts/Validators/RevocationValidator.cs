@@ -31,7 +31,7 @@ public class RevocationValidator : IValidator<RevocationContext>
         // check token type hint
         ///////////////////////////
         var hint = context.TokenTypeHint;
-        if (hint.IsPresent() && !Constants.SupportedTokenTypeHints.Contains(hint))
+        if (hint.IsPresent() && !context.Options.Discovery.TokenTypeHintIsSupported(hint))
         {
             logger.LogError("Invalid token type hint: {TokenTypeHint}", hint);
             context.InvalidRequest("Invalid token type hint");

@@ -138,7 +138,7 @@ public static partial class Constants
     {
         public static class Routes
         {
-            private class Names
+            private static class Names
             {
                 public const string OidcConnect = "connect";
                 public const string Callback = $"callback";
@@ -155,6 +155,12 @@ public static partial class Constants
                 public const string EndSession = "endsession";
                 public const string CheckSession = "checksession";
                 public const string DeviceAuthorization = "deviceauthorization";
+            }
+
+            public static class Params
+            {
+                public const string CallbackId = "callbackId";
+                public const string Authorization = "authzId";
             }
 
             public const string Authorize = $"{{realm}}/{Names.OidcConnect}/{Names.Authorize}";
@@ -237,52 +243,12 @@ public static partial class Constants
 
 public static partial class Constants
 {
-    [Obsolete("Use Constants.Oidc.Routes")]
-    public static class ProtocolRoutePaths
-    {
-        public const string ConnectPathPrefix = "connect";
-
-        public const string Authorize = ConnectPathPrefix + "/authorize";
-        public const string AuthorizeCallback = Authorize + "/callback";
-        public const string DiscoveryConfiguration = ".well-known/openid-configuration";
-        public const string DiscoveryWebKeys = DiscoveryConfiguration + "/jwks";
-        public const string Token = ConnectPathPrefix + "/token";
-        public const string Revocation = ConnectPathPrefix + "/revocation";
-        public const string UserInfo = ConnectPathPrefix + "/userinfo";
-        public const string Introspection = ConnectPathPrefix + "/introspect";
-        public const string EndSession = ConnectPathPrefix + "/endsession";
-        public const string EndSessionCallback = EndSession + "/callback";
-        public const string CheckSession = ConnectPathPrefix + "/checksession";
-        public const string DeviceAuthorization = ConnectPathPrefix + "/deviceauthorization";
-
-        public const string MtlsPathPrefix = ConnectPathPrefix + "/mtls";
-        public const string MtlsToken = MtlsPathPrefix + "/token";
-        public const string MtlsRevocation = MtlsPathPrefix + "/revocation";
-        public const string MtlsIntrospection = MtlsPathPrefix + "/introspect";
-        public const string MtlsDeviceAuthorization = MtlsPathPrefix + "/deviceauthorization";
-
-        public static readonly string[] CorsPaths =
-        [
-            DiscoveryConfiguration,
-            DiscoveryWebKeys,
-            Token,
-            UserInfo,
-            Revocation
-        ];
-    }
-
+    
     public static class TokenTypeHints
     {
         public const string RefreshToken = "refresh_token";
         public const string AccessToken = "access_token";
     }
-
-    [Redesign("Move to options")]
-    public static readonly ICollection<string> SupportedTokenTypeHints =
-    [
-        TokenTypeHints.RefreshToken,
-        TokenTypeHints.AccessToken
-    ];
 
     public static class RevocationErrors
     {
@@ -346,30 +312,23 @@ public static partial class Constants
         ];
     }
 
-
-    public static class AuthorizationParamsStore
-    {
-        [Redesign("Rename")]
-        public const string MessageStoreIdParameterName = "authzId";
-    }
-
     public static class CurveOids
     {
         public const string P256 = "1.2.840.10045.3.1.7";
         public const string P384 = "1.3.132.0.34";
         public const string P521 = "1.3.132.0.35";
     }
-}
 
-[Redesign("Move all to Constants")]
-public static class OidcConstants
-{
     public static class IdentityProfileTypes
     {
         public const string User = nameof(User);
         public const string Client = nameof(Client);
     }
+}
 
+[Redesign("Move all to Constants")]
+public static class OidcConstants
+{
     public static class AuthorizeRequest
     {
         public const string Scope = "scope";

@@ -42,7 +42,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
                 resources,
                 subject,
                 client,
-                OidcConstants.IdentityProfileTypes.User,
+                IdentityProfileTypes.User,
                 resources.RequestedIdentityClaimTypes());
 
             await profileService.GetProfileDataAsync(profileDataRequest, ct);
@@ -159,7 +159,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     protected virtual IEnumerable<Claim> FilterClaims(HashSet<Claim> claims)
     {
         var claimsToFilter = claims
-            .Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))
+            .Where(x => Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))
             .ToList();
 
         if (claimsToFilter.Count is not 0)
@@ -176,7 +176,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     protected virtual IEnumerable<Claim> FilterProtocolClaims(HashSet<Claim> claims)
     {
         var claimsToFilter = claims
-            .Where(x => Constants.Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))
+            .Where(x => Filters.ClaimsServiceFilterClaimTypes.Contains(x.Type))
             .ToList();
 
         if (claimsToFilter.Count is not 0 && logger.IsEnabled(LogLevel.Debug))

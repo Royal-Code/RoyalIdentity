@@ -41,12 +41,12 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
             User = context.GetSubject()!,
             Client = client,
             Resources = context.Resources,
-            IdentityType = OidcConstants.IdentityProfileTypes.Client,
+            IdentityType = IdentityProfileTypes.Client,
         };
 
         var accessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);
 
-        var atEvent = new AccessTokenIssuedEvent(context, new Token(OidcConstants.TokenTypes.AccessToken, accessToken.Token));
+        var atEvent = new AccessTokenIssuedEvent(context, new Token(TokenTypes.AccessToken, accessToken.Token));
 
         logger.LogDebug("Access token issued");
 

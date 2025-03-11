@@ -125,6 +125,12 @@ public class DiscoveryOptions
         PromptModes.SelectAccount
     ];
 
+    public HashSet<string> SupportedTokenTypeHints { get; } =
+    [
+        TokenTypeHints.RefreshToken,
+        TokenTypeHints.AccessToken
+    ];
+
     public bool ResponseTypesIsSupported(ICollection<string> responseTypes)
     {
         return responseTypes.All(SupportedResponseTypes.Contains);
@@ -153,5 +159,10 @@ public class DiscoveryOptions
     public bool PromptModeIsSupported(string promptMode)
     {
         return SupportedPromptModes.Contains(promptMode);
+    }
+
+    public bool TokenTypeHintIsSupported(string tokenTypeHint)
+    {
+        return SupportedTokenTypeHints.Contains(tokenTypeHint);
     }
 }

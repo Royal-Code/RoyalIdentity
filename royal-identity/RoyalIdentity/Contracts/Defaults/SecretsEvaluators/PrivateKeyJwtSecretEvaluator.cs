@@ -93,7 +93,7 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
             return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
         }
 
-        if (!trustedKeys.Any())
+        if (trustedKeys.Count is 0)
         {
             logger.LogError(context, "There are no keys available to validate client assertion.");
             return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
@@ -103,8 +103,8 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
         {
             // token endpoint URL
             string.Concat(
-                context.HttpContext.GetServerIssuerUri(context.Options).EnsureTrailingSlash(),
-                Constants.ProtocolRoutePaths.Token)
+                context.HttpContext.GetServerIssuerUri(context.Options, false).EnsureTrailingSlash(),
+                Oidc.Routes.BuildTokenUrl(context.Realm.Path))
         };
 
         var tokenValidationParameters = new TokenValidationParameters

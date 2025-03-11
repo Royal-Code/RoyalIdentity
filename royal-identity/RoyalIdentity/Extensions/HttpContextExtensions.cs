@@ -77,7 +77,7 @@ public static class HttpContextExtensions
 
         if (options.MutualTls.Enabled &&
             options.MutualTls.DomainName.IsPresent() &&
-            !options.MutualTls.DomainName.Contains(".") &&
+            !options.MutualTls.DomainName.Contains('.') &&
             request.Host.Value.StartsWith(options.MutualTls.DomainName, StringComparison.OrdinalIgnoreCase))
         {
             return string.Concat(request.Scheme, "://", request.Host.Value.AsSpan(options.MutualTls.DomainName.Length + 1));
@@ -155,7 +155,7 @@ public static class HttpContextExtensions
             return null;
 
         if (path.StartsWith("~/"))
-            path = path.Substring(1);
+            path = path[1..];
 
         path = context.GetServerBaseUrl().EnsureTrailingSlash() + path.RemoveLeadingSlash();
         return path;
@@ -168,7 +168,7 @@ public static class HttpContextExtensions
     /// <param name="options">The options.</param>
     /// <returns></returns>
     /// <exception cref="System.ArgumentNullException">context</exception>
-    public static string GetServerIssuerUri(this HttpContext context, RealmOptions options)
+    public static string GetServerIssuerUri(this HttpContext context, RealmOptions options, bool? includeRealmPath = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(options);
@@ -180,7 +180,7 @@ public static class HttpContextExtensions
 
         var uri = $"{context.GetServerOrigin(options)}{context.GetServerBasePath()}";
 
-        if (options.IncludeRealmPathToIssuerUri)
+        if (includeRealmPath ?? options.IncludeRealmPathToIssuerUri)
         {
             var realm = context.GetRealmPath();
             if (realm.IsPresent())

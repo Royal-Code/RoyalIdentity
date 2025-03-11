@@ -38,23 +38,32 @@ public class DefaultSignInManager : ISignInManager
     [Redesign("Disparar exception ou mudar para método Try com out do context e error")]
     public async Task<AuthorizationContext?> GetAuthorizationContextAsync(string? returnUrl, CancellationToken ct)
     {
-        if (returnUrl.IsValidReturnUrl())
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is null)
+        {
+            logger.LogInformation("Sign-in is not being executed in an HTTP context");
+
+            throw new InvalidOperationException("Sign-in requires execution under an HTTP context.");
+        }
+
+        var realm = httpContext.GetRealmPath();
+        if (realm == null)
+        {
+            logger.LogInformation("Sign-in is not being executed in a realm context");
+            throw new InvalidOperationException("Sign-in requires execution under a realm context.");
+        }
+
+        if (returnUrl.IsValidReturnUrl(realm))
         {
             logger.LogDebug("returnUrl is valid");
 
             var parameters = returnUrl.ReadQueryStringAsNameValueCollection();
-            if (parameters.TryGet(Constants.AuthorizationParamsStore.MessageStoreIdParameterName, out var messageStoreId))
+            if (parameters.TryGet(Oidc.Routes.Params.Authorization, out var messageStoreId))
             {
                 parameters = await storage.AuthorizeParameters.ReadAsync(messageStoreId, ct) ?? [];
             }
 
-            var httpContext = httpContextAccessor.HttpContext;
-            if (httpContext is null)
-            {
-                logger.LogInformation("Sign-in is not being executed in an HTTP context");
-
-                throw new InvalidOperationException("Sign-in requires execution under an HTTP context.");
-            }
+            
 
             var authorizationRequest = new AuthorizationValidationRequest()
             {

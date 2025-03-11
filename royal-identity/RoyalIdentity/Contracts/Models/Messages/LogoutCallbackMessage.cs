@@ -1,6 +1,4 @@
-﻿using static RoyalIdentity.Options.Constants;
-
-namespace RoyalIdentity.Contracts.Models.Messages;
+﻿namespace RoyalIdentity.Contracts.Models.Messages;
 
 public class LogoutCallbackMessage
 {
@@ -18,10 +16,10 @@ public class LogoutCallbackMessage
 
     public bool AutomaticRedirectAfterSignOut { get; set; }
 
-    public string SignOutIframeUrl { get; set; } = ProtocolRoutePaths.EndSessionCallback;
+    public required string SignOutIframeUrl { get; set; }
 
     public bool HasFrontChannel()
     {
-        return FrontChannelLogout is not null && FrontChannelLogout.Any();
+        return FrontChannelLogout is not null && FrontChannelLogout.Count is not 0;
     }
 }

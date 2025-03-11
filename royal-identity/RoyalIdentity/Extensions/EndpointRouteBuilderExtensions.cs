@@ -8,13 +8,13 @@ public static class EndpointRouteBuilderExtensions
 {
     public static void MapOpenIdConnectProviderEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPipeline<DiscoveryEndpoint>(ProtocolRoutePaths.DiscoveryConfiguration);
-        endpoints.MapPipeline<JwkEndpoint>(ProtocolRoutePaths.DiscoveryWebKeys);
-        endpoints.MapPipeline<AuthorizeEndpoint>(ProtocolRoutePaths.Authorize);
-        endpoints.MapPipeline<AuthorizeCallbackEndpoint>(ProtocolRoutePaths.AuthorizeCallback);
-        endpoints.MapPipeline<TokenEndpoint>(ProtocolRoutePaths.Token);
-        endpoints.MapPipeline<UserInfoEndpoint>(ProtocolRoutePaths.UserInfo);
-        endpoints.MapPipeline<RevocationEndpoint>(ProtocolRoutePaths.Revocation);
-        endpoints.MapPipeline<EndSessionEndpoint>(ProtocolRoutePaths.EndSession);
+        endpoints.MapPipeline<DiscoveryEndpoint>(Oidc.Routes.DiscoveryConfiguration);
+        endpoints.MapPipeline<JwkEndpoint>(Oidc.Routes.DiscoveryWebKeys);
+        endpoints.MapPipeline<AuthorizeEndpoint>(Oidc.Routes.Authorize);
+        endpoints.MapPipeline<AuthorizeCallbackEndpoint>(Oidc.Routes.AuthorizeCallback);
+        endpoints.MapPipeline<TokenEndpoint>(Oidc.Routes.Token);
+        endpoints.MapPipeline<UserInfoEndpoint>(Oidc.Routes.UserInfo);
+        endpoints.MapPipeline<RevocationEndpoint>(Oidc.Routes.Revocation);
+        endpoints.MapPipeline<EndSessionEndpoint>(Oidc.Routes.EndSession);
     }
 }

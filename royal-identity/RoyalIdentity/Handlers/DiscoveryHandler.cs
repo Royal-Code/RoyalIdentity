@@ -39,6 +39,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         var issuerUri = context.IssuerUri;
         var baseUrl = context.BaseUrl;
         var options = context.Options;
+        var realmPath = context.Realm.Path;
 
 
         var entries = new Dictionary<string, object>
@@ -49,7 +50,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         // jwks
         if (options.Discovery.ShowKeySet && (await keys.GetValidationKeysAsync(context.Realm, ct)).Keys.Count is not 0)
         {
-            entries.Add(Discovery.JwksUri, baseUrl + ProtocolRoutePaths.DiscoveryWebKeys);
+            entries.Add(Discovery.JwksUri, baseUrl + Oidc.Routes.BuildDiscoveryWebKeysUrl(realmPath));
         }
 
         // endpoints
@@ -57,42 +58,42 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         {
             if (options.Endpoints.EnableAuthorizeEndpoint)
             {
-                entries.Add(Discovery.AuthorizationEndpoint, baseUrl + ProtocolRoutePaths.Authorize);
+                entries.Add(Discovery.AuthorizationEndpoint, baseUrl + Oidc.Routes.BuildAuthorizeUrl(realmPath));
             }
 
             if (options.Endpoints.EnableTokenEndpoint)
             {
-                entries.Add(Discovery.TokenEndpoint, baseUrl + ProtocolRoutePaths.Token);
+                entries.Add(Discovery.TokenEndpoint, baseUrl + Oidc.Routes.BuildTokenUrl(realmPath));
             }
 
             if (options.Endpoints.EnableUserInfoEndpoint)
             {
-                entries.Add(Discovery.UserInfoEndpoint, baseUrl + ProtocolRoutePaths.UserInfo);
+                entries.Add(Discovery.UserInfoEndpoint, baseUrl + Oidc.Routes.BuildUserInfoUrl(realmPath));
             }
 
             if (options.Endpoints.EnableEndSessionEndpoint)
             {
-                entries.Add(Discovery.EndSessionEndpoint, baseUrl + ProtocolRoutePaths.EndSession);
+                entries.Add(Discovery.EndSessionEndpoint, baseUrl + Oidc.Routes.BuildEndSessionUrl(realmPath));
             }
 
             if (options.Endpoints.EnableCheckSessionEndpoint)
             {
-                entries.Add(Discovery.CheckSessionIframe, baseUrl + ProtocolRoutePaths.CheckSession);
+                entries.Add(Discovery.CheckSessionIframe, baseUrl + Oidc.Routes.BuildCheckSessionUrl(realmPath));
             }
 
             if (options.Endpoints.EnableTokenRevocationEndpoint)
             {
-                entries.Add(Discovery.RevocationEndpoint, baseUrl + ProtocolRoutePaths.Revocation);
+                entries.Add(Discovery.RevocationEndpoint, baseUrl + Oidc.Routes.BuildRevocationUrl(realmPath));
             }
 
             if (options.Endpoints.EnableIntrospectionEndpoint)
             {
-                entries.Add(Discovery.IntrospectionEndpoint, baseUrl + ProtocolRoutePaths.Introspection);
+                entries.Add(Discovery.IntrospectionEndpoint, baseUrl + Oidc.Routes.BuildIntrospectionUrl(realmPath));
             }
 
             if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
             {
-                entries.Add(Discovery.DeviceAuthorizationEndpoint, baseUrl + ProtocolRoutePaths.DeviceAuthorization);
+                entries.Add(Discovery.DeviceAuthorizationEndpoint, baseUrl + Oidc.Routes.BuildDeviceAuthorizationUrl(realmPath));
             }
 
             if (options.MutualTls.Enabled)
@@ -101,19 +102,19 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
 
                 if (options.Endpoints.EnableTokenEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.TokenEndpoint, ConstructMtlsEndpoint(ProtocolRoutePaths.Token));
+                    mtlsEndpoints.Add(Discovery.TokenEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
                 if (options.Endpoints.EnableTokenRevocationEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.RevocationEndpoint, ConstructMtlsEndpoint(ProtocolRoutePaths.Revocation));
+                    mtlsEndpoints.Add(Discovery.RevocationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
                 if (options.Endpoints.EnableIntrospectionEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.IntrospectionEndpoint, ConstructMtlsEndpoint(ProtocolRoutePaths.Introspection));
+                    mtlsEndpoints.Add(Discovery.IntrospectionEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
                 if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.DeviceAuthorizationEndpoint, ConstructMtlsEndpoint(ProtocolRoutePaths.DeviceAuthorization));
+                    mtlsEndpoints.Add(Discovery.DeviceAuthorizationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
 
                 if (mtlsEndpoints.Count is not 0)
@@ -126,7 +127,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                     // path based
                     if (options.MutualTls.DomainName.IsMissing())
                     {
-                        return baseUrl + endpoint.Replace(ProtocolRoutePaths.ConnectPathPrefix, ProtocolRoutePaths.MtlsPathPrefix);
+                        return baseUrl + endpoint;
                     }
 
                     // domain based

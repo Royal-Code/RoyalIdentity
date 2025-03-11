@@ -36,38 +36,36 @@ public static class PipelineExtensions
     public static RouteHandlerBuilder MapPipeline<TEndpoint>(this IEndpointRouteBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.Map(pattern.WithRealm(), ServerEndpoint<TEndpoint>.EndpointHandler);
+        return builder.Map(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipeline<TEndpoint>(this RouteGroupBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.Map(pattern.WithRealm(), ServerEndpoint<TEndpoint>.EndpointHandler);
+        return builder.Map(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelineGet<TEndpoint>(this IEndpointRouteBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapGet(pattern.WithRealm(), ServerEndpoint<TEndpoint>.EndpointHandler);
+        return builder.MapGet(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelineGet<TEndpoint>(this RouteGroupBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapGet(pattern.WithRealm(), ServerEndpoint<TEndpoint>.EndpointHandler);
+        return builder.MapGet(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelinePost<TEndpoint>(this IEndpointRouteBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapPost(pattern.WithRealm(), ServerEndpoint<TEndpoint>.EndpointHandler);
+        return builder.MapPost(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
 
     public static RouteHandlerBuilder MapPipelinePost<TEndpoint>(this RouteGroupBuilder builder, string pattern)
         where TEndpoint : class, IEndpointHandler
     {
-        return builder.MapPost(pattern.WithRealm(), ServerEndpoint<TEndpoint>.EndpointHandler);
+        return builder.MapPost(pattern, ServerEndpoint<TEndpoint>.EndpointHandler);
     }
-        
-    private static string WithRealm(this string pattern) => $"{{realm}}/{pattern}";
 }

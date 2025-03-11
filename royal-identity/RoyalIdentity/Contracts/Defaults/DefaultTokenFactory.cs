@@ -56,7 +56,7 @@ public class DefaultTokenFactory : ITokenFactory
         }
 
         // add session id claim
-        if (request.IdentityType == OidcConstants.IdentityProfileTypes.User)
+        if (request.IdentityType == IdentityProfileTypes.User)
         {
             var sid = request.User.GetSessionId();
             claims.Add(new Claim(JwtClaimTypes.SessionId, sid));

@@ -1,9 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Responses.HttpResults;
 
@@ -13,9 +10,9 @@ public class CustomRedirectResult(IEndpointContextBase context, string redirectU
 
     public Task ExecuteAsync(HttpContext httpContext)
     {
-        var options = httpContext.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value;
+        var options = context.Realm.Options.ServerOptions.UI;
 
-        var returnUrl = httpContext.GetServerBasePath().EnsureTrailingSlash() + Constants.ProtocolRoutePaths.Authorize;
+        var returnUrl = httpContext.GetServerBasePath().EnsureTrailingSlash() + Oidc.Routes.BuildAuthorizeUrl(context.Realm.Path);
         returnUrl = returnUrl.AddQueryString(context.Raw.ToQueryString());
 
         if (!redirectUrl.IsLocalUrl())
@@ -25,7 +22,7 @@ public class CustomRedirectResult(IEndpointContextBase context, string redirectU
             returnUrl = httpContext.GetServerBaseUrl().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
         }
 
-        var url = redirectUrl.AddQueryString(options.UI.CustomRedirectParameter, returnUrl);
+        var url = redirectUrl.AddQueryString(options.CustomRedirectParameter, returnUrl);
         httpContext.Response.RedirectToAbsoluteUrl(url);
 
         return Task.CompletedTask;

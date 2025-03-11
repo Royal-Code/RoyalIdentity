@@ -6,7 +6,7 @@ using RoyalIdentity.Users;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Models;
-using static RoyalIdentity.Options.OidcConstants;
+using static RoyalIdentity.Options.Constants;
 using RoyalIdentity.Models.Tokens;
 
 namespace Tests.Host;

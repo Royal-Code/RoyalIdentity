@@ -12,7 +12,7 @@ public class DiscoveryContext : EndpointContextBase
         RealmOptions options,
         ContextItems? items = null) : base(httpContext, [], items)
     {
-        BaseUrl = httpContext.GetRealmBaseUrl().EnsureTrailingSlash();
+        BaseUrl = httpContext.GetServerBaseUrl().EnsureTrailingSlash();
         IssuerUri = httpContext.GetServerIssuerUri(options);
     }
 

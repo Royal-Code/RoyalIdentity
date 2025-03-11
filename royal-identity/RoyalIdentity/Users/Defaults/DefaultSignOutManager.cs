@@ -170,7 +170,8 @@ public class DefaultSignOutManager : ISignOutManager
             SessionId = session?.Id,
             State = state,
             UiLocales = message.UiLocales,
-            AutomaticRedirectAfterSignOut = realm.Options.Account.AutomaticRedirectAfterSignOut
+            AutomaticRedirectAfterSignOut = realm.Options.Account.AutomaticRedirectAfterSignOut,
+            SignOutIframeUrl = Oidc.Routes.BuildEndSessionCallbackUrl(realm.Path)
         };
 
         var logoutCallbackId = await messageStore.WriteAsync<LogoutCallbackMessage>(new(callbackMessage), ct);

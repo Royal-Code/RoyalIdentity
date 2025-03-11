@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Responses.HttpResults;
 
@@ -13,13 +12,13 @@ public class LoginPageResult(IEndpointContextBase context) : IResult, IStatusCod
 
     public async Task ExecuteAsync(HttpContext httpContext)
     {
-        var returnUrl = $"/{context.Realm.Path}/{Constants.ProtocolRoutePaths.AuthorizeCallback}";
+        var returnUrl = Oidc.Routes.BuildAuthorizeCallbackUrl(context.Realm.Path).EnsureLeadingSlash();
 
         if (context.Realm.Options.StoreAuthorizationParameters)
         {
             var storage = httpContext.RequestServices.GetRequiredService<IStorage>();
             var id = await storage.AuthorizeParameters.WriteAsync(context.Raw, httpContext.RequestAborted);
-            returnUrl = returnUrl.AddQueryString(Constants.AuthorizationParamsStore.MessageStoreIdParameterName, id);
+            returnUrl = returnUrl.AddQueryString(Oidc.Routes.Params.Authorization, id);
         }
         else
         {
