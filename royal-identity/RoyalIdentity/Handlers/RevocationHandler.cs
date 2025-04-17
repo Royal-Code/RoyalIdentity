@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Endpoints.Defaults;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
@@ -40,17 +42,30 @@ public class RevocationHandler : IHandler<RevocationContext>
         bool success = false;
 
         // revoke tokens
-        if (context.TokenTypeHint == Constants.TokenTypeHints.AccessToken)
+        if (context.TokenTypeHint == Oidc.TokenTypeHints.AccessToken)
         {
             logger.LogDebug("Hint was for access token");
 
             success = await RevokeAccessTokenAsync(context.Token!, context.ClientId!, ct);
         }
-        else if (context.TokenTypeHint == Constants.TokenTypeHints.RefreshToken)
+        else if (context.TokenTypeHint == Oidc.TokenTypeHints.RefreshToken)
         {
             logger.LogDebug("Hint was for refresh token");
 
             success = await RevokeRefreshTokenAsync(context.Token!, context.ClientId!, ct);
+        }
+        else if (context.TokenTypeHint.IsPresent())
+        {
+            logger.LogWarning("Unknown token type hint: {TokenTypeHint}", context.TokenTypeHint);
+
+            // Note: invalid tokens do not cause an error response since the client
+            // cannot handle such an error in a reasonable way.
+            context.Response = ResponseHandler.Error(new ErrorResponseParameters()
+            {
+                Error = Oidc.Errors.Revocation.UnsupportedTokenType
+            }, 200);
+
+            return;
         }
         else
         {

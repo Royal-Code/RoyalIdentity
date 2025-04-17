@@ -127,8 +127,8 @@ public class DiscoveryOptions
 
     public HashSet<string> SupportedTokenTypeHints { get; } =
     [
-        TokenTypeHints.RefreshToken,
-        TokenTypeHints.AccessToken
+        Oidc.TokenTypeHints.RefreshToken,
+        Oidc.TokenTypeHints.AccessToken
     ];
 
     public bool ResponseTypesIsSupported(ICollection<string> responseTypes)

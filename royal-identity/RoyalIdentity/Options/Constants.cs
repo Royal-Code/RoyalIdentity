@@ -238,22 +238,32 @@ public static partial class Constants
             public static string BuildMtlsDeviceAuthorizationUrl(string realm)
                 => $"{realm}/{Names.OidcConnect}/{Names.Mtls}/{Names.DeviceAuthorization}";
         }
+
+        public static class TokenTypeHints
+        {
+            public const string RefreshToken = "refresh_token";
+            public const string AccessToken = "access_token";
+        }
+
+        public static class Errors
+        {
+            public static class Revocation
+            {
+                public const string UnsupportedTokenType = "unsupported_token_type";
+            }
+        }
+    }
+
+    public static class  OAuth
+    {
+
     }
 }
 
 public static partial class Constants
 {
-    
-    public static class TokenTypeHints
-    {
-        public const string RefreshToken = "refresh_token";
-        public const string AccessToken = "access_token";
-    }
 
-    public static class RevocationErrors
-    {
-        public const string UnsupportedTokenType = "unsupported_token_type";
-    }
+
 
     public static class Filters
     {
