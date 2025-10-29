@@ -3,7 +3,6 @@ using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Decorators;
 
@@ -29,10 +28,10 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         //////////////////////////////////////////////////////////
 
         var resourceStore = storage.GetResourceStore(context.Realm);
-        var resourcesFromStore = await resourceStore.FindResourcesByScopeAsync(context.Resources.RequestedScopes, true, ct);
-        if (resourcesFromStore.MissingScopes.Count is not 0)
+        var scopesFromStorage = await resourceStore.FindResourcesByScopeAsync(context.Scopes.Scopes, true, ct);
+        if (!scopesFromStorage.IsValid)
         {
-            logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", string.Join(" ", resourcesFromStore.MissingScopes));
+            logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", context.Scopes.GetInvalidScopes());
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "scopes requested are invalid or inactive");
             return;
         }
@@ -40,14 +39,14 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         //////////////////////////////////////////////////////////
         // once the requested scopes are validated, we can copy the resources to the context
         //////////////////////////////////////////////////////////
-        resourcesFromStore.CopyTo(context.Resources);
+        scopesFromStorage.CopyTo(context.Scopes);
 
 
         //////////////////////////////////////////////////////////
         // check for openid scope
         //////////////////////////////////////////////////////////
-        if (!context.Resources.IsOpenId && 
-            context.Resources.IdentityResources.Count is not 0)
+        if (!context.Scopes.IsOpenId && 
+            context.Scopes.IdentityResources.Count is not 0)
         {
             logger.LogError(context, "Identity related scope requests, but no openid scope");
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "Identity scopes requested, but openid scope is missing");

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
+using RoyalIdentity.Models.Resources;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -23,7 +24,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     /// <inheritdoc />
     public async Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(
         ClaimsPrincipal subject,
-        Resources resources,
+        RequestedScopes resources,
         Client client,
         bool includeAllIdentityClaims,
         CancellationToken ct)
@@ -65,7 +66,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     /// <inheritdoc />
     public async Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(
         ClaimsPrincipal subject,
-        Resources resources,
+        RequestedScopes resources,
         Client client,
         string identityType,
         CancellationToken ct)
@@ -94,7 +95,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
         }
 
         // add scopes
-        outputClaims.AddRange(resources.RequestedScopes.Select(scope => new Claim(JwtClaimTypes.Scope, scope)));
+        outputClaims.AddRange(resources.ToScopeClaims());
 
         logger.LogDebug("Getting claims for access token for subject: {Subject}", subject.GetSubjectId());
 
@@ -106,7 +107,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             subject,
             client,
             identityType,
-            resources.RequestedResourcesClaimTypes());
+            resources.GetRequestedIdentityClaimsTypes());
 
         await profileService.GetProfileDataAsync(profileDataRequest, ct);
 

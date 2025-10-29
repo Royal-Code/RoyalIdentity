@@ -38,7 +38,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         var consentRequired = await consent.RequiresConsentAsync(
             context.Subject, 
             context.ClientParameters.Client,
-            context.Resources,
+            context.Scopes,
             ct);
 
         if (consentRequired && context.PromptModes.Contains(OidcConstants.PromptModes.None))

@@ -2,6 +2,7 @@
 using System.Security.Claims;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Utils;
+using RoyalIdentity.Models.Resources;
 
 namespace RoyalIdentity.Contracts.Models;
 
@@ -19,7 +20,7 @@ public class ProfileDataRequest
     /// <param name="identityType">The caller.</param>
     /// <param name="requestedClaimTypes">The requested claim types.</param>
     public ProfileDataRequest(
-        Resources requestedResources,
+        RequestedScopes requestedResources,
         ClaimsPrincipal subject,
         Client client,
         string identityType,
@@ -46,7 +47,7 @@ public class ProfileDataRequest
     /// <value>
     /// The resources.
     /// </value>
-    public Resources RequestedResources { get; }
+    public RequestedScopes RequestedResources { get; }
 
     /// <summary>
     /// Gets or sets the requested claim types.

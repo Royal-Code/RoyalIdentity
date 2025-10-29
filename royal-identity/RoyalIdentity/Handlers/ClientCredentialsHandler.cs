@@ -40,7 +40,7 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
             HttpContext = context.HttpContext,
             User = context.GetSubject()!,
             Client = client,
-            Resources = context.Resources,
+            Resources = context.Scopes,
             IdentityType = IdentityProfileTypes.Client,
         };
 
@@ -54,7 +54,7 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
             accessToken,
             null,
             null,
-            context.Resources.RequestedScopes.ToSpaceSeparatedString());
+            context.Scopes.Scopes.ToSpaceSeparatedString());
 
         await eventDispatcher.DispatchAsync(atEvent);
 

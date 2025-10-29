@@ -12,6 +12,26 @@ public static class StringExtensions
     internal static readonly char[] separator = [' '];
 
     [DebuggerStepThrough]
+    public static string ToSpaceSeparatedString(this IReadOnlyCollection<string> list)
+    {
+        if (list == null || list.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var sb = new StringBuilder(100);
+
+        foreach (var element in list)
+        {
+            sb.Append(element).Append(' ');
+        }
+
+        sb.Length--; // remove last space
+
+        return sb.ToString();
+    }
+
+    [DebuggerStepThrough]
     public static string ToSpaceSeparatedString(this IEnumerable<string> list)
     {
         if (list == null)
@@ -23,10 +43,13 @@ public static class StringExtensions
 
         foreach (var element in list)
         {
-            sb.Append(element + " ");
+            sb.Append(element).Append(' ');
         }
 
-        return sb.ToString().Trim();
+        if (sb.Length > 0)
+            sb.Length--; // remove last space
+
+        return sb.ToString();
     }
 
     [DebuggerStepThrough]

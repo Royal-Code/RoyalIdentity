@@ -32,7 +32,6 @@ public class DefaultProfileService : IProfileService
         IEnumerable<Claim> userClaims = userDetails.Claims;
         userClaims = userClaims.Concat(
             [
-                new Claim(JwtClaimTypes.Subject, userDetails.Username),
                 new Claim(JwtClaimTypes.Name, userDetails.DisplayName),
                 new Claim(JwtClaimTypes.PreferredUserName, userDetails.DisplayName)
             ]);

@@ -48,7 +48,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         {
             HttpContext = context.HttpContext,
             User = code.Subject,
-            Resources = code.Resources,
+            Resources = code.Scopes,
             Client = client,
             Confirmation = context.ClientParameters.Confirmation,
             IdentityType = IdentityProfileTypes.Client,
@@ -59,7 +59,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
 
         logger.LogDebug("Access token issued");
 
-        if (code.Resources.OfflineAccess)
+        if (code.Scopes.OfflineAccess)
         {
             var refreshTokenRequest = new RefreshTokenRequest()
             {
@@ -75,14 +75,14 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             logger.LogDebug("Refresh token issued");
         }
 
-        if (code.Resources.IsOpenId)
+        if (code.Scopes.IsOpenId)
         {
             var idTokenRequest = new IdentityTokenRequest()
             {
                 HttpContext = context.HttpContext,
                 User = code.Subject,
                 Client = client,
-                Resources = code.Resources,
+                Resources = code.Scopes,
                 Nonce = code.Nonce,
                 AccessTokenToHash = accessToken.Token,
             };
@@ -97,7 +97,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             accessToken, 
             refreshToken, 
             identityToken, 
-            code.Resources.RequestedScopes.ToSpaceSeparatedString());
+            code.Scopes.Scopes.ToSpaceSeparatedString());
 
         await eventDispatcher.DispatchAsync(atEvent);
 

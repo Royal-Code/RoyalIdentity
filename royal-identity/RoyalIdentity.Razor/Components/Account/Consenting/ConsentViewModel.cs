@@ -1,4 +1,4 @@
-using RoyalIdentity.Models;
+using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Razor.Components.Account.Consenting;
 
@@ -12,7 +12,7 @@ public class ConsentViewModel
 
     public bool AllowRememberConsent { get; set; }
 
-    public IEnumerable<IdentityResource> IdentityScopes { get; set; }
+    public IEnumerable<IdentityScope> IdentityScopes { get; set; }
 
     public IEnumerable<ApiScope> ApiScopes { get; set; }
 

@@ -1,4 +1,5 @@
-﻿using RoyalIdentity.Utils;
+﻿using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Utils;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Models.Tokens;
@@ -12,7 +13,7 @@ public class AuthorizationCode
 {
     public AuthorizationCode(string clientId, ClaimsPrincipal subject, string sessionState,
         DateTime creationTime, int lifetime,
-        Resources resources, string redirectUri)
+        RequestedScopes scopes, string redirectUri)
     {
         Code = CryptoRandom.CreateUniqueId();
         ClientId = clientId;
@@ -20,7 +21,7 @@ public class AuthorizationCode
         SessionState = sessionState;
         CreationTime = creationTime;
         Lifetime = lifetime;
-        Resources = resources;
+        Scopes = scopes;
         RedirectUri = redirectUri;
     }
 
@@ -75,7 +76,7 @@ public class AuthorizationCode
     /// <value>
     /// The requested scopes.
     /// </value>
-    public Resources Resources { get; }
+    public RequestedScopes Scopes { get; }
 
     /// <summary>
     /// Gets or sets the redirect URI.

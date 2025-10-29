@@ -2,6 +2,7 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
+using RoyalIdentity.Models.Resources;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 
@@ -23,7 +24,7 @@ public class DefaultConsentService : IConsentService
         this.clock = clock;
     }
 
-    public async ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, Resources resources, CancellationToken ct)
+    public async ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, RequestedScopes resources, CancellationToken ct)
     {
         if (!client.RequireConsent)
         {
@@ -92,7 +93,7 @@ public class DefaultConsentService : IConsentService
         await storage.UserConsents.StoreUserConsentAsync(consent, ct);
     }
 
-    public async ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, Resources resources, CancellationToken ct)
+    public async ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, RequestedScopes resources, CancellationToken ct)
     {
         if (!client.RequireConsent)
         {
@@ -116,7 +117,7 @@ public class DefaultConsentService : IConsentService
         return await Consented(consent, resources, ct);
     }
 
-    private async Task<bool> Consented([NotNullWhen(true)]Consent? consent, Resources resources, CancellationToken ct)
+    private async Task<bool> Consented([NotNullWhen(true)]Consent? consent, RequestedScopes resources, CancellationToken ct)
     {
         if (consent is null)
         {

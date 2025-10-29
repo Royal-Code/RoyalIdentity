@@ -23,7 +23,7 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
         //////////////////////////////////////////////////////////
         // check scope vs response_type plausibility
         //////////////////////////////////////////////////////////
-        if (context.ResponseTypes.Contains(ResponseTypes.IdToken) && !context.Resources.IsOpenId)
+        if (context.ResponseTypes.Contains(ResponseTypes.IdToken) && !context.Scopes.IsOpenId)
         {
             logger.LogError(context, "The parameter response_type requires the openid scope");
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing openid scope");
@@ -31,21 +31,21 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
         }
 
         if (context.ResponseTypes.Only(ResponseTypes.IdToken) &&
-            (context.Resources.ApiScopes.Any() || context.Resources.ApiResources.Any()))
+            (context.Scopes.ApiScopes.Any() || context.Scopes.ApiResources.Any()))
         {
             logger.LogError(context, "Requests for id_token response type only must include identity scopes only");
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "resource scopes are not allowed for id_token response type only");
             return default;
         }
 
-        if (context.ResponseTypes.Contains(ResponseTypes.Token) && !context.Resources.ApiScopes.Any())
+        if (context.ResponseTypes.Contains(ResponseTypes.Token) && !context.Scopes.ApiScopes.Any())
         {
             logger.LogError(context, "The parameter response_type requires resource scopes");
             context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing resource scopes");
             return default;
         }
 
-        if (context.ResponseTypes.Only(ResponseTypes.Token) && context.Resources.IdentityResources.Any())
+        if (context.ResponseTypes.Only(ResponseTypes.Token) && context.Scopes.IdentityResources.Any())
         {
             logger.LogError(context, "Requests for token response type only must include resource scopes only");
         }

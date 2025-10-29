@@ -1,5 +1,6 @@
 ﻿using RoyalIdentity.Models;
 using RoyalIdentity.Models.Keys;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
@@ -17,6 +18,14 @@ public class RealmMemoryStore
     {
         this.realm = realm;
         Clients = isServer ? ServerClients(realm) : DemoClients(realm);
+
+        var apiResource = ResourceServers.First().Value.Resources.First();
+        ApiResources[apiResource.Name] = apiResource;
+        var apiscopes = apiResource.Scopes;
+        foreach (var item in apiscopes)
+        {
+            ApiScopes[item.Name] = item;
+        }
     }
 
     public ConcurrentDictionary<string, Client> Clients { get; }
@@ -25,27 +34,24 @@ public class RealmMemoryStore
 
     public ConcurrentDictionary<string, IdentitySession> UserSessions { get; } = new();
 
-    public ConcurrentDictionary<string, IdentityResource> IdentityResources { get; } = new()
+    public ConcurrentDictionary<string, IdentityScope> IdentityResources { get; } = new()
     {
-        [ServerConstants.StandardScopes.OpenId] = new IdentityResource
+        [ServerConstants.StandardScopes.OpenId] = new IdentityScope(
+            ScopeVisibility.Public,
+            ServerConstants.StandardScopes.OpenId,
+            "Your user identifier",
+            "Your user identifier",
+            [JwtClaimTypes.Subject])
         {
-            Name = ServerConstants.StandardScopes.OpenId,
-            DisplayName = "Your user identifier",
-            Description = "Your user identifier",
             Required = true,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
-            UserClaims = [JwtClaimTypes.Subject]
         },
-        [ServerConstants.StandardScopes.Profile] = new IdentityResource
-        {
-            Name = ServerConstants.StandardScopes.Profile,
-            DisplayName = "Your profile data",
-            Description = "Your profile data, which are: name, family_name, given_name, middle_name, nickname, preferred_username, profile, picture, website, gender, birthdate, zoneinfo, locale, and updated_at.",
-            Required = false,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true,
-            UserClaims =
+        [ServerConstants.StandardScopes.Profile] = new IdentityScope(
+            ScopeVisibility.Public,
+            ServerConstants.StandardScopes.Profile,
+            "Your profile data",
+            "Your profile data, which are: name, family_name, given_name, middle_name, nickname, preferred_username, profile, picture, website, gender, birthdate, zoneinfo, locale, and updated_at.0",
             [
                 JwtClaimTypes.Name,
                 JwtClaimTypes.FamilyName,
@@ -61,90 +67,92 @@ public class RealmMemoryStore
                 JwtClaimTypes.ZoneInfo,
                 JwtClaimTypes.Locale,
                 JwtClaimTypes.UpdatedAt
-            ]
-        },
-        [ServerConstants.StandardScopes.Email] = new IdentityResource
+            ])
         {
-            Name = ServerConstants.StandardScopes.Email,
-            DisplayName = "Your email address",
-            Description = "Your email address",
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
-            UserClaims = 
+        },
+        [ServerConstants.StandardScopes.Email] = new IdentityScope(
+            ScopeVisibility.Public,
+            ServerConstants.StandardScopes.Email,
+            "Your email address",
+            "Your email address",
             [
                 JwtClaimTypes.Email,
                 JwtClaimTypes.EmailVerified
-            ]
-        },
-        [ServerConstants.StandardScopes.Address] = new IdentityResource
+            ])
         {
-            Name = ServerConstants.StandardScopes.Address,
-            DisplayName = "Your address",
-            Description = "Your address",
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
-            UserClaims =
-            [
-                JwtClaimTypes.Address
-            ]
         },
-        [ServerConstants.StandardScopes.Phone] = new IdentityResource
+        [ServerConstants.StandardScopes.Address] = new IdentityScope(
+            ScopeVisibility.Public,
+            ServerConstants.StandardScopes.Address, 
+            "Your address",
+            "Your address",
+            [JwtClaimTypes.Address])
         {
-            Name = ServerConstants.StandardScopes.Phone,
-            DisplayName = "Your phone number",
-            Description = "Your phone number",
             Required = false,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true,
-            UserClaims =
-            [
-                JwtClaimTypes.PhoneNumber,
-                JwtClaimTypes.PhoneNumberVerified
-            ]
-        }
-    };
-
-    public ConcurrentDictionary<string, ApiScope> ApiScopes { get; } = new()
-    {
-        ["api"] = new ApiScope
-        {
-            Name = "api",
-            DisplayName = "API",
-            Description = "Access to the API",
-            Required = true,
             Emphasize = false,
             ShowInDiscoveryDocument = true
         },
-        ["api:read"] = new ApiScope
+        [ServerConstants.StandardScopes.Phone] = new IdentityScope(
+            ScopeVisibility.Public,
+            ServerConstants.StandardScopes.Phone,
+            "Your phone number",
+            "Your phone number",
+            [
+                JwtClaimTypes.PhoneNumber,
+                JwtClaimTypes.PhoneNumberVerified
+            ])
         {
-            Name = "api:read",
-            DisplayName = "API read",
-            Description = "Read values from the API",
+            Required = false,
+            Emphasize = false,
+            ShowInDiscoveryDocument = true,
+        }
+    };
+
+    public ConcurrentDictionary<string, ResourceServer> ResourceServers { get; } = new()
+    {
+        ["apiserver"] = new ResourceServer(ScopeVisibility.Public, "apiserver", "API Server", "Access to the API Server")
+        {
+            Resources =
+            [
+                new ApiResource(ScopeVisibility.Public, "api1", "API 1", "Access to the API 1")
+                {
+                    Name = "api",
+                    DisplayName = "API",
+                    Scopes = 
+                    [
+                        new ApiScope(ScopeVisibility.Public, "api", "API", "Access to the API")
+                        {
+                            Required = true,
+                            Emphasize = false,
+                        }
+                    ]
+                }
+            ],
+        }
+    };
+
+    public ConcurrentDictionary<string, ApiResource> ApiResources { get; } = [];
+
+    public ConcurrentDictionary<string, ApiScope> ApiScopes { get; } = new()
+    {
+        ["api:read"] = new ApiScope(ScopeVisibility.Public, "api:read", "API read", "Read values from the API")
+        {
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true
         }
         ,
-        ["api:write"] = new ApiScope
+        ["api:write"] = new ApiScope(ScopeVisibility.Public, "api:write", "API write", "Write values from the API")
         {
-            Name = "api:write",
-            DisplayName = "API write",
-            Description = "Write values from the API",
             Required = false,
             Emphasize = true,
             ShowInDiscoveryDocument = true
-        }
-    };
-
-    public ConcurrentDictionary<string, ApiResource> ApiResources { get; } = new()
-    {
-        ["api"] = new ApiResource
-        {
-            Name = "api",
-            DisplayName = "API",
-            Scopes = { "api" }
         }
     };
 

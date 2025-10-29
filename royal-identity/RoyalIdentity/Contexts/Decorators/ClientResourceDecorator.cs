@@ -58,7 +58,7 @@ public class ClientResourceDecorator : IDecorator<ClientCredentialsContext>
                 context.InvalidRequest(TokenErrors.InvalidScope, "scopes requested are invalid or inactive");
             }
 
-            resourcesFromStore.CopyTo(context.Resources);
+            resourcesFromStore.CopyTo(context.Scopes);
         }
 
         await next();

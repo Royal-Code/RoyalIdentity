@@ -65,7 +65,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
                 HttpContext = context.HttpContext,
                 User = context.Subject,
                 Client = context.ClientParameters.Client,
-                Resources = context.Resources,
+                Resources = context.Scopes,
                 IdentityType = IdentityProfileTypes.User,
             };
 
@@ -87,7 +87,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
                 HttpContext = context.HttpContext,
                 User = context.Subject,
                 Client = context.ClientParameters.Client,
-                Resources = context.Resources,
+                Resources = context.Scopes,
                 Nonce = context.Nonce,
                 AccessTokenToHash = accessTokenValue,
                 AuthorizationCodeToHash = codeValue,

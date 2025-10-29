@@ -123,7 +123,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 return ValueTask.CompletedTask;
             }
         }
-        else if (context.Resources.IsOpenId && 
+        else if (context.Scopes.IsOpenId && 
             context.ResponseTypes.Contains(ResponseTypes.Token))
         {
             logger.LogError(context, "Nonce required for implicit flow with openid scope");

@@ -42,7 +42,7 @@ public class DefaultCodeFactory : ICodeFactory
             sessionState,
             time.GetUtcNow().UtcDateTime,
             context.ClientParameters.Client.AuthorizationCodeLifetime,
-            context.Resources,
+            context.Scopes,
             context.RedirectUri)
         {
             SessionId = context.SessionId,

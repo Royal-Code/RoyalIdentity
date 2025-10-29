@@ -2,12 +2,12 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;
 using System.Security.Claims;
 using RoyalIdentity.Extensions;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using RoyalIdentity.Models.Resources;
 
 namespace RoyalIdentity.Contexts;
 
@@ -22,7 +22,7 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
         ContextItems items) : base(httpContext, raw, OpenIdConnectGrantTypes.ClientCredentials, items)
     { }
 
-    public Resources Resources { get; } = new();
+    public RequestedScopes Scopes { get; } = new();
 
     public override ClaimsPrincipal? GetSubject()
     {
@@ -49,7 +49,7 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
     public override void Load(ILogger logger)
     {
         LoadBase(logger);
-        Resources.RequestedScopes.AddRange(Scope.FromSpaceSeparatedString());
+        Scopes.Scopes.AddRange(Scope.FromSpaceSeparatedString());
     }
 
     public void ResourcesValidated() => resourcesValidated = true;

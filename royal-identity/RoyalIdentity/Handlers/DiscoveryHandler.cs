@@ -165,7 +165,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
             // scopes
             if (options.Discovery.ShowIdentityScopes)
             {
-                scopes.AddRange(resources.IdentityResources.Where(x => x.ShowInDiscoveryDocument).Select(x => x.Name));
+                scopes.AddRange(resources.IdentityScopes.Where(x => x.ShowInDiscoveryDocument).Select(x => x.Name));
             }
 
             if (options.Discovery.ShowApiScopes)
@@ -189,10 +189,8 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 var claims = new List<string>();
 
                 // add non-hidden identity scopes related claims
-                claims.AddRange(resources.IdentityResources.Where(x => x.ShowInDiscoveryDocument).SelectMany(x => x.UserClaims));
-                claims.AddRange(resources.ApiResources.Where(x => x.ShowInDiscoveryDocument).SelectMany(x => x.UserClaims));
-                claims.AddRange(resources.ApiScopes.Where(x => x.ShowInDiscoveryDocument).SelectMany(x => x.UserClaims));
-
+                claims.AddRange(resources.IdentityScopes.Where(x => x.ShowInDiscoveryDocument).SelectMany(x => x.UserClaims));
+                
                 entries.Add(Discovery.ClaimsSupported, claims.Distinct().ToArray());
             }
         }

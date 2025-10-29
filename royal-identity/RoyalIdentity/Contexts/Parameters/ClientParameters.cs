@@ -1,8 +1,6 @@
-﻿using RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
-using RoyalIdentity.Contracts.Models;
+﻿using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
-using RoyalIdentity.Options;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 

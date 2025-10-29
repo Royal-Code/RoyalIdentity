@@ -1,38 +1,44 @@
 using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Models;
 using RoyalIdentity.Extensions;
 using static RoyalIdentity.Options.ServerConstants;
 using System.Collections.Concurrent;
+using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Storage.InMemory;
 
 public class ResourceStore : IResourceStore
 {
-    private readonly ConcurrentDictionary<string, IdentityResource> identityResources;
+    private readonly ConcurrentDictionary<string, ResourceServer> resourceServers;
+    private readonly ConcurrentDictionary<string, IdentityScope> identityResources;
     private readonly ConcurrentDictionary<string, ApiScope> apiScopes;
     private readonly ConcurrentDictionary<string, ApiResource> apiResources;
 
     public ResourceStore(
-        ConcurrentDictionary<string, IdentityResource> identityResources,
+        ConcurrentDictionary<string, ResourceServer> resourceServers,
+        ConcurrentDictionary<string, IdentityScope> identityResources,
         ConcurrentDictionary<string, ApiScope> apiScopes,
         ConcurrentDictionary<string, ApiResource> apiResources)
     {
+        this.resourceServers = resourceServers;
         this.identityResources = identityResources;
         this.apiScopes = apiScopes;
         this.apiResources = apiResources;
     }
 
-    public Task<IEnumerable<IdentityResource>> FindIdentityResourcesByScopeNameAsync(IEnumerable<string> scopeNames, CancellationToken ct = default)
+    [Obsolete("Use FindResourcesByScopeAsync instead.")]
+    public Task<IEnumerable<IdentityScope>> FindIdentityResourcesByScopeNameAsync(IEnumerable<string> scopeNames, CancellationToken ct = default)
     {
-        List<IdentityResource> scopes = new();
+        List<IdentityScope> scopes = new();
         foreach (var scope in scopeNames)
         {
             if (identityResources.TryGetValue(scope, out var identityResource))
                 scopes.Add(identityResource);
         }
-        return Task.FromResult<IEnumerable<IdentityResource>>(scopes);
+        return Task.FromResult<IEnumerable<IdentityScope>>(scopes);
     }
 
+    [Obsolete("Use FindResourcesByScopeAsync instead.")]
     public Task<IEnumerable<ApiScope>> FindApiScopesByScopeNameAsync(IEnumerable<string> scopeNames, CancellationToken ct = default)
     {
         List<ApiScope> scopes = new();
@@ -44,6 +50,7 @@ public class ResourceStore : IResourceStore
         return Task.FromResult<IEnumerable<ApiScope>>(scopes);
     }
 
+    [Obsolete("Use FindResourcesByScopeAsync instead.")]
     public Task<IEnumerable<ApiResource>> FindApiResourcesByScopeNameAsync(IEnumerable<string> scopeNames, CancellationToken ct = default)
     {
         List<ApiResource> scopes = new();
@@ -55,29 +62,33 @@ public class ResourceStore : IResourceStore
         return Task.FromResult<IEnumerable<ApiResource>>(scopes);
     }
 
-    public Task<Resources> GetAllResourcesAsync(CancellationToken ct = default)
+    public Task<AllScopes> GetAllResourcesAsync(CancellationToken ct = default)
     {
-        Resources resources = new();
-        AddRange(resources.IdentityResources, identityResources.Values);
-        AddRange(resources.ApiResources, apiResources.Values);
-        AddRange(resources.ApiScopes, apiScopes.Values);
+        var resources = new AllScopes(
+            resourceServers.Values.ToList(),
+            apiResources.Values.ToList(),
+            apiScopes.Values.ToList(),
+            identityResources.Values.ToList()
+        );
         return Task.FromResult(resources);
     }
 
-    public Task<Resources> GetAllEnabledResourcesAsync(CancellationToken ct = default)
+    public Task<AllScopes> GetAllEnabledResourcesAsync(CancellationToken ct = default)
     {
-        Resources resources = new();
-        AddRange(resources.IdentityResources, identityResources.Values.Where(x => x.Enabled));
-        AddRange(resources.ApiResources, apiResources.Values.Where(x => x.Enabled));
-        AddRange(resources.ApiScopes, apiScopes.Values.Where(x => x.Enabled));
+        var resources = new AllScopes(
+            resourceServers.Values.Where(x => x.Enabled).ToList(),
+            apiResources.Values.Where(x => x.Enabled).ToList(),
+            apiScopes.Values.Where(x => x.Enabled).ToList(),
+            identityResources.Values.Where(x => x.Enabled).ToList()
+        );
         return Task.FromResult(resources);
     }
 
-    public Task<Resources> FindResourcesByScopeAsync(
+    public Task<RequestedScopes> FindResourcesByScopeAsync(
         IEnumerable<string> scopeNames, bool onlyEnabled = false, CancellationToken ct = default)
     {
-        Resources resources = new();
-        resources.RequestedScopes.AddRange(scopeNames);
+        RequestedScopes resources = new();
+        resources.Scopes.AddRange(scopeNames);
 
         foreach (var scope in scopeNames)
         {
@@ -87,24 +98,35 @@ public class ResourceStore : IResourceStore
                 continue;
             }
 
+            if (resourceServers.TryGetValue(scope, out var resourceServer)
+                && (!onlyEnabled || resourceServer.Enabled))
+            {
+                if (IsEnabled(resourceServer, resources))
+                    resources.ResourceServers.Add(resourceServer);
+                continue;
+            }
+
             if (identityResources.TryGetValue(scope, out var identityResource)
                 && (!onlyEnabled || identityResource.Enabled))
             {
-                resources.IdentityResources.Add(identityResource);
+                if (IsEnabled(identityResource, resources))
+                    resources.IdentityResources.Add(identityResource);
                 continue;
             }
 
             if (apiResources.TryGetValue(scope, out var apiResource)
                 && (!onlyEnabled || apiResource.Enabled))
             {
-                resources.ApiResources.Add(apiResource);
+                if (IsEnabled(apiResource, resources))
+                    resources.ApiResources.Add(apiResource);
                 continue;
             }
 
             if (apiScopes.TryGetValue(scope, out var apiScope)
                 && (!onlyEnabled || apiScope.Enabled))
             {
-                resources.ApiScopes.Add(apiScope);
+                if (IsEnabled(apiScope, resources))
+                    resources.ApiScopes.Add(apiScope);
                 continue;
             }
 
@@ -112,6 +134,15 @@ public class ResourceStore : IResourceStore
         }
 
         return Task.FromResult(resources);
+    }
+
+    private bool IsEnabled(ScopeBase scope, RequestedScopes requestedScopes)
+    {
+        if (scope.Enabled)
+            return true;
+
+        requestedScopes.DisabledScopes.Add(scope.Name);
+        return false;
     }
 
     private static void AddRange<T>(ICollection<T> collection, IEnumerable<T> items)

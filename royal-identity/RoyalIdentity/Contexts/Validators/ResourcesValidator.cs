@@ -24,7 +24,7 @@ public class ResourcesValidator : IValidator<IWithResources>
         context.ClientParameters.AssertHasClient();
 
         var client = context.ClientParameters.Client;
-        var resources = context.Resources;
+        var resources = context.Scopes;
 
         if (!resources.IsValid)
         {
@@ -37,7 +37,7 @@ public class ResourcesValidator : IValidator<IWithResources>
         {
             if (client.AllowOfflineAccess)
             {
-                context.Resources.OfflineAccess = true;
+                context.Scopes.OfflineAccess = true;
             }
             else
             {
