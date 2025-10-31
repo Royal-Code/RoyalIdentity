@@ -61,6 +61,14 @@ Na hora de adicionar os scopes ao token, apenas os *scopes* do recurso serão adi
 
 Para exibir o consentimento, todos os *scopes* do recurso serão exibidos.
 
+## Users
+
+Unificar a lógica de usuários.
+Existe IdentityUser, UserDetails, IUserStore e IUserDetailsStore.
+Há IdentitySession e IUserSessionStore.
+Há lógica confusa entre usuários e sessões.
+Precisa unificar o usuário e revisar a sessão e o login.
+
 ## UI Services
 
 Existe muita lógica dentro dos componentes Razor.

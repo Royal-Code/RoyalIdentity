@@ -1,6 +1,6 @@
 <Project>
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net9.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
@@ -9,8 +9,8 @@
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 	<PropertyGroup>
-		<AspVer>8.0.11</AspVer>
-		<ExtVer>8.0.11</ExtVer>
-		<IdVer>8.2.1</IdVer>
+		<AspVer>9.0.10</AspVer>
+		<ExtVer>9.0.10</ExtVer>
+		<IdVer>8.14.0</IdVer>
 	</PropertyGroup>
 </Project>
