@@ -93,35 +93,35 @@ public class RequestedScopes
     public IEnumerable<Claim> ToScopeClaims()
     {
         if (OfflineAccess)
-            yield return new Claim(JwtClaimTypes.Scope, ServerConstants.StandardScopes.OfflineAccess);
+            yield return new Claim(Jwt.ClaimTypes.Scope, ServerConstants.StandardScopes.OfflineAccess);
 
         // api scopes.
 
         foreach (var scope in ResourceServers.SelectMany(rs => rs.Resources).SelectMany(r => r.Scopes).Select(s => s.Name).Distinct())
         {
-            yield return new Claim(JwtClaimTypes.Scope, scope);
+            yield return new Claim(Jwt.ClaimTypes.Scope, scope);
         }
 
         foreach (var resource in ApiResources.SelectMany(ar => ar.Scopes).Select(s => s.Name).Distinct())
         {
-            yield return new Claim(JwtClaimTypes.Scope, resource);
+            yield return new Claim(Jwt.ClaimTypes.Scope, resource);
         }
 
         foreach (var resource in ApiScopes.Select(s => s.Name).Distinct())
         {
-            yield return new Claim(JwtClaimTypes.Scope, resource);
+            yield return new Claim(Jwt.ClaimTypes.Scope, resource);
         }
 
         // identity scopes.
 
         foreach (var resource in IdentityResources.Select(s => s.Name).Distinct())
         {
-            yield return new Claim(JwtClaimTypes.Scope, resource);
+            yield return new Claim(Jwt.ClaimTypes.Scope, resource);
         }
 
         foreach (var scope in ResourceServers.SelectMany(rs => rs.IdentityScopes).Select(s => s.Name).Distinct())
         {
-            yield return new Claim(JwtClaimTypes.Scope, scope);
+            yield return new Claim(Jwt.ClaimTypes.Scope, scope);
         }
     }
 

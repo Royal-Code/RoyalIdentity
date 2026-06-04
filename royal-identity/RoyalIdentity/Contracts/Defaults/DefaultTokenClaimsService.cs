@@ -125,8 +125,8 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     {
         var claims = new List<Claim>
         {
-            new(JwtClaimTypes.Subject, subject.GetSubjectId()),
-            new(JwtClaimTypes.AuthenticationTime, subject.GetAuthenticationTimeEpoch().ToString(),
+            new(JwtRegisteredClaimNames.Sub, subject.GetSubjectId()),
+            new(JwtRegisteredClaimNames.AuthTime, subject.GetAuthenticationTimeEpoch().ToString(),
                 ClaimValueTypes.Integer64),
             new(Jwt.ClaimTypes.IdentityProvider, subject.GetIdentityProvider())
         };
@@ -145,7 +145,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     {
         var claims = new List<Claim>();
 
-        var acr = subject.FindFirst(JwtClaimTypes.AuthenticationContextClassReference);
+        var acr = subject.FindFirst(JwtRegisteredClaimNames.Acr);
         if (acr is not null)
             claims.Add(acr);
 

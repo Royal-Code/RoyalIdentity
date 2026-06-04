@@ -60,7 +60,7 @@ public class AccessToken : TokenBase
         };
 
         newToken.Claims.AddRange(Claims.Where(c => c.Type != "jti"));
-        newToken.Claims.Add(new Claim(JwtClaimTypes.JwtId, jti));
+        newToken.Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, jti));
 
         return newToken;
     }

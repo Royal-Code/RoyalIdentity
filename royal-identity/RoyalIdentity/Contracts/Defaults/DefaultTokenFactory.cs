@@ -52,18 +52,18 @@ public class DefaultTokenFactory : ITokenFactory
         var jti = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex);
         if (request.Client.IncludeJwtId)
         {
-            claims.Add(new Claim(JwtClaimTypes.JwtId, jti));
+            claims.Add(new Claim(JwtRegisteredClaimNames.Jti, jti));
         }
 
         // add session id claim
         if (request.IdentityType == IdentityProfileTypes.User)
         {
             var sid = request.User.GetSessionId();
-            claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
+            claims.Add(new Claim(JwtRegisteredClaimNames.Sid, sid));
         }
 
         // iat claim as required by JWT profile
-        claims.Add(new Claim(JwtClaimTypes.IssuedAt, clock.GetUtcNow().ToUnixTimeSeconds().ToString(),
+        claims.Add(new Claim(JwtRegisteredClaimNames.Iat, clock.GetUtcNow().ToUnixTimeSeconds().ToString(),
             ClaimValueTypes.Integer64));
 
         var issuer = request.HttpContext.GetServerIssuerUri(request.Client.Realm.Options);
@@ -142,20 +142,20 @@ public class DefaultTokenFactory : ITokenFactory
         // if nonce was sent, must be mirrored in id token
         if (request.Nonce.IsPresent())
         {
-            claims.Add(new Claim(JwtClaimTypes.Nonce, request.Nonce));
+            claims.Add(new Claim(JwtRegisteredClaimNames.Nonce, request.Nonce));
         }
 
         // add iat claim
         claims.Add(new Claim(
-            JwtClaimTypes.IssuedAt, 
-            clock.GetUtcNow().ToUnixTimeSeconds().ToString(), 
+            JwtRegisteredClaimNames.Iat,
+            clock.GetUtcNow().ToUnixTimeSeconds().ToString(),
             ClaimValueTypes.Integer64));
 
         // add at_hash claim
         if (request.AccessTokenToHash.IsPresent())
         {
             claims.Add(new Claim(
-                JwtClaimTypes.AccessTokenHash,
+                JwtRegisteredClaimNames.AtHash,
                 CryptoHelper.CreateHashClaimValue(request.AccessTokenToHash, signingAlgorithm)));
         }
 
@@ -163,7 +163,7 @@ public class DefaultTokenFactory : ITokenFactory
         if (request.AuthorizationCodeToHash.IsPresent())
         {
             claims.Add(new Claim(
-                JwtClaimTypes.AuthorizationCodeHash, 
+                JwtRegisteredClaimNames.CHash,
                 CryptoHelper.CreateHashClaimValue(request.AuthorizationCodeToHash, signingAlgorithm)));
         }
 
@@ -175,7 +175,7 @@ public class DefaultTokenFactory : ITokenFactory
 
         // add sid
         var sid = request.User.GetSessionId();
-        claims.Add(new Claim(JwtClaimTypes.SessionId, sid));
+        claims.Add(new Claim(JwtRegisteredClaimNames.Sid, sid));
 
         claims.AddRange(await tokenClaimsService.GetIdentityTokenClaimsAsync(
             request.User,
@@ -187,7 +187,7 @@ public class DefaultTokenFactory : ITokenFactory
         // add client_id to audiences if is openid
         if (request.Resources.IsOpenId)
         {
-            claims.Add(new Claim(JwtClaimTypes.Audience, client.Id));
+            claims.Add(new Claim(JwtRegisteredClaimNames.Aud, client.Id));
         }
 
         var issuer = request.HttpContext.GetServerIssuerUri(request.Client.Realm.Options);

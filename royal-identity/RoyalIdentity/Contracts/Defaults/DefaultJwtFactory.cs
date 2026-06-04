@@ -123,16 +123,16 @@ public class DefaultJwtFactory : IJwtFactory
 
         foreach (var aud in token.Audiences)
         {
-            payload.AddClaim(new Claim(JwtClaimTypes.Audience, aud));
+            payload.AddClaim(new Claim(JwtRegisteredClaimNames.Aud, aud));
         }
 
-        var scopeClaims = token.Claims.Where(x => x.Type == JwtClaimTypes.Scope).ToArray();
+        var scopeClaims = token.Claims.Where(x => x.Type == Jwt.ClaimTypes.Scope).ToArray();
         var jsonClaims = token.Claims.Where(x => x.ValueType == ServerConstants.ClaimValueTypes.Json).ToList();
 
         // add confirmation claim if present (it's JSON valued)
         if (token.Confirmation.IsPresent())
         {
-            jsonClaims.Add(new Claim(JwtClaimTypes.Confirmation, token.Confirmation, ServerConstants.ClaimValueTypes.Json));
+            jsonClaims.Add(new Claim(Jwt.ClaimTypes.Confirmation, token.Confirmation, ServerConstants.ClaimValueTypes.Json));
         }
 
         var normalClaims = token.Claims
@@ -148,11 +148,11 @@ public class DefaultJwtFactory : IJwtFactory
 
             if (options.EmitScopesAsSpaceDelimitedStringInJwt)
             {
-                payload.Add(JwtClaimTypes.Scope, string.Join(" ", scopeValues));
+                payload.Add(Jwt.ClaimTypes.Scope, string.Join(" ", scopeValues));
             }
             else
             {
-                payload.Add(JwtClaimTypes.Scope, scopeValues);
+                payload.Add(Jwt.ClaimTypes.Scope, scopeValues);
             }
         }
 

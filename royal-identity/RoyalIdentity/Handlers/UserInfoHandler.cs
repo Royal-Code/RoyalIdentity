@@ -34,7 +34,7 @@ public class UserInfoHandler : IHandler<UserInfoContext>
         var bearerToken = context.BearerParameters.EvaluatedToken;
         var resourceStore = storage.GetResourceStore(context.Realm);
 
-        var scopes = bearerToken.Principal.Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
+        var scopes = bearerToken.Principal.Claims.Where(x => x.Type == Jwt.ClaimTypes.Scope).Select(x => x.Value);
         var resources = await resourceStore.FindResourcesByScopeAsync(scopes, ct: ct);
 
         var request = new ProfileDataRequest(
@@ -66,10 +66,10 @@ public class UserInfoHandler : IHandler<UserInfoContext>
             }
         }
 
-        var subClaim = outgoingClaims.SingleOrDefault(x => x.Type == JwtClaimTypes.Subject);
+        var subClaim = outgoingClaims.SingleOrDefault(x => x.Type == JwtRegisteredClaimNames.Sub);
         if (subClaim is null)
         {
-            outgoingClaims.Add(new Claim(JwtClaimTypes.Subject, bearerToken.Principal.GetSubjectId()));
+            outgoingClaims.Add(new Claim(JwtRegisteredClaimNames.Sub, bearerToken.Principal.GetSubjectId()));
         }
         else if (subClaim.Value != bearerToken.Principal.GetSubjectId())
         {

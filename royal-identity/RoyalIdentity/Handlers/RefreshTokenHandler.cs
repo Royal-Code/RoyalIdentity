@@ -120,8 +120,8 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             logger.LogDebug("Updating Refresh Token");
 
             newRefreshToken = refreshToken;
-            newRefreshToken.Claims.RemoveWhere(c => c.Type == JwtClaimTypes.JwtId);
-            newRefreshToken.Claims.Add(new Claim(JwtClaimTypes.JwtId, accessToken.Id));
+            newRefreshToken.Claims.RemoveWhere(c => c.Type == JwtRegisteredClaimNames.Jti);
+            newRefreshToken.Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, accessToken.Id));
 
             await storage.RefreshTokens.UpdateAsync(refreshToken, ct);
         }

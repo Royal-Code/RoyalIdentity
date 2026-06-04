@@ -95,12 +95,12 @@ public sealed class DefaultIdentityUser : IdentityUser
 
         var claims = new List<Claim>
         {
-            new(JwtClaimTypes.Subject, details.Username),
+            new(JwtRegisteredClaimNames.Sub, details.Username),
             new(JwtClaimTypes.Name, details.DisplayName),
-            new(JwtClaimTypes.AuthenticationTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
-            new(JwtClaimTypes.SessionId, currentSession.Id),
+            new(JwtRegisteredClaimNames.AuthTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
+            new(JwtRegisteredClaimNames.Sid, currentSession.Id),
             new(Jwt.ClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
-            new(JwtClaimTypes.AuthenticationMethod, currentSession.Amr)
+            new(JwtRegisteredClaimNames.Amr, currentSession.Amr)
         };
 
         foreach (var role in details.Roles)

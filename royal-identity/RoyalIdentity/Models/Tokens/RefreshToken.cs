@@ -16,9 +16,9 @@ public class RefreshToken: TokenBase
         int lifetime,
         string tokenItSelf) : base(clientId, issuer, creationTime, lifetime, tokenItSelf)
     {
-        Claims.Add(new Claim(JwtClaimTypes.Subject, subjectId));
-        Claims.Add(new Claim(JwtClaimTypes.SessionId, sessionId));
-        Claims.Add(new Claim(JwtClaimTypes.JwtId, accessTokenId));
+        Claims.Add(new Claim(JwtRegisteredClaimNames.Sub, subjectId));
+        Claims.Add(new Claim(JwtRegisteredClaimNames.Sid, sessionId));
+        Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, accessTokenId));
 
         RequestedScopes = requestedScopes;
     }
@@ -26,7 +26,7 @@ public class RefreshToken: TokenBase
     /// <summary>
     /// Gets the access token id (jit).
     /// </summary>
-    public string? AccessTokenId => Claims.Where(x => x.Type == JwtClaimTypes.JwtId).Select(x => x.Value).SingleOrDefault();
+    public string? AccessTokenId => Claims.Where(x => x.Type == JwtRegisteredClaimNames.Jti).Select(x => x.Value).SingleOrDefault();
 
     /// <summary>
     /// Gets or sets the requested scopes.

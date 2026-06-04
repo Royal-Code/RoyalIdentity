@@ -90,7 +90,7 @@ public abstract class TokenBase
     /// <value>
     /// The subject identifier.
     /// </value>
-    public string? SubjectId => Claims.Where(x => x.Type == JwtClaimTypes.Subject).Select(x => x.Value).SingleOrDefault();
+    public string? SubjectId => Claims.Where(x => x.Type == JwtRegisteredClaimNames.Sub).Select(x => x.Value).SingleOrDefault();
 
     /// <summary>
     /// Gets the session identifier.
@@ -98,7 +98,7 @@ public abstract class TokenBase
     /// <value>
     /// The session identifier.
     /// </value>
-    public string? SessionId => Claims.Where(x => x.Type == JwtClaimTypes.SessionId).Select(x => x.Value).SingleOrDefault();
+    public string? SessionId => Claims.Where(x => x.Type == JwtRegisteredClaimNames.Sid).Select(x => x.Value).SingleOrDefault();
 
     /// <summary>
     /// Gets the scopes.
@@ -106,7 +106,7 @@ public abstract class TokenBase
     /// <value>
     /// The scopes.
     /// </value>
-    public IEnumerable<string> Scopes => Claims.Where(x => x.Type == JwtClaimTypes.Scope).Select(x => x.Value);
+    public IEnumerable<string> Scopes => Claims.Where(x => x.Type == Jwt.ClaimTypes.Scope).Select(x => x.Value);
 
     public ClaimsPrincipal CreatePrincipal()
     {

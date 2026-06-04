@@ -42,7 +42,7 @@ public static class PrincipalExtensions
     {
         if (identity is ClaimsIdentity id)
         {
-            var claim = id.FindFirst(JwtClaimTypes.AuthenticationTime);
+            var claim = id.FindFirst(JwtRegisteredClaimNames.AuthTime);
             if (claim is not null)
                 return long.Parse(claim.Value);
         }
@@ -72,7 +72,7 @@ public static class PrincipalExtensions
     {
         if (identity is ClaimsIdentity id)
         {
-            var claim = id.FindFirst(JwtClaimTypes.Subject);
+            var claim = id.FindFirst(JwtRegisteredClaimNames.Sub);
             if (claim is not null)
                 return claim.Value;
         }
@@ -103,7 +103,7 @@ public static class PrincipalExtensions
     {
         if (identity is ClaimsIdentity id)
         {
-            var claim = id.FindFirst(JwtClaimTypes.SessionId);
+            var claim = id.FindFirst(JwtRegisteredClaimNames.Sid);
             if (claim is not null)
                 return claim.Value;
         }
@@ -123,7 +123,7 @@ public static class PrincipalExtensions
         if (name.IsPresent())
             return name;
 
-        var sub = principal.FindFirst(JwtClaimTypes.Subject);
+        var sub = principal.FindFirst(JwtRegisteredClaimNames.Sub);
         if (sub != null) 
             return sub.Value;
 
@@ -152,7 +152,7 @@ public static class PrincipalExtensions
     {
         if (identity is ClaimsIdentity id)
         {
-            var claim = id.FindFirst(JwtClaimTypes.AuthenticationMethod);
+            var claim = id.FindFirst(JwtRegisteredClaimNames.Amr);
             if (claim is not null)
                 return claim.Value;
         }
@@ -180,7 +180,7 @@ public static class PrincipalExtensions
     public static IEnumerable<Claim> GetAuthenticationMethods(this IIdentity identity)
     {
         return identity is ClaimsIdentity id
-            ? id.FindAll(JwtClaimTypes.AuthenticationMethod) 
+            ? id.FindAll(JwtRegisteredClaimNames.Amr) 
             : ([]);
     }
 

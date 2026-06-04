@@ -66,7 +66,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
     protected virtual async Task<string> CreateTokenAsync(LogoutBackChannelRequest request)
     {
         var claims = await CreateClaimsForTokenAsync(request);
-        if (claims.Any(x => x.Type == JwtClaimTypes.Nonce))
+        if (claims.Any(x => x.Type == JwtRegisteredClaimNames.Nonce))
         {
             throw new InvalidOperationException("nonce claim is not allowed in the back-channel sign out token.");
         }
@@ -90,16 +90,16 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
 
         var claims = new List<Claim>
             {
-                new(JwtClaimTypes.Subject, request.Subject),
-                new(JwtClaimTypes.Audience, request.ClientId),
-                new(JwtClaimTypes.IssuedAt, clock.GetUtcNow().ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new(JwtClaimTypes.JwtId, CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex)),
+                new(JwtRegisteredClaimNames.Sub, request.Subject),
+                new(JwtRegisteredClaimNames.Aud, request.ClientId),
+                new(JwtRegisteredClaimNames.Iat, clock.GetUtcNow().ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new(JwtRegisteredClaimNames.Jti, CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex)),
                 new(JwtClaimTypes.Events, json, ServerConstants.ClaimValueTypes.Json)
             };
 
         if (request.SessionId is not null)
         {
-            claims.Add(new Claim(JwtClaimTypes.SessionId, request.SessionId));
+            claims.Add(new Claim(JwtRegisteredClaimNames.Sid, request.SessionId));
         }
 
         return Task.FromResult(claims.AsEnumerable());

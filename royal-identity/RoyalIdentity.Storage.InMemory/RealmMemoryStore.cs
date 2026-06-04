@@ -1,4 +1,5 @@
-﻿using RoyalIdentity.Models;
+﻿using Microsoft.IdentityModel.Tokens;
+using RoyalIdentity.Models;
 using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Options;
@@ -6,6 +7,7 @@ using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Utils;
 using System.Collections.Concurrent;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Storage.InMemory;
@@ -41,7 +43,7 @@ public class RealmMemoryStore
             ServerConstants.StandardScopes.OpenId,
             "Your user identifier",
             "Your user identifier",
-            [JwtClaimTypes.Subject])
+            [JwtRegisteredClaimNames.Sub])
         {
             Required = true,
             Emphasize = false,

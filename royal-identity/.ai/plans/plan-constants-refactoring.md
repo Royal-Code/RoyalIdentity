@@ -4,19 +4,42 @@
 
 ## Progresso
 
-`█░░░░░░░░░` **~10%** — Passo 0 concluído + 1º ciclo JwtClaimTypes (project-specific) concluído
+`██░░░░░░░░` **~20%** — Passo 0 concluído + JwtClaimTypes parcialmente migrado (claims core JWT + project-specific feitos; OIDC-profile claims pendentes)
 
 ### Concluído
-- **Passo 0 (diretivas `using static`)**: estratégia decidida — Strategy B (manter `global using static Constants`; callers usam `Jwt.ClaimTypes.*` via o global already existente; sem novo global using static por subclasse)
+- **Passo 0 (diretivas `using static`)**: estratégia decidida — Strategy B (manter `global using static Constants`; callers usam `Jwt.ClaimTypes.*` via o global já existente; sem novo global using static por subclasse)
 - **`Constants.Jwt` criado** com:
-  - `Constants.Jwt.ClaimTypes`: `IdentityProvider`, `Role`, `Roles`, `ReferenceTokenId`
+  - `Constants.Jwt.ClaimTypes`: `IdentityProvider`, `Role`, `Roles`, `ReferenceTokenId`, `Scope`, `Confirmation`
   - `Constants.Jwt.ClaimTypes.JwtTypes`: `AccessToken`, `AuthorizationRequest`, `DPoPProofToken`
   - `Constants.Jwt.ConfirmationMethods`: `JsonWebKey`, `JwkThumbprint`, `X509ThumbprintSha256`
 - **`Constants.OAuth` deletado** (estava vazio)
 - **`[Redesign("Move all to Constants")]`** adicionado a `JwtClaimTypes` e `ServerConstants`
-- **`JwtClaimTypes` parcialmente esvaziado**: removidos `IdentityProvider`, `Role`, `Roles`, `ReferenceTokenId`, `JwtTypes` inner class, `ConfirmationMethods` inner class
-- **Callers atualizados** (9 arquivos): `ClientCredentialsContext`, `DefaultIdentityUser`, `ClaimsExtensions`, `PrincipalExtensions`, `DefaultProfileService`, `DefaultTokenClaimsService`, `SubjectFactory`, `Constants.Filters`
-- **Build**: 0 erros
+- **`global using System.IdentityModel.Tokens.Jwt`** adicionado a `RoyalIdentity/Global.Usings.cs`, `Tests.Integration/Global.Usings.cs`; `using System.IdentityModel.Tokens.Jwt` adicionado a `RealmMemoryStore.cs`
+- **`JwtClaimTypes` esvaziado — removidos**:
+  - Project-specific: `IdentityProvider`, `Role`, `Roles`, `ReferenceTokenId` + inner classes `JwtTypes`, `ConfirmationMethods`
+  - Grupo 1 (→ `JwtRegisteredClaimNames`): `Subject` (Sub), `Audience` (Aud), `Issuer` (Iss), `NotBefore` (Nbf), `Expiration` (Exp), `IssuedAt` (Iat), `AuthenticationMethod` (Amr), `SessionId` (Sid), `AuthenticationContextClassReference` (Acr), `AuthenticationTime` (AuthTime), `AuthorizedParty` (Azp), `AccessTokenHash` (AtHash), `AuthorizationCodeHash` (CHash), `Nonce` (Nonce), `JwtId` (Jti)
+  - → `Jwt.ClaimTypes`: `Scope`, `Confirmation`
+- **Callers atualizados** (~25 arquivos): `ClientCredentialsContext`, `DefaultIdentityUser`, `ClaimsExtensions`, `PrincipalExtensions`, `DefaultProfileService`, `DefaultTokenClaimsService`, `SubjectFactory`, `Constants.Filters`, `DefaultBackChannelLogoutNotifier`, `DefaultJwtFactory`, `DefaultTokenFactory`, `DefaultSignInManager`, `DefaultSignOutManager`, `AuthorizeContext`, `UserInfoHandler`, `RefreshTokenHandler`, `TokenBase`, `RefreshToken`, `AccessToken`, `RequestedScopes`, `RealmMemoryStore`
+- **Build**: 0 erros (ambas as sessões)
+
+### Pendente em `JwtClaimTypes` (próximos ciclos)
+
+**→ `JwtRegisteredClaimNames` (avaliar disponibilidade em 8.14.0 e migrar callers):**
+- `Name` (usado: SubjectFactory, DefaultIdentityUser)
+- `GivenName`, `FamilyName`, `Email`, `BirthDate` (`Birthdate`), `WebSite` (`Website`) — provavelmente só em filters futuros
+
+**→ `Constants.Jwt.ClaimTypes` (não têm equivalente MS):**
+- `MiddleName`, `NickName`, `PreferredUserName`, `Profile`, `Picture`, `EmailVerified`, `Gender`, `ZoneInfo`, `Locale`, `PhoneNumber`, `PhoneNumberVerified`, `Address` — claims OIDC standard sem equivalente em `JwtRegisteredClaimNames`
+- `UpdatedAt` — OIDC standard
+- `StateHash` — extensão OIDC (`s_hash`)
+- `Events` — back-channel logout
+- `ClientId` — usado em 3 arquivos
+- `Actor`, `MayAct` — token exchange
+- `Id` — custom
+- `Algorithm`, `JsonWebKey`, `TokenType` — header JWT / DPoP
+- `DPoPHttpMethod`, `DPoPHttpUrl`, `DPoPAccessTokenHash` — DPoP
+
+**Após limpar `JwtClaimTypes`:** partir para grupo 2 (`OidcConstants.ResponseTypes`).
 
 ## Ordem de execução (global)
 

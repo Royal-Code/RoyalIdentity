@@ -148,7 +148,7 @@ public class DefaultSignInManager : ISignInManager
 
         var principal = await user.CreatePrincipalAsync(session, ct);
 
-        var sid = principal.FindFirst(JwtClaimTypes.SessionId);
+        var sid = principal.FindFirst(JwtRegisteredClaimNames.Sid);
         if (sid is null)
         {
             // sid is required, when not present, throw exception
@@ -156,7 +156,7 @@ public class DefaultSignInManager : ISignInManager
         }
 
         props ??= new();
-        props.Items[JwtClaimTypes.SessionId] = sid.Value;
+        props.Items[JwtRegisteredClaimNames.Sid] = sid.Value;
 
         var authenticationScheme = httpContext.GetRealmAuthenticationScheme();
         await httpContext.SignInAsync(authenticationScheme, principal, props);

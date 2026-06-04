@@ -34,12 +34,12 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
 
         var identity = new ClaimsIdentity();
 
-        if (!client.AlwaysSendClientClaims || client.Claims.All(x => x.Type != JwtClaimTypes.Subject))
-            identity.AddClaim(new Claim(JwtClaimTypes.Subject, client.Id));
+        if (!client.AlwaysSendClientClaims || client.Claims.All(x => x.Type != JwtRegisteredClaimNames.Sub))
+            identity.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, client.Id));
 
-        identity.AddClaim(new(JwtClaimTypes.AuthenticationTime, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+        identity.AddClaim(new(JwtRegisteredClaimNames.AuthTime, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
         identity.AddClaim(new(Jwt.ClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider));
-        identity.AddClaim(new(JwtClaimTypes.AuthenticationMethod, ClientParameters.AuthenticationMethod));
+        identity.AddClaim(new(JwtRegisteredClaimNames.Amr, ClientParameters.AuthenticationMethod));
 
         principal = new ClaimsPrincipal(identity);
 

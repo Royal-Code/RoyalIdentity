@@ -184,7 +184,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <summary>
     /// Gets the session id from the current user.
     /// </summary>
-    public string? SessionId => Identity?.FindFirst(c => c.Type == JwtClaimTypes.SessionId)?.Value;
+    public string? SessionId => Identity?.FindFirst(c => c.Type == JwtRegisteredClaimNames.Sid)?.Value;
 
     /// <summary>
     /// <para>

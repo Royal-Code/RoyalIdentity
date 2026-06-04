@@ -116,7 +116,7 @@ public class DefaultSignOutManager : ISignOutManager
                     iss ??= httpContext.GetServerIssuerUri(realm.Options);
 
                     var logoutUri = client.FrontChannelLogoutSessionRequired
-                        ? uri.AddQueryString(JwtClaimTypes.Issuer, iss).AddQueryString(JwtClaimTypes.SessionId, session.Id)
+                        ? uri.AddQueryString(JwtRegisteredClaimNames.Iss, iss).AddQueryString(JwtRegisteredClaimNames.Sid, session.Id)
                         : uri;
                     
                     frontChannelLogout.Add(logoutUri);
