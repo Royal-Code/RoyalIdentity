@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Routing;
 using RoyalIdentity.Endpoints;
+using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Pipelines.Mapping;
+using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Pipelines.Infrastructure;
 
 namespace RoyalIdentity.Extensions;

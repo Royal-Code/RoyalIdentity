@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Resources;
 using RoyalIdentity.Options;

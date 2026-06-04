@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Endpoints.Abstractions;
+using Microsoft.AspNetCore.Http;
+using RoyalIdentity.Pipelines.Abstractions;
 using System.Text.Json;
 
-namespace RoyalIdentity.Endpoints.Defaults;
+namespace RoyalIdentity.Pipelines.Defaults;
 
 public sealed class ErrorResponseResult : IResult, IStatusCodeHttpResult
 {

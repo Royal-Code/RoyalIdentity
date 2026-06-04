@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using RoyalIdentity.Contexts;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Responses.HttpResults;

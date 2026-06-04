@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Pipelines.Infrastructure.Builder;
 
 namespace RoyalIdentity.Pipelines.Configurations;

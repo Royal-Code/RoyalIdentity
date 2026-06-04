@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using RoyalIdentity.Endpoints.Abstractions;
+using Microsoft.AspNetCore.Mvc;
+using RoyalIdentity.Pipelines.Abstractions;
 
-namespace RoyalIdentity.Endpoints.Defaults;
+namespace RoyalIdentity.Pipelines.Defaults;
 
 public static class ProblemsExtensions
 {

@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Endpoints.Defaults;
+using Microsoft.AspNetCore.Http;
+using RoyalIdentity.Pipelines.Defaults;
 
-namespace RoyalIdentity.Endpoints.Abstractions;
+namespace RoyalIdentity.Pipelines.Abstractions;
 
 public static class EndpointErrorResults
 {

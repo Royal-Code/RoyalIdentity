@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using System.Collections.Specialized;
 using System.Security.Claims;
 using static RoyalIdentity.Options.OidcConstants;

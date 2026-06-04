@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
 
 namespace RoyalIdentity.Endpoints;

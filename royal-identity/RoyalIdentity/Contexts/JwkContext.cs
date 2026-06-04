@@ -1,7 +1,7 @@
-﻿// Ignore Spelling: Jwk
+// Ignore Spelling: Jwk
 
 using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts;
 

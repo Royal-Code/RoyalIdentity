@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Endpoints.Abstractions;
+using Microsoft.AspNetCore.Http;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;

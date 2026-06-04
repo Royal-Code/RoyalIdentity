@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
-using RoyalIdentity.Endpoints.Mapping;
+using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Pipelines.Defaults;
+using RoyalIdentity.Pipelines.Mapping;
 using RoyalIdentity.Pipelines.Configurations;
 
 namespace RoyalIdentity.Pipelines.Infrastructure;

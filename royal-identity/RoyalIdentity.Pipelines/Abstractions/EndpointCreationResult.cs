@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using RoyalIdentity.Endpoints.Defaults;
+using RoyalIdentity.Pipelines.Defaults;
 using System.Diagnostics.CodeAnalysis;
 
-namespace RoyalIdentity.Endpoints.Abstractions;
+namespace RoyalIdentity.Pipelines.Abstractions;
 
 /// <summary>
 /// A struct containing the result of creating a context object for an endpoint.

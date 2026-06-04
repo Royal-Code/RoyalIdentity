@@ -1,4 +1,4 @@
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Pipelines.Infrastructure.Builder;
 

@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Users.Contexts;
 

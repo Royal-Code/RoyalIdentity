@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Builder;
-using RoyalIdentity.Endpoints.Abstractions;
+using Microsoft.AspNetCore.Builder;
+using RoyalIdentity.Pipelines.Abstractions;
 
-namespace RoyalIdentity.Endpoints.Mapping;
+namespace RoyalIdentity.Pipelines.Mapping;
 
 /// <summary>
 /// Extension methods for map authentication endpoints.

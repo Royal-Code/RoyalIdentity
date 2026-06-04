@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 
-namespace RoyalIdentity.Endpoints.Abstractions;
+namespace RoyalIdentity.Pipelines.Abstractions;
 
 /// <summary>
 /// Default and abstract implementation of <see cref="IContextBase"/>.

@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics.CodeAnalysis;
 
-namespace RoyalIdentity.Endpoints.Abstractions;
+namespace RoyalIdentity.Pipelines.Abstractions;
 
 /// <summary>
 /// Interface for types that produce Http responses. 

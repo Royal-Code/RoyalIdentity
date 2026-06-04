@@ -1,5 +1,5 @@
-﻿using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
+using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Models;
 using static RoyalIdentity.Options.OidcConstants;
 

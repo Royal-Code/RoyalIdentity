@@ -1,4 +1,4 @@
-﻿using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;

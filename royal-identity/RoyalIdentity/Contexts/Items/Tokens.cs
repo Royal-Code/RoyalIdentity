@@ -1,4 +1,4 @@
-﻿using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using System.Diagnostics.CodeAnalysis;
 
 namespace RoyalIdentity.Contexts.Items;

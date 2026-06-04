@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
-using RoyalIdentity.Endpoints.Defaults;
+using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Handlers;
 using RoyalIdentity.Pipelines.Configurations;
 using RoyalIdentity.Pipelines.Infrastructure;

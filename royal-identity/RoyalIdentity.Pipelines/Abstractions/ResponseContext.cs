@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Endpoints.Defaults;
+using Microsoft.AspNetCore.Http;
+using RoyalIdentity.Pipelines.Defaults;
 
-namespace RoyalIdentity.Endpoints.Abstractions;
+namespace RoyalIdentity.Pipelines.Abstractions;
 
 /// <summary>
 /// Default implementation of a context for a direct response to the request.

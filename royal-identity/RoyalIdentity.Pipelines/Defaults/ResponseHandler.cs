@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
-namespace RoyalIdentity.Endpoints.Defaults;
+namespace RoyalIdentity.Pipelines.Defaults;
 
 /// <summary>
 /// A simple implementation for when the result has already been created

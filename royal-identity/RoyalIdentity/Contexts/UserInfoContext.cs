@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts;
 

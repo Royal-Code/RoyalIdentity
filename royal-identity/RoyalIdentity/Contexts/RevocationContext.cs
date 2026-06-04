@@ -2,7 +2,7 @@ using System.Collections.Specialized;
 using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contexts;

@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Endpoints.Defaults;
+using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
 

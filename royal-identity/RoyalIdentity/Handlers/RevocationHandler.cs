@@ -1,11 +1,10 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
+using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
-using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Handlers;
 

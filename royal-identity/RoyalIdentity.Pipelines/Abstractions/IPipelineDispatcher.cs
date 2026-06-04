@@ -1,4 +1,4 @@
-﻿namespace RoyalIdentity.Endpoints.Abstractions;
+namespace RoyalIdentity.Pipelines.Abstractions;
 
 /// <summary>
 /// Service to identify the context pipeline for a given context object 

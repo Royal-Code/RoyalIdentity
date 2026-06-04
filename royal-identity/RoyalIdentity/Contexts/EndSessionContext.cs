@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Models;
-using RoyalIdentity.Endpoints.Abstractions;
+using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using System.Collections.Specialized;

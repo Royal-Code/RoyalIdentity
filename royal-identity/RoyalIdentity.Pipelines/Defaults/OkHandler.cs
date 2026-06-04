@@ -1,7 +1,6 @@
-﻿using RoyalIdentity.Endpoints.Abstractions;
 using RoyalIdentity.Pipelines.Abstractions;
 
-namespace RoyalIdentity.Endpoints.Defaults;
+namespace RoyalIdentity.Pipelines.Defaults;
 
 public class OkHandler<TContext> : IHandler<TContext>
     where TContext : IContextBase

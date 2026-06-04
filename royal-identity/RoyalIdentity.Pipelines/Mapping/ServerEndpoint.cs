@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using RoyalIdentity.Endpoints.Abstractions;
-using RoyalIdentity.Endpoints.Defaults;
+using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Pipelines.Defaults;
 
-namespace RoyalIdentity.Endpoints.Mapping;
+namespace RoyalIdentity.Pipelines.Mapping;
 
 /// <summary>
 /// <para>
@@ -99,12 +99,11 @@ public static class ServerEndpoint<TEndpoint>
                 return InternalServerError();
             }
 
-            // return the response from the response handler
             return await responseHandler.CreateResponseAsync(httpContext.RequestAborted);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to create the Result from the ResponseHandler");
+            logger.LogError(ex, "Failed to execute the response handler");
 
             return InternalServerError();
         }
@@ -112,10 +111,9 @@ public static class ServerEndpoint<TEndpoint>
 
     private static IResult InternalServerError()
     {
-        // generate a internal server error
-        return ErrorResponseResult.Create(
-            "internal_server_error",
-            "An internal server error has occurred",
-            statusCode: StatusCodes.Status500InternalServerError);
+        return Results.Problem(
+            title: "Internal Server Error",
+            statusCode: StatusCodes.Status500InternalServerError,
+            detail: "An unexpected error occurred");
     }
 }
