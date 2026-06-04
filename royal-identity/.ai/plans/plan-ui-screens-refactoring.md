@@ -2,9 +2,39 @@
 
 ## Status: PENDING
 
+## Progresso
+
+`░░░░░░░░░░` **0%** — 0 de 6 fases concluídas
+
+## Ordem de execução (global)
+
+Os três planos rodam **um por vez, cada um 100% completo antes do próximo**:
+
+1. Constantes (`plan-constants-refactoring.md`)
+2. Contextos (`plan-contexts-redesign.md`)
+3. **UI** ← este plano
+
+## Modo de Renderização: SSR estático (não Blazor Server interativo)
+
+> **Premissa corrigida — ler antes de tudo.** As páginas de account rodam em **Static Server Rendering (SSR)**, *não* em circuit interativo. Confirmado em [`App.razor`](../../RoyalIdentity.Server/Components/App.razor):
+>
+> ```csharp
+> private IComponentRenderMode? RenderModeForPage => HttpContext.IsAccountPages() ? null : InteractiveServer;
+> ```
+>
+> `IsAccountPages()` ([`RoyalIdentityHttpContextExtensions.cs`](../../RoyalIdentity.Razor/Extensions/RoyalIdentityHttpContextExtensions.cs)) é true para qualquer rota `{realm}/account/*` → render mode **`null`** (SSR). Só rotas não-account usam `InteractiveServer`.
+>
+> **Evidências no código** (todos os componentes de account): `method="post"` + `[SupplyParameterFromForm]` + `FormName`, `[CascadingParameter] HttpContext`, e estado passado via `IMessageStore`/query string/campos de form — **nunca** via campo de componente entre requests.
+>
+> **Consequências para este plano (todas tratadas abaixo):**
+> 1. **Não há circuit SignalR.** `Scoped` = tempo de vida do **request HTTP**, não de um circuit. GET e POST são requests distintos → instâncias de serviço distintas.
+> 2. **Não existe "cache entre renders".** O `AuthorizationContext` deve ser **re-obtido do store a cada request** (idempotente via `returnUrl`/`authzId`). O `??=` atual só evita uma 2ª chamada **dentro do mesmo request**.
+> 3. **`HttpContext` está disponível** durante o request → escrever cookies/headers funciona. O risco real é o inverso: **não** migrar estas páginas para `InteractiveServer` sem repensar tudo.
+> 4. **`NavigationManager.NavigateTo` lança `NavigationException`** e **não retorna** ao método — é o mecanismo de redirect do SSR, não um bug. Os serviços **não** devem capturá-la.
+
 ## Context
 
-`RoyalIdentity.Razor` contém os componentes Blazor Server para os fluxos de autenticação. O problema identificado: lógica de negócio e coordenação de fluxo estão implementadas diretamente nos componentes `.razor`, em vez de em serviços injetáveis.
+`RoyalIdentity.Razor` contém os componentes Razor (renderizados em **SSR** para as account pages — ver "Modo de Renderização") para os fluxos de autenticação. O problema identificado: lógica de negócio e coordenação de fluxo estão implementadas diretamente nos componentes `.razor`, em vez de em serviços injetáveis.
 
 Evidência concreta lida no código:
 
@@ -254,9 +284,9 @@ public enum ConsentResultType
 }
 ```
 
-#### Problema de Estado no ConsentPage — Antes
+#### Problema de Estado no ConsentPage — Antes (em SSR)
 
-O componente atual cacheia `AuthorizationContext` como campo privado com lazy init. O fluxo multi-render é frágil:
+O componente cacheia `AuthorizationContext` num campo privado com `??=`. Em SSR isso é **inócuo entre requests** (cada request instancia um componente novo, campo sempre `null` no início) — o `??=` só evita a 2ª chamada **dentro** do POST (`OnParametersSetAsync` + `ConsentHandler`). O problema real: a lógica de obtenção/validação/persistência está toda no componente, misturada ao ciclo de render, e dificulta teste.
 
 ```mermaid
 sequenceDiagram
@@ -264,29 +294,28 @@ sequenceDiagram
     participant CP as ConsentPage.razor
     participant SIM as ISignInManager
 
-    Note over CP: authorizationContext = null
+    Note over CP: GET — nova instância, campo = null
 
     B->>CP: GET /consent?returnUrl=...
     CP->>CP: OnParametersSetAsync()
     CP->>SIM: GetAuthorizationContextAsync(returnUrl)
-    SIM-->>CP: AuthorizationContext
-    Note over CP: authorizationContext salvo em campo privado
-
+    SIM-->>CP: AuthorizationContext (do store)
     CP-->>B: Renderiza formulário
 
+    Note over CP: POST — OUTRA instância, campo = null de novo
+
     B->>CP: POST (submit do form)
-    CP->>CP: ConsentHandler()
-    CP->>CP: GetAuthorizationContextAsync(InputModel.ReturnUrl)
-    Note over CP: ⚠️ authorizationContext ??= await...<br/>Reutiliza campo se não for null,<br/>mas acopla estado ao ciclo do componente
+    CP->>CP: OnParametersSetAsync() → GetAuthorizationContextAsync(returnUrl)
+    CP->>CP: ConsentHandler() → GetAuthorizationContextAsync(InputModel.ReturnUrl)
+    Note over CP: ⚠️ ??= só evita a 2ª chamada DESTE request;<br/>nada é reutilizado do GET (request anterior)
 
     CP->>SIM: UpdateConsentAsync(subject, client, scopes)
-    CP->>CP: NavigateTo(consentedUrl)
-    Note over CP: ⚠️ Estado do campo persiste<br/>se componente for reutilizado
+    CP->>CP: NavigateTo(consentedUrl) — lança NavigationException
 ```
 
-#### Fluxo de Consentimento — Depois
+#### Fluxo de Consentimento — Depois (SSR)
 
-`ConsentPageService` é `Scoped` (vive pelo SignalR circuit), gerencia o cache internamente e limpa o estado ao concluir o fluxo:
+`ConsentPageService` é **stateless** (registrar como `Scoped`; em SSR vive só pelo request). Cada request **re-obtém** o `AuthorizationContext` do store via `returnUrl` — **não há cache entre GET e POST** porque são requests distintos:
 
 ```mermaid
 sequenceDiagram
@@ -296,51 +325,65 @@ sequenceDiagram
     participant SCS as SessionContextService
     participant CS as IConsentService
 
-    Note over CPS: Scoped — instância por circuit<br/>Estado interno: AuthorizationContext? cached
+    Note over CPS: Stateless — sem campo de cache<br/>(GET e POST são requests distintos em SSR)
 
     B->>CP: GET /consent?returnUrl=...
     CP->>CPS: BuildViewModelAsync(returnUrl, ct)
     CPS->>SCS: GetAuthorizationContextAsync(returnUrl)
-    SCS-->>CPS: AuthorizationContext
-    Note over CPS: Cacheia contexto internamente por returnUrl
+    SCS-->>CPS: AuthorizationContext (do store)
     CPS-->>CP: ConsentViewModel
-    CP-->>B: Renderiza formulário
+    CP-->>B: Renderiza form (returnUrl em campo hidden)
 
-    B->>CP: POST (submit do form)
+    B->>CP: POST (submit do form, carregando returnUrl)
     CP->>CPS: ProcessConsentAsync(realm, input, ct)
-    Note over CPS: Reutiliza contexto cacheado — sem nova chamada
+    CPS->>SCS: GetAuthorizationContextAsync(input.ReturnUrl)
+    SCS-->>CPS: AuthorizationContext (re-obtido do store)
     CPS->>CPS: Valida scopes obrigatórios
     CPS->>CS: UpdateConsentAsync(subject, client, scopes)
-    Note over CPS: Limpa estado interno ao concluir
     CPS-->>CP: ConsentResult(Granted, consentedUrl)
 
-    CP->>CP: NavigateTo(result.NavigateTo!)
+    CP->>CP: NavigateTo(result.NavigateTo!) — lança NavigationException
 ```
 
+> O `returnUrl` (campo hidden no form) transporta a identidade da requisição entre GET e POST. O store (via `GetAuthorizationContextAsync`) é a fonte de verdade idempotente — re-obter é barato e correto. Isso elimina o `authorizationContext ??=` frágil do componente atual.
+
 **Implementação encapsula:**
-- `SignInManager.GetAuthorizationContextAsync()`
+- `SignInManager.GetAuthorizationContextAsync()` (re-obtido a cada request)
 - Criação de `ConsentViewModel` a partir do contexto
 - Validação de scopes obrigatórios
 - Construção de `ConsentedScope` list
 - `ConsentService.UpdateConsentAsync()`
 - Tratamento do caso "contexto não encontrado" (navega para error URL)
-- Limpeza de estado interno ao concluir
 
 ---
 
 ### `IEndSessionPageService`
 
-Responsabilidade: preparar e processar o fluxo de logout (3 fases: confirmação → processamento → conclusão).
+Responsabilidade: preparar e processar o fluxo de logout. Mapeamento das 3 telas (já lidas):
+
+| Tela | Rota | Hoje faz | Serviços usados |
+|---|---|---|---|
+| `LogoutPage` | `Logout` | GET: cria `logoutId` se ausente (`CreateLogoutIdAsync`), lê `LogoutMessage`; se `ShowSignoutPrompt` → prompt, senão sign-out direto. POST: valida `ConfirmedId`, sign-out. | `ISignOutManager`, `IMessageStore` |
+| `LoggingOutPage` | `LoggingOut` | GET: lê `LogoutCallbackMessage`; renderiza `<iframe>` de front-channel logout + link de redirect. | `IMessageStore` |
+| `LoggedOutPage` | `LoggedOut` | Estático (apenas mensagem). | — (nenhum; **não precisa de serviço**) |
+
+Assinatura proposta (cobre confirmação + sign-out + processamento de callback):
 
 ```csharp
 public interface IEndSessionPageService
 {
-    Task<LogoutViewModel> BuildViewModelAsync(string? logoutId, CancellationToken ct);
-    Task<LogoutResult> ProcessLogoutAsync(string? logoutId, CancellationToken ct);
+    // LogoutPage GET — decide entre mostrar prompt ou efetuar sign-out direto
+    Task<LogoutResult> BeginLogoutAsync(string? logoutId, CancellationToken ct);
+
+    // LogoutPage POST — confirma e efetua o sign-out
+    Task<LogoutResult> ConfirmLogoutAsync(string confirmedId, CancellationToken ct);
+
+    // LoggingOutPage GET — monta o model de processamento (front-channel iframe + redirect)
+    Task<LoggingOutViewModel> BuildLoggingOutAsync(string? logoutId, CancellationToken ct);
 }
 ```
 
-> Assinatura detalhada a ser definida após leitura de `LogoutPage.razor`, `LoggingOutPage.razor`, `LoggedOutPage.razor` na Fase 1.
+`LogoutResult.Type` cobre: `RequiresConfirmation` (renderiza prompt), `LoggedOut`/redirect (navega para a URI de sign-out), `Error` (navega para error URL). O caso "model nulo / logoutId ausente" → `Error`. `LoggedOutPage` permanece sem serviço.
 
 ---
 
@@ -358,6 +401,13 @@ public interface ISessionContextService
     Task<AuthorizationContext?> GetAuthorizationContextAsync(string? returnUrl, CancellationToken ct);
 }
 ```
+
+> **Origem do `HttpContext` (decisão de design necessária).** Hoje `TryGetCurrentRealm` e `GetAuthorizationContextAsync` são *extension methods* sobre `HttpContext`, que os componentes recebem via `[CascadingParameter] HttpContext`. Movê-los para um serviço exige uma fonte de `HttpContext`. Duas opções:
+>
+> 1. **`IHttpContextAccessor`** injetado no `SessionContextService` (funciona em SSR, pois os componentes rodam dentro do pipeline do request). Preferível — mantém a assinatura dos métodos limpa.
+> 2. **Passar `HttpContext` por parâmetro** em cada método (o componente repassa seu `[CascadingParameter]`). Mais explícito, porém verboso.
+>
+> Recomendação: **opção 1** (`IHttpContextAccessor`), registrando `AddHttpContextAccessor()` se ainda não estiver. Validar em SSR que `accessor.HttpContext` não é nulo durante o render das account pages.
 
 ---
 
@@ -456,15 +506,19 @@ RoyalIdentity.Razor/
     IdentityRevalidatingAuthenticationStateProvider.cs ← existente
     IdentityUserManager.cs          ← existente
   ViewModels/
-    LoginViewModel.cs               ← mover (hoje junto ao componente)
-    LoginInput.cs                   ← mover
+    LoginViewModel.cs               ← mover (já é .cs irmão do .razor)
+    LoginInputModel.cs              ← mover (nome real: ...InputModel, não ...Input)
     LoginResult.cs                  ← novo
     ConsentViewModel.cs             ← mover
-    ConsentInput.cs                 ← mover
+    ConsentInputModel.cs            ← mover
     ConsentResult.cs                ← novo
-    LogoutViewModel.cs              ← mover
+    LogoutInputModel.cs             ← mover (confirmar arquivo na Fase 1)
+    LogoutViewModel.cs              ← novo (model do prompt de confirmação)
+    LoggingOutViewModel.cs         ← novo (model da tela de processamento/front-channel)
     LogoutResult.cs                 ← novo
 ```
+
+> **Nomenclatura real**: o código usa o sufixo **`InputModel`** (`LoginInputModel`, `ConsentInputModel`, `LogoutInputModel`), não `Input`. Os ViewModels/InputModels **já são arquivos `.cs` separados** na pasta do componente (não estão embutidos no `.razor`). Portanto a Fase 6 é **reorganização de pasta + ajuste de namespace/`_Imports.razor`**, não extração de código de dentro do `.razor`.
 
 ---
 
@@ -473,16 +527,17 @@ RoyalIdentity.Razor/
 ### Fase 1 — Auditoria dos componentes atuais
 
 1. Ler todos os `.razor` em `Components/Account/` e mapear: quais serviços são injetados, qual lógica está no `@code`, quais ViewModels existem e onde.
-2. Localizar ViewModels e InputModels (estão no mesmo arquivo `.razor` ou em arquivos separados?).
-3. Mapear todos os lugares onde `HttpContext.GetAuthorizationContextAsync()` e `TryGetCurrentRealm()` são chamados.
-4. Ler `LogoutPage.razor`, `LoggingOutPage.razor`, `LoggedOutPage.razor` para detalhar a assinatura de `IEndSessionPageService`.
+2. ~~Localizar ViewModels e InputModels~~ — **já confirmado: arquivos `.cs` separados** na pasta de cada componente (`LoginViewModel.cs`, `LoginInputModel.cs`, `ConsentViewModel.cs`, `ConsentInputModel.cs`, …), não embutidos no `.razor`.
+3. Mapear todos os lugares onde `HttpContext.GetAuthorizationContextAsync()` e `TryGetCurrentRealm()` são chamados (hoje: `LoginPage`, `LocalLogin`, `ConsentPage`, `SignedIn`).
+4. ~~Ler os componentes de logout~~ — **já lido**; assinatura de `IEndSessionPageService` detalhada acima. Confirmar apenas o arquivo de `LogoutInputModel`.
+5. **Confirmar o render mode** de cada página de account = SSR (`null`) — já validado em `App.razor` + `IsAccountPages()`. Garante que o design stateless é o correto.
 
 ### Fase 2 — Criar `ISessionContextService`
 
-1. Criar interface e implementação.
-2. Registrar no DI como `Scoped`.
+1. Criar interface e implementação (obtém `HttpContext` via `IHttpContextAccessor` — ver nota em "ISessionContextService").
+2. Registrar no DI como `Scoped`; garantir `AddHttpContextAccessor()` no host.
 3. Substituir o padrão direto nos componentes pela injeção do serviço.
-4. Build + verificar comportamento.
+4. Build + verificar comportamento (validar `accessor.HttpContext` não-nulo em SSR).
 
 ### Fase 3 — Extrair `ILoginPageService`
 
@@ -498,9 +553,9 @@ RoyalIdentity.Razor/
 
 1. Criar interface com `BuildViewModelAsync` e `ProcessConsentAsync`.
 2. Mover lógica de `ConsentPage.OnParametersSetAsync` e `ConsentHandler` para o serviço.
-3. Garantir que o serviço gerencia o caching do `AuthorizationContext` e limpa ao concluir.
+3. O serviço é **stateless**: `ProcessConsentAsync` **re-obtém** o `AuthorizationContext` do store via `input.ReturnUrl` (não cachear entre requests — SSR não tem circuit). Eliminar o `authorizationContext ??=` do componente.
 4. Simplificar `ConsentPage.razor`.
-5. Registrar no DI como `Scoped`.
+5. Registrar no DI como `Scoped` (= por request em SSR).
 6. Verificar comportamento.
 
 ### Fase 5 — Extrair lógica de Logout
@@ -512,7 +567,7 @@ RoyalIdentity.Razor/
 ### Fase 6 — Mover ViewModels para pasta dedicada
 
 1. Criar `RoyalIdentity.Razor/ViewModels/`.
-2. Mover todas as classes de model que hoje estão junto aos componentes.
+2. Mover os arquivos `.cs` de model que hoje vivem na pasta de cada componente (`LoginViewModel.cs`, `LoginInputModel.cs`, `ConsentViewModel.cs`, `ConsentInputModel.cs`, `LogoutInputModel.cs`, …) — eles **já são arquivos separados**, então é mover + renomear namespace, não extrair de dentro do `.razor`.
 3. Atualizar namespaces e `_Imports.razor`.
 
 ---
@@ -527,21 +582,27 @@ RoyalIdentity.Razor/
 
 ---
 
-## Tratamento de Sessão e Estado entre Renders
+## Tratamento de Estado entre Requests (SSR)
 
-`IConsentPageService` deve ser registrado como `Scoped`. Em Blazor Server, `Scoped` vive pelo tempo do SignalR circuit — não do HTTP request. Isso é intencional: permite reutilizar o `AuthorizationContext` entre o GET e o POST do formulário de consent sem nova chamada ao store.
+Em SSR **não há circuit** — cada request HTTP (GET do form, POST do submit) cria um novo escopo de DI. Portanto **não depender de cache em campo de serviço entre requests**. O estado é transportado por:
 
-**Contrato de ciclo de vida do serviço:**
-- Ao receber `BuildViewModelAsync` → carrega e cacheia `AuthorizationContext`
-- Ao receber `ProcessConsentAsync` → usa contexto cacheado, limpa ao concluir
-- Se o circuit for descartado antes de concluir → o contexto cacheado é liberado com o serviço
+- **`returnUrl`/`logoutId`** (campo hidden no form / query string) — identifica a requisição;
+- **Store** (`IMessageStore`, `IAuthorizeParametersStore` via `GetAuthorizationContextAsync`) — fonte de verdade idempotente, re-consultada a cada request;
+- **Campos `[SupplyParameterFromForm]`** — dados do próprio submit.
 
-O mesmo vale para `IEndSessionPageService` se o fluxo de logout tiver múltiplos passos (confirmação → processamento).
+**Contrato de ciclo de vida dos serviços de UI (SSR):**
+- `Scoped` = tempo do **request** (não de circuit). Os serviços são efetivamente **stateless** entre requests.
+- `BuildViewModelAsync` → obtém o contexto do store e monta o view model.
+- `ProcessConsentAsync`/`ProcessLogoutAsync` → **re-obtêm** o contexto do store (via `returnUrl`/`logoutId`), validam e persistem.
+- Nenhuma limpeza de cache é necessária — não há cache cross-request.
+
+> **Se um dia as páginas migrarem para `InteractiveServer`** (circuit), este contrato muda: `Scoped` passaria a viver pelo circuit e o cache cross-render voltaria a ser possível — mas aí o `HttpContext` deixa de estar disponível para escrita de cookies, exigindo redesenho do sign-in/sign-out. **Não** assumir esse modo sem revisão.
 
 ---
 
 ## Riscos
 
-- **Blazor Server vs SSR**: Verificar quais componentes usam SSR (`@rendermode` não definido) vs `InteractiveServer`. Componentes SSR recebem novo `HttpContext` a cada request — não há circuit. O serviço de UI deve funcionar nos dois modos; se for SSR puro, o caching por circuit não se aplica.
-- **Escrita de cookies em componentes interativos**: `SignInManager.SignInAsync()` escreve cookies via `HttpContext.Response`. Após a primeira renderização interativa, o `HttpContext` pode não estar disponível para escrita. Isso pode ser um bug latente que a extração para serviço vai expor — investigar durante a Fase 3.
-- **`NavigationManager.NavigateTo` em Blazor Server**: pode lançar `NavigationException` internamente (é o mecanismo de redirecionamento). Não capturar essa exceção nos serviços — deixar propagar normalmente.
+- **SSR confirmado (não interativo)**: as account pages usam render mode `null` (ver "Modo de Renderização" no topo). Logo, **sem circuit**, `Scoped` = por request, e **cache cross-render não existe** — os serviços são stateless e re-consultam o store. Este foi o principal ajuste de premissa do plano.
+- **Escrita de cookies**: `SignInManager.SignInAsync()` escreve cookies via `HttpContext.Response`. Em SSR isso **funciona** (o `HttpContext` está disponível durante o render). O risco é o oposto do imaginado: **migrar estas páginas para `InteractiveServer` quebraria** a escrita de cookies — não fazer isso sem redesenhar o sign-in/sign-out.
+- **`NavigationManager.NavigateTo` em SSR**: lança `NavigationException` e **não retorna** ao método chamador — é o mecanismo de redirect (comportamento esperado, **não** é bug de fall-through). Os serviços **não** devem capturá-la; o componente chama `NavigateTo(result.NavigateTo!)` como passo final.
+- **Validação do `IHttpContextAccessor` em SSR**: confirmar que `accessor.HttpContext` é não-nulo durante o render das account pages (ver `ISessionContextService`). Se houver qualquer caminho interativo, tratar o nulo.

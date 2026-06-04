@@ -2,6 +2,18 @@
 
 ## Status: PENDING
 
+## Progresso
+
+`░░░░░░░░░░` **0%** — 0 de 8 grupos migrados (ver "Ordem sugerida")
+
+## Ordem de execução (global)
+
+Os três planos rodam **um por vez, cada um 100% completo antes do próximo**:
+
+1. **Constantes** ← este plano
+2. Contextos (`plan-contexts-redesign.md`)
+3. UI (`plan-ui-screens-refactoring.md`)
+
 ## Context
 
 `RoyalIdentity/Options/Constants.cs` contém duas realidades distintas:
@@ -55,6 +67,21 @@ Constants.Oidc.HttpHeaders            ← DPoP, DPoP-Nonce
 
 ---
 
+## Destino de `JwtClaimTypes` e `ServerConstants`
+
+```
+Constants.Jwt.ClaimTypes              ← claims (sub, name, email, role, roles, idp, reference_token_id, ...)
+Constants.Jwt.ClaimTypes.JwtTypes     ← at+jwt, oauth-authz-req+jwt, dpop+jwt (inner class atual)
+Constants.Jwt.ConfirmationMethods     ← jwk, jkt, x5t#S256
+Constants.Server.*                    ← já existe; absorve ServerConstants (cookies, StandardScopes, SecretTypes, HttpClients, LocalApi, ...)
+```
+
+**`JwtClaimTypes` será migrado** (não apenas avaliado). A avaliação de overlap com `Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames` define, **por claim**, se o caller passa a referenciar o pacote MS (valor idêntico e padrão) ou se a constante é recriada em `Constants.Jwt.ClaimTypes` (claims do projeto: `role`, `roles`, `idp`, `reference_token_id`, etc.). O resultado é o mesmo nos dois casos: a classe `JwtClaimTypes` deixa de existir.
+
+> **Caso especial**: `Constants.Filters` (em `Constants.cs`) referencia `JwtClaimTypes.*` ~40 vezes. Ao migrar, esses arrays passam a referenciar `Constants.Jwt.ClaimTypes.*` (mesmo arquivo) — confirmar que compila sem ambiguidade com o `global using static` existente.
+
+> **Nota `[Redesign]`**: ao contrário de `OidcConstants`, as classes `JwtClaimTypes` e `ServerConstants` **não** têm `[Redesign]` no código, embora a intenção de consolidá-las exista (CLAUDE.md). Marcá-las com `[Redesign("Move all to Constants")]` no início do trabalho deixa a intenção explícita e ativa as advertências do analisador.
+
 ## Avaliação Prévia — O Que Realmente Precisa Ser Migrado
 
 **Antes de criar qualquer constante nova**, avaliar cada grupo:
@@ -78,15 +105,40 @@ Constants.Oidc.HttpHeaders            ← DPoP, DPoP-Nonce
 
 **Regra**: Se o pacote MS já tem a constante com o mesmo valor, **não migrar** — refatorar o código chamador para usar diretamente o pacote MS. Só criar em `Constants` o que é genuinamente específico do RoyalIdentity.
 
-### Constantes de baixa prioridade (não implementadas ainda)
+### Constantes de baixa prioridade (features não implementadas) — migrar por último
 
-CIBA (`Backchannel*`), Device Authorization (`DeviceAuthorization*`), PAR (`PushedAuthorizationRequest*`), Dynamic Registration (`Registration*`, `ClientMetadata`) — funcionalidades não implementadas no sistema hoje. **Não migrar agora**. Manter nas classes legadas até que o código que as usa exista.
+CIBA (`Backchannel*`), Device Authorization (`DeviceAuthorization*`), PAR (`PushedAuthorizationRequest*`), Dynamic Registration (`Registration*`, `ClientMetadata`) — funcionalidades ainda não implementadas no sistema.
+
+**Devem ser migradas também**, mas ficam **por último** na ordem. Como não há código chamador hoje, a migração é puramente mecânica (mover a classe para o lugar correto em `Constants`, sem refatorar callers) e não bloqueia o resto. A meta final é que **nenhuma** constante reste nas classes legadas, permitindo removê-las por completo.
 
 ### Candidatos a deleção direta (sem migrar)
 
 - `ServerConstants.ProfileIsActiveCallers` — `[Redesign("Remover")]` explícito
 - `Constants.OAuth` — vazio, deletar
-- Constantes de CIBA/Device/PAR/Registration — só migrar quando a feature for implementada
+
+---
+
+## Pré-requisito Crítico: `global using static` e usos não-qualificados
+
+As classes legadas são expostas via *global using static*, então **a maioria dos usos não menciona o nome da classe**, e um grep textual por `OidcConstants.` / `JwtClaimTypes.` / `ServerConstants.` os **subconta drasticamente**.
+
+`RoyalIdentity/Global.Usings.cs`:
+```csharp
+global using static RoyalIdentity.Options.OidcConstants;
+global using static RoyalIdentity.Options.Constants;
+```
+Há ainda `using static` por arquivo e em `_Imports.razor` (ex.: `RoyalIdentity.Razor/_Imports.razor`, `RoyalIdentity.Storage.InMemory/ResourceStore.cs` → `ServerConstants`, `Tests.Integration/Prepare/SubjectFactory.cs` → `OidcConstants`) e `Tests.Integration/Global.Usings.cs`.
+
+**Consequências:**
+- Um uso como `TokenErrors.InvalidGrant` ou `AuthorizeRequest.Scope` resolve via global using — **não há prefixo** para o grep encontrar.
+- Remover/renomear uma constante quebra a compilação em arquivos que **nem citam** a classe legada.
+- O grep com prefixo serve apenas para **estimativa inicial** e para localizar as diretivas `using static` a atualizar.
+
+**Ferramentas — abordagem confiável (compiler-driven):**
+
+1. O oráculo definitivo é o **próprio compilador**: ao remover (ou renomear) a constante da classe legada, `dotnet build` lista **todos** os usos a corrigir — qualificados ou não. Rodar build a cada ciclo é a forma 100% confiável de encontrar callers.
+2. No VS Code com **C# Dev Kit** (Roslyn), o desenvolvedor humano pode usar **Find All References (Shift+F12)** e **Rename Symbol (F2)** sobre a constante: resolvem por análise semântica e capturam usos via `using static` (o que o grep não faz). **Não há tool de refatoração Roslyn exposta ao agente nesta sessão**; portanto o agente opera com **grep (estimativa) + build (verdade)**.
+3. **Estratégia de diretiva (decidir no passo 0)**: ao consolidar em `Constants.Oidc.*`/`Constants.Jwt.*`, escolher entre (a) trocar `global using static OidcConstants` por referências qualificadas via o `global using static …Constants` já existente (ex.: `Oidc.Token.Errors.InvalidGrant`), ou (b) manter um global using static por subclasse migrada para minimizar churn. Fixar isso antes do primeiro ciclo evita retrabalho.
 
 ---
 
@@ -115,7 +167,7 @@ A migração **não** é feita em lote. O ciclo por constante é:
 5. `OidcConstants.AuthorizeRequest` (parâmetros) — verificar overlap com `OpenIdConnectParameterNames`
 6. `OidcConstants.TokenRequest` (parâmetros) — idem
 7. `ServerConstants` (partes em uso) — conforme surgir necessidade
-8. Grupos de baixa prioridade — adiar
+8. Grupos de baixa prioridade (CIBA, Device, PAR, Registration) — **por último**, migração mecânica (mover sem refatorar callers, pois não há callers)
 
 ---
 
@@ -131,15 +183,17 @@ A migração **não** é feita em lote. O ciclo por constante é:
 
 ## Passos de Execução (Nível de Processo)
 
-1. **Grep geral** — mapear volume: quantos usos de `OidcConstants`, `JwtClaimTypes`, `ServerConstants` existem no codebase total. Serve para estimar esforço.
-2. **Decisão inicial** — verificar quais constantes de `JwtClaimTypes` e `OidcConstants.ResponseTypes` já têm equivalente nos pacotes MS. Determinar o que será deletado vs migrado.
-3. **Ciclos de migração** — uma constante/grupo por ciclo conforme ordem sugerida acima.
-4. **Ao final de cada classe legada** — quando zero referências restarem, deletar a classe.
+1. **Passo 0 — Diretivas `using static`** — tratar primeiro o `global using static` (ver "Pré-requisito Crítico"). Decidir a estratégia de diretiva **antes** de migrar a primeira constante.
+2. **Grep geral (estimativa, não exaustivo)** — mapear volume aproximado. ⚠️ O grep com prefixo **subconta** os usos não-qualificados (global using static); a contagem real só é conhecida pelo compilador ao remover cada constante. Usar o grep apenas para ordenar o esforço.
+3. **Decisão inicial** — verificar quais constantes de `JwtClaimTypes` e `OidcConstants.ResponseTypes` já têm equivalente nos pacotes MS. Determinar, por constante, se o caller passa a usar o pacote MS (sem recriar) ou se a constante é recriada em `Constants.*`.
+4. **Ciclos de migração** — uma constante/grupo por ciclo conforme ordem sugerida acima. O `dotnet build` após remover a constante legada é o que revela todos os callers.
+5. **Ao final de cada classe legada** — quando zero referências restarem, deletar a classe (`OidcConstants`, depois `JwtClaimTypes`, depois `ServerConstants`).
 
 ---
 
 ## Riscos
 
 - **Risco baixo**: puramente de nomes — não altera comportamento em runtime.
-- **Risco médio**: `using static` em `.razor` pode não compilar se namespace não for reexportado — verificar `_Imports.razor` a cada ciclo que toque em constantes usadas no Razor.
+- **Risco médio (global using static)**: `OidcConstants`/`Constants` são global-using-static; a busca textual é incompleta e remoções quebram arquivos sem referência textual à classe. Mitigar com ciclos compiler-driven (build após cada remoção). Ver "Pré-requisito Crítico".
+- **Risco médio**: `using static` em `.razor` pode não compilar se o namespace não for reexportado — verificar `_Imports.razor` a cada ciclo que toque em constantes usadas no Razor.
 - **Restrição**: o atributo `[Redesign]` está definido no projeto — verificar se precisa ser migrado junto ou se desaparece com as classes.

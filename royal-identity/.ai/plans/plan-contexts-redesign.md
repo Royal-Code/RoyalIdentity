@@ -2,6 +2,18 @@
 
 ## Status: PENDING
 
+## Progresso
+
+`░░░░░░░░░░` **0%** — 0 de 5 fases concluídas (Fase 2 adiada — ver "Decisão")
+
+## Ordem de execução (global)
+
+Os três planos rodam **um por vez, cada um 100% completo antes do próximo**:
+
+1. Constantes (`plan-constants-refactoring.md`)
+2. **Contextos** ← este plano
+3. UI (`plan-ui-screens-refactoring.md`)
+
 ## Context
 
 Os contextos em `RoyalIdentity/Contexts/` são o contrato central do sistema. Todo o pipeline passa por eles. A modelagem atual tem problemas de consistência identificados via leitura do código:
@@ -30,8 +42,10 @@ IWithRedirectUri : IWithClient
 IWithResources : IWithClient
 IWithBearerToken : IEndpointContextBase
 IWithRefreshToken  (sem herança — correto)
-IWithAuthorizationCode (não visto — verificar)
+IWithAuthorizationCode (sem herança — verificado, já no estado-alvo)
 ```
+
+> **Verificado**: `IWithAuthorizationCode` e `IWithRefreshToken` já não herdam de nada — nenhuma ação necessária nesses dois.
 
 **Problema**: `IWithClient : IEndpointContextBase` significa que toda interface de capacidade herda o contrato de contexto de endpoint. Isso impede criar implementações de teste leves, e cria um acoplamento desnecessário entre "ter um client" e "ser um endpoint context".
 
@@ -66,7 +80,7 @@ public interface IWithResources : IWithClient
 
 **Problema**: Uma interface de dados (`Scopes`) misturada com método de sinalização de estado do pipeline. Quem chama `ResourcesValidated()`? Um decorator ou validator. Quem lê `AssertResourcesValidated()`? Um handler. Isso é um estado interno de progresso do pipeline exposto como contrato público.
 
-**Solução proposta**: Mover os métodos de sinalização para os `Parameters/*` objects, e remover da interface:
+**Solução proposta**: Remover os métodos de sinalização da interface — ela fica só com dados:
 
 ```csharp
 public interface IWithResources : IWithClient
@@ -77,7 +91,9 @@ public interface IWithResources : IWithClient
 }
 ```
 
-O `ResourcesDecorator` e o `AuthorizationResourcesValidator` que chamam esses métodos devem usar `Parameters` internamente ou uma propriedade booleana no contexto concreto — mas não via interface pública.
+A flag de validação (`resourcesValidated`) e a assertiva passam a ser **membros do tipo concreto** (`AuthorizeContext` etc.), não da interface nem dos `Parameters`. O `ResourcesDecorator`/`AuthorizationResourcesValidator` sinalizam fazendo cast para o tipo concreto (ou recebendo o tipo concreto via constraint), e o handler chama a assertiva no tipo concreto.
+
+> **Decisão fixada (aprovada)**: a assertiva fica no **tipo concreto que possui as propriedades**, *não* nos `Parameters/*`. Motivo técnico: a versão de `redirect_uri` usa `[MemberNotNull(nameof(RedirectUri))]` (ver próxima seção), e `[MemberNotNull]` só pode referenciar um membro do **mesmo tipo**. Movida para um objeto `Parameters`, ela não conseguiria garantir o não-nulo de uma propriedade que vive no contexto — perderia a análise de null-state. Portanto: dados na interface; flag + assertiva no concreto.
 
 ### IWithRedirectUri — mesmo problema
 
@@ -91,6 +107,8 @@ public interface IWithRedirectUri : IWithClient
 ```
 
 Mesma solução: `RedirectUriValidated()` e `AssertHasRedirectUri()` saem da interface. A flag fica privada na classe concreta. O decorator `RedirectUriValidator` não precisa conhecer essa flag via interface.
+
+> **Atenção ao `[MemberNotNull]`**: no código atual `AssertHasRedirectUri()` é anotado com `[MemberNotNull(nameof(RedirectUri))]`. Essa anotação **deve permanecer no tipo concreto** que declara `RedirectUri` — é o único lugar onde o compilador a aceita e onde ela continua informando ao handler que `RedirectUri` é não-nulo após a chamada. Não mover para `Parameters`.
 
 ### Parameters/* — contrato a formalizar
 
@@ -125,7 +143,9 @@ Ambos marcados `[Redesign("Acredito que o uso destes seja desnecessário")]`. Ve
 
 ## Estado Alvo
 
-### Hierarquia de interfaces limpa
+> **Ressalva (Fase 2 adiada)**: a hierarquia "sem herança" abaixo é o alvo *de longo prazo*, condicionado à Fase 2. **Neste ciclo, as `IWith*` mantêm `: IEndpointContextBase`.** O que muda agora é a **remoção dos métodos de estado** das interfaces (Fases 3–5); a estrutura de herança permanece.
+
+### Hierarquia de interfaces limpa (alvo de longo prazo — depende da Fase 2)
 
 ```
 IContextBase (Pipelines)
@@ -176,22 +196,23 @@ Apenas métodos `Set*()` dentro do objeto alteram estado. Nenhuma propriedade te
 2. Mapear todos os callers de `ResourcesValidated()`, `AssertResourcesValidated()`, `RedirectUriValidated()`, `AssertHasRedirectUri()`.
 3. Mapear todos os callers de `ClientParameters.ClientClaims`.
 4. Verificar se `Items/Token.cs` e `Items/Tokens.cs` têm callers ativos.
-5. Verificar se `IWithRefreshToken` e `IWithAuthorizationCode` herdam de algo (confirmar).
+5. ~~Verificar se `IWithRefreshToken` e `IWithAuthorizationCode` herdam de algo~~ — **já confirmado: nenhum herda; ambos já estão no estado-alvo.**
 
-### Fase 2 — Remover herança de IWith* de IEndpointContextBase (SE for o caminho escolhido)
+### Fase 2 — Remover herança de IWith* de IEndpointContextBase — **ADIADA (não executar agora)**
 
+> **Decisão**: manter `IWith*` herdando de `IEndpointContextBase` por ora. Justificativa em "Decisão" abaixo. Esta fase fica registrada para o futuro, mas **não entra neste ciclo de trabalho**. As Fases 3–6 são independentes dela.
+
+Se um dia for executada:
 1. Remover `: IEndpointContextBase` de `IWithAcr` e `IWithClient`.
 2. Atualizar todos os decorators para usar múltiplos constraints.
 3. Verificar build.
-
-> **Alternativa**: Se a decisão for manter `IWithClient : IEndpointContextBase` (argumento: capacidades de endpoint sempre pressupõem contexto de endpoint), pular esta fase e documentar a decisão.
 
 ### Fase 3 — Remover métodos de estado das interfaces
 
 1. Remover `ResourcesValidated()` e `AssertResourcesValidated()` de `IWithResources`.
 2. Remover `RedirectUriValidated()` e `AssertHasRedirectUri()` de `IWithRedirectUri`.
 3. Os booleans privados nos contextos concretos (`redirectUriValidated`, `resourcesValidated`) continuam existindo — mas são estado interno, não contrato de interface.
-4. Os callers que usavam os métodos via interface agora devem fazer cast para o tipo concreto, OU mover a assertiva para dentro do `Parameters` correspondente.
+4. A flag e a assertiva (incl. `[MemberNotNull(nameof(RedirectUri))]`) ficam **no tipo concreto** que declara a propriedade. Os callers que usavam os métodos via interface fazem cast para o tipo concreto (ou recebem o concreto via constraint). **Não** mover a assertiva para `Parameters` (quebra o `[MemberNotNull]`).
 5. Verificar build.
 
 ### Fase 4 — Migrar ClientClaims
@@ -219,34 +240,38 @@ Apenas métodos `Set*()` dentro do objeto alteram estado. Nenhuma propriedade te
 
 | Arquivo | Ação |
 |---|---|
-| `Contexts/Withs/IWithAcr.cs` | Remover herança de `IEndpointContextBase` |
-| `Contexts/Withs/IWithClient.cs` | Remover herança de `IEndpointContextBase`; remover `IEndpointContextBase` da assinatura |
-| `Contexts/Withs/IWithResources.cs` | Remover `ResourcesValidated()` e `AssertResourcesValidated()` |
-| `Contexts/Withs/IWithRedirectUri.cs` | Remover `RedirectUriValidated()` e `AssertHasRedirectUri()` |
-| `Contexts/Withs/IWithCodeChallenge.cs` | Remover herança de `IWithClient` se não for mais necessária |
-| `Contexts/Withs/IWithPrompt.cs` | Remover herança de `IWithClient` e `IWithAcr` |
-| `Contexts/Parameters/ClientParameters.cs` | Remover `ClientClaims` |
-| `Contexts/AuthorizeContext.cs` | Expor métodos de estado como membros privados/internos |
-| `Contexts/AuthorizationCodeContext.cs` | Idem |
-| `Contexts/Items/Token.cs` | Deletar |
-| `Contexts/Items/Tokens.cs` | Deletar |
-| Todos os decorators com constraint `IWith*` | Atualizar constraints |
+| `Contexts/Withs/IWithResources.cs` | **Fase 3** — Remover `ResourcesValidated()` e `AssertResourcesValidated()` |
+| `Contexts/Withs/IWithRedirectUri.cs` | **Fase 3** — Remover `RedirectUriValidated()` e `AssertHasRedirectUri()` (assertiva + `[MemberNotNull]` vão para o tipo concreto) |
+| `Contexts/AuthorizeContext.cs` | **Fase 3** — Mover flag `resourcesValidated`/`redirectUriValidated` + assertivas (com `[MemberNotNull]`) para membros privados/internos do concreto |
+| `Contexts/AuthorizationCodeContext.cs` | **Fase 3** — Idem |
+| `Contexts/Parameters/ClientParameters.cs` | **Fase 4** — Remover `ClientClaims` |
+| `Contexts/ClientCredentialsContext.cs` | **Fase 4** — Receber `ClientClaims` como propriedade local |
+| `Contexts/Items/Token.cs` | **Fase 5** — Deletar (após confirmar zero callers) |
+| `Contexts/Items/Tokens.cs` | **Fase 5** — Deletar (após confirmar zero callers) |
+| `Contexts/Withs/IWithAcr.cs` | ~~Remover herança de `IEndpointContextBase`~~ — **Fase 2 adiada** |
+| `Contexts/Withs/IWithClient.cs` | ~~Remover herança de `IEndpointContextBase`~~ — **Fase 2 adiada** |
+| `Contexts/Withs/IWithCodeChallenge.cs` | ~~Remover herança de `IWithClient`~~ — **Fase 2 adiada** |
+| `Contexts/Withs/IWithPrompt.cs` | ~~Remover herança de `IWithClient` e `IWithAcr`~~ — **Fase 2 adiada** |
+| Todos os decorators com constraint `IWith*` | ~~Atualizar constraints~~ — **Fase 2 adiada** |
 
 ---
 
-## Decisão Pendente (Requer Input do Autor)
+## Decisão (Resolvida) — manter herança de `IWith*`
 
 **Questão central**: `IWith*` deve ou não herdar de `IEndpointContextBase`?
 
-- **Sim (manter atual)**: Capacidades de endpoint sempre pressupõem contexto de endpoint. Simplifica constraints de decorators. Custo: não dá para usar IWith* em contextos de teste leves.
-- **Não (remover herança)**: Maior flexibilidade. Constraints de decorators ficam mais verbosas. Permite testes sem overhead de endpoint context.
+**Decisão: manter a herança (não executar a Fase 2 agora).**
 
-Esta decisão impacta Fase 2 inteira. As demais fases são independentes desta decisão.
+- **Sim (escolhido)**: Hoje **todas** as `IWith*` são usadas exclusivamente em endpoint contexts, e os decorators dependem dessa herança para o constraint simples (`IDecorator<IWithClient>`). Manter a herança preserva os decorators como estão.
+- **Não (remover herança)**: traria flexibilidade para testes leves, mas adiciona verbosidade em **todos** os decorators (`where TContext : IEndpointContextBase, IWithClient`) em troca de uma testabilidade que ninguém exerce hoje.
+
+**Custo/benefício**: o ganho real do redesign está nas Fases 3–5 (tirar sinalização de estado do contrato público), que são cirúrgicas e de baixo risco. A Fase 2 tem blast radius alto e benefício atualmente teórico → **adiada**. Reavaliar quando/se surgir necessidade de usar `IWith*` fora de endpoint contexts (ex.: testes unitários de decorators sem montar um endpoint context completo).
 
 ---
 
 ## Riscos
 
-- Fase 2 (herança) tem blast radius alto — todos os decorators são afetados.
-- Fases 3, 4, 5 são cirúrgicas e de baixo risco.
+- Fase 2 (herança) tem blast radius alto — todos os decorators seriam afetados. **Por isso foi adiada** (ver "Decisão").
+- Fases 3, 4, 5 são cirúrgicas e de baixo risco — o foco deste ciclo.
 - Nenhuma fase altera comportamento em runtime — apenas contratos de tipo.
+- `[MemberNotNull]` deve permanecer no tipo concreto que declara a propriedade (`RedirectUri`); movê-lo para `Parameters` quebraria a análise de null-state. Ver Fase 3.
