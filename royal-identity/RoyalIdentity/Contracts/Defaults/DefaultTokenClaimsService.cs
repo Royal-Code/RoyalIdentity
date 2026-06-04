@@ -128,7 +128,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
             new(JwtClaimTypes.Subject, subject.GetSubjectId()),
             new(JwtClaimTypes.AuthenticationTime, subject.GetAuthenticationTimeEpoch().ToString(),
                 ClaimValueTypes.Integer64),
-            new(JwtClaimTypes.IdentityProvider, subject.GetIdentityProvider())
+            new(Jwt.ClaimTypes.IdentityProvider, subject.GetIdentityProvider())
         };
 
         claims.AddRange(subject.GetAuthenticationMethods());

@@ -1,10 +1,22 @@
 # Plan: Constants Refactoring
 
-## Status: PENDING
+## Status: IN PROGRESS
 
 ## Progresso
 
-`░░░░░░░░░░` **0%** — 0 de 8 grupos migrados (ver "Ordem sugerida")
+`█░░░░░░░░░` **~10%** — Passo 0 concluído + 1º ciclo JwtClaimTypes (project-specific) concluído
+
+### Concluído
+- **Passo 0 (diretivas `using static`)**: estratégia decidida — Strategy B (manter `global using static Constants`; callers usam `Jwt.ClaimTypes.*` via o global already existente; sem novo global using static por subclasse)
+- **`Constants.Jwt` criado** com:
+  - `Constants.Jwt.ClaimTypes`: `IdentityProvider`, `Role`, `Roles`, `ReferenceTokenId`
+  - `Constants.Jwt.ClaimTypes.JwtTypes`: `AccessToken`, `AuthorizationRequest`, `DPoPProofToken`
+  - `Constants.Jwt.ConfirmationMethods`: `JsonWebKey`, `JwkThumbprint`, `X509ThumbprintSha256`
+- **`Constants.OAuth` deletado** (estava vazio)
+- **`[Redesign("Move all to Constants")]`** adicionado a `JwtClaimTypes` e `ServerConstants`
+- **`JwtClaimTypes` parcialmente esvaziado**: removidos `IdentityProvider`, `Role`, `Roles`, `ReferenceTokenId`, `JwtTypes` inner class, `ConfirmationMethods` inner class
+- **Callers atualizados** (9 arquivos): `ClientCredentialsContext`, `DefaultIdentityUser`, `ClaimsExtensions`, `PrincipalExtensions`, `DefaultProfileService`, `DefaultTokenClaimsService`, `SubjectFactory`, `Constants.Filters`
+- **Build**: 0 erros
 
 ## Ordem de execução (global)
 

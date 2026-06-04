@@ -47,7 +47,7 @@ internal static class ClaimsExtensions
             claims.Distinct(new ClaimComparer()),
             Server.AuthenticationScheme,
             JwtClaimTypes.Subject,
-            JwtClaimTypes.Role);
+            Jwt.ClaimTypes.Role);
 
         return identity;
     }

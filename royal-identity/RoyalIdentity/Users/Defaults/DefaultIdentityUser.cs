@@ -99,12 +99,12 @@ public sealed class DefaultIdentityUser : IdentityUser
             new(JwtClaimTypes.Name, details.DisplayName),
             new(JwtClaimTypes.AuthenticationTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
             new(JwtClaimTypes.SessionId, currentSession.Id),
-            new(JwtClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
+            new(Jwt.ClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
             new(JwtClaimTypes.AuthenticationMethod, currentSession.Amr)
         };
 
         foreach (var role in details.Roles)
-            claims.Add(new(JwtClaimTypes.Role, role));
+            claims.Add(new(Jwt.ClaimTypes.Role, role));
 
         claims.AddRange(details.Claims);
 

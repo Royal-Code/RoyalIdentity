@@ -17,14 +17,14 @@ public static class SubjectFactory
         [
             new(JwtClaimTypes.Subject, sub),
             new(JwtClaimTypes.Name, name),
-            new(JwtClaimTypes.Role, role),
+            new(Jwt.ClaimTypes.Role, role),
             new(JwtClaimTypes.SessionId, CryptoRandom.CreateUniqueId(24)),
             new(JwtClaimTypes.AuthenticationTime, DateTimeOffset.Now.ToUnixTimeSeconds().ToString()),
-            new(JwtClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
+            new(Jwt.ClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
             new(JwtClaimTypes.AuthenticationMethod, AuthenticationMethods.Password)
         ];
 
-        var identity = new ClaimsIdentity(claims, "tests", JwtClaimTypes.Subject, JwtClaimTypes.Role);
+        var identity = new ClaimsIdentity(claims, "tests", JwtClaimTypes.Subject, Jwt.ClaimTypes.Role);
 
         return new ClaimsPrincipal(identity);
     }

@@ -254,10 +254,6 @@ public static partial class Constants
         }
     }
 
-    public static class  OAuth
-    {
-
-    }
 }
 
 public static partial class Constants
@@ -281,7 +277,7 @@ public static partial class Constants
             JwtClaimTypes.JwtId,
             JwtClaimTypes.Nonce,
             JwtClaimTypes.NotBefore,
-            JwtClaimTypes.ReferenceTokenId,
+            Jwt.ClaimTypes.ReferenceTokenId,
             JwtClaimTypes.SessionId,
             JwtClaimTypes.Scope
         ];
@@ -298,13 +294,13 @@ public static partial class Constants
             JwtClaimTypes.AuthorizationCodeHash,
             JwtClaimTypes.ClientId,
             JwtClaimTypes.Expiration,
-            JwtClaimTypes.IdentityProvider,
+            Jwt.ClaimTypes.IdentityProvider,
             JwtClaimTypes.IssuedAt,
             JwtClaimTypes.Issuer,
             JwtClaimTypes.JwtId,
             JwtClaimTypes.Nonce,
             JwtClaimTypes.NotBefore,
-            JwtClaimTypes.ReferenceTokenId,
+            Jwt.ClaimTypes.ReferenceTokenId,
             JwtClaimTypes.SessionId,
             JwtClaimTypes.Subject,
             JwtClaimTypes.Scope,
@@ -333,6 +329,31 @@ public static partial class Constants
     {
         public const string User = nameof(User);
         public const string Client = nameof(Client);
+    }
+
+    public static class Jwt
+    {
+        public static class ClaimTypes
+        {
+            public const string IdentityProvider = "idp";
+            public const string Role = "role";
+            public const string Roles = "roles";
+            public const string ReferenceTokenId = "reference_token_id";
+
+            public static class JwtTypes
+            {
+                public const string AccessToken = "at+jwt";
+                public const string AuthorizationRequest = "oauth-authz-req+jwt";
+                public const string DPoPProofToken = "dpop+jwt";
+            }
+        }
+
+        public static class ConfirmationMethods
+        {
+            public const string JsonWebKey = "jwk";
+            public const string JwkThumbprint = "jkt";
+            public const string X509ThumbprintSha256 = "x5t#S256";
+        }
     }
 }
 
@@ -850,6 +871,7 @@ public static class OidcConstants
 /// <summary>
 /// Commonly used claim types
 /// </summary>
+[Redesign("Move all to Constants")]
 public static class JwtClaimTypes
 {
     /// <summary>Unique Identifier for the End-User at the Issuer.</summary>
@@ -991,26 +1013,6 @@ public static class JwtClaimTypes
     public const string Id = "id";
 
     /// <summary>
-    /// The identity provider
-    /// </summary>
-    public const string IdentityProvider = "idp";
-
-    /// <summary>
-    /// The role
-    /// </summary>
-    public const string Role = "role";
-
-    /// <summary>
-    /// The roles
-    /// </summary>
-    public const string Roles = "roles";
-
-    /// <summary>
-    /// The reference token identifier
-    /// </summary>
-    public const string ReferenceTokenId = "reference_token_id";
-
-    /// <summary>
     /// The confirmation
     /// </summary>
     public const string Confirmation = "cnf";
@@ -1044,50 +1046,9 @@ public static class JwtClaimTypes
     /// DPoP access token hash
     /// </summary>
     public const string DPoPAccessTokenHash = "ath";
-
-    /// <summary>
-    /// Values for strongly typed JWTs
-    /// </summary>
-    public static class JwtTypes
-    {
-        /// <summary>
-        /// OAuth 2.0 access token
-        /// </summary>
-        public const string AccessToken = "at+jwt";
-
-        /// <summary>
-        /// JWT secured authorization request
-        /// </summary>
-        public const string AuthorizationRequest = "oauth-authz-req+jwt";
-
-        /// <summary>
-        /// DPoP proof token
-        /// </summary>
-        public const string DPoPProofToken = "dpop+jwt";
-    }
-
-    /// <summary>
-    /// Values for the cnf claim
-    /// </summary>
-    public static class ConfirmationMethods
-    {
-        /// <summary>
-        /// JSON web key
-        /// </summary>
-        public const string JsonWebKey = "jwk";
-
-        /// <summary>
-        /// JSON web key thumbprint
-        /// </summary>
-        public const string JwkThumbprint = "jkt";
-
-        /// <summary>
-        /// X.509 certificate thumbprint using SHA256
-        /// </summary>
-        public const string X509ThumbprintSha256 = "x5t#S256";
-    }
 }
 
+[Redesign("Move all to Constants")]
 public static class ServerConstants
 {
     public const string LocalIdentityProvider = "local";

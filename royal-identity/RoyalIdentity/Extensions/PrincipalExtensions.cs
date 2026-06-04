@@ -206,7 +206,7 @@ public static class PrincipalExtensions
     {
         if (identity is ClaimsIdentity id)
         {
-            var claim = id.FindFirst(JwtClaimTypes.IdentityProvider);
+            var claim = id.FindFirst(Jwt.ClaimTypes.IdentityProvider);
             if (claim is not null)
                 return claim.Value;
         }

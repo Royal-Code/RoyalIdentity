@@ -38,7 +38,7 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
             identity.AddClaim(new Claim(JwtClaimTypes.Subject, client.Id));
 
         identity.AddClaim(new(JwtClaimTypes.AuthenticationTime, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
-        identity.AddClaim(new(JwtClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider));
+        identity.AddClaim(new(Jwt.ClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider));
         identity.AddClaim(new(JwtClaimTypes.AuthenticationMethod, ClientParameters.AuthenticationMethod));
 
         principal = new ClaimsPrincipal(identity);

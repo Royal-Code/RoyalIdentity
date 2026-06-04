@@ -41,7 +41,7 @@ public class DefaultProfileService : IProfileService
         request.IssuedClaims.AddRange(userClaims.Where(c => requestedClaim.Contains(c.Type)));
 
         // add the user's roles to the claims
-        request.IssuedClaims.AddRange(userDetails.Roles.Select(r => new Claim(JwtClaimTypes.Role, r)));
+        request.IssuedClaims.AddRange(userDetails.Roles.Select(r => new Claim(Jwt.ClaimTypes.Role, r)));
     }
 
     public async ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller, CancellationToken ct)
