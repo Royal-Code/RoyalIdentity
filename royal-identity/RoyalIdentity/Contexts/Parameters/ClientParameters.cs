@@ -1,8 +1,6 @@
 ﻿using RoyalIdentity.Contracts.Models;
-using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using System.Diagnostics.CodeAnalysis;
-using System.Security.Claims;
 
 namespace RoyalIdentity.Contexts.Parameters;
 
@@ -28,14 +26,6 @@ public class ClientParameters
     /// </value>
     public string? Confirmation => ClientSecret?.Confirmation;
 
-    /// <summary>
-    /// Gets or sets the client claims for the current request.
-    /// This value is initally read from the client configuration but can be modified in the request pipeline
-    /// </summary>
-    [Redesign("Use only in ClientCredentialsContext --  remove")]
-    public HashSet<Claim> ClientClaims { get; } = [];
-
-
     [MemberNotNull(nameof(Client))]
     public void AssertHasClient()
     {
@@ -59,7 +49,6 @@ public class ClientParameters
     public void SetClient(Client client)
     {
         Client = client;
-        ClientClaims.AddRange(client.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)));
     }
 
     public void SetClientAndSecret(Client client, EvaluatedCredential clientSecret, string authenticationMethod)

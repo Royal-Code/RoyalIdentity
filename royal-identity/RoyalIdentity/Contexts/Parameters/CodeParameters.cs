@@ -5,7 +5,12 @@ namespace RoyalIdentity.Contexts.Parameters;
 
 public class CodeParameters
 {
-    public AuthorizationCode? AuthorizationCode { get; set; }
+    public AuthorizationCode? AuthorizationCode { get; private set; }
+
+    public void SetCode(AuthorizationCode code)
+    {
+        AuthorizationCode = code;
+    }
 
     [MemberNotNull(nameof(AuthorizationCode))]
     public void AssertHasCode()

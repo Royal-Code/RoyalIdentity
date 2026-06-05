@@ -77,7 +77,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
             return;
         }
 
-        context.CodeParameters.AuthorizationCode = authorizationCode;
+        context.CodeParameters.SetCode(authorizationCode);
 
         await next();
     }

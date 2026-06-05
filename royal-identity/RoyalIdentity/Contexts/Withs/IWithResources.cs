@@ -11,13 +11,4 @@ public interface IWithResources : IWithClient
     /// </summary>
     public RequestedScopes Scopes { get; }
 
-    /// <summary>
-    /// Determines that the resources have been loaded and are valid for the client.
-    /// </summary>
-    public void ResourcesValidated();
-
-    /// <summary>
-    /// Ensures that the resources have been validated.
-    /// </summary>
-    public void AssertResourcesValidated();
 }

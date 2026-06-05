@@ -1,9 +1,8 @@
-﻿namespace RoyalIdentity.Razor.Components.Account.SignIn;
+namespace RoyalIdentity.Razor.ViewModels;
 
 public class LoginViewModel : LoginInputModel
 {
     private ExternalProvider[]? visibleExternalProviders = null;
-
 
     public bool AllowRememberLogin { get; set; } = true;
 

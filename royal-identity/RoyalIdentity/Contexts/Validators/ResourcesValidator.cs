@@ -2,6 +2,7 @@
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Contexts;
 
 namespace RoyalIdentity.Contexts.Validators;
 
@@ -66,7 +67,15 @@ public class ResourcesValidator : IValidator<IWithResources>
             }
         }
 
-        context.ResourcesValidated();
+        switch (context)
+        {
+            case AuthorizeContext ac:
+                ac.ResourcesValidated();
+                break;
+            case ClientCredentialsContext cc:
+                cc.ResourcesValidated();
+                break;
+        }
 
         return default;
     }

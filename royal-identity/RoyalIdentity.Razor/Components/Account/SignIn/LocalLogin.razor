@@ -1,18 +1,5 @@
-﻿@using Microsoft.Extensions.Logging
-@using RoyalIdentity.Contracts
-@using RoyalIdentity.Contracts.Models.Messages
-@using RoyalIdentity.Contracts.Storage
-@using RoyalIdentity.Events
-@using RoyalIdentity.Extensions;
-@using RoyalIdentity.Models
-@using RoyalIdentity.Users
-@using RoyalIdentity.Users.Contexts
-
-@inject ISignInManager SignInManager
-@inject ILogger<LoginPage> Logger
+@inject ILoginPageService LoginPageService
 @inject NavigationManager NavigationManager
-@inject IEventDispatcher EventDispatcher
-@inject IMessageStore MessageStore
 
 <StatusMessage Message="@errorMessage" MessageClass="danger"/>
 
@@ -65,96 +52,20 @@
     [SupplyParameterFromForm]
     private LoginInputModel Input { get; set; } = new();
 
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
     protected override Task OnParametersSetAsync()
     {
-        if (HttpContext is null)
-            throw new InvalidOperationException("HttpContext is required.");
-
         Input.ReturnUrl = Model.ReturnUrl;
         return base.OnParametersSetAsync();
     }
 
     public async Task LoginUser()
     {
-        Realm? realm;
-
-        var context = await HttpContext.GetAuthorizationContextAsync(Input.ReturnUrl);
-        if (context is null)
-        {
-            if (!HttpContext.TryGetCurrentRealm(out realm))
-            {
-                Logger.LogError("No authorization context found for return URL: {ReturnUrl}", Input.ReturnUrl);
-                NavigationManager.NavigateTo(Routes.SelectDomain);
-                return;
-            }
-        }
-        else
-        {
-            realm = context.Client.Realm;
-        }
-        
-        var result = await SignInManager.AuthenticateUserAsync(realm, Input.Username!, Input.Password!, CancellationToken.None);
-
-        if (!result.Success)
+        var result = await LoginPageService.LoginAsync(Input, CancellationToken.None);
+        if (result.NavigateTo is null)
         {
             errorMessage = result.ErrorMessage;
-            var evt = new UserLoginFailureEvent(Input.Username!, errorMessage, context);
-            await EventDispatcher.DispatchAsync(evt);
             return;
         }
-
-        await EventDispatcher.DispatchAsync(new UserLoginSuccessEvent(Input.Username!, result.User, context));
-
-        var user = await SignInManager.SignInAsync(result.User, result.Session, Input.RememberLogin, CancellationToken.None);
-
-        if (context is not null)
-        {
-            // if consent is required, navigate to consent page
-            if (await SignInManager.ConsentRequired(user, context.Client, context.Resources, CancellationToken.None))
-            {
-                var consentUrl = Routes.BuildConsentUrl(realm.Path, Input.ReturnUrl);
-                NavigationManager.NavigateTo(consentUrl);
-            }
-
-            var redirectUri = context.RedirectUri;
-
-            if (!redirectUri.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-            {
-                // The client is native, so this change in how to
-                // return the response is for better UX for the end user.
-
-                NavigationManager.NavigateTo(Routes.BuildSignedInUrl(realm.Path, Input.ReturnUrl));
-            }
-
-            // we can trust in the redirectUri since GetAuthorizationContextAsync returned non-null
-            NavigationManager.NavigateTo(Input.ReturnUrl!);
-        }
-
-        if (Input.ReturnUrl.IsMissing())
-        {
-            NavigationManager.NavigateTo(Routes.BuildProfileUrl(realm.Path), true);
-        }
-
-        var uri = new Uri(Input.ReturnUrl!, UriKind.RelativeOrAbsolute);
-
-        // if it's an absolute URI and it's not a local page (from the same host),
-        // it generate an error because no client was found to validate the URL.
-        if (uri is { IsAbsoluteUri: true, IsLoopback: false })
-        {
-            var error = new ErrorMessage()
-                {
-                    ErrorDescription = $"No consent request matching request: {uri}"
-                };
-            var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
-
-            NavigationManager.NavigateTo(Routes.BuildErrorUrl(errorId), true);
-            return;
-        }
-
-        // redirect to the return URL
-        NavigationManager.NavigateTo(uri.ToString(), true);
+        NavigationManager.NavigateTo(result.NavigateTo, result.ForceLoad);
     }
 }

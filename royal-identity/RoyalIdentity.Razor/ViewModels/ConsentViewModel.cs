@@ -1,6 +1,6 @@
 using RoyalIdentity.Models.Scopes;
 
-namespace RoyalIdentity.Razor.Components.Account.Consenting;
+namespace RoyalIdentity.Razor.ViewModels;
 
 public class ConsentViewModel
 {
@@ -18,7 +18,7 @@ public class ConsentViewModel
 
     public ICollection<ScopeConsentInputModel> CreateIdentityScopes()
     {
-        return IdentityScopes.Select(s => new ScopeConsentInputModel()
+        return IdentityScopes.Select(s => new ScopeConsentInputModel
         {
             Scope = s.Name,
             Description = s.Description,
@@ -31,7 +31,7 @@ public class ConsentViewModel
 
     public ICollection<ScopeConsentInputModel> CreateApiScopes()
     {
-        return ApiScopes.Select(s => new ScopeConsentInputModel()
+        return ApiScopes.Select(s => new ScopeConsentInputModel
         {
             Scope = s.Name,
             Description = s.Description,

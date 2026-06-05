@@ -1,12 +1,6 @@
 @attribute [Route(Routes.Logout)]
 
-@using RoyalIdentity.Contracts.Models.Messages
-@using RoyalIdentity.Contracts.Storage
-@using RoyalIdentity.Extensions
-@using RoyalIdentity.Users
-
-@inject IMessageStore MessageStore
-@inject ISignOutManager SignOutManager
+@inject IEndSessionPageService EndSessionPageService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Log out</PageTitle>
@@ -16,7 +10,7 @@
         <h1>Logging out</h1>
     </Title>
     <ChildContent>
-        @if (model is not null)
+        @if (showPrompt)
         {
             <EditForm Model="LogoutInput" method="post" OnValidSubmit="LogoutUser" FormName="logout">
 
@@ -33,7 +27,7 @@
 
 @code {
 
-    private LogoutMessage? model = null;
+    private bool showPrompt = false;
 
     [Parameter]
     public string Realm { get; set; } = default!;
@@ -46,80 +40,27 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var logoutId = LogoutId ?? await SignOutManager.CreateLogoutIdAsync(default);
-        if (logoutId is null)
-        {
-            // error
-            var errorMessage = new ErrorMessage()
-                {
-                    Error = "invalid_request",
-                    ErrorDescription = "Logout Id is required"
-                };
+        var result = await EndSessionPageService.BeginLogoutAsync(LogoutId, CancellationToken.None);
 
-            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
-            var redirect = Routes.BuildErrorUrl(errorId);
-            NavigationManager.NavigateTo(redirect);
+        if (result.Type == LogoutResultType.RequiresConfirmation)
+        {
+            showPrompt = true;
+            LogoutInput = new LogoutInputModel { ConfirmedId = result.NavigateTo };
             return;
         }
 
-        LogoutInput = new()
-        {
-            ConfirmedId = LogoutId
-        };
-
-        var message = await MessageStore.ReadAsync<LogoutMessage>(logoutId, default);
-        model = message?.Data;
-
-        if (model is null || model.ShowSignoutPrompt)
-            return;
-
-        await MessageStore.DeleteAsync(logoutId, default);
-        var uri = await SignOutManager.SignOutAsync(model, default);
-
-        NavigationManager.NavigateTo(uri.AbsoluteUri);
-
-        await base.OnParametersSetAsync();
+        NavigationManager.NavigateTo(result.NavigateTo!);
     }
 
     public async Task LogoutUser()
     {
-        if (LogoutInput is null || LogoutInput.ConfirmedId is null)
+        if (LogoutInput?.ConfirmedId is null)
         {
-            // error
-            var errorMessage = new ErrorMessage()
-            {
-                Error = "invalid_request",
-                ErrorDescription = "Logout Confirmed Id is required"
-            };
-
-            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
-            var redirect = Routes.BuildErrorUrl(errorId);
-            NavigationManager.NavigateTo(redirect);
+            NavigationManager.NavigateTo(Routes.Error);
             return;
         }
 
-        var message = await MessageStore.ReadAsync<LogoutMessage>(LogoutInput.ConfirmedId, default);
-        model = message?.Data;
-
-        if (model is null)
-        {
-            // error
-            var errorMessage = new ErrorMessage()
-            {
-                Error = "invalid_request",
-                ErrorDescription = "Logout Id is not found"
-            };
-
-            var errorId = await MessageStore.WriteAsync<ErrorMessage>(new(errorMessage), default);
-            var redirect = Routes.BuildErrorUrl(errorId);
-            NavigationManager.NavigateTo(redirect);
-            return;
-        }
-
-        await MessageStore.DeleteAsync(LogoutInput.ConfirmedId, default);
-
-        var uri = await SignOutManager.SignOutAsync(model, default);
-
-        NavigationManager.NavigateTo(uri.AbsoluteUri);
+        var result = await EndSessionPageService.ConfirmLogoutAsync(LogoutInput.ConfirmedId, CancellationToken.None);
+        NavigationManager.NavigateTo(result.NavigateTo!);
     }
 }

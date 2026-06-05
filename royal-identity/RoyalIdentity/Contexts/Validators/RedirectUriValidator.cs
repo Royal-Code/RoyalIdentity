@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Storage;
@@ -66,6 +67,14 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
             return;
         }
 
-        context.RedirectUriValidated();
+        switch (context)
+        {
+            case AuthorizeContext ac:
+                ac.RedirectUriValidated();
+                break;
+            case AuthorizationCodeContext acc:
+                acc.RedirectUriValidated();
+                break;
+        }
     }
 }

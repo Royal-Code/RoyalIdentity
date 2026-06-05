@@ -63,7 +63,7 @@ public class EvaluateBearerToken : IDecorator<IWithBearerToken>
             return;
         }
 
-        context.BearerParameters.EvaluatedToken = evaluationResult.Token;
+        context.BearerParameters.SetToken(evaluationResult.Token);
 
         await next();
     }

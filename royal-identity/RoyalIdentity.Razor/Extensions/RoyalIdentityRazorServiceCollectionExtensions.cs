@@ -17,6 +17,12 @@ public static class RoyalIdentityRazorServiceCollectionExtensions
         services.AddScoped<IdentityRedirectManager>();
         services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
+        services.AddHttpContextAccessor();
+        services.AddScoped<ISessionContextService, SessionContextService>();
+        services.AddScoped<ILoginPageService, LoginPageService>();
+        services.AddScoped<IConsentPageService, ConsentPageService>();
+        services.AddScoped<IEndSessionPageService, EndSessionPageService>();
+
         return services;
     }
 }

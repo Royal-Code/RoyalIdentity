@@ -1,4 +1,4 @@
-namespace RoyalIdentity.Razor.Components.Account.Consenting;
+namespace RoyalIdentity.Razor.ViewModels;
 
 public class ConsentInputModel
 {

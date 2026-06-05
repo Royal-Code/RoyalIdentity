@@ -51,7 +51,6 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             sessionState = code.SessionState;
 
             var token = new Token(Oidc.Token.Types.Code, codeValue);
-            context.Items.AddToken(token);
             codeEvent = new CodeIssuedEvent(context, token);
 
             logger.LogDebug("Code generated");
@@ -72,8 +71,6 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             accessTokenValue = accessToken.Token;
 
             var token = new Token(Oidc.Token.Types.AccessToken, accessTokenValue);
-            context.Items.AddToken(token);
-
             atEvent = new AccessTokenIssuedEvent(context, token);
 
             logger.LogDebug("Access Token generated");
@@ -97,8 +94,6 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             identityTokenValue = idToken.Token;
 
             var token = new Token(Oidc.Token.Types.IdentityToken, identityTokenValue);
-            context.Items.AddToken(token);
-
             idEvent = new IdentityTokenIssuedEvent(context, token);
 
             logger.LogDebug("Identity Token generated");

@@ -24,6 +24,10 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
 
     public RequestedScopes Scopes { get; } = new();
 
+    public IReadOnlyCollection<Claim> ClientClaims
+        => ClientParameters.Client?.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)).ToList()
+            ?? [];
+
     public override ClaimsPrincipal? GetSubject()
     {
         if (principal is not null)

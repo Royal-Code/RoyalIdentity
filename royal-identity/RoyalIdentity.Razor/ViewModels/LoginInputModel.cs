@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
-namespace RoyalIdentity.Razor.Components.Account.SignIn;
+namespace RoyalIdentity.Razor.ViewModels;
 
 public class LoginInputModel
 {

@@ -1,12 +1,6 @@
-﻿@attribute [Route(Routes.Login)]
+@attribute [Route(Routes.Login)]
 
-@using Microsoft.Extensions.Options
-@using RoyalIdentity.Extensions
-@using RoyalIdentity.Options
-@using RoyalIdentity.Users
-
-@inject ISignInManager SignInManager
-@inject IAuthenticationSchemeProvider SchemeProvider
+@inject ILoginPageService LoginPageService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Log in</PageTitle>
@@ -38,56 +32,12 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
     private LoginViewModel? model = null;
 
     protected override async Task OnParametersSetAsync()
     {
-        if (HttpContext is null)
-            throw new InvalidOperationException("HttpContext is required.");
-
-        if (!HttpContext.TryGetCurrentRealm(out var realm))
-        {
+        model = await LoginPageService.BuildViewModelAsync(ReturnUrl, CancellationToken.None);
+        if (model is null)
             NavigationManager.NavigateTo(Routes.SelectDomain);
-            return;
-        }
-
-        var context = await HttpContext.GetAuthorizationContextAsync(ReturnUrl);
-        var returnUrl = ReturnUrl ?? Routes.BuildProfileUrl(realm.Path);
-
-        var schemes = await SchemeProvider.GetAllSchemesAsync();
-
-        var providers = schemes
-            .Where(x => x.Name != "RoyalIdentity")
-            .Where(x => x.DisplayName != null)
-            .Select(x => new ExternalProvider
-                {
-                    DisplayName = x.DisplayName ?? x.Name,
-                    AuthenticationScheme = x.Name
-                });
-
-        var accountOptions = realm.Options.Account;
-        var allowLocal = accountOptions.AllowLocalLogin;
-        if (context is not null)
-        {
-            allowLocal = allowLocal && context.Client.EnableLocalLogin;
-
-            if (context.Client.IdentityProviderRestrictions.Any())
-            {
-                providers = providers
-                    .Where(provider => context.Client.IdentityProviderRestrictions.Contains(provider.AuthenticationScheme));
-            }
-        }
-
-        model = new LoginViewModel
-            {
-                AllowRememberLogin = accountOptions.AllowRememberLogin,
-                EnableLocalLogin = allowLocal,
-                ReturnUrl = returnUrl,
-                Username = context?.LoginHint,
-                ExternalProviders = providers.ToArray()
-            };
     }
 }

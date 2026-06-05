@@ -1,24 +1,16 @@
 @attribute [Route(Routes.Consent)]
 
-@using RoyalIdentity.Contracts
-@using RoyalIdentity.Contracts.Models.Messages
-@using RoyalIdentity.Contracts.Storage
 @using RoyalIdentity.Extensions
-@using RoyalIdentity.Models
 @using RoyalIdentity.Razor.Components.Shared
-@using RoyalIdentity.Users
-@using RoyalIdentity.Users.Contexts
 
-@inject ISignInManager SignInManager
-@inject IMessageStore MessageStore
-@inject IConsentService ConsentService
+@inject IConsentPageService ConsentPageService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Consent</PageTitle>
 
 <AccountContent>
     <div class="lead">
-        @if (viewModel.ClientLogoUrl.IsPresent())
+        @if (viewModel?.ClientLogoUrl.IsPresent() is true)
         {
             <div class="client-logo">
                 <img src="@viewModel.ClientLogoUrl" alt="Client Logo" />
@@ -26,7 +18,7 @@
         }
         <div class="text-center mb-2">
             <strong class="fs-4">
-                @viewModel.ClientName
+                @viewModel?.ClientName
             </strong>
             <br />
             <small class="text-muted">
@@ -63,7 +55,7 @@
             <ValidationMessage For="() => inputModel.Description" class="text-danger" />
         </div>
 
-        @if (viewModel.AllowRememberConsent)
+        @if (viewModel?.AllowRememberConsent is true)
         {
             <div class="form-floating mb-3">
                 <div class="form-check">
@@ -82,7 +74,7 @@
             <button type="submit" name="button" value="no" class="btn btn btn-secondary">No, Do Not Allow</button>
         </div>
 
-        @if (viewModel.ClientUrl.IsPresent())
+        @if (viewModel?.ClientUrl.IsPresent() is true)
         {
             <a class="btn btn-outline-info" href="@viewModel.ClientUrl">
                 <span class="icon-info-sign"></span>
@@ -95,9 +87,8 @@
 
 @code {
 
-    private AuthorizationContext? authorizationContext;
-    private ConsentViewModel viewModel = null!;
-    private ConsentInputModel inputModel = null!;
+    private ConsentViewModel? viewModel;
+    private ConsentInputModel inputModel = new();
     private string? errorMessage;
 
     [Parameter]
@@ -111,155 +102,38 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var context = await GetAuthorizationContextAsync(ReturnUrl);
-        CreateModels(context);
+        viewModel = await ConsentPageService.BuildViewModelAsync(ReturnUrl, CancellationToken.None);
+
+        if (viewModel is null)
+            NavigationManager.NavigateTo(Routes.BuildErrorUrl("no_consent_request"));
+
+        if (inputModel.ReturnUrl is null)
+        {
+            inputModel = new ConsentInputModel
+            {
+                RememberConsent = true,
+                IdentityScopesConsent = viewModel!.CreateIdentityScopes(),
+                ApiScopesConsent = viewModel.CreateApiScopes(),
+                ReturnUrl = ReturnUrl!
+            };
+        }
     }
 
     private async Task ConsentHandler()
     {
         ArgumentNullException.ThrowIfNull(InputModel);
-
-        inputModel = InputModel;
         errorMessage = null;
 
-        var context = await GetAuthorizationContextAsync(InputModel.ReturnUrl);
-        viewModel = CreateConsentViewModel(context);
+        var result = await ConsentPageService.ProcessConsentAsync(Realm, InputModel, CancellationToken.None);
 
-        // Validate remember consent
-        if (InputModel.RememberConsent && !viewModel.AllowRememberConsent)
+        if (result.Type == ConsentResultType.ValidationError)
         {
-            // User is trying to remember consent but client does not allow it
-            errorMessage = "Client does not allow consent to be remembered.";
-
-            InputModel.RememberConsent = false;
-
-            CreateModels(context);
+            errorMessage = result.ErrorMessage;
+            viewModel = await ConsentPageService.BuildViewModelAsync(InputModel.ReturnUrl, CancellationToken.None);
+            inputModel = InputModel;
             return;
         }
 
-        // validate required scopes
-        foreach (var scope in viewModel.IdentityScopes)
-        {
-            var inputModel = InputModel.IdentityScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
-            if (scope.Required && inputModel?.Checked is not true)
-            {
-                errorMessage = "Required scope not granted.";
-                CreateModels(context);
-                return;
-            }
-        }
-        foreach (var scope in viewModel.ApiScopes)
-        {
-            var inputModel = InputModel.ApiScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
-            if (scope.Required && inputModel?.Checked is not true)
-            {
-                errorMessage = "Required scope not granted.";
-                CreateModels(context);
-                return;
-            }
-        }
-
-        if (errorMessage is null)
-        {
-            var subject = context.User;
-            var client = context.Client;
-            var consentedScopes = new List<ConsentedScope>();
-
-            consentedScopes.AddRange(inputModel.IdentityScopesConsent
-                .Where(s => s.Checked)
-                .Select(s => new ConsentedScope()
-                    {
-                        Scope = s.Scope,
-                        Description = inputModel.Description,
-                        CreationTime = DateTimeOffset.UtcNow,
-                        JustOnce = !inputModel.RememberConsent
-                    }));
-
-            consentedScopes.AddRange(inputModel.ApiScopesConsent
-                .Where(s => s.Checked)
-                .Select(s => new ConsentedScope()
-                    {
-                        Scope = s.Scope,
-                        Description = inputModel.Description,
-                        CreationTime = DateTimeOffset.UtcNow,
-                        JustOnce = !inputModel.RememberConsent
-                    }));
-
-            await ConsentService.UpdateConsentAsync(subject, client, consentedScopes, CancellationToken.None);
-            
-            var returnUrl = Routes.BuildConsentedUrl(Realm, InputModel.ReturnUrl);
-            NavigationManager.NavigateTo(returnUrl, true);
-        }
-
-        CreateModels(context);
-    }
-
-    private void CreateModels(AuthorizationContext context)
-    {
-        viewModel ??= CreateConsentViewModel(context);
-
-        if (inputModel is null)
-        {
-            inputModel = new ConsentInputModel()
-                {
-                    RememberConsent = true,
-                    IdentityScopesConsent = viewModel.CreateIdentityScopes(),
-                    ApiScopesConsent = viewModel.CreateApiScopes(),
-                    ReturnUrl = ReturnUrl!
-                };
-        }
-        else
-        {
-            var identityScopesConsent = viewModel.CreateIdentityScopes();
-            foreach (var scope in identityScopesConsent)
-            {
-                var inputScope = inputModel.IdentityScopesConsent.FirstOrDefault(s => s.Scope == scope.Scope);
-                if (inputScope is not null)
-                    scope.Checked = inputScope.Checked;
-            }
-            var apiScopesConsent = viewModel.CreateApiScopes();
-            foreach (var scope in apiScopesConsent)
-            {
-                var inputScope = inputModel.ApiScopesConsent.FirstOrDefault(s => s.Scope == scope.Scope);
-                if (inputScope is not null)
-                    scope.Checked = inputScope.Checked;
-            }
-
-            inputModel.IdentityScopesConsent = identityScopesConsent;
-            inputModel.ApiScopesConsent = apiScopesConsent;
-        }
-    }
-
-    private ConsentViewModel CreateConsentViewModel(AuthorizationContext context)
-    {
-        return new ConsentViewModel
-            {
-                ClientName = context.Client.Name,
-                ClientUrl = context.Client.ClientUri,
-                ClientLogoUrl = context.Client.LogoUri,
-                AllowRememberConsent = context.Client.AllowRememberConsent,
-
-                IdentityScopes = context.Resources.IdentityResources,
-                ApiScopes = context.Resources.ApiScopes
-            };
-    }
-
-    private async Task<AuthorizationContext> GetAuthorizationContextAsync(string? returnUrl)
-    {
-        if (authorizationContext is null)
-            authorizationContext = await SignInManager.GetAuthorizationContextAsync(returnUrl, CancellationToken.None);
-
-        if (authorizationContext is null)
-        {
-            var error = new ErrorMessage()
-                {
-                    ErrorDescription = $"No consent request matching request: {ReturnUrl}"
-                };
-            var errorId = await MessageStore.WriteAsync(new Message<ErrorMessage>(error), CancellationToken.None);
-
-            NavigationManager.NavigateTo(Routes.BuildErrorUrl(errorId), true);
-        }
-
-        return authorizationContext!;
+        NavigationManager.NavigateTo(result.NavigateTo!, result.ForceLoad);
     }
 }
