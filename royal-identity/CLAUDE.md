@@ -10,11 +10,19 @@ Before any significant work, read these three files — they contain context abo
 - [.ai/foundation/tech.md](.ai/foundation/tech.md) — stack, pipeline execution semantics, storage abstraction, patterns to follow
 - [.ai/foundation/structure.md](.ai/foundation/structure.md) — project dependency graph, directory map, naming conventions, where new code belongs
 
-Active refactoring plans (check status before modifying affected areas):
+Completed refactoring plans (useful as historical record and for understanding design decisions):
 
-- [.ai/plans/plan-constants-refactoring.md](.ai/plans/plan-constants-refactoring.md)
-- [.ai/plans/plan-contexts-redesign.md](.ai/plans/plan-contexts-redesign.md)
-- [.ai/plans/plan-ui-screens-refactoring.md](.ai/plans/plan-ui-screens-refactoring.md)
+- [.ai/plans/plan-constants-refactoring.md](.ai/plans/plan-constants-refactoring.md) — COMPLETED
+- [.ai/plans/plan-contexts-redesign.md](.ai/plans/plan-contexts-redesign.md) — COMPLETED
+- [.ai/plans/plan-ui-screens-refactoring.md](.ai/plans/plan-ui-screens-refactoring.md) — COMPLETED
+
+Active plans (check status before modifying affected areas):
+
+- [.ai/plans/plan-realm-hardening.md](.ai/plans/plan-realm-hardening.md) — realm isolation, events, branding, IRealmManager
+
+Backlog (deferred items with design notes):
+
+- [.ai/backlogs/backlog.md](.ai/backlogs/backlog.md)
 
 ## Commands
 
@@ -66,7 +74,7 @@ services.AddPipelines(builder =>
 
 **Decorator abort** — do not call `next()` to abort the pipeline from a decorator.
 
-**Constants** — use `Constants.*`, `OidcConstants.*`, or `JwtClaimTypes.*` for all protocol strings. Three top-level classes (`OidcConstants`, `JwtClaimTypes`, `ServerConstants`) are being consolidated into `Constants` — do not add new constants to the legacy classes.
+**Constants** — use `Constants.*` for all protocol strings (`Constants.Oidc.*`, `Constants.Server.*`, `Constants.Jwt.*`). Use `JwtRegisteredClaimNames.*` for standard JWT claims. The legacy classes `OidcConstants`, `JwtClaimTypes`, `ServerConstants` were deleted — do not re-introduce them.
 
 ## Code Style
 

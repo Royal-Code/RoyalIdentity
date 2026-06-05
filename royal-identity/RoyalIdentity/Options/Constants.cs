@@ -245,6 +245,12 @@ public static partial class Constants
             {
                 public const string CallbackId = "callbackId";
                 public const string Authorization = "authzId";
+
+                /// <summary>
+                /// Internal marker appended to the authorize callback URL when the resource owner
+                /// denies consent, signalling the pipeline to emit an <c>access_denied</c> error.
+                /// </summary>
+                public const string ConsentDenied = "consentDenied";
             }
 
             public const string Authorize = $"{{realm}}/{Names.OidcConnect}/{Names.Authorize}";

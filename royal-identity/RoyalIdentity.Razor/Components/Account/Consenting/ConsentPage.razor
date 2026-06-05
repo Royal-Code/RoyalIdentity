@@ -70,8 +70,8 @@
         <StatusMessage Message="@errorMessage" MessageClass="danger" />
 
         <div class="d-flex justify-content-evenly">
-            <button type="submit" name="button" value="yes" class="btn btn btn-primary">Yes, Allow</button>
-            <button type="submit" name="button" value="no" class="btn btn btn-secondary">No, Do Not Allow</button>
+            <button type="submit" name="inputModel.Button" value="@ConsentButtons.Yes" class="btn btn btn-primary">Yes, Allow</button>
+            <button type="submit" name="inputModel.Button" value="@ConsentButtons.No" class="btn btn btn-secondary">No, Do Not Allow</button>
         </div>
 
         @if (viewModel?.ClientUrl.IsPresent() is true)

@@ -270,6 +270,21 @@ Explicit enable/disable flags for each endpoint. Future feature work that introd
 
 ---
 
+## Protocol Constants
+
+All OIDC/OAuth2/JWT protocol strings live in `RoyalIdentity/Options/Constants.cs` (single static partial class, multiple files):
+
+- `Constants.Oidc.*` — OIDC spec parameter names, response types, grant types, error codes
+- `Constants.Server.*` — server-specific identifiers, cookie names, realm keys
+- `Constants.Jwt.ClaimTypes.*` — project-specific JWT claims not in `JwtRegisteredClaimNames`
+- `Constants.Jwt.ConfirmationMethods.*` — DPoP/mTLS confirmation methods
+
+Standard JWT claim names (`sub`, `aud`, `iss`, `exp`, etc.) come from `JwtRegisteredClaimNames` (via `global using System.IdentityModel.Tokens.Jwt` in `Global.Usings.cs`). Never add duplicates to `Constants`.
+
+> Legacy classes `OidcConstants`, `ServerConstants`, and `JwtClaimTypes` were deleted in the constants consolidation refactoring. Do not re-introduce them.
+
+---
+
 ## Patterns to Follow Consistently
 
 1. **New endpoint**: create `*Endpoint : IEndpointHandler`, context class inheriting `EndpointContextBase`, register in `AddOpenIdConnectProviderServices`, add route in `MapOpenIdConnectProviderEndpoints`
@@ -278,3 +293,4 @@ Explicit enable/disable flags for each endpoint. Future feature work that introd
 4. **New option**: add property to appropriate `*Options` class; for realm-specific config, add to `RealmOptions`; for server-wide config, add to `ServerOptions`
 5. **Error signaling in validators**: set `context.Response` — never throw for expected validation failures
 6. **Decorator abort**: do not call `next()` to abort pipeline from a decorator
+7. **New UI page**: inject `I*PageService` in Razor component, call `GetViewModelAsync()` on GET and `ProcessAsync()` on POST — no business logic in components

@@ -63,6 +63,12 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
 
         context.Load(logger);
 
+        // The consent screen appends this marker to the callback URL when the resource owner denies
+        // consent. It is read from the raw query (not the stored authorize parameters) so it works
+        // regardless of the realm's StoreAuthorizationParameters setting.
+        context.UserDeniedConsent =
+            httpContext.Request.Query[Oidc.Routes.Params.ConsentDenied] == "true";
+
         return new EndpointCreationResult(context);
     }
 }

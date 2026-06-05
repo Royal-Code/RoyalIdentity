@@ -5,82 +5,80 @@
 
 Adicionar a funcionalidade de Realm, onde cada realm seja semelhante a um tenant.
 
-Dever· haver configuraÁıes por realm. O ServerOptions dever· ser substituÌdo por RealmOptions.
+Dever√° haver configura√ß√µes por realm. O ServerOptions dever√° ser substitu√≠do por RealmOptions.
 
-O RealmOptions ter· um ServerOptions, com os atributos de configuraÁ„o do servidor.
+O RealmOptions ter√° um ServerOptions, com os atributos de configura√ß√£o do servidor.
 
-As configuraÁıes male·veis ser„o feitas para cada realm.
+As configura√ß√µes male√°veis ser√£o feitas para cada realm.
 
-Para identificar o realm, as rotas ter„o o nome do realm no inÌcio.
+Para identificar o realm, as rotas ter√£o o nome do realm no in√≠cio.
 
 Exemplo:
 - /{realm}/connect/authorize
 - /{realm}/connect/token
 - /{realm}/.well-known/openid-configuration
 
-No mapeamento da rota, o realm ser· identificado, e a pipeline receber· o RealmOptions correspondente.
+No mapeamento da rota, o realm ser√° identificado, e a pipeline receber√° o RealmOptions correspondente.
 
 ## Resources
 
-O componente resources, o qual trata scopes, tem trÍs tipos de recursos ou scopes:
+O componente resources, o qual trata scopes, tem tr√™s tipos de recursos ou scopes:
 - IdentityResources
 - ApiScopes
 - ApiResources
 
-Para evitar confusıes do que se tratam isso, ser· refatorado da seguinte forma:
+Para evitar confus√µes do que se tratam isso, ser√° refatorado da seguinte forma:
 - IdentityResources -> IdentityScopes
 - ApiScopes -> Scopes
 - ApiResources -> Resources
 
-O prÛprio objeto Resources precisa ser refatorado para RequestedResources.
+O pr√≥prio objeto Resources precisa ser refatorado para RequestedResources.
 
-Ele ser· construÌdo atravÈs dos scopes requisitados pelo cliente.
+Ele ser√° constru√≠do atrav√©s dos scopes requisitados pelo cliente.
 
-A restrutura mudar· tambÈm.
+A restrutura mudar√° tamb√©m.
 
-Haver· o **IdentityScope**, o qual ter· os claims que devem ser enviados ao cliente.
+Haver√° o **IdentityScope**, o qual ter√° os claims que devem ser enviados ao cliente.
 
-Ent„o, para controlar o acesso a recursos, ser· feito da seguinte forma:
+Ent√£o, para controlar o acesso a recursos, ser√° feito da seguinte forma:
 
-- **ResourceServer**: um serviÁo que disponibiliza recursos para os clientes consumirem, como um WebApi. 
-O servidor de recursos tem o mesmo papel definido o OAuth2, que È fornecer de recursos protegidos aos clientes autorizados.
-- **Resource**: um recurso È uma funcionalidade disponibilizada pelo ResourceServer.
-Pode ser uma p·gina web, um documento ou arquivo, um grupo de endpoints de uma API, etc.
-- **Scope**: È uma operaÁ„o que pode ser executada sobre um recurso.
+- **ResourceServer**: um servi√ßo que disponibiliza recursos para os clientes consumirem, como um WebApi. 
+O servidor de recursos tem o mesmo papel definido o OAuth2, que √© fornecer de recursos protegidos aos clientes autorizados.
+- **Resource**: um recurso √© uma funcionalidade disponibilizada pelo ResourceServer.
+Pode ser uma p√°gina web, um documento ou arquivo, um grupo de endpoints de uma API, etc.
+- **Scope**: √© uma opera√ß√£o que pode ser executada sobre um recurso.
 Pode estar relacionado ao verbo HTTP, como GET, POST, PUT, DELETE, etc.
-Pode ser operaÁıes que podem ser executadas sobre um recurso, como leitura, escrita, atualizaÁ„o, exclus„o, etc.
+Pode ser opera√ß√µes que podem ser executadas sobre um recurso, como leitura, escrita, atualiza√ß√£o, exclus√£o, etc.
 
-Cada um dos tipos de recursos, IdentityScope, ResourceServer, Resource, Scope, ter· um nome como recurso.
-O *scope* solicitado pelo cliente, ser· o nome do recurso.
+Cada um dos tipos de recursos, IdentityScope, ResourceServer, Resource, Scope, ter√° um nome como recurso.
+O *scope* solicitado pelo cliente, ser√° o nome do recurso.
 
-Quando selecionado o recurso, o cliente ter· acesso a todos os *scopes* do recurso.
-Quando selecionado o *scope*, o cliente ter· acesso apenas a operaÁ„o do *scope*.
-Quando selecionado o *ResourceServer*, o cliente ter· acesso a todos os recursos do *ResourceServer*.
+Quando selecionado o recurso, o cliente ter√° acesso a todos os *scopes* do recurso.
+Quando selecionado o *scope*, o cliente ter√° acesso apenas a opera√ß√£o do *scope*.
+Quando selecionado o *ResourceServer*, o cliente ter√° acesso a todos os recursos do *ResourceServer*.
 
-Na hora de adicionar os scopes ao token, apenas os *scopes* do recurso ser„o adicionados.
+Na hora de adicionar os scopes ao token, apenas os *scopes* do recurso ser√£o adicionados.
 
-Para exibir o consentimento, todos os *scopes* do recurso ser„o exibidos.
+Para exibir o consentimento, todos os *scopes* do recurso ser√£o exibidos.
 
 ## Users
 
-Unificar a lÛgica de usu·rios.
+Unificar a l√≥gica de usu√°rios.
 Existe IdentityUser, UserDetails, IUserStore e IUserDetailsStore.
-H· IdentitySession e IUserSessionStore.
-H· lÛgica confusa entre usu·rios e sessıes.
-Precisa unificar o usu·rio e revisar a sess„o e o login.
+H√° IdentitySession e IUserSessionStore.
+H√° l√≥gica confusa entre usu√°rios e sess√µes.
+Precisa unificar o usu√°rio e revisar a sess√£o e o login.
 
-## UI Services
+## UI Services ‚úì DONE
 
-Existe muita lÛgica dentro dos componentes Razor.
-
-… melhor criar serviÁos de UI, como por exemplo: UILoginService, UIConsentService, etc.
-
-Esses serviÁos ter„o a lÛgica de UI, e os componentes Razor apenas exibir„o os dados.
+`ILoginPageService`, `IConsentPageService`, `IEndSessionPageService`, `ISessionContextService` criados em `RoyalIdentity.Razor/Services/`.
+ViewModels movidos para `RoyalIdentity.Razor/ViewModels/`.
+Componentes Razor agora apenas exibem dados.
 
 ## Localization
 
-Adicionar a funcionalidade de localizaÁ„o.
+Adicionar a funcionalidade de localiza√ß√£o.
 
-Todos os textos e labels est„o fixos no cÛdigo em inglÍs.
+Todos os textos e labels est√£o fixos no c√≥digo em ingl√™s.
 
-Dever· ser possÌvel adicionar arquivos de localizaÁ„o para cada idioma.
+Dever√° ser poss√≠vel adicionar arquivos de localiza√ß√£o para cada idioma.

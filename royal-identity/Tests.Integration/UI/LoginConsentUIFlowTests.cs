@@ -214,4 +214,63 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         Assert.NotNull(tokenEndpointParameters.IdentityToken);
         Assert.NotNull(tokenEndpointParameters.Scope);
     }
+
+    [Fact]
+    public async Task Login_WhenUserDeniesConsent_MustRedirectToClient_WithAccessDenied()
+    {
+        // Arrange
+
+        var client = factory.CreateClient();
+
+        var codeVerifier = CryptoRandom.CreateUniqueId();
+        var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
+        var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
+
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+            .AddQueryString("client_id", "demo_consent_client")
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile email api api:read api:write offline_access")
+            .AddQueryString("redirect_uri", $"{client.BaseAddress}callback")
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", codeChallenge)
+            .AddQueryString("code_challenge_method", "S256");
+
+        // will redirect to login page
+        var loginPage = await client.GetAsync(path);
+        var content = await loginPage.Content.ReadAsStringAsync();
+        var doc = new HtmlDocument();
+        doc.LoadHtml(content);
+        var form = doc.DocumentNode.SelectSingleNode("//form");
+        // Use 'bob' (not 'alice') so this test does not depend on consent state another test may have
+        // persisted for the same (subject, client). The denial path never stores consent, so 'bob'
+        // always reaches the consent screen here.
+        var formAction = new FormAction(client, form)
+            .SetValue("Input.Username", "bob")
+            .SetValue("Input.Password", "bob");
+
+        // after login, will redirect to consent page
+        var response = await formAction.SubmitAsync();
+        content = await response.Content.ReadAsStringAsync();
+        doc.LoadHtml(content);
+        form = doc.DocumentNode.SelectSingleNode("//form");
+
+        // deny consent: the "No, Do Not Allow" submit button posts the model's Button field as "no".
+        // FormAction only collects input/textarea/select, so add the button value explicitly.
+        formAction = new FormAction(client, form).AddValue("inputModel.Button", "no");
+
+        // Act
+        // submitting denial resumes the authorize callback with the denial marker, which makes the
+        // pipeline redirect access_denied back to the client's redirect_uri (echoed as json).
+        response = await formAction.SubmitAsync();
+        var json = await response.Content.ReadAsStringAsync();
+        var callbackData = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(callbackData);
+        Assert.Equal("access_denied", callbackData["error"]);
+        Assert.Equal("state", callbackData["state"]);
+        Assert.DoesNotContain("code", callbackData.Keys);
+    }
 }

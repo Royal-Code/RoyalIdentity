@@ -1,9 +1,5 @@
 @attribute [Route(Routes.SignedIn)]
 
-@using RoyalIdentity.Users
-
-@inject ISignInManager SignInManager
-
 <PageTitle>Signed In</PageTitle>
 
 <AccountContent>
@@ -23,10 +19,5 @@
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
-
-    protected override async Task OnParametersSetAsync()
-    {
-        var context = await SignInManager.GetAuthorizationContextAsync(ReturnUrl, default);
-    }
 
 }

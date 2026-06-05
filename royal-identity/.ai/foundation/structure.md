@@ -146,8 +146,7 @@ Contexts/                               ← One context class per endpoint opera
     ResponseTypeEqualityComparer.cs     ← Utility: normalize response_type comparison
 
   Items/                                ← Named context item wrappers
-    Token.cs                            ← Token item holder
-    Tokens.cs                           ← Multiple tokens item holder
+    Token.cs                            ← Token item holder (used for log obfuscation)
 
   Parameters/                           ← Named parameter extractors
     BearerParameters.cs
@@ -339,6 +338,60 @@ Utils/
 
 ---
 
+## RoyalIdentity.Razor — UI Project Structure
+
+Razor Components (Blazor) for the account-facing UI (`/{realm}/account/*`).
+
+> **Rendering mode**: account pages use **Static Server Rendering (SSR)** — `RenderModeForPage` in `App.razor` returns `null` for `IsAccountPages()`, not `InteractiveServer`. `Scoped` services have **HTTP request lifetime** (not circuit lifetime). GET and POST are separate instances.
+
+```
+Components/
+  Account/
+    SignIn/
+      LoginPage.razor          ← GET/POST handler for username/password login
+      LocalLogin.razor         ← Login form fragment
+      SignedIn.razor           ← Post-login redirect/confirmation
+      ExternalLoginPicker.razor← External IdP selection
+    Consenting/
+      ConsentPage.razor        ← GET/POST handler for user consent
+    EndSession/
+      LoggingOutPage.razor     ← Logout confirmation / in-progress page
+  Layout/
+    AccountLayout.razor        ← Shared layout for account pages
+
+Services/                      ← UI page services (all registered Scoped)
+  ISessionContextService.cs    ← Resolves AuthorizationContext for current request
+  SessionContextService.cs
+  ILoginPageService.cs         ← Login flow: load ViewModel, process POST
+  LoginPageService.cs
+  IConsentPageService.cs       ← Consent flow: load ViewModel, process POST
+  ConsentPageService.cs
+  IEndSessionPageService.cs    ← End-session flow: load ViewModel, process POST
+  EndSessionPageService.cs
+  IdentityRedirectManager.cs   ← Utility: NavigationManager wrapper for SSR redirects
+  IdentityUserManager.cs       ← Thin wrapper: UserManager<T> usage
+
+ViewModels/                    ← Data transfer objects for page rendering
+  LoginViewModel.cs            ← What LoginPage.razor needs to render
+  LoginInputModel.cs           ← Form fields from login POST
+  LoginResult.cs               ← Outcome of LoginPageService.ProcessAsync()
+  ConsentViewModel.cs          ← What ConsentPage.razor needs to render
+  ConsentInputModel.cs         ← Form fields from consent POST
+  ConsentResult.cs             ← Outcome of ConsentPageService.ProcessAsync()
+  LogoutViewModel.cs           ← What LoggingOutPage.razor needs to render
+  LogoutInputModel.cs          ← Form fields (logout_id from query/form)
+  LoggingOutViewModel.cs       ← Intermediate rendering model for logout confirmation
+  LogoutResult.cs              ← Outcome of EndSessionPageService.ProcessAsync()
+  ExternalProvider.cs          ← DTO for an external login provider option
+
+Extensions/
+  RoyalIdentityHttpContextExtensions.cs  ← IsAccountPages(), GetRealm(), etc.
+```
+
+**Service pattern** for UI pages: each Razor component injects the matching `I*PageService`, calls `GetViewModelAsync()` on GET and `ProcessAsync()` on POST. The service calls into `ISessionContextService` (resolves `AuthorizationContext`), then uses the core pipeline/stores to do work, and returns a typed `*Result` that the component converts to a redirect or re-render. Components contain no business logic.
+
+---
+
 ## Architectural Layers & Allowed Dependencies
 
 ```
@@ -375,10 +428,10 @@ Layer 1: RoyalIdentity.Pipelines (infrastructure, no domain knowledge)
 | Service interface | `I{Operation}` or `I{Noun}` | `ITokenFactory`, `IProfileService` |
 | Options class | `{Concern}Options` | `RealmOptions`, `DiscoveryOptions` |
 | Event | `{Action}Event` | `UserLoginSuccessEvent`, `AccessTokenIssuedEvent` |
-| Constants class | `{Concern}Constants` | `OidcConstants`, `ServerConstants` |
+| Constants class | `Constants.{Group}.*` | `Constants.Oidc.Authorize.Request`, `Constants.Server` |
 | "With" interface | `IWith{Capability}` | `IWithClient`, `IWithCodeChallenge` |
 
-Constants: `OidcConstants` contains OIDC-spec names. `ServerConstants` contains server-specific names. Use these instead of string literals for all protocol values.
+Constants: all protocol strings live in the single `Constants` static class (`RoyalIdentity/Options/Constants.cs`), organized by nested static classes: `Constants.Oidc.*` (OIDC/OAuth2 spec values), `Constants.Server.*` (server-specific), `Constants.Jwt.*` (JWT claim types not in `JwtRegisteredClaimNames`). Use `JwtRegisteredClaimNames.*` for standard JWT claims (Sub, Aud, Iss, etc.) — they come from `System.IdentityModel.Tokens.Jwt` which has a `global using` in `Global.Usings.cs`. Never use string literals for protocol values.
 
 ---
 
@@ -464,6 +517,4 @@ From `redesign-todo.md` and `[Redesign]` attributes in code:
 - `Client.AllowedScopes` and `Client.AllowOfflineAccess` — to be replaced by `AllowedResources` model
 - `RoyalIdentity/Users/` — user/session model needs unification (not stable)
 - `RoyalIdentity/Models/Scopes/ResourceServer.cs` and related — scope hierarchy redesign in progress
-- `RoyalIdentity.Razor/` — business logic to be extracted into UI services
-
 Do not add heavy logic to these areas without consulting current context on whether redesign is still pending.

@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`██████████` **100%** — 5 de 5 fases concluídas (Fase 2 adiada — ver "Decisão")
+`██████████` **100%** — 5 de 5 fases concluídas (Fase 2 adiada — ver "Decisão"; remoção de `Items/Token.cs` adiada na Fase 5 — ver nota)
 
 ## Ordem de execução (global)
 
@@ -139,6 +139,10 @@ Mover `ClientClaims` para `ClientCredentialsContext` diretamente, como proprieda
 
 Ambos marcados `[Redesign("Acredito que o uso destes seja desnecessário")]`. Verificar os únicos callers antes de deletar. Se não forem usados ou forem usados apenas para logging/obfuscação, remover.
 
+> **Resultado da execução (Fase 5):**
+> - `Items/Tokens.cs` (a **coleção** de tokens) — **removido**: nenhum caller ativo; era armazenamento morto (escrito em `AuthorizeHandler` via `Items.AddToken`, sem nenhuma leitura). As 3 chamadas de escrita foram removidas junto.
+> - `Items/Token.cs` (o **wrapper** de um único token, com obfuscação) — **mantido (remoção adiada)**. O guard "confirmar zero callers ativos" **falha**: `Token` é usado ativamente pelos eventos de emissão `CodeIssuedEvent`, `AccessTokenIssuedEvent` e `IdentityTokenIssuedEvent` (criados em `AuthorizeHandler`), que carregam o valor obfuscado para auditoria. Removê-lo exige redesenhar o contrato desses eventos — mudança com blast radius no subsistema de eventos, fora do escopo cirúrgico/baixo-risco deste plano. Adiado para um futuro redesign de eventos, na mesma linha da Fase 2.
+
 ---
 
 ## Estado Alvo
@@ -225,14 +229,14 @@ Se um dia for executada:
 ### Fase 5 — Remover Items/Token e Items/Tokens
 
 1. Confirmar zero callers ativos.
-2. Deletar `RoyalIdentity/Contexts/Items/Token.cs`.
-3. Deletar `RoyalIdentity/Contexts/Items/Tokens.cs`.
+2. ~~Deletar `RoyalIdentity/Contexts/Items/Token.cs`~~ — **adiado**: tem callers ativos (eventos de emissão de token). Ver nota em "Items/Token.cs e Items/Tokens.cs — remoção".
+3. Deletar `RoyalIdentity/Contexts/Items/Tokens.cs` — **feito** (era armazenamento morto).
 4. Verificar build.
 
 ### Fase 6 — Documentar a convenção Parameters/*
 
-1. Adicionar comentário XML ou summary file em `Contexts/Parameters/` explicando o padrão.
-2. Revisar todos os `Parameters/*` existentes para garantir conformidade (nenhum setter público).
+1. Adicionar comentário XML ou summary file em `Contexts/Parameters/` explicando o padrão. **Feito**: a convenção completa está documentada no XML doc de `ClientParameters`; `CodeParameters`, `BearerParameters` e `RefreshParameters` têm um doc conciso que referencia (`<see cref="ClientParameters"/>`) a descrição canônica.
+2. Revisar todos os `Parameters/*` existentes para garantir conformidade (nenhum setter público). **Feito**: as 4 classes usam `{ get; private set; }` + `Set*()` + `Assert*()` com `[MemberNotNull]`.
 
 ---
 
@@ -246,8 +250,8 @@ Se um dia for executada:
 | `Contexts/AuthorizationCodeContext.cs` | **Fase 3** — Idem |
 | `Contexts/Parameters/ClientParameters.cs` | **Fase 4** — Remover `ClientClaims` |
 | `Contexts/ClientCredentialsContext.cs` | **Fase 4** — Receber `ClientClaims` como propriedade local |
-| `Contexts/Items/Token.cs` | **Fase 5** — Deletar (após confirmar zero callers) |
-| `Contexts/Items/Tokens.cs` | **Fase 5** — Deletar (após confirmar zero callers) |
+| `Contexts/Items/Token.cs` | **Fase 5** — ~~Deletar~~ **adiado**: callers ativos nos eventos de emissão de token (ver nota) |
+| `Contexts/Items/Tokens.cs` | **Fase 5** — Deletar (feito — armazenamento morto) |
 | `Contexts/Withs/IWithAcr.cs` | ~~Remover herança de `IEndpointContextBase`~~ — **Fase 2 adiada** |
 | `Contexts/Withs/IWithClient.cs` | ~~Remover herança de `IEndpointContextBase`~~ — **Fase 2 adiada** |
 | `Contexts/Withs/IWithCodeChallenge.cs` | ~~Remover herança de `IWithClient`~~ — **Fase 2 adiada** |

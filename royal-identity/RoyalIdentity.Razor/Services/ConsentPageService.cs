@@ -1,8 +1,10 @@
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Razor.ViewModels;
+using static RoyalIdentity.Options.Constants;
 using static RoyalIdentity.Options.Constants.UI;
 
 namespace RoyalIdentity.Razor.Services;
@@ -29,6 +31,14 @@ public class ConsentPageService(
             var error = new ErrorMessage { ErrorDescription = $"No consent request matching request: {input.ReturnUrl}" };
             var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
             return new ConsentResult(ConsentResultType.Denied, Routes.BuildErrorUrl(errorId), ForceLoad: true);
+        }
+
+        // User denied consent: resume the authorize callback with the denial marker so the pipeline
+        // emits access_denied back to the client. Do not persist any consent.
+        if (input.Button == ConsentButtons.No)
+        {
+            var denyUrl = input.ReturnUrl.AddQueryString(Oidc.Routes.Params.ConsentDenied, "true");
+            return new ConsentResult(ConsentResultType.Denied, denyUrl, ForceLoad: true);
         }
 
         var viewModel = BuildConsentViewModel(context);

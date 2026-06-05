@@ -24,6 +24,18 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
 
         context.ClientParameters.AssertHasClient();
 
+        if (context.UserDeniedConsent)
+        {
+            logger.LogInformation("Resource owner denied consent; returning access_denied to the client");
+
+            context.Response = new AuthorizeErrorResponse(
+                context,
+                Oidc.Authorize.Errors.AccessDenied,
+                "The resource owner denied the request.");
+
+            return;
+        }
+
         if (context.PromptModes.Count is not 0 &&
             !context.PromptModes.Contains(Oidc.PromptModes.None) &&
             !context.PromptModes.Contains(Oidc.PromptModes.Consent))
