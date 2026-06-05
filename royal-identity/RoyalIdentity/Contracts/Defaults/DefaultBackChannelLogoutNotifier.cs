@@ -5,7 +5,6 @@ using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -53,7 +52,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
 
         var data = new Dictionary<string, string>
             {
-                { BackChannelLogoutRequest.LogoutToken, token }
+                { Oidc.BackChannelLogout.Request.LogoutToken, token }
             };
         return data;
     }
@@ -86,7 +85,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
             throw new InvalidOperationException("Client requires SessionId");
         }
 
-        var json = "{\"" + OidcConstants.Events.BackChannelLogout + "\":{} }";
+        var json = "{\"" + Oidc.Events.BackChannelLogout + "\":{} }";
 
         var claims = new List<Claim>
             {
@@ -94,7 +93,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
                 new(JwtRegisteredClaimNames.Aud, request.ClientId),
                 new(JwtRegisteredClaimNames.Iat, clock.GetUtcNow().ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
                 new(JwtRegisteredClaimNames.Jti, CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex)),
-                new(JwtClaimTypes.Events, json, ServerConstants.ClaimValueTypes.Json)
+                new(Jwt.ClaimTypes.Events, json, Server.ClaimValueTypes.Json)
             };
 
         if (request.SessionId is not null)
@@ -115,7 +114,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
     {
         try
         {
-            var client = httpClientFactory.CreateClient(ServerConstants.HttpClients.BackChannelLogoutHttpClient);
+            var client = httpClientFactory.CreateClient(Server.HttpClients.BackChannelLogoutHttpClient);
 
             var response = await client.PostAsync(url, new FormUrlEncodedContent(payload));
             if (response.IsSuccessStatusCode)

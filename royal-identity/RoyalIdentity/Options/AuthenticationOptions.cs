@@ -10,12 +10,12 @@ public class AuthenticationOptions
     /// <summary>
     /// Gets or sets the cookie name used to persist the user's session details.
     /// </summary>
-    public string CookieName { get; set; } = ServerConstants.DefaultCookieName;
+    public string CookieName { get; set; } = Server.DefaultCookieName;
 
     /// <summary>
     /// Sets the cookie lifetime.
     /// </summary>
-    public TimeSpan CookieLifetime { get; set; } = ServerConstants.DefaultCookieTimeSpan;
+    public TimeSpan CookieLifetime { get; set; } = Server.DefaultCookieTimeSpan;
 
     /// <summary>
     /// Specified if the cookie should be sliding or not (only effective if the built-in cookie middleware is used)
@@ -30,7 +30,7 @@ public class AuthenticationOptions
     /// <summary>
     /// Gets or sets the name of the cookie used for the check session endpoint.
     /// </summary>
-    public string CheckSessionCookieName { get; set; } = ServerConstants.DefaultCheckSessionCookieName;
+    public string CheckSessionCookieName { get; set; } = Server.DefaultCheckSessionCookieName;
 
     /// <summary>
     /// Gets or sets the domain of the cookie used for the check session endpoint. Defaults to null.

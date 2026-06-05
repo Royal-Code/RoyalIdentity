@@ -29,8 +29,8 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
     {
         context.ClientParameters.AssertHasClient();
 
-        if (context.PromptModes.Contains(PromptModes.Login) ||
-            context.PromptModes.Contains(PromptModes.SelectAccount))
+        if (context.PromptModes.Contains(Oidc.PromptModes.Login) ||
+            context.PromptModes.Contains(Oidc.PromptModes.SelectAccount))
         {
             logger.LogInformation(
                 "Showing login: request contains prompt={PromptModes}", 
@@ -38,7 +38,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
 
             // remove prompt so when we redirect back in from login page
             // we won't think we need to force a prompt again
-            context.Raw.Remove(AuthorizeRequest.Prompt);
+            context.Raw.Remove(Oidc.Authorize.Request.Prompt);
 
             context.Response = new InteractionResponse(context)
             {
@@ -55,7 +55,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             await profileService.IsActiveAsync(
                 principal,
                 context.ClientParameters.Client,
-                ServerConstants.ProfileIsActiveCallers.AuthorizeEndpoint,
+                "AuthorizeEndpoint",
                 ct);
 
         if (!isUserActive)
@@ -91,7 +91,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
         }
 
         // check local IdP restrictions
-        if (currentIdp == ServerConstants.LocalIdentityProvider)
+        if (currentIdp == Server.LocalIdentityProvider)
         {
             if (!context.ClientParameters.Client.EnableLocalLogin)
             {

@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
@@ -44,13 +44,13 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
 
         var entries = new Dictionary<string, object>
         {
-            { Discovery.Issuer, issuerUri }
+            { Oidc.Discovery.Issuer, issuerUri }
         };
 
         // jwks
         if (options.Discovery.ShowKeySet && (await keys.GetValidationKeysAsync(context.Realm, ct)).Keys.Count is not 0)
         {
-            entries.Add(Discovery.JwksUri, baseUrl + Oidc.Routes.BuildDiscoveryWebKeysUrl(realmPath));
+            entries.Add(Oidc.Discovery.JwksUri, baseUrl + Oidc.Routes.BuildDiscoveryWebKeysUrl(realmPath));
         }
 
         // endpoints
@@ -58,42 +58,42 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         {
             if (options.Endpoints.EnableAuthorizeEndpoint)
             {
-                entries.Add(Discovery.AuthorizationEndpoint, baseUrl + Oidc.Routes.BuildAuthorizeUrl(realmPath));
+                entries.Add(Oidc.Discovery.AuthorizationEndpoint, baseUrl + Oidc.Routes.BuildAuthorizeUrl(realmPath));
             }
 
             if (options.Endpoints.EnableTokenEndpoint)
             {
-                entries.Add(Discovery.TokenEndpoint, baseUrl + Oidc.Routes.BuildTokenUrl(realmPath));
+                entries.Add(Oidc.Discovery.TokenEndpoint, baseUrl + Oidc.Routes.BuildTokenUrl(realmPath));
             }
 
             if (options.Endpoints.EnableUserInfoEndpoint)
             {
-                entries.Add(Discovery.UserInfoEndpoint, baseUrl + Oidc.Routes.BuildUserInfoUrl(realmPath));
+                entries.Add(Oidc.Discovery.UserInfoEndpoint, baseUrl + Oidc.Routes.BuildUserInfoUrl(realmPath));
             }
 
             if (options.Endpoints.EnableEndSessionEndpoint)
             {
-                entries.Add(Discovery.EndSessionEndpoint, baseUrl + Oidc.Routes.BuildEndSessionUrl(realmPath));
+                entries.Add(Oidc.Discovery.EndSessionEndpoint, baseUrl + Oidc.Routes.BuildEndSessionUrl(realmPath));
             }
 
             if (options.Endpoints.EnableCheckSessionEndpoint)
             {
-                entries.Add(Discovery.CheckSessionIframe, baseUrl + Oidc.Routes.BuildCheckSessionUrl(realmPath));
+                entries.Add(Oidc.Discovery.CheckSessionIframe, baseUrl + Oidc.Routes.BuildCheckSessionUrl(realmPath));
             }
 
             if (options.Endpoints.EnableTokenRevocationEndpoint)
             {
-                entries.Add(Discovery.RevocationEndpoint, baseUrl + Oidc.Routes.BuildRevocationUrl(realmPath));
+                entries.Add(Oidc.Discovery.RevocationEndpoint, baseUrl + Oidc.Routes.BuildRevocationUrl(realmPath));
             }
 
             if (options.Endpoints.EnableIntrospectionEndpoint)
             {
-                entries.Add(Discovery.IntrospectionEndpoint, baseUrl + Oidc.Routes.BuildIntrospectionUrl(realmPath));
+                entries.Add(Oidc.Discovery.IntrospectionEndpoint, baseUrl + Oidc.Routes.BuildIntrospectionUrl(realmPath));
             }
 
             if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
             {
-                entries.Add(Discovery.DeviceAuthorizationEndpoint, baseUrl + Oidc.Routes.BuildDeviceAuthorizationUrl(realmPath));
+                entries.Add(Oidc.Discovery.DeviceAuthorizationEndpoint, baseUrl + Oidc.Routes.BuildDeviceAuthorizationUrl(realmPath));
             }
 
             if (options.MutualTls.Enabled)
@@ -102,24 +102,24 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
 
                 if (options.Endpoints.EnableTokenEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.TokenEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
+                    mtlsEndpoints.Add(Oidc.Discovery.TokenEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
                 if (options.Endpoints.EnableTokenRevocationEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.RevocationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
+                    mtlsEndpoints.Add(Oidc.Discovery.RevocationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
                 if (options.Endpoints.EnableIntrospectionEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.IntrospectionEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
+                    mtlsEndpoints.Add(Oidc.Discovery.IntrospectionEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
                 if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
                 {
-                    mtlsEndpoints.Add(Discovery.DeviceAuthorizationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
+                    mtlsEndpoints.Add(Oidc.Discovery.DeviceAuthorizationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
                 }
 
                 if (mtlsEndpoints.Count is not 0)
                 {
-                    entries.Add(Discovery.MtlsEndpointAliases, mtlsEndpoints);
+                    entries.Add(Oidc.Discovery.MtlsEndpointAliases, mtlsEndpoints);
                 }
 
                 string ConstructMtlsEndpoint(string endpoint)
@@ -148,10 +148,10 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         // logout
         if (options.Endpoints.EnableEndSessionEndpoint)
         {
-            entries.Add(Discovery.FrontChannelLogoutSupported, true);
-            entries.Add(Discovery.FrontChannelLogoutSessionSupported, true);
-            entries.Add(Discovery.BackChannelLogoutSupported, true);
-            entries.Add(Discovery.BackChannelLogoutSessionSupported, true);
+            entries.Add(Oidc.Discovery.FrontChannelLogoutSupported, true);
+            entries.Add(Oidc.Discovery.FrontChannelLogoutSessionSupported, true);
+            entries.Add(Oidc.Discovery.BackChannelLogoutSupported, true);
+            entries.Add(Oidc.Discovery.BackChannelLogoutSessionSupported, true);
         }
 
         // scopes and claims
@@ -175,12 +175,12 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                                 select scope.Name;
 
                 scopes.AddRange(apiScopes);
-                scopes.Add(ServerConstants.StandardScopes.OfflineAccess);
+                scopes.Add(Server.StandardScopes.OfflineAccess);
             }
 
             if (scopes.Count is not 0)
             {
-                entries.Add(Discovery.ScopesSupported, scopes.ToArray());
+                entries.Add(Oidc.Discovery.ScopesSupported, scopes.ToArray());
             }
 
             // claims
@@ -191,7 +191,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 // add non-hidden identity scopes related claims
                 claims.AddRange(resources.IdentityScopes.Where(x => x.ShowInDiscoveryDocument).SelectMany(x => x.UserClaims));
                 
-                entries.Add(Discovery.ClaimsSupported, claims.Distinct().ToArray());
+                entries.Add(Oidc.Discovery.ClaimsSupported, claims.Distinct().ToArray());
             }
         }
 
@@ -217,19 +217,19 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 showGrantTypes.AddRange(extensionGrantsProvider.GetAvailableGrantTypes());
             }
 
-            entries.Add(Discovery.GrantTypesSupported, showGrantTypes.ToArray());
+            entries.Add(Oidc.Discovery.GrantTypesSupported, showGrantTypes.ToArray());
         }
 
         // response types
         if (options.Discovery.ShowResponseTypes)
         {
-            entries.Add(Discovery.ResponseTypesSupported, options.Discovery.SupportedResponseTypes.ToArray());
+            entries.Add(Oidc.Discovery.ResponseTypesSupported, options.Discovery.SupportedResponseTypes.ToArray());
         }
 
         // response modes
         if (options.Discovery.ShowResponseModes)
         {
-            entries.Add(Discovery.ResponseModesSupported, options.Discovery.SupportedResponseModes.ToArray());
+            entries.Add(Oidc.Discovery.ResponseModesSupported, options.Discovery.SupportedResponseModes.ToArray());
         }
 
         // misc
@@ -238,36 +238,36 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
             var types = clientSecretChecker.GetAvailableAuthenticationMethods().ToList();
             if (options.MutualTls.Enabled)
             {
-                types.Add(EndpointAuthenticationMethods.TlsClientAuth);
-                types.Add(EndpointAuthenticationMethods.SelfSignedTlsClientAuth);
+                types.Add(Oidc.Endpoint.AuthMethods.TlsClientAuth);
+                types.Add(Oidc.Endpoint.AuthMethods.SelfSignedTlsClientAuth);
             }
 
-            entries.Add(Discovery.TokenEndpointAuthenticationMethodsSupported, types);
+            entries.Add(Oidc.Discovery.TokenEndpointAuthenticationMethodsSupported, types);
         }
 
         var signingCredentials = await keys.GetAllSigningCredentialsAsync(context.Realm, ct);
         if (signingCredentials.Count is not 0)
         {
             var signingAlgorithms = signingCredentials.Select(c => c.Algorithm).Distinct();
-            entries.Add(Discovery.IdTokenSigningAlgorithmsSupported, signingAlgorithms);
+            entries.Add(Oidc.Discovery.IdTokenSigningAlgorithmsSupported, signingAlgorithms);
         }
 
-        entries.Add(Discovery.SubjectTypesSupported, options.Discovery.SupportedSubjectTypes.ToArray());
-        entries.Add(Discovery.CodeChallengeMethodsSupported, options.Discovery.CodeChallengeMethodsSupported.ToArray());
+        entries.Add(Oidc.Discovery.SubjectTypesSupported, options.Discovery.SupportedSubjectTypes.ToArray());
+        entries.Add(Oidc.Discovery.CodeChallengeMethodsSupported, options.Discovery.CodeChallengeMethodsSupported.ToArray());
 
         if (options.Endpoints.EnableAuthorizeEndpoint)
         {
-            entries.Add(Discovery.RequestParameterSupported, true);
+            entries.Add(Oidc.Discovery.RequestParameterSupported, true);
 
             if (options.Endpoints.EnableJwtRequestUri)
             {
-                entries.Add(Discovery.RequestUriParameterSupported, true);
+                entries.Add(Oidc.Discovery.RequestUriParameterSupported, true);
             }
         }
 
         if (options.MutualTls.Enabled)
         {
-            entries.Add(Discovery.TlsClientCertificateBoundAccessTokens, true);
+            entries.Add(Oidc.Discovery.TlsClientCertificateBoundAccessTokens, true);
         }
 
         // custom entries

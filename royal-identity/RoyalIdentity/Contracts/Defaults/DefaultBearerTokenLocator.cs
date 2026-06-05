@@ -60,7 +60,7 @@ public class DefaultBearerTokenLocator : IBearerTokenLocator
     private BearerTokenResult LocatorAuthorizationHeader(string authorizationHeader)
     {
         var header = authorizationHeader.Trim();
-        if (header.StartsWith(OidcConstants.AuthenticationSchemes.AuthorizationHeaderBearer) && header.Length > 7)
+        if (header.StartsWith(Oidc.AuthSchemes.AuthorizationHeaderBearer) && header.Length > 7)
         {
             var value = header[7..];
                 return new BearerTokenResult

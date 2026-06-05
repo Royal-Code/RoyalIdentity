@@ -6,7 +6,6 @@ using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
@@ -28,7 +27,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         //////////////////////////////////////////////////////////
         // check if PKCE is required and validate parameters
         //////////////////////////////////////////////////////////
-        if (!context.ResponseTypes.Contains(ResponseTypes.Code))
+        if (!context.ResponseTypes.Contains(Oidc.ResponseTypes.Code))
         {
             return default;
         }
@@ -72,7 +71,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         if (codeChallengeMethod.IsMissing())
         {
             logger.LogDebug("Missing code_challenge_method, defaulting to plain");
-            codeChallengeMethod = CodeChallengeMethods.Plain;
+            codeChallengeMethod = Oidc.CodeChallenge.Methods.Plain;
         }
 
         if (!context.Options.Discovery.CodeChallengeMethodIsSupported(codeChallengeMethod))
@@ -83,7 +82,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         }
 
         // check if plain method is allowed
-        if (codeChallengeMethod == CodeChallengeMethods.Plain && !context.ClientParameters.Client.AllowPlainTextPkce)
+        if (codeChallengeMethod == Oidc.CodeChallenge.Methods.Plain && !context.ClientParameters.Client.AllowPlainTextPkce)
         {
             logger.LogError(context, "The parameter code_challenge_method of plain is not allowed", codeChallengeMethod);
             context.InvalidRequest("Transform algorithm not supported", "code_challenge_method of plain is not allowed");

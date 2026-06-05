@@ -2,7 +2,6 @@
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
@@ -29,7 +28,7 @@ public class ResourcesValidator : IValidator<IWithResources>
         if (!resources.IsValid)
         {
             logger.LogError(context, "Resources are not load or invalid", context.Scope);
-            context.InvalidRequest(AuthorizeErrors.InvalidScope);
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
             return default;
         }
 
@@ -42,7 +41,7 @@ public class ResourcesValidator : IValidator<IWithResources>
             else
             {
                 logger.LogError(context, "Offline access is not allowed for this client", $"{client.Id}, {client.Name}");
-                context.InvalidRequest(AuthorizeErrors.InvalidScope, "Offline access is not allowed for this client");
+                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "Offline access is not allowed for this client");
                 return default;
             }
         }
@@ -52,7 +51,7 @@ public class ResourcesValidator : IValidator<IWithResources>
             if (!client.AllowedScopes.Contains(identity.Name))
             {
                 logger.LogError(context, "Identity Scope not allowed for the client", $"{identity.Name}, {client.Id}, {client.Name}");
-                context.InvalidRequest(AuthorizeErrors.InvalidScope);
+                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
                 return default;
             }
         }
@@ -62,7 +61,7 @@ public class ResourcesValidator : IValidator<IWithResources>
             if (!client.AllowedScopes.Contains(apiScope.Name))
             {
                 logger.LogError(context, "Api Scope not allowed for the client", $"{apiScope.Name}, {client.Id}, {client.Name}");
-                context.InvalidRequest(AuthorizeErrors.InvalidScope);
+                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
                 return default;
             }
         }

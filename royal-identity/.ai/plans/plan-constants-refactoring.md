@@ -1,10 +1,10 @@
 # Plan: Constants Refactoring
 
-## Status: IN PROGRESS
+## Status: COMPLETED
 
 ## Progresso
 
-`██░░░░░░░░` **~20%** — Passo 0 concluído + JwtClaimTypes parcialmente migrado (claims core JWT + project-specific feitos; OIDC-profile claims pendentes)
+`██████████` **100%** — **MIGRAÇÃO COMPLETA**: `JwtClaimTypes`, `OidcConstants` e `ServerConstants` **deletadas**. Todas as constantes consolidadas em `Constants.*`
 
 ### Concluído
 - **Passo 0 (diretivas `using static`)**: estratégia decidida — Strategy B (manter `global using static Constants`; callers usam `Jwt.ClaimTypes.*` via o global já existente; sem novo global using static por subclasse)
@@ -22,24 +22,13 @@
 - **Callers atualizados** (~25 arquivos): `ClientCredentialsContext`, `DefaultIdentityUser`, `ClaimsExtensions`, `PrincipalExtensions`, `DefaultProfileService`, `DefaultTokenClaimsService`, `SubjectFactory`, `Constants.Filters`, `DefaultBackChannelLogoutNotifier`, `DefaultJwtFactory`, `DefaultTokenFactory`, `DefaultSignInManager`, `DefaultSignOutManager`, `AuthorizeContext`, `UserInfoHandler`, `RefreshTokenHandler`, `TokenBase`, `RefreshToken`, `AccessToken`, `RequestedScopes`, `RealmMemoryStore`
 - **Build**: 0 erros (ambas as sessões)
 
-### Pendente em `JwtClaimTypes` (próximos ciclos)
+### `JwtClaimTypes` — CONCLUÍDA ✓
 
-**→ `JwtRegisteredClaimNames` (avaliar disponibilidade em 8.14.0 e migrar callers):**
-- `Name` (usado: SubjectFactory, DefaultIdentityUser)
-- `GivenName`, `FamilyName`, `Email`, `BirthDate` (`Birthdate`), `WebSite` (`Website`) — provavelmente só em filters futuros
-
-**→ `Constants.Jwt.ClaimTypes` (não têm equivalente MS):**
-- `MiddleName`, `NickName`, `PreferredUserName`, `Profile`, `Picture`, `EmailVerified`, `Gender`, `ZoneInfo`, `Locale`, `PhoneNumber`, `PhoneNumberVerified`, `Address` — claims OIDC standard sem equivalente em `JwtRegisteredClaimNames`
-- `UpdatedAt` — OIDC standard
-- `StateHash` — extensão OIDC (`s_hash`)
-- `Events` — back-channel logout
-- `ClientId` — usado em 3 arquivos
-- `Actor`, `MayAct` — token exchange
-- `Id` — custom
-- `Algorithm`, `JsonWebKey`, `TokenType` — header JWT / DPoP
-- `DPoPHttpMethod`, `DPoPHttpUrl`, `DPoPAccessTokenHash` — DPoP
-
-**Após limpar `JwtClaimTypes`:** partir para grupo 2 (`OidcConstants.ResponseTypes`).
+- Deletada por completo; `using static OidcConstants` e `using static Constants` permanecem nos projetos principais
+- `RealmMemoryStore.cs` recebeu `using static RoyalIdentity.Options.Constants` explícito (projeto sem Global.Usings)
+- Claims migradas para `JwtRegisteredClaimNames`: Name, GivenName, FamilyName, Email, BirthDate (Birthdate), WebSite (Website), TokenType (Typ)
+- Claims migradas para `Constants.Jwt.ClaimTypes`: todos os OIDC-profile, DPoP, extensões OAuth2
+- **Build**: 0 erros
 
 ## Ordem de execução (global)
 

@@ -10,12 +10,12 @@ public class LoggingOptions
     /// </summary>
     public ICollection<string> SensitiveValuesFilter { get; set; } =
         [
-            OidcConstants.TokenRequest.ClientSecret,
-            OidcConstants.TokenRequest.Password,
-            OidcConstants.TokenRequest.ClientAssertion,
-            OidcConstants.TokenRequest.RefreshToken,
-            OidcConstants.TokenRequest.DeviceCode,
-            OidcConstants.AuthorizeRequest.IdTokenHint
+            Oidc.Token.Request.ClientSecret,
+            Oidc.Token.Request.Password,
+            Oidc.Token.Request.ClientAssertion,
+            Oidc.Token.Request.RefreshToken,
+            Oidc.Token.Request.DeviceCode,
+            Oidc.Authorize.Request.IdTokenHint
         ];
 
     /// <summary>

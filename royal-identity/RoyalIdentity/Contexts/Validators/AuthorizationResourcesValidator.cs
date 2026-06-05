@@ -1,7 +1,6 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
@@ -23,29 +22,29 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
         //////////////////////////////////////////////////////////
         // check scope vs response_type plausibility
         //////////////////////////////////////////////////////////
-        if (context.ResponseTypes.Contains(ResponseTypes.IdToken) && !context.Scopes.IsOpenId)
+        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.IdToken) && !context.Scopes.IsOpenId)
         {
             logger.LogError(context, "The parameter response_type requires the openid scope");
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing openid scope");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "missing openid scope");
             return default;
         }
 
-        if (context.ResponseTypes.Only(ResponseTypes.IdToken) &&
+        if (context.ResponseTypes.Only(Oidc.ResponseTypes.IdToken) &&
             (context.Scopes.ApiScopes.Any() || context.Scopes.ApiResources.Any()))
         {
             logger.LogError(context, "Requests for id_token response type only must include identity scopes only");
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "resource scopes are not allowed for id_token response type only");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "resource scopes are not allowed for id_token response type only");
             return default;
         }
 
-        if (context.ResponseTypes.Contains(ResponseTypes.Token) && !context.Scopes.ApiScopes.Any())
+        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.Token) && !context.Scopes.ApiScopes.Any())
         {
             logger.LogError(context, "The parameter response_type requires resource scopes");
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "missing resource scopes");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "missing resource scopes");
             return default;
         }
 
-        if (context.ResponseTypes.Only(ResponseTypes.Token) && context.Scopes.IdentityResources.Any())
+        if (context.ResponseTypes.Only(Oidc.ResponseTypes.Token) && context.Scopes.IdentityResources.Any())
         {
             logger.LogError(context, "Requests for token response type only must include resource scopes only");
         }

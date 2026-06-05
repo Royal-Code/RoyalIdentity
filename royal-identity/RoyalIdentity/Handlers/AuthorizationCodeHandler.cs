@@ -7,7 +7,6 @@ using RoyalIdentity.Events;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 using TokenResponse = RoyalIdentity.Responses.TokenResponse;
 
 namespace RoyalIdentity.Handlers;
@@ -55,7 +54,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         };
 
         accessToken = await tokenFactory.CreateAccessTokenAsync(accessTokenRequest, ct);
-        atEvent = new AccessTokenIssuedEvent(context, new Token(TokenTypes.AccessToken, accessToken.Token));
+        atEvent = new AccessTokenIssuedEvent(context, new Token(Oidc.Token.Types.AccessToken, accessToken.Token));
 
         logger.LogDebug("Access token issued");
 
@@ -70,7 +69,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             };
 
             refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);
-            rtEvent = new RefreshTokenIssuedEvent(context, new Token(TokenTypes.RefreshToken, refreshToken.Token));
+            rtEvent = new RefreshTokenIssuedEvent(context, new Token(Oidc.Token.Types.RefreshToken, refreshToken.Token));
 
             logger.LogDebug("Refresh token issued");
         }
@@ -88,7 +87,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             };
 
             identityToken = await tokenFactory.CreateIdentityTokenAsync(idTokenRequest, ct);
-            idEvent = new IdentityTokenIssuedEvent(context, new Token(TokenTypes.IdentityToken, identityToken.Token));
+            idEvent = new IdentityTokenIssuedEvent(context, new Token(Oidc.Token.Types.IdentityToken, identityToken.Token));
 
             logger.LogDebug("Identity token issued");
         }

@@ -1,4 +1,4 @@
-// Ignore Spelling: Pkce
+﻿// Ignore Spelling: Pkce
 
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
@@ -35,7 +35,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         bool equals;
         switch (code.CodeChallengeMethod)
         {
-            case OidcConstants.CodeChallengeMethods.Plain:
+            case Oidc.CodeChallenge.Methods.Plain:
 
                 equals = TimeConstantComparer.IsEqual(
                     context.CodeVerifier.Sha256(),
@@ -46,7 +46,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
 
                 break;
 
-            case OidcConstants.CodeChallengeMethods.Sha256:
+            case Oidc.CodeChallenge.Methods.Sha256:
 
                 var transformedCodeVerifier = PkceHelper.GenerateCodeChallengeS256(context.CodeVerifier);
 

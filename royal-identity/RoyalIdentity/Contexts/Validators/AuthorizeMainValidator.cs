@@ -3,7 +3,6 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Validators;
 
@@ -31,14 +30,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (responseTypes.Count is 0)
         {
             logger.LogError(context, "Missing response_type");
-            context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Missing response_type");
+            context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseType, "Missing response_type");
             return ValueTask.CompletedTask;
         }
 
         if (!context.Options.Discovery.ResponseTypesIsSupported(responseTypes))
         {
             logger.LogError(context, "Response type not supported", responseTypes.ToSpaceSeparatedString());
-            context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not supported");
+            context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseType, "Response type not supported");
             return ValueTask.CompletedTask;
         }
 
@@ -49,7 +48,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 "Response type not allowed for the client",
                 $"{responseTypes.ToSpaceSeparatedString()} - {client.Id} - {client.Name}");
 
-            context.InvalidRequest(AuthorizeErrors.UnsupportedResponseType, "Response type not allowed");
+            context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseType, "Response type not allowed");
             
             return ValueTask.CompletedTask;
         }
@@ -66,19 +65,19 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             if (!context.Options.Discovery.ResponseModeIsSupported(responseMode))
             {
                 logger.LogError(context, "Unsupported response_mode", responseMode);
-                context.InvalidRequest(AuthorizeErrors.UnsupportedResponseMode);
+                context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseMode);
                 return ValueTask.CompletedTask;
             }
 
             // when a token is required, the response mode should be form_post
-            if (responseMode != ResponseModes.FormPost && responseTypes.Any(t => t != ResponseTypes.Code))
+            if (responseMode != Oidc.ResponseModes.FormPost && responseTypes.Any(t => t != Oidc.ResponseTypes.Code))
             {
                 logger.LogError(
                     context,
                     "Invalid response_mode for response_type",
                     $"{responseMode} - {responseTypes.ToSpaceSeparatedString()}");
 
-                context.InvalidRequest(AuthorizeErrors.InvalidRequest, "Invalid response_mode for response_type");
+                context.InvalidRequest(Oidc.Authorize.Errors.InvalidRequest, "Invalid response_mode for response_type");
 
                 return ValueTask.CompletedTask;
             }            
@@ -86,10 +85,10 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         else
         {
             // set default response_mode
-            if (responseTypes.Contains(ResponseTypes.Token) || responseTypes.Contains(ResponseTypes.IdToken))
-                context.ResponseMode = ResponseModes.FormPost;
+            if (responseTypes.Contains(Oidc.ResponseTypes.Token) || responseTypes.Contains(Oidc.ResponseTypes.IdToken))
+                context.ResponseMode = Oidc.ResponseModes.FormPost;
             else
-                context.ResponseMode = ResponseModes.Query;
+                context.ResponseMode = Oidc.ResponseModes.Query;
         }
 
 
@@ -99,14 +98,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (context.Scope.IsMissing())
         {
             logger.LogError(context, "scope is missing");
-            context.InvalidRequest(AuthorizeErrors.InvalidScope);
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
             return ValueTask.CompletedTask;
         }
 
         if (context.Scope.Length > options.InputLengthRestrictions.Scope)
         {
             logger.LogError(context, "Scopes too long");
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "scopes too long");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "scopes too long");
             return ValueTask.CompletedTask;
         }
 
@@ -124,7 +123,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             }
         }
         else if (context.Scopes.IsOpenId && 
-            context.ResponseTypes.Contains(ResponseTypes.Token))
+            context.ResponseTypes.Contains(Oidc.ResponseTypes.Token))
         {
             logger.LogError(context, "Nonce required for implicit flow with openid scope");
             context.InvalidRequest("Invalid nonce", "required");
@@ -135,7 +134,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         // check prompt
         //////////////////////////////////////////////////////////
-        if (context.PromptModes.Count > 1 && context.PromptModes.Contains(PromptModes.None))
+        if (context.PromptModes.Count > 1 && context.PromptModes.Contains(Oidc.PromptModes.None))
         {
             logger.LogError(context, "The property prompt contains 'none' and other values. 'none' should be used by itself.");
             context.InvalidRequest("Invalid prompt");
@@ -170,7 +169,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         if (context.AcrValues.Count > 0)
         {
-            var acrValues = context.Raw.Get(AuthorizeRequest.AcrValues)!;
+            var acrValues = context.Raw.Get(Oidc.Authorize.Request.AcrValues)!;
             if (acrValues.Length > options.InputLengthRestrictions.AcrValues)
             {
                 logger.LogError(context, "Acr values too long");

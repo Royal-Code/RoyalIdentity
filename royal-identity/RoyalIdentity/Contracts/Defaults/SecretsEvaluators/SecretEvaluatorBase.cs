@@ -63,7 +63,7 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
 
         // get secrets
         var sharedSecrets = client.ClientSecrets
-            .Where(s => s.Type == ServerConstants.SecretTypes.SharedSecret)
+            .Where(s => s.Type == Server.SecretTypes.SharedSecret)
             .Where(s => !s.Expiration.HasExpired(clock.GetUtcNow().UtcDateTime))
             .ToList();
 

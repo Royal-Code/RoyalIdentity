@@ -26,7 +26,7 @@ internal static class ClientExtensions
         keys.AddRange(certificates);
 
         var jwks = secretList
-            .Where(s => s.Type == ServerConstants.SecretTypes.JsonWebKey)
+            .Where(s => s.Type == Server.SecretTypes.JsonWebKey)
             .Select(s => new JsonWebKey(s.Value))
             .ToList();
         keys.AddRange(jwks);
@@ -37,7 +37,7 @@ internal static class ClientExtensions
     private static List<X509Certificate2> GetCertificates(IEnumerable<ClientSecret> secrets)
     {
         return secrets
-            .Where(s => s.Type == ServerConstants.SecretTypes.X509CertificateBase64)
+            .Where(s => s.Type == Server.SecretTypes.X509CertificateBase64)
             .Select(s => new X509Certificate2(Convert.FromBase64String(s.Value)))
             .ToList();
     }

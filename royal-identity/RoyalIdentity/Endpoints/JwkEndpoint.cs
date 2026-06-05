@@ -1,4 +1,4 @@
-// Ignore Spelling: Jwk
+﻿// Ignore Spelling: Jwk
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;

@@ -157,7 +157,7 @@ public class DefaultSignOutManager : ISignOutManager
             var redirectUri = postLogoutRedirectUri!;
 
             if (state.IsPresent())
-                redirectUri = redirectUri.AddQueryString(EndSessionRequest.State, state);
+                redirectUri = redirectUri.AddQueryString(Oidc.EndSession.Request.State, state);
 
             return new Uri(redirectUri);
         }

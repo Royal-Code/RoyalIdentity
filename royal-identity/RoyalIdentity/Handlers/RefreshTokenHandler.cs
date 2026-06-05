@@ -11,7 +11,6 @@ using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Handlers;
 
@@ -144,7 +143,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         // Identity Token
         /////////////////////////////////////
 
-        if (newAccessToken.Scopes.Any(scope => scope.Contains(ServerConstants.StandardScopes.OpenId)))
+        if (newAccessToken.Scopes.Any(scope => scope.Contains(Server.StandardScopes.OpenId)))
         {
             var scopes = newAccessToken.Scopes;
             var resources = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);

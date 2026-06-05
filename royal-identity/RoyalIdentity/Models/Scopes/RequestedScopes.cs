@@ -45,7 +45,7 @@ public class RequestedScopes
     /// <summary>
     /// Gets a value indicating whether this instance has identity resources.
     /// </summary>
-    public bool IsOpenId => IdentityResources.Any(x => x.Name == ServerConstants.StandardScopes.OpenId);
+    public bool IsOpenId => IdentityResources.Any(x => x.Name == Server.StandardScopes.OpenId);
 
     /// <summary>
     /// Gets or sets a value indicating whether [offline access].
@@ -93,7 +93,7 @@ public class RequestedScopes
     public IEnumerable<Claim> ToScopeClaims()
     {
         if (OfflineAccess)
-            yield return new Claim(Jwt.ClaimTypes.Scope, ServerConstants.StandardScopes.OfflineAccess);
+            yield return new Claim(Jwt.ClaimTypes.Scope, Server.StandardScopes.OfflineAccess);
 
         // api scopes.
 

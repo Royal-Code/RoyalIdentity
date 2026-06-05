@@ -1,4 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contexts;
@@ -12,7 +12,7 @@ namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
 {
     private static readonly EvaluatedCredential PrivateKeyJwtInvalidCredentials =
-        new(ServerConstants.ParsedSecretTypes.JwtBearer, false);
+        new(Server.ParsedSecretTypes.JwtBearer, false);
 
     private readonly IReplayCache replayCache;
 
@@ -27,17 +27,17 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
 
     protected override EvaluatedCredential InvalidCredentials => PrivateKeyJwtInvalidCredentials;
 
-    public override string AuthenticationMethod => OidcConstants.EndpointAuthenticationMethods.PrivateKeyJwt;
+    public override string AuthenticationMethod => Oidc.Endpoint.AuthMethods.PrivateKeyJwt;
 
     public override async Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct)
     {
         logger.LogDebug("Start parsing and evaluate PrivateKeyJwt Authentication secret");
 
-        var hasAssertion = context.Raw.TryGet(OidcConstants.TokenRequest.ClientAssertion, out var assertion);
+        var hasAssertion = context.Raw.TryGet(Oidc.Token.Request.ClientAssertion, out var assertion);
         var hasAssertionType =
-            context.Raw.TryGet(OidcConstants.TokenRequest.ClientAssertionType, out var assertionType);
+            context.Raw.TryGet(Oidc.Token.Request.ClientAssertionType, out var assertionType);
 
-        if (!hasAssertion || !hasAssertionType || assertionType != OidcConstants.ClientAssertionTypes.JwtBearer)
+        if (!hasAssertion || !hasAssertionType || assertionType != Oidc.ClientAssertionTypes.JwtBearer)
         {
             logger.LogDebug("Client assertion or assertion type not found in post body");
             return null;
@@ -164,6 +164,6 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
             return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
         }
 
-        return new EvaluatedClient(client, new EvaluatedCredential(ServerConstants.ParsedSecretTypes.JwtBearer, true), AuthenticationMethod);
+        return new EvaluatedClient(client, new EvaluatedCredential(Server.ParsedSecretTypes.JwtBearer, true), AuthenticationMethod);
     }
 }

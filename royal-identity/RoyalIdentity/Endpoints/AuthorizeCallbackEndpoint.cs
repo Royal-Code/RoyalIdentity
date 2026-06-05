@@ -1,11 +1,10 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;
 
@@ -56,7 +55,7 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
 
         if (user is null)
         {
-            return EndpointErrorResults.BadRequest(httpContext, AuthorizeErrors.LoginRequired, "Login required");
+            return EndpointErrorResults.BadRequest(httpContext, Oidc.Authorize.Errors.LoginRequired, "Login required");
         }
 
         var items = ContextItems.From(realm.Options.ServerOptions);

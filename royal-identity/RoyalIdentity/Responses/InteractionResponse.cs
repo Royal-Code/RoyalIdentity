@@ -73,7 +73,7 @@ public class InteractionResponse : IResponseHandler
             {
                 Type = "about:blank",
                 Status = StatusCodes.Status400BadRequest,
-                Title = OidcConstants.AuthorizeErrors.InvalidRequest,
+                Title = Oidc.Authorize.Errors.InvalidRequest,
                 Detail = ""
             };
 

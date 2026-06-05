@@ -120,10 +120,10 @@ public static class ServiceCollectionExtensions
         // Others
         services.AddSingleton<RealmCaching>();
         services.AddTransient<JwtUtil>();
-        services.AddHttpClient(ServerConstants.HttpClients.BackChannelLogoutHttpClient)
-            .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(ServerConstants.HttpClients.DefaultTimeoutSeconds))
-            .AddPolicyHandler(ServerConstants.HttpClients.GetRetryPolicy())
-            .AddPolicyHandler(ServerConstants.HttpClients.GetCircuitBreakerPolicy());
+        services.AddHttpClient(Server.HttpClients.BackChannelLogoutHttpClient)
+            .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(Server.HttpClients.DefaultTimeoutSeconds))
+            .AddPolicyHandler(Server.HttpClients.GetRetryPolicy())
+            .AddPolicyHandler(Server.HttpClients.GetCircuitBreakerPolicy());
 
         return services;
     }

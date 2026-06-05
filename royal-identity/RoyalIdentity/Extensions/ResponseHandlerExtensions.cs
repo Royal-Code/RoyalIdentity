@@ -1,7 +1,6 @@
-using RoyalIdentity.Pipelines.Abstractions;
+﻿using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Models;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Extensions;
 
@@ -18,13 +17,13 @@ internal static class ResponseHandlerExtensions
     public static void Error(this IContextBase context, ErrorDetails errorDetails)
     {
         context.Response = ResponseHandler.Error(
-            errorDetails.Error ?? AuthorizeErrors.InvalidRequest,
+            errorDetails.Error ?? Oidc.Authorize.Errors.InvalidRequest,
             errorDetails.ErrorDescription);
     }
 
     public static void InvalidRequest(this IContextBase context, string errorDescription)
     {
-        context.Response = ResponseHandler.Error(AuthorizeErrors.InvalidRequest, errorDescription);
+        context.Response = ResponseHandler.Error(Oidc.Authorize.Errors.InvalidRequest, errorDescription);
     }
 
     public static void InvalidRequest(this IContextBase context, string errorDescription, string? details)
@@ -34,11 +33,11 @@ internal static class ResponseHandlerExtensions
 
     public static void InvalidGrant(this IContextBase context, string errorDescription)
     {
-        context.Response = ResponseHandler.Error(TokenErrors.InvalidGrant, errorDescription);
+        context.Response = ResponseHandler.Error(Oidc.Token.Errors.InvalidGrant, errorDescription);
     }
 
     public static void InvalidClient(this IContextBase context, string errorDescription)
     {
-        context.Response = ResponseHandler.Error(TokenErrors.InvalidClient, errorDescription);
+        context.Response = ResponseHandler.Error(Oidc.Token.Errors.InvalidClient, errorDescription);
     }
 }

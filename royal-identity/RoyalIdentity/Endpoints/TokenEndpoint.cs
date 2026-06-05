@@ -1,11 +1,10 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;
 
@@ -49,7 +48,7 @@ public class TokenEndpoint : IEndpointHandler
         var parameters = form.AsNameValueCollection();
 
         // validate request
-        if (!parameters.TryGet(TokenRequest.GrantType, out var grantType))
+        if (!parameters.TryGet(Oidc.Token.Request.GrantType, out var grantType))
         {
             logger.LogWarning("Grant type parameter not found");
 
@@ -96,7 +95,7 @@ public class TokenEndpoint : IEndpointHandler
         {
             logger.LogError("Grant type not supported: {GrantType}", grantType);
 
-            return EndpointErrorResults.BadRequest(httpContext, TokenErrors.UnsupportedGrantType, "Grant type not supported");
+            return EndpointErrorResults.BadRequest(httpContext, Oidc.Token.Errors.UnsupportedGrantType, "Grant type not supported");
         }
 
         context.Load(logger);

@@ -1,7 +1,6 @@
 ﻿using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace Tests.Integration.Prepare;
 
@@ -16,12 +15,12 @@ public static class SubjectFactory
         Claim[] claims = 
         [
             new(JwtRegisteredClaimNames.Sub, sub),
-            new(JwtClaimTypes.Name, name),
+            new(JwtRegisteredClaimNames.Name, name),
             new(Jwt.ClaimTypes.Role, role),
             new(JwtRegisteredClaimNames.Sid, CryptoRandom.CreateUniqueId(24)),
             new(JwtRegisteredClaimNames.AuthTime, DateTimeOffset.Now.ToUnixTimeSeconds().ToString()),
-            new(Jwt.ClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
-            new(JwtRegisteredClaimNames.Amr, AuthenticationMethods.Password)
+            new(Jwt.ClaimTypes.IdentityProvider, Server.LocalIdentityProvider),
+            new(JwtRegisteredClaimNames.Amr, Oidc.AuthMethods.Password)
         ];
 
         var identity = new ClaimsIdentity(claims, "tests", JwtRegisteredClaimNames.Sub, Jwt.ClaimTypes.Role);

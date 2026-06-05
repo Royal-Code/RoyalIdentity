@@ -1,4 +1,4 @@
-using System.Collections.Specialized;
+﻿using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +6,6 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Responses.HttpResults;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Responses;
 
@@ -46,15 +45,15 @@ public class AuthorizeResponse : IResponseHandler
         var redirectUri = Context.RedirectUri!;
         var values = ToNameValueCollection();
 
-        if (Context.ResponseMode == ResponseModes.Query)
+        if (Context.ResponseMode == Oidc.ResponseModes.Query)
         {
             result = new ResponseToQueryResult(redirectUri, values);
         }
-        else if (Context.ResponseMode == ResponseModes.Fragment)
+        else if (Context.ResponseMode == Oidc.ResponseModes.Fragment)
         {
             result = new ResponseToFragmentResult(redirectUri, values);
         }
-        else if (Context.ResponseMode == ResponseModes.FormPost)
+        else if (Context.ResponseMode == Oidc.ResponseModes.FormPost)
         {
             result = new ResponseToFormPostResult(redirectUri, values);
         }
@@ -77,28 +76,28 @@ public class AuthorizeResponse : IResponseHandler
         var collection = new NameValueCollection();
 
         if (Code.IsPresent())
-            collection.Add(AuthorizeResponseFields.Code, Code);
+            collection.Add(Oidc.Authorize.Response.Code, Code);
 
         if (Token.IsPresent())
-            collection.Add(AuthorizeResponseFields.AccessToken, Token);
+            collection.Add(Oidc.Authorize.Response.AccessToken, Token);
 
         if (TokenType.IsPresent())
-            collection.Add(AuthorizeResponseFields.TokenType, TokenType);
+            collection.Add(Oidc.Authorize.Response.TokenType, TokenType);
 
         if (AccessTokenLifetime.HasValue)
-            collection.Add(AuthorizeResponseFields.ExpiresIn, AccessTokenLifetime.Value.ToString());
+            collection.Add(Oidc.Authorize.Response.ExpiresIn, AccessTokenLifetime.Value.ToString());
 
         if (IdentityToken.IsPresent())
-            collection.Add(AuthorizeResponseFields.IdentityToken, IdentityToken);
+            collection.Add(Oidc.Authorize.Response.IdentityToken, IdentityToken);
 
         if (Scope.IsPresent())
-            collection.Add(AuthorizeResponseFields.Scope, Scope);
+            collection.Add(Oidc.Authorize.Response.Scope, Scope);
 
         if (State.IsPresent())
-            collection.Add(AuthorizeResponseFields.State, State);
+            collection.Add(Oidc.Authorize.Response.State, State);
 
         if (SessionState.IsPresent())
-            collection.Add(AuthorizeResponseFields.SessionState, SessionState);
+            collection.Add(Oidc.Authorize.Response.SessionState, SessionState);
 
         return collection;
     }

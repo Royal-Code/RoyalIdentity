@@ -32,7 +32,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         if (!scopesFromStorage.IsValid)
         {
             logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", context.Scopes.GetInvalidScopes());
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "scopes requested are invalid or inactive");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "scopes requested are invalid or inactive");
             return;
         }
 
@@ -49,7 +49,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
             context.Scopes.IdentityResources.Count is not 0)
         {
             logger.LogError(context, "Identity related scope requests, but no openid scope");
-            context.InvalidRequest(AuthorizeErrors.InvalidScope, "Identity scopes requested, but openid scope is missing");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "Identity scopes requested, but openid scope is missing");
             return;
         }
 

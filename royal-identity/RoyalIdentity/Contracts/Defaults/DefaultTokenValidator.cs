@@ -52,14 +52,14 @@ public class DefaultTokenValidator : ITokenValidator
         {
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken,
+                Error = Oidc.ProtectedResource.Errors.InvalidToken,
                 ErrorDescription = "invalid JWT token type"
             });
         }
 
         // load the client that belongs to the client_id claim
         Client? client = null;
-        var clientId = principal!.FindFirst(JwtClaimTypes.ClientId);
+        var clientId = principal!.FindFirst(Jwt.ClaimTypes.ClientId);
         if (clientId is not null)
         {
             var clients = storage.GetClientStore(realm);
@@ -71,7 +71,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError("Client not found or deleted or disabled: {ClientId}", clientId);
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken,
+                Error = Oidc.ProtectedResource.Errors.InvalidToken,
             });
         }
 
@@ -94,7 +94,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError("Invalid reference token.");
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+                Error = Oidc.ProtectedResource.Errors.InvalidToken
             });
         }
 
@@ -103,7 +103,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError("Token expired.");
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.ExpiredToken
+                Error = Oidc.ProtectedResource.Errors.ExpiredToken
             });
         }
 
@@ -115,7 +115,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError("Client deleted or disabled: {ClientId}", token.ClientId);
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+                Error = Oidc.ProtectedResource.Errors.InvalidToken
             });
         }
 
@@ -143,7 +143,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError("JWT too long");
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+                Error = Oidc.ProtectedResource.Errors.InvalidToken
             });
         }
 
@@ -155,7 +155,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError("No clientId supplied, can't find id in identity token.");
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+                Error = Oidc.ProtectedResource.Errors.InvalidToken
             });
         }
 
@@ -166,7 +166,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError("Unknown or disabled client: {ClientId}.", clientId);
             return new(new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+                Error = Oidc.ProtectedResource.Errors.InvalidToken
             });
         }
 
@@ -244,7 +244,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogInformation(expiredException, "JWT token validation error: {Exception}", expiredException.Message);
             return (null, null, new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.ExpiredToken
+                Error = Oidc.ProtectedResource.Errors.ExpiredToken
             });
         }
         catch (Exception ex)
@@ -252,7 +252,7 @@ public class DefaultTokenValidator : ITokenValidator
             logger.LogError(ex, "JWT token validation error: {Exception}", ex.Message);
             return (null, null, new ErrorDetails()
             {
-                Error = OidcConstants.ProtectedResourceErrors.InvalidToken
+                Error = Oidc.ProtectedResource.Errors.InvalidToken
             });
         }
     }

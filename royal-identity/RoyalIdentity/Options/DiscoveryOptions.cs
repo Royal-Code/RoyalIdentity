@@ -1,4 +1,4 @@
-// Ignore Spelling: Api
+﻿// Ignore Spelling: Api
 
 namespace RoyalIdentity.Options;
 
@@ -86,43 +86,43 @@ public class DiscoveryOptions
     /// </summary>
     public HashSet<string> SupportedResponseTypes { get; } =
     [
-        ResponseTypes.Code,
-        ResponseTypes.Token,
-        ResponseTypes.IdToken
+        Oidc.ResponseTypes.Code,
+        Oidc.ResponseTypes.Token,
+        Oidc.ResponseTypes.IdToken
     ];
 
     public HashSet<string> CodeChallengeMethodsSupported { get; } =
     [
-        CodeChallengeMethods.Plain,
-        CodeChallengeMethods.Sha256
+        Oidc.CodeChallenge.Methods.Plain,
+        Oidc.CodeChallenge.Methods.Sha256
     ];
 
     public HashSet<string> SupportedResponseModes { get; } =
     [
-        ResponseModes.FormPost,
-        ResponseModes.Fragment,
-        ResponseModes.Query
+        Oidc.ResponseModes.FormPost,
+        Oidc.ResponseModes.Fragment,
+        Oidc.ResponseModes.Query
     ];
 
     public HashSet<string> SupportedSubjectTypes { get; } =
     [
-        SubjectTypes.Public
+        Oidc.SubjectTypes.Public
     ];
 
     public HashSet<string> SupportedDisplayModes { get; } =
     [
-        DisplayModes.Page,
-        DisplayModes.Popup,
-        DisplayModes.Touch,
-        DisplayModes.Wap
+        Oidc.DisplayModes.Page,
+        Oidc.DisplayModes.Popup,
+        Oidc.DisplayModes.Touch,
+        Oidc.DisplayModes.Wap
     ];
 
     public HashSet<string> SupportedPromptModes { get; } =
     [
-        PromptModes.None,
-        PromptModes.Login,
-        PromptModes.Consent,
-        PromptModes.SelectAccount
+        Oidc.PromptModes.None,
+        Oidc.PromptModes.Login,
+        Oidc.PromptModes.Consent,
+        Oidc.PromptModes.SelectAccount
     ];
 
     public HashSet<string> SupportedTokenTypeHints { get; } =

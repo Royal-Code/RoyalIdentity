@@ -1,7 +1,6 @@
 ﻿using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
-using static RoyalIdentity.Options.OidcConstants;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using RoyalIdentity.Options;
@@ -12,7 +11,7 @@ namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 public class BasicSecretEvaluator : SecretEvaluatorBase
 {
     private static readonly EvaluatedCredential BasicInvalidCredentials =
-        new (ServerConstants.ParsedSecretTypes.SharedSecret, false);
+        new (Server.ParsedSecretTypes.SharedSecret, false);
 
     public BasicSecretEvaluator(
         IStorage storage,
@@ -22,7 +21,7 @@ public class BasicSecretEvaluator : SecretEvaluatorBase
 
     protected override EvaluatedCredential InvalidCredentials => BasicInvalidCredentials;
 
-    public override string AuthenticationMethod => EndpointAuthenticationMethods.BasicAuthentication;
+    public override string AuthenticationMethod => Oidc.Endpoint.AuthMethods.BasicAuthentication;
 
     public override async Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct)
     {
@@ -67,6 +66,6 @@ public class BasicSecretEvaluator : SecretEvaluatorBase
         var clientId = pair[..ix];
         var secret = pair[(ix + 1)..];
 
-        return await EvaluateAsync(context, clientId, secret, ServerConstants.ParsedSecretTypes.SharedSecret, ct);
+        return await EvaluateAsync(context, clientId, secret, Server.ParsedSecretTypes.SharedSecret, ct);
     }
 }

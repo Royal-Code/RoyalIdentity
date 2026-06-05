@@ -26,9 +26,9 @@ public static partial class Constants
 
         public static readonly IReadOnlyCollection<string> SupportedResponseTypes =
         [
-            ResponseTypes.Code,
-            ResponseTypes.Token,
-            ResponseTypes.IdToken
+            Oidc.ResponseTypes.Code,
+            Oidc.ResponseTypes.Token,
+            Oidc.ResponseTypes.IdToken
         ];
 
         public static class Realms
@@ -44,6 +44,90 @@ public static partial class Constants
             public const string AdminRealm = "admin";
             public const string AdminDomain = "royalidentity.admin";
             public const string AdminDisplayName = "RoyalIdentity Administrative Realm";
+        }
+
+        public const string LocalIdentityProvider = "local";
+        public const string CookiePrefix = ".roid.";
+        public const string ExternalCookieAuthenticationScheme = $"{DefaultCookieAuthenticationScheme}.External";
+        public const string DefaultCookieName = $"{CookiePrefix}user";
+        public const string DefaultCheckSessionCookieName = $"{CookiePrefix}session";
+        public const string AccessTokenAudience = "{0}resources";
+        public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(1);
+        public const string JwtRequestClientKey = "roid.jwtrequesturi.client";
+
+        public static class StandardScopes
+        {
+            public const string OpenId = "openid";
+            public const string Profile = "profile";
+            public const string Email = "email";
+            public const string Address = "address";
+            public const string Phone = "phone";
+            public const string OfflineAccess = "offline_access";
+        }
+
+        public static class LocalApi
+        {
+            public const string AuthenticationScheme = "ServerAccessToken";
+            public const string ScopeName = "RoyalServerApi";
+            public const string PolicyName = AuthenticationScheme;
+        }
+
+        public static class ProtocolTypes
+        {
+            public const string OpenIdConnect = "oidc";
+            public const string WsFederation = "wsfed";
+            public const string Saml2p = "saml2p";
+        }
+
+        public static class TokenTypes
+        {
+            public const string IdentityToken = "id_token";
+            public const string AccessToken = "access_token";
+            public const string RefreshToken = "refresh_token";
+            public const string Code = "code";
+        }
+
+        public static class ClaimValueTypes
+        {
+            public const string Json = "json";
+        }
+
+        public static class ParsedSecretTypes
+        {
+            public const string NoSecret = "NoSecret";
+            public const string SharedSecret = "SharedSecret";
+            public const string X509Certificate = "X509Certificate";
+            public const string JwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+        }
+
+        public static class SecretTypes
+        {
+            public const string SharedSecret = "SharedSecret";
+            public const string X509CertificateThumbprint = "X509Thumbprint";
+            public const string X509CertificateName = "X509Name";
+            public const string X509CertificateBase64 = "X509CertificateBase64";
+            public const string JsonWebKey = "JWK";
+        }
+
+        public static class HttpClients
+        {
+            public const int DefaultTimeoutSeconds = 10;
+            public const string JwtRequestUriHttpClient = "RoyalIdentity:JwtRequestUriClient";
+            public const string BackChannelLogoutHttpClient = "RoyalIdentity:BackChannelLogoutClient";
+
+            public static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+            {
+                return Policy
+                    .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)
+                    .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+            }
+
+            public static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+            {
+                return Policy
+                    .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)
+                    .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+            }
         }
     }
 
@@ -245,12 +329,543 @@ public static partial class Constants
             public const string AccessToken = "access_token";
         }
 
+        public static class ResponseTypes
+        {
+            public const string Code = "code";
+            public const string Token = "token";
+            public const string IdToken = "id_token";
+        }
+
+        public static class Authorize
+        {
+            public static class Request
+            {
+                public const string Scope = "scope";
+                public const string ResponseType = "response_type";
+                public const string ClientId = "client_id";
+                public const string RedirectUri = "redirect_uri";
+                public const string State = "state";
+                public const string ResponseMode = "response_mode";
+                public const string Nonce = "nonce";
+                public const string Display = "display";
+                public const string Prompt = "prompt";
+                public const string MaxAge = "max_age";
+                public const string UiLocales = "ui_locales";
+                public const string IdTokenHint = "id_token_hint";
+                public const string LoginHint = "login_hint";
+                public const string AcrValues = "acr_values";
+                public const string CodeChallenge = "code_challenge";
+                public const string CodeChallengeMethod = "code_challenge_method";
+                public const string RequestObject = "request";
+                public const string RequestObjectUri = "request_uri";
+                public const string Resource = "resource";
+                public const string DPoPKeyThumbprint = "dpop_jkt";
+            }
+
+            public static class Errors
+            {
+                // OAuth2 errors
+                public const string InvalidRequest = "invalid_request";
+                public const string UnauthorizedClient = "unauthorized_client";
+                public const string AccessDenied = "access_denied";
+                public const string UnsupportedResponseType = "unsupported_response_type";
+                public const string UnsupportedResponseMode = "unsupported_response_mode";
+                public const string InvalidScope = "invalid_scope";
+                public const string ServerError = "server_error";
+                public const string TemporarilyUnavailable = "temporarily_unavailable";
+                public const string UnmetAuthenticationRequirements = "unmet_authentication_requirements";
+
+                // OIDC errors
+                public const string InteractionRequired = "interaction_required";
+                public const string LoginRequired = "login_required";
+                public const string AccountSelectionRequired = "account_selection_required";
+                public const string ConsentRequired = "consent_required";
+                public const string InvalidRequestUri = "invalid_request_uri";
+                public const string InvalidRequestObject = "invalid_request_object";
+                public const string RequestNotSupported = "request_not_supported";
+                public const string RequestUriNotSupported = "request_uri_not_supported";
+                public const string RegistrationNotSupported = "registration_not_supported";
+
+                // resource indicator spec
+                public const string InvalidTarget = "invalid_target";
+            }
+
+            public static class Response
+            {
+                public const string Scope = "scope";
+                public const string Code = "code";
+                public const string AccessToken = "access_token";
+                public const string ExpiresIn = "expires_in";
+                public const string TokenType = "token_type";
+                public const string RefreshToken = "refresh_token";
+                public const string IdentityToken = "id_token";
+                public const string State = "state";
+                public const string SessionState = "session_state";
+                public const string Issuer = "iss";
+                public const string Error = "error";
+                public const string ErrorDescription = "error_description";
+            }
+        }
+
+        public static class Token
+        {
+            public static class Request
+            {
+                public const string GrantType = "grant_type";
+                public const string RedirectUri = "redirect_uri";
+                public const string ClientId = "client_id";
+                public const string ClientSecret = "client_secret";
+                public const string ClientAssertion = "client_assertion";
+                public const string ClientAssertionType = "client_assertion_type";
+                public const string Assertion = "assertion";
+                public const string Code = "code";
+                public const string RefreshToken = "refresh_token";
+                public const string Scope = "scope";
+                public const string UserName = "username";
+                public const string Password = "password";
+                public const string CodeVerifier = "code_verifier";
+                public const string TokenType = "token_type";
+                public const string Algorithm = "alg";
+                public const string Key = "key";
+                public const string DeviceCode = "device_code";
+
+                // token exchange
+                public const string Resource = "resource";
+                public const string Audience = "audience";
+                public const string RequestedTokenType = "requested_token_type";
+                public const string SubjectToken = "subject_token";
+                public const string SubjectTokenType = "subject_token_type";
+                public const string ActorToken = "actor_token";
+                public const string ActorTokenType = "actor_token_type";
+
+                // ciba
+                public const string AuthenticationRequestId = "auth_req_id";
+            }
+
+            public static class Errors
+            {
+                public const string InvalidRequest = "invalid_request";
+                public const string InvalidClient = "invalid_client";
+                public const string InvalidGrant = "invalid_grant";
+                public const string UnauthorizedClient = "unauthorized_client";
+                public const string UnsupportedGrantType = "unsupported_grant_type";
+                public const string UnsupportedResponseType = "unsupported_response_type";
+                public const string InvalidScope = "invalid_scope";
+                public const string AuthorizationPending = "authorization_pending";
+                public const string AccessDenied = "access_denied";
+                public const string SlowDown = "slow_down";
+                public const string ExpiredToken = "expired_token";
+                public const string InvalidTarget = "invalid_target";
+                public const string InvalidDPoPProof = "invalid_dpop_proof";
+                public const string UseDPoPNonce = "use_dpop_nonce";
+            }
+
+            public static class Response
+            {
+                public const string AccessToken = "access_token";
+                public const string ExpiresIn = "expires_in";
+                public const string TokenType = "token_type";
+                public const string RefreshToken = "refresh_token";
+                public const string IdentityToken = "id_token";
+                public const string Error = "error";
+                public const string ErrorDescription = "error_description";
+                public const string BearerTokenType = "Bearer";
+                public const string DPoPTokenType = "DPoP";
+                public const string IssuedTokenType = "issued_token_type";
+                public const string Scope = "scope";
+            }
+
+            public static class RequestTypes
+            {
+                public const string Bearer = "bearer";
+                public const string Pop = "pop";
+            }
+
+            public static class Types
+            {
+                public const string AccessToken = "access_token";
+                public const string IdentityToken = "id_token";
+                public const string RefreshToken = "refresh_token";
+                public const string Code = "code";
+            }
+
+            public static class TypeIdentifiers
+            {
+                public const string AccessToken = "urn:ietf:params:oauth:token-type:access_token";
+                public const string IdentityToken = "urn:ietf:params:oauth:token-type:id_token";
+                public const string RefreshToken = "urn:ietf:params:oauth:token-type:refresh_token";
+                public const string Saml11 = "urn:ietf:params:oauth:token-type:saml1";
+                public const string Saml2 = "urn:ietf:params:oauth:token-type:saml2";
+                public const string Jwt = "urn:ietf:params:oauth:token-type:jwt";
+            }
+        }
+
         public static class Errors
         {
             public static class Revocation
             {
                 public const string UnsupportedTokenType = "unsupported_token_type";
             }
+        }
+
+        public static class ResponseModes
+        {
+            public const string FormPost = "form_post";
+            public const string Query = "query";
+            public const string Fragment = "fragment";
+        }
+
+        public static class PromptModes
+        {
+            public const string None = "none";
+            public const string Login = "login";
+            public const string Consent = "consent";
+            public const string SelectAccount = "select_account";
+            public const string Create = "create";
+        }
+
+        public static class CodeChallenge
+        {
+            public static class Methods
+            {
+                public const string Plain = "plain";
+                public const string Sha256 = "S256";
+            }
+        }
+
+        public static class SubjectTypes
+        {
+            public const string Pairwise = "pairwise";
+            public const string Public = "public";
+        }
+
+        public static class DisplayModes
+        {
+            public const string Page = "page";
+            public const string Popup = "popup";
+            public const string Touch = "touch";
+            public const string Wap = "wap";
+        }
+
+        public static class Endpoint
+        {
+            public static class AuthMethods
+            {
+                public const string BasicAuthentication = "client_secret_basic";
+                public const string PostBody = "client_secret_post";
+                public const string PrivateKeyJwt = "private_key_jwt";
+                public const string TlsClientAuth = "tls_client_auth";
+                public const string SelfSignedTlsClientAuth = "self_signed_tls_client_auth";
+            }
+        }
+
+        public static class AuthSchemes
+        {
+            public const string AuthorizationHeaderBearer = "Bearer";
+            public const string AuthorizationHeaderDPoP = "DPoP";
+            public const string FormPostBearer = "access_token";
+            public const string QueryStringBearer = "access_token";
+            public const string AuthorizationHeaderPop = "PoP";
+            public const string FormPostPop = "pop_access_token";
+            public const string QueryStringPop = "pop_access_token";
+        }
+
+        public static class ClientAssertionTypes
+        {
+            public const string JwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+            public const string SamlBearer = "urn:ietf:params:oauth:client-assertion-type:saml2-bearer";
+        }
+
+        public static class ProtectedResource
+        {
+            public static class Errors
+            {
+                public const string InvalidToken = "invalid_token";
+                public const string ExpiredToken = "expired_token";
+                public const string InvalidRequest = "invalid_request";
+                public const string InsufficientScope = "insufficient_scope";
+            }
+        }
+
+        public static class Revocation
+        {
+            public static class Request
+            {
+                public const string Token = "token";
+                public const string TokenTypeHint = "token_type_hint";
+            }
+        }
+
+        public static class Introspection
+        {
+            public static class Request
+            {
+                public const string Token = "token";
+                public const string TokenTypeHint = "token_type_hint";
+            }
+        }
+
+        public static class EndSession
+        {
+            public static class Request
+            {
+                public const string IdTokenHint = "id_token_hint";
+                public const string LogoutHint = "logout_hint";
+                public const string ClientId = "client_id";
+                public const string PostLogoutRedirectUri = "post_logout_redirect_uri";
+                public const string State = "state";
+                public const string UiLocales = "ui_locales";
+            }
+        }
+
+        public static class Events
+        {
+            public const string BackChannelLogout = "http://schemas.openid.net/event/backchannel-logout";
+        }
+
+        public static class HttpHeaders
+        {
+            public const string DPoP = "DPoP";
+            public const string DPoPNonce = "DPoP-Nonce";
+        }
+
+        public static class AuthMethods
+        {
+            public const string FacialRecognition = "face";
+            public const string FingerprintBiometric = "fpt";
+            public const string Geolocation = "geo";
+            public const string ProofOfPossessionHardwareSecuredKey = "hwk";
+            public const string IrisScanBiometric = "iris";
+            public const string KnowledgeBasedAuthentication = "kba";
+            public const string MultipleChannelAuthentication = "mca";
+            public const string MultiFactorAuthentication = "mfa";
+            public const string OneTimePassword = "otp";
+            public const string PersonalIdentificationOrPattern = "pin";
+            public const string ProofOfPossessionKey = "pop";
+            public const string Password = "pwd";
+            public const string RiskBasedAuthentication = "rba";
+            public const string RetinaScanBiometric = "retina";
+            public const string SmartCard = "sc";
+            public const string ConfirmationBySms = "sms";
+            public const string ProofOfPossessionSoftwareSecuredKey = "swk";
+            public const string ConfirmationByTelephone = "tel";
+            public const string UserPresenceTest = "user";
+            public const string VoiceBiometric = "vbm";
+            public const string WindowsIntegratedAuthentication = "wia";
+        }
+
+        // Low-priority groups (features not yet implemented)
+
+        public static class Device
+        {
+            public static class AuthorizationResponse
+            {
+                public const string DeviceCode = "device_code";
+                public const string UserCode = "user_code";
+                public const string VerificationUri = "verification_uri";
+                public const string VerificationUriComplete = "verification_uri_complete";
+                public const string ExpiresIn = "expires_in";
+                public const string Interval = "interval";
+            }
+        }
+
+        public static class Backchannel
+        {
+            public static class Request
+            {
+                public const string Scope = "scope";
+                public const string ClientNotificationToken = "client_notification_token";
+                public const string AcrValues = "acr_values";
+                public const string LoginHintToken = "login_hint_token";
+                public const string IdTokenHint = "id_token_hint";
+                public const string LoginHint = "login_hint";
+                public const string BindingMessage = "binding_message";
+                public const string UserCode = "user_code";
+                public const string RequestedExpiry = "requested_expiry";
+                public const string RequestObject = "request";
+                public const string Resource = "resource";
+                public const string DPoPKeyThumbprint = "dpop_jkt";
+            }
+
+            public static class Errors
+            {
+                public const string InvalidRequestObject = "invalid_request_object";
+                public const string InvalidRequest = "invalid_request";
+                public const string InvalidScope = "invalid_scope";
+                public const string ExpiredLoginHintToken = "expired_login_hint_token";
+                public const string UnknownUserId = "unknown_user_id";
+                public const string UnauthorizedClient = "unauthorized_client";
+                public const string MissingUserCode = "missing_user_code";
+                public const string InvalidUserCode = "invalid_user_code";
+                public const string InvalidBindingMessage = "invalid_binding_message";
+                public const string InvalidClient = "invalid_client";
+                public const string AccessDenied = "access_denied";
+                public const string InvalidTarget = "invalid_target";
+            }
+
+            public static class Response
+            {
+                public const string AuthenticationRequestId = "auth_req_id";
+                public const string ExpiresIn = "expires_in";
+                public const string Interval = "interval";
+            }
+
+            public static class DeliveryModes
+            {
+                public const string Poll = "poll";
+                public const string Ping = "ping";
+                public const string Push = "push";
+            }
+        }
+
+        public static class Par
+        {
+            public static class Response
+            {
+                public const string ExpiresIn = "expires_in";
+                public const string RequestUri = "request_uri";
+            }
+        }
+
+        public static class Registration
+        {
+            public static class Response
+            {
+                public const string Error = "error";
+                public const string ErrorDescription = "error_description";
+                public const string ClientId = "client_id";
+                public const string ClientSecret = "client_secret";
+                public const string RegistrationAccessToken = "registration_access_token";
+                public const string RegistrationClientUri = "registration_client_uri";
+                public const string ClientIdIssuedAt = "client_id_issued_at";
+                public const string ClientSecretExpiresAt = "client_secret_expires_at";
+                public const string SoftwareStatement = "software_statement";
+            }
+
+            public static class ClientMetadata
+            {
+                public const string RedirectUris = "redirect_uris";
+                public const string ResponseTypes = "response_types";
+                public const string GrantTypes = "grant_types";
+                public const string ApplicationType = "application_type";
+                public const string Contacts = "contacts";
+                public const string ClientName = "client_name";
+                public const string LogoUri = "logo_uri";
+                public const string ClientUri = "client_uri";
+                public const string PolicyUri = "policy_uri";
+                public const string TosUri = "tos_uri";
+                public const string JwksUri = "jwks_uri";
+                public const string Jwks = "jwks";
+                public const string SectorIdentifierUri = "sector_identifier_uri";
+                public const string Scope = "scope";
+                public const string PostLogoutRedirectUris = "post_logout_redirect_uris";
+                public const string FrontChannelLogoutUri = "frontchannel_logout_uri";
+                public const string FrontChannelLogoutSessionRequired = "frontchannel_logout_session_required";
+                public const string BackchannelLogoutUri = "backchannel_logout_uri";
+                public const string BackchannelLogoutSessionRequired = "backchannel_logout_session_required";
+                public const string SoftwareId = "software_id";
+                public const string SoftwareVersion = "software_version";
+                public const string SubjectType = "subject_type";
+                public const string TokenEndpointAuthenticationMethod = "token_endpoint_auth_method";
+                public const string TokenEndpointAuthenticationSigningAlgorithm = "token_endpoint_auth_signing_alg";
+                public const string DefaultMaxAge = "default_max_age";
+                public const string RequireAuthenticationTime = "require_auth_time";
+                public const string DefaultAcrValues = "default_acr_values";
+                public const string InitiateLoginUri = "initiate_login_uri";
+                public const string RequestUris = "request_uris";
+                public const string IdentityTokenSignedResponseAlgorithm = "id_token_signed_response_alg";
+                public const string IdentityTokenEncryptedResponseAlgorithm = "id_token_encrypted_response_alg";
+                public const string IdentityTokenEncryptedResponseEncryption = "id_token_encrypted_response_enc";
+                public const string UserinfoSignedResponseAlgorithm = "userinfo_signed_response_alg";
+                public const string UserInfoEncryptedResponseAlgorithm = "userinfo_encrypted_response_alg";
+                public const string UserinfoEncryptedResponseEncryption = "userinfo_encrypted_response_enc";
+                public const string RequestObjectSigningAlgorithm = "request_object_signing_alg";
+                public const string RequestObjectEncryptionAlgorithm = "request_object_encryption_alg";
+                public const string RequestObjectEncryptionEncryption = "request_object_encryption_enc";
+                public const string RequireSignedRequestObject = "require_signed_request_object";
+                public const string AlwaysUseDPoPBoundAccessTokens = "dpop_bound_access_tokens";
+            }
+        }
+
+        public static class BackChannelLogout
+        {
+            public static class Request
+            {
+                public const string LogoutToken = "logout_token";
+            }
+        }
+
+        public static class Discovery
+        {
+            public const string Issuer = "issuer";
+
+            // endpoints
+            public const string AuthorizationEndpoint = "authorization_endpoint";
+            public const string DeviceAuthorizationEndpoint = "device_authorization_endpoint";
+            public const string TokenEndpoint = "token_endpoint";
+            public const string UserInfoEndpoint = "userinfo_endpoint";
+            public const string IntrospectionEndpoint = "introspection_endpoint";
+            public const string RevocationEndpoint = "revocation_endpoint";
+            public const string DiscoveryEndpoint = ".well-known/openid-configuration";
+            public const string JwksUri = "jwks_uri";
+            public const string EndSessionEndpoint = "end_session_endpoint";
+            public const string CheckSessionIframe = "check_session_iframe";
+            public const string RegistrationEndpoint = "registration_endpoint";
+            public const string MtlsEndpointAliases = "mtls_endpoint_aliases";
+            public const string PushedAuthorizationRequestEndpoint = "pushed_authorization_request_endpoint";
+
+            // common capabilities
+            public const string FrontChannelLogoutSupported = "frontchannel_logout_supported";
+            public const string FrontChannelLogoutSessionSupported = "frontchannel_logout_session_supported";
+            public const string BackChannelLogoutSupported = "backchannel_logout_supported";
+            public const string BackChannelLogoutSessionSupported = "backchannel_logout_session_supported";
+            public const string GrantTypesSupported = "grant_types_supported";
+            public const string CodeChallengeMethodsSupported = "code_challenge_methods_supported";
+            public const string ScopesSupported = "scopes_supported";
+            public const string SubjectTypesSupported = "subject_types_supported";
+            public const string ResponseModesSupported = "response_modes_supported";
+            public const string ResponseTypesSupported = "response_types_supported";
+            public const string ClaimsSupported = "claims_supported";
+            public const string TokenEndpointAuthenticationMethodsSupported = "token_endpoint_auth_methods_supported";
+
+            // more capabilities
+            public const string ClaimsLocalesSupported = "claims_locales_supported";
+            public const string ClaimsParameterSupported = "claims_parameter_supported";
+            public const string ClaimTypesSupported = "claim_types_supported";
+            public const string DisplayValuesSupported = "display_values_supported";
+            public const string AcrValuesSupported = "acr_values_supported";
+            public const string IdTokenEncryptionAlgorithmsSupported = "id_token_encryption_alg_values_supported";
+            public const string IdTokenEncryptionEncValuesSupported = "id_token_encryption_enc_values_supported";
+            public const string IdTokenSigningAlgorithmsSupported = "id_token_signing_alg_values_supported";
+            public const string OpPolicyUri = "op_policy_uri";
+            public const string OpTosUri = "op_tos_uri";
+            public const string RequestObjectEncryptionAlgorithmsSupported = "request_object_encryption_alg_values_supported";
+            public const string RequestObjectEncryptionEncValuesSupported = "request_object_encryption_enc_values_supported";
+            public const string RequestObjectSigningAlgorithmsSupported = "request_object_signing_alg_values_supported";
+            public const string RequestParameterSupported = "request_parameter_supported";
+            public const string RequestUriParameterSupported = "request_uri_parameter_supported";
+            public const string RequireRequestUriRegistration = "require_request_uri_registration";
+            public const string ServiceDocumentation = "service_documentation";
+            public const string TokenEndpointAuthSigningAlgorithmsSupported = "token_endpoint_auth_signing_alg_values_supported";
+            public const string UILocalesSupported = "ui_locales_supported";
+            public const string UserInfoEncryptionAlgorithmsSupported = "userinfo_encryption_alg_values_supported";
+            public const string UserInfoEncryptionEncValuesSupported = "userinfo_encryption_enc_values_supported";
+            public const string UserInfoSigningAlgorithmsSupported = "userinfo_signing_alg_values_supported";
+            public const string TlsClientCertificateBoundAccessTokens = "tls_client_certificate_bound_access_tokens";
+            public const string AuthorizationResponseIssParameterSupported = "authorization_response_iss_parameter_supported";
+            public const string PromptValuesSupported = "prompt_values_supported";
+
+            // CIBA
+            public const string BackchannelTokenDeliveryModesSupported = "backchannel_token_delivery_modes_supported";
+            public const string BackchannelAuthenticationEndpoint = "backchannel_authentication_endpoint";
+            public const string BackchannelAuthenticationRequestSigningAlgValuesSupported = "backchannel_authentication_request_signing_alg_values_supported";
+            public const string BackchannelUserCodeParameterSupported = "backchannel_user_code_parameter_supported";
+
+            // DPoP
+            public const string DPoPSigningAlgorithmsSupported = "dpop_signing_alg_values_supported";
+
+            // PAR
+            public const string RequirePushedAuthorizationRequests = "require_pushed_authorization_requests";
         }
     }
 
@@ -270,7 +885,7 @@ public static partial class Constants
             JwtRegisteredClaimNames.Aud,
             JwtRegisteredClaimNames.Azp,
             JwtRegisteredClaimNames.CHash,
-            JwtClaimTypes.ClientId,
+            Jwt.ClaimTypes.ClientId,
             JwtRegisteredClaimNames.Exp,
             JwtRegisteredClaimNames.Iat,
             JwtRegisteredClaimNames.Iss,
@@ -292,7 +907,7 @@ public static partial class Constants
             JwtRegisteredClaimNames.AuthTime,
             JwtRegisteredClaimNames.Azp,
             JwtRegisteredClaimNames.CHash,
-            JwtClaimTypes.ClientId,
+            Jwt.ClaimTypes.ClientId,
             JwtRegisteredClaimNames.Exp,
             Jwt.ClaimTypes.IdentityProvider,
             JwtRegisteredClaimNames.Iat,
@@ -335,12 +950,43 @@ public static partial class Constants
     {
         public static class ClaimTypes
         {
+            // Project-specific
             public const string IdentityProvider = "idp";
             public const string Role = "role";
             public const string Roles = "roles";
             public const string ReferenceTokenId = "reference_token_id";
+
+            // OAuth2/OIDC extensions (not in JwtRegisteredClaimNames)
             public const string Scope = "scope";
             public const string Confirmation = "cnf";
+            public const string StateHash = "s_hash";
+            public const string Events = "events";
+            public const string ClientId = "client_id";
+            public const string Actor = "act";
+            public const string MayAct = "may_act";
+            public const string Id = "id";
+
+            // OIDC standard profile claims (not in JwtRegisteredClaimNames)
+            public const string MiddleName = "middle_name";
+            public const string NickName = "nickname";
+            public const string PreferredUserName = "preferred_username";
+            public const string Profile = "profile";
+            public const string Picture = "picture";
+            public const string EmailVerified = "email_verified";
+            public const string Gender = "gender";
+            public const string ZoneInfo = "zoneinfo";
+            public const string Locale = "locale";
+            public const string PhoneNumber = "phone_number";
+            public const string PhoneNumberVerified = "phone_number_verified";
+            public const string Address = "address";
+            public const string UpdatedAt = "updated_at";
+
+            // JWT header / DPoP claims
+            public const string Algorithm = "alg";
+            public const string JsonWebKey = "jwk";
+            public const string DPoPHttpMethod = "htm";
+            public const string DPoPHttpUrl = "htu";
+            public const string DPoPAccessTokenHash = "ath";
 
             public static class JwtTypes
             {
@@ -359,785 +1005,3 @@ public static partial class Constants
     }
 }
 
-[Redesign("Move all to Constants")]
-public static class OidcConstants
-{
-    public static class AuthorizeRequest
-    {
-        public const string Scope = "scope";
-        public const string ResponseType = "response_type";
-        public const string ClientId = "client_id";
-        public const string RedirectUri = "redirect_uri";
-        public const string State = "state";
-        public const string ResponseMode = "response_mode";
-        public const string Nonce = "nonce";
-        public const string Display = "display";
-        public const string Prompt = "prompt";
-        public const string MaxAge = "max_age";
-        public const string UiLocales = "ui_locales";
-        public const string IdTokenHint = "id_token_hint";
-        public const string LoginHint = "login_hint";
-        public const string AcrValues = "acr_values";
-        public const string CodeChallenge = "code_challenge";
-        public const string CodeChallengeMethod = "code_challenge_method";
-        public const string Request = "request";
-        public const string RequestUri = "request_uri";
-        public const string Resource = "resource";
-        public const string DPoPKeyThumbprint = "dpop_jkt";
-    }
-
-    public static class AuthorizeErrors
-    {
-        // OAuth2 errors
-        public const string InvalidRequest = "invalid_request";
-        public const string UnauthorizedClient = "unauthorized_client";
-        public const string AccessDenied = "access_denied";
-        public const string UnsupportedResponseType = "unsupported_response_type";
-        public const string UnsupportedResponseMode = "unsupported_response_mode";
-        public const string InvalidScope = "invalid_scope";
-        public const string ServerError = "server_error";
-        public const string TemporarilyUnavailable = "temporarily_unavailable";
-        public const string UnmetAuthenticationRequirements = "unmet_authentication_requirements";
-
-        // OIDC errors
-        public const string InteractionRequired = "interaction_required";
-        public const string LoginRequired = "login_required";
-        public const string AccountSelectionRequired = "account_selection_required";
-        public const string ConsentRequired = "consent_required";
-        public const string InvalidRequestUri = "invalid_request_uri";
-        public const string InvalidRequestObject = "invalid_request_object";
-        public const string RequestNotSupported = "request_not_supported";
-        public const string RequestUriNotSupported = "request_uri_not_supported";
-        public const string RegistrationNotSupported = "registration_not_supported";
-
-        // resource indicator spec
-        public const string InvalidTarget = "invalid_target";
-    }
-
-    public static class AuthorizeResponseFields
-    {
-        public const string Scope = "scope";
-        public const string Code = "code";
-        public const string AccessToken = "access_token";
-        public const string ExpiresIn = "expires_in";
-        public const string TokenType = "token_type";
-        public const string RefreshToken = "refresh_token";
-        public const string IdentityToken = "id_token";
-        public const string State = "state";
-        public const string SessionState = "session_state";
-        public const string Issuer = "iss";
-        public const string Error = "error";
-        public const string ErrorDescription = "error_description";
-    }
-
-    public static class DeviceAuthorizationResponse
-    {
-        public const string DeviceCode = "device_code";
-        public const string UserCode = "user_code";
-        public const string VerificationUri = "verification_uri";
-        public const string VerificationUriComplete = "verification_uri_complete";
-        public const string ExpiresIn = "expires_in";
-        public const string Interval = "interval";
-    }
-
-    public static class EndSessionRequest
-    {
-        public const string IdTokenHint = "id_token_hint";
-        public const string LogoutHint = "logout_hint";
-        public const string ClientId = "client_id";
-        public const string PostLogoutRedirectUri = "post_logout_redirect_uri";
-        public const string State = "state";
-        public const string UiLocales = "ui_locales";
-    }
-
-    public static class TokenRequest
-    {
-        public const string GrantType = "grant_type";
-        public const string RedirectUri = "redirect_uri";
-        public const string ClientId = "client_id";
-        public const string ClientSecret = "client_secret";
-        public const string ClientAssertion = "client_assertion";
-        public const string ClientAssertionType = "client_assertion_type";
-        public const string Assertion = "assertion";
-        public const string Code = "code";
-        public const string RefreshToken = "refresh_token";
-        public const string Scope = "scope";
-        public const string UserName = "username";
-        public const string Password = "password";
-        public const string CodeVerifier = "code_verifier";
-        public const string TokenType = "token_type";
-        public const string Algorithm = "alg";
-        public const string Key = "key";
-        public const string DeviceCode = "device_code";
-
-        // token exchange
-        public const string Resource = "resource";
-        public const string Audience = "audience";
-        public const string RequestedTokenType = "requested_token_type";
-        public const string SubjectToken = "subject_token";
-        public const string SubjectTokenType = "subject_token_type";
-        public const string ActorToken = "actor_token";
-        public const string ActorTokenType = "actor_token_type";
-
-        // ciba
-        public const string AuthenticationRequestId = "auth_req_id";
-    }
-
-    public static class BackchannelAuthenticationRequest
-    {
-        public const string Scope = "scope";
-        public const string ClientNotificationToken = "client_notification_token";
-        public const string AcrValues = "acr_values";
-        public const string LoginHintToken = "login_hint_token";
-        public const string IdTokenHint = "id_token_hint";
-        public const string LoginHint = "login_hint";
-        public const string BindingMessage = "binding_message";
-        public const string UserCode = "user_code";
-        public const string RequestedExpiry = "requested_expiry";
-        public const string Request = "request";
-        public const string Resource = "resource";
-        public const string DPoPKeyThumbprint = "dpop_jkt";
-    }
-
-    public static class BackchannelAuthenticationRequestErrors
-    {
-        public const string InvalidRequestObject = "invalid_request_object";
-        public const string InvalidRequest = "invalid_request";
-        public const string InvalidScope = "invalid_scope";
-        public const string ExpiredLoginHintToken = "expired_login_hint_token";
-        public const string UnknownUserId = "unknown_user_id";
-        public const string UnauthorizedClient = "unauthorized_client";
-        public const string MissingUserCode = "missing_user_code";
-        public const string InvalidUserCode = "invalid_user_code";
-        public const string InvalidBindingMessage = "invalid_binding_message";
-        public const string InvalidClient = "invalid_client";
-        public const string AccessDenied = "access_denied";
-        public const string InvalidTarget = "invalid_target";
-    }
-
-    public static class TokenRequestTypes
-    {
-        public const string Bearer = "bearer";
-        public const string Pop = "pop";
-    }
-
-    public static class TokenErrors
-    {
-        public const string InvalidRequest = "invalid_request";
-        public const string InvalidClient = "invalid_client";
-        public const string InvalidGrant = "invalid_grant";
-        public const string UnauthorizedClient = "unauthorized_client";
-        public const string UnsupportedGrantType = "unsupported_grant_type";
-        public const string UnsupportedResponseType = "unsupported_response_type";
-        public const string InvalidScope = "invalid_scope";
-        public const string AuthorizationPending = "authorization_pending";
-        public const string AccessDenied = "access_denied";
-        public const string SlowDown = "slow_down";
-        public const string ExpiredToken = "expired_token";
-        public const string InvalidTarget = "invalid_target";
-        public const string InvalidDPoPProof = "invalid_dpop_proof";
-        public const string UseDPoPNonce = "use_dpop_nonce";
-    }
-
-    public static class TokenResponse
-    {
-        public const string AccessToken = "access_token";
-        public const string ExpiresIn = "expires_in";
-        public const string TokenType = "token_type";
-        public const string RefreshToken = "refresh_token";
-        public const string IdentityToken = "id_token";
-        public const string Error = "error";
-        public const string ErrorDescription = "error_description";
-        public const string BearerTokenType = "Bearer";
-        public const string DPoPTokenType = "DPoP";
-        public const string IssuedTokenType = "issued_token_type";
-        public const string Scope = "scope";
-    }
-
-    public static class BackchannelAuthenticationResponse
-    {
-        public const string AuthenticationRequestId = "auth_req_id";
-        public const string ExpiresIn = "expires_in";
-        public const string Interval = "interval";
-    }
-
-    public static class PushedAuthorizationRequestResponse
-    {
-        public const string ExpiresIn = "expires_in";
-        public const string RequestUri = "request_uri";
-    }
-
-    public static class TokenIntrospectionRequest
-    {
-        public const string Token = "token";
-        public const string TokenTypeHint = "token_type_hint";
-    }
-
-    public static class RevocationRequest
-    {
-        public const string Token = "token";
-        public const string TokenTypeHint = "token_type_hint";
-    }
-
-    public static class RegistrationResponse
-    {
-        public const string Error = "error";
-        public const string ErrorDescription = "error_description";
-        public const string ClientId = "client_id";
-        public const string ClientSecret = "client_secret";
-        public const string RegistrationAccessToken = "registration_access_token";
-        public const string RegistrationClientUri = "registration_client_uri";
-        public const string ClientIdIssuedAt = "client_id_issued_at";
-        public const string ClientSecretExpiresAt = "client_secret_expires_at";
-        public const string SoftwareStatement = "software_statement";
-    }
-
-    public static class ClientMetadata
-    {
-        public const string RedirectUris = "redirect_uris";
-        public const string ResponseTypes = "response_types";
-        public const string GrantTypes = "grant_types";
-        public const string ApplicationType = "application_type";
-        public const string Contacts = "contacts";
-        public const string ClientName = "client_name";
-        public const string LogoUri = "logo_uri";
-        public const string ClientUri = "client_uri";
-        public const string PolicyUri = "policy_uri";
-        public const string TosUri = "tos_uri";
-        public const string JwksUri = "jwks_uri";
-        public const string Jwks = "jwks";
-        public const string SectorIdentifierUri = "sector_identifier_uri";
-        public const string Scope = "scope";
-        public const string PostLogoutRedirectUris = "post_logout_redirect_uris";
-        public const string FrontChannelLogoutUri = "frontchannel_logout_uri";
-        public const string FrontChannelLogoutSessionRequired = "frontchannel_logout_session_required";
-        public const string BackchannelLogoutUri = "backchannel_logout_uri";
-        public const string BackchannelLogoutSessionRequired = "backchannel_logout_session_required";
-        public const string SoftwareId = "software_id";
-        public const string SoftwareStatement = "software_statement";
-        public const string SoftwareVersion = "software_version";
-        public const string SubjectType = "subject_type";
-        public const string TokenEndpointAuthenticationMethod = "token_endpoint_auth_method";
-        public const string TokenEndpointAuthenticationSigningAlgorithm = "token_endpoint_auth_signing_alg";
-        public const string DefaultMaxAge = "default_max_age";
-        public const string RequireAuthenticationTime = "require_auth_time";
-        public const string DefaultAcrValues = "default_acr_values";
-        public const string InitiateLoginUri = "initiate_login_uri";
-        public const string RequestUris = "request_uris";
-        public const string IdentityTokenSignedResponseAlgorithm = "id_token_signed_response_alg";
-        public const string IdentityTokenEncryptedResponseAlgorithm = "id_token_encrypted_response_alg";
-        public const string IdentityTokenEncryptedResponseEncryption = "id_token_encrypted_response_enc";
-        public const string UserinfoSignedResponseAlgorithm = "userinfo_signed_response_alg";
-        public const string UserInfoEncryptedResponseAlgorithm = "userinfo_encrypted_response_alg";
-        public const string UserinfoEncryptedResponseEncryption = "userinfo_encrypted_response_enc";
-        public const string RequestObjectSigningAlgorithm = "request_object_signing_alg";
-        public const string RequestObjectEncryptionAlgorithm = "request_object_encryption_alg";
-        public const string RequestObjectEncryptionEncryption = "request_object_encryption_enc";
-        public const string RequireSignedRequestObject = "require_signed_request_object";
-        public const string AlwaysUseDPoPBoundAccessTokens = "dpop_bound_access_tokens";
-    }
-
-    public static class TokenTypes
-    {
-        public const string AccessToken = "access_token";
-        public const string IdentityToken = "id_token";
-        public const string RefreshToken = "refresh_token";
-        public const string Code = "code";
-    }
-
-    public static class TokenTypeIdentifiers
-    {
-        public const string AccessToken = "urn:ietf:params:oauth:token-type:access_token";
-        public const string IdentityToken = "urn:ietf:params:oauth:token-type:id_token";
-        public const string RefreshToken = "urn:ietf:params:oauth:token-type:refresh_token";
-        public const string Saml11 = "urn:ietf:params:oauth:token-type:saml1";
-        public const string Saml2 = "urn:ietf:params:oauth:token-type:saml2";
-        public const string Jwt = "urn:ietf:params:oauth:token-type:jwt";
-    }
-
-    public static class AuthenticationSchemes
-    {
-        public const string AuthorizationHeaderBearer = "Bearer";
-        public const string AuthorizationHeaderDPoP = "DPoP";
-
-        public const string FormPostBearer = "access_token";
-        public const string QueryStringBearer = "access_token";
-
-        public const string AuthorizationHeaderPop = "PoP";
-        public const string FormPostPop = "pop_access_token";
-        public const string QueryStringPop = "pop_access_token";
-    }
-
-    public static class ClientAssertionTypes
-    {
-        public const string JwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-        public const string SamlBearer = "urn:ietf:params:oauth:client-assertion-type:saml2-bearer";
-    }
-
-    public static class ResponseTypes
-    {
-        public const string Code = "code";
-        public const string Token = "token"; // implicit flow - considered harmful in oauth2.1 -- remove? TODO: review implicit flow
-        public const string IdToken = "id_token";
-    }
-
-    public static class ResponseModes
-    {
-        public const string FormPost = "form_post";
-        public const string Query = "query";
-        public const string Fragment = "fragment";
-    }
-
-    public static class SubjectTypes
-    {
-        public const string Pairwise = "pairwise";
-        public const string Public = "public";
-    }
-
-    public static class DisplayModes
-    {
-        public const string Page = "page";
-        public const string Popup = "popup";
-        public const string Touch = "touch";
-        public const string Wap = "wap";
-    }
-
-    public static class PromptModes
-    {
-        public const string None = "none";
-        public const string Login = "login";
-        public const string Consent = "consent";
-        public const string SelectAccount = "select_account";
-        public const string Create = "create";
-    }
-
-    public static class CodeChallengeMethods
-    {
-        public const string Plain = "plain";
-        public const string Sha256 = "S256";
-    }
-
-    public static class ProtectedResourceErrors
-    {
-        public const string InvalidToken = "invalid_token";
-        public const string ExpiredToken = "expired_token";
-        public const string InvalidRequest = "invalid_request";
-        public const string InsufficientScope = "insufficient_scope";
-    }
-
-    public static class EndpointAuthenticationMethods
-    {
-        public const string BasicAuthentication = "client_secret_basic";
-        public const string PostBody = "client_secret_post";
-        public const string PrivateKeyJwt = "private_key_jwt";
-        public const string TlsClientAuth = "tls_client_auth";
-        public const string SelfSignedTlsClientAuth = "self_signed_tls_client_auth";
-    }
-
-    public static class AuthenticationMethods
-    {
-        public const string FacialRecognition = "face";
-        public const string FingerprintBiometric = "fpt";
-        public const string Geolocation = "geo";
-        public const string ProofOfPossessionHardwareSecuredKey = "hwk";
-        public const string IrisScanBiometric = "iris";
-        public const string KnowledgeBasedAuthentication = "kba";
-        public const string MultipleChannelAuthentication = "mca";
-        public const string MultiFactorAuthentication = "mfa";
-        public const string OneTimePassword = "otp";
-        public const string PersonalIdentificationOrPattern = "pin";
-        public const string ProofOfPossessionKey = "pop";
-        public const string Password = "pwd";
-        public const string RiskBasedAuthentication = "rba";
-        public const string RetinaScanBiometric = "retina";
-        public const string SmartCard = "sc";
-        public const string ConfirmationBySms = "sms";
-        public const string ProofOfPossessionSoftwareSecuredKey = "swk";
-        public const string ConfirmationByTelephone = "tel";
-        public const string UserPresenceTest = "user";
-        public const string VoiceBiometric = "vbm";
-        public const string WindowsIntegratedAuthentication = "wia";
-    }
-
-    public static class Discovery
-    {
-        public const string Issuer = "issuer";
-
-        // endpoints
-        public const string AuthorizationEndpoint = "authorization_endpoint";
-        public const string DeviceAuthorizationEndpoint = "device_authorization_endpoint";
-        public const string TokenEndpoint = "token_endpoint";
-        public const string UserInfoEndpoint = "userinfo_endpoint";
-        public const string IntrospectionEndpoint = "introspection_endpoint";
-        public const string RevocationEndpoint = "revocation_endpoint";
-        public const string DiscoveryEndpoint = ".well-known/openid-configuration";
-        public const string JwksUri = "jwks_uri";
-        public const string EndSessionEndpoint = "end_session_endpoint";
-        public const string CheckSessionIframe = "check_session_iframe";
-        public const string RegistrationEndpoint = "registration_endpoint";
-        public const string MtlsEndpointAliases = "mtls_endpoint_aliases";
-        public const string PushedAuthorizationRequestEndpoint = "pushed_authorization_request_endpoint";
-
-        // common capabilities
-        public const string FrontChannelLogoutSupported = "frontchannel_logout_supported";
-        public const string FrontChannelLogoutSessionSupported = "frontchannel_logout_session_supported";
-        public const string BackChannelLogoutSupported = "backchannel_logout_supported";
-        public const string BackChannelLogoutSessionSupported = "backchannel_logout_session_supported";
-        public const string GrantTypesSupported = "grant_types_supported";
-        public const string CodeChallengeMethodsSupported = "code_challenge_methods_supported";
-        public const string ScopesSupported = "scopes_supported";
-        public const string SubjectTypesSupported = "subject_types_supported";
-        public const string ResponseModesSupported = "response_modes_supported";
-        public const string ResponseTypesSupported = "response_types_supported";
-        public const string ClaimsSupported = "claims_supported";
-        public const string TokenEndpointAuthenticationMethodsSupported = "token_endpoint_auth_methods_supported";
-
-        // more capabilities
-        public const string ClaimsLocalesSupported = "claims_locales_supported";
-        public const string ClaimsParameterSupported = "claims_parameter_supported";
-        public const string ClaimTypesSupported = "claim_types_supported";
-        public const string DisplayValuesSupported = "display_values_supported";
-        public const string AcrValuesSupported = "acr_values_supported";
-        public const string IdTokenEncryptionAlgorithmsSupported = "id_token_encryption_alg_values_supported";
-        public const string IdTokenEncryptionEncValuesSupported = "id_token_encryption_enc_values_supported";
-        public const string IdTokenSigningAlgorithmsSupported = "id_token_signing_alg_values_supported";
-        public const string OpPolicyUri = "op_policy_uri";
-        public const string OpTosUri = "op_tos_uri";
-
-        public const string RequestObjectEncryptionAlgorithmsSupported =
-            "request_object_encryption_alg_values_supported";
-
-        public const string RequestObjectEncryptionEncValuesSupported =
-            "request_object_encryption_enc_values_supported";
-
-        public const string RequestObjectSigningAlgorithmsSupported = "request_object_signing_alg_values_supported";
-        public const string RequestParameterSupported = "request_parameter_supported";
-        public const string RequestUriParameterSupported = "request_uri_parameter_supported";
-        public const string RequireRequestUriRegistration = "require_request_uri_registration";
-        public const string ServiceDocumentation = "service_documentation";
-
-        public const string TokenEndpointAuthSigningAlgorithmsSupported =
-            "token_endpoint_auth_signing_alg_values_supported";
-
-        public const string UILocalesSupported = "ui_locales_supported";
-        public const string UserInfoEncryptionAlgorithmsSupported = "userinfo_encryption_alg_values_supported";
-        public const string UserInfoEncryptionEncValuesSupported = "userinfo_encryption_enc_values_supported";
-        public const string UserInfoSigningAlgorithmsSupported = "userinfo_signing_alg_values_supported";
-        public const string TlsClientCertificateBoundAccessTokens = "tls_client_certificate_bound_access_tokens";
-
-        public const string AuthorizationResponseIssParameterSupported =
-            "authorization_response_iss_parameter_supported";
-
-        public const string PromptValuesSupported = "prompt_values_supported";
-
-        // CIBA
-        public const string BackchannelTokenDeliveryModesSupported = "backchannel_token_delivery_modes_supported";
-        public const string BackchannelAuthenticationEndpoint = "backchannel_authentication_endpoint";
-
-        public const string BackchannelAuthenticationRequestSigningAlgValuesSupported =
-            "backchannel_authentication_request_signing_alg_values_supported";
-
-        public const string BackchannelUserCodeParameterSupported = "backchannel_user_code_parameter_supported";
-
-        // DPoP
-        public const string DPoPSigningAlgorithmsSupported = "dpop_signing_alg_values_supported";
-
-        // PAR
-        public const string RequirePushedAuthorizationRequests = "require_pushed_authorization_requests";
-    }
-
-    public static class BackchannelTokenDeliveryModes
-    {
-        public const string Poll = "poll";
-        public const string Ping = "ping";
-        public const string Push = "push";
-    }
-
-    public static class Events
-    {
-        public const string BackChannelLogout = "http://schemas.openid.net/event/backchannel-logout";
-    }
-
-    public static class BackChannelLogoutRequest
-    {
-        public const string LogoutToken = "logout_token";
-    }
-
-    public static class HttpHeaders
-    {
-        public const string DPoP = "DPoP";
-        public const string DPoPNonce = "DPoP-Nonce";
-    }
-}
-
-/// <summary>
-/// Commonly used claim types
-/// </summary>
-[Redesign("Move all to Constants")]
-public static class JwtClaimTypes
-{
-    /// <summary>End-User's full name in displayable form including all name parts, possibly including titles and suffixes, ordered according to the End-User's locale and preferences.</summary>
-    public const string Name = "name";
-
-    /// <summary>Given name(s) or first name(s) of the End-User. Note that in some cultures, people can have multiple given names; all can be present, with the names being separated by space characters.</summary>
-    public const string GivenName = "given_name";
-
-    /// <summary>Surname(s) or last name(s) of the End-User. Note that in some cultures, people can have multiple family names or no family name; all can be present, with the names being separated by space characters.</summary>
-    public const string FamilyName = "family_name";
-
-    /// <summary>Middle name(s) of the End-User. Note that in some cultures, people can have multiple middle names; all can be present, with the names being separated by space characters. Also note that in some cultures, middle names are not used.</summary>
-    public const string MiddleName = "middle_name";
-
-    /// <summary>Casual name of the End-User that may or may not be the same as the given_name. For instance, a nickname value of Mike might be returned alongside a given_name value of Michael.</summary>
-    public const string NickName = "nickname";
-
-    /// <summary>Shorthand name by which the End-User wishes to be referred to at the RP, such as janedoe or j.doe. This value MAY be any valid JSON string including special characters such as @, /, or whitespace. The relying party MUST NOT rely upon this value being unique</summary>
-    /// <remarks>The RP MUST NOT rely upon this value being unique, as discussed in http://openid.net/specs/openid-connect-basic-1_0-32.html#ClaimStability </remarks>
-    public const string PreferredUserName = "preferred_username";
-
-    /// <summary>URL of the End-User's profile page. The contents of this Web page SHOULD be about the End-User.</summary>
-    public const string Profile = "profile";
-
-    /// <summary>URL of the End-User's profile picture. This URL MUST refer to an image file (for example, a PNG, JPEG, or GIF image file), rather than to a Web page containing an image.</summary>
-    /// <remarks>Note that this URL SHOULD specifically reference a profile photo of the End-User suitable for displaying when describing the End-User, rather than an arbitrary photo taken by the End-User.</remarks>
-    public const string Picture = "picture";
-
-    /// <summary>URL of the End-User's Web page or blog. This Web page SHOULD contain information published by the End-User or an organization that the End-User is affiliated with.</summary>
-    public const string WebSite = "website";
-
-    /// <summary>End-User's preferred e-mail address. Its value MUST conform to the RFC 5322 [RFC5322] addr-spec syntax. The relying party MUST NOT rely upon this value being unique</summary>
-    public const string Email = "email";
-
-    /// <summary>"true" if the End-User's e-mail address has been verified; otherwise "false".</summary>
-    ///  <remarks>When this Claim Value is "true", this means that the OP took affirmative steps to ensure that this e-mail address was controlled by the End-User at the time the verification was performed. The means by which an e-mail address is verified is context-specific, and dependent upon the trust framework or contractual agreements within which the parties are operating.</remarks>
-    public const string EmailVerified = "email_verified";
-
-    /// <summary>End-User's gender. Values defined by this specification are "female" and "male". Other values MAY be used when neither of the defined values are applicable.</summary>
-    public const string Gender = "gender";
-
-    /// <summary>End-User's birthday, represented as an ISO 8601:2004 [ISO8601‑2004] YYYY-MM-DD format. The year MAY be 0000, indicating that it is omitted. To represent only the year, YYYY format is allowed. Note that depending on the underlying platform's date related function, providing just year can result in varying month and day, so the implementers need to take this factor into account to correctly process the dates.</summary>
-    public const string BirthDate = "birthdate";
-
-    /// <summary>String from the time zone database (https://data.iana.org/time-zones/tz-link.html) representing the End-User's time zone. For example, Europe/Paris or America/Los_Angeles.</summary>
-    public const string ZoneInfo = "zoneinfo";
-
-    /// <summary>End-User's locale, represented as a BCP47 [RFC5646] language tag. This is typically an ISO 639-1 Alpha-2 [ISO639‑1] language code in lowercase and an ISO 3166-1 Alpha-2 [ISO3166‑1] country code in uppercase, separated by a dash. For example, en-US or fr-CA. As a compatibility note, some implementations have used an underscore as the separator rather than a dash, for example, en_US; Relying Parties MAY choose to accept this locale syntax as well.</summary>
-    public const string Locale = "locale";
-
-    /// <summary>End-User's preferred telephone number. E.164 (https://www.itu.int/rec/T-REC-E.164/e) is RECOMMENDED as the format of this Claim, for example, +1 (425) 555-1212 or +56 (2) 687 2400. If the phone number contains an extension, it is RECOMMENDED that the extension be represented using the RFC 3966 [RFC3966] extension syntax, for example, +1 (604) 555-1234;ext=5678.</summary>
-    public const string PhoneNumber = "phone_number";
-
-    /// <summary>True if the End-User's phone number has been verified; otherwise false. When this Claim Value is true, this means that the OP took affirmative steps to ensure that this phone number was controlled by the End-User at the time the verification was performed.</summary>
-    /// <remarks>The means by which a phone number is verified is context-specific, and dependent upon the trust framework or contractual agreements within which the parties are operating. When true, the phone_number Claim MUST be in E.164 format and any extensions MUST be represented in RFC 3966 format.</remarks>
-    public const string PhoneNumberVerified = "phone_number_verified";
-
-    /// <summary>End-User's preferred postal address. The value of the address member is a JSON structure containing some or all of the members defined in http://openid.net/specs/openid-connect-basic-1_0-32.html#AddressClaim </summary>
-    public const string Address = "address";
-
-    /// <summary>Time the End-User's information was last updated. Its value is a JSON number representing the number of seconds from 1970-01-01T0:0:0Z as measured in UTC until the date/time.</summary>
-    public const string UpdatedAt = "updated_at";
-
-    /// <summary>State hash value. Its value is the base64url encoding of the left-most half of the hash of the octets of the ASCII representation of the state value, where the hash algorithm used is the hash algorithm used in the alg Header Parameter of the ID Token's JOSE Header. For instance, if the alg is HS512, hash the code value with SHA-512, then take the left-most 256 bits and base64url encode them. The c_hash value is a case sensitive string.</summary>
-    public const string StateHash = "s_hash";
-
-    /// <summary>Defines a set of event statements that each may add additional claims to fully describe a single logical event that has occurred.</summary>
-    public const string Events = "events";
-
-    /// <summary>OAuth 2.0 Client Identifier valid at the Authorization Server.</summary>
-    public const string ClientId = "client_id";
-
-    /// <summary>The "act" (actor) claim provides a means within a JWT to express that delegation has occurred and identify the acting party to whom authority has been delegated.The "act" claim value is a JSON object and members in the JSON object are claims that identify the actor. The claims that make up the "act" claim identify and possibly provide additional information about the actor.</summary>
-    public const string Actor = "act";
-
-    /// <summary>The "may_act" claim makes a statement that one party is authorized to become the actor and act on behalf of another party. The claim value is a JSON object and members in the JSON object are claims that identify the party that is asserted as being eligible to act for the party identified by the JWT containing the claim.</summary>
-    public const string MayAct = "may_act";
-
-    /// <summary>
-    /// an identifier
-    /// </summary>
-    public const string Id = "id";
-
-    /// <summary>
-    /// The algorithm
-    /// </summary>
-    public const string Algorithm = "alg";
-
-    /// <summary>
-    /// JSON web key
-    /// </summary>
-    public const string JsonWebKey = "jwk";
-
-    /// <summary>
-    /// The token type
-    /// </summary>
-    public const string TokenType = "typ";
-
-    /// <summary>
-    /// DPoP HTTP method
-    /// </summary>
-    public const string DPoPHttpMethod = "htm";
-
-    /// <summary>
-    /// DPoP HTTP URL
-    /// </summary>
-    public const string DPoPHttpUrl = "htu";
-
-    /// <summary>
-    /// DPoP access token hash
-    /// </summary>
-    public const string DPoPAccessTokenHash = "ath";
-}
-
-[Redesign("Move all to Constants")]
-public static class ServerConstants
-{
-    public const string LocalIdentityProvider = "local";
-
-    public const string CookiePrefix = ".roid.";
-
-    // Cookies padrão do AspNetCore.
-    public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    public const string ExternalCookieAuthenticationScheme = $"{DefaultCookieAuthenticationScheme}.External";
-    public const string DefaultCookieName = $"{CookiePrefix}user";
-    public const string DefaultCheckSessionCookieName = $"{CookiePrefix}session";
-    public const string AccessTokenAudience = "{0}resources";
-
-    public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(1);
-
-    public const string JwtRequestClientKey = "roid.jwtrequesturi.client";
-
-    /// <summary>
-    /// Constants for local RoyalIdentity access token authentication.
-    /// </summary>
-    public static class LocalApi
-    {
-        /// <summary>
-        /// The authentication scheme when using the AddLocalApi helper.
-        /// </summary>
-        public const string AuthenticationScheme = "ServerAccessToken";
-
-        /// <summary>
-        /// The API scope name when using the AddLocalApiAuthentication helper.
-        /// </summary>
-        public const string ScopeName = "RoyalServerApi";
-
-        /// <summary>
-        /// The authorization policy name when using the AddLocalApiAuthentication helper.
-        /// </summary>
-        public const string PolicyName = AuthenticationScheme;
-    }
-
-    public static class ProtocolTypes
-    {
-        public const string OpenIdConnect = "oidc";
-        public const string WsFederation = "wsfed";
-        public const string Saml2p = "saml2p";
-    }
-
-    public static class TokenTypes
-    {
-        public const string IdentityToken = "id_token";
-        public const string AccessToken = "access_token";
-        public const string RefreshToken = "refresh_token";
-        public const string Code = "code";
-    }
-
-    public static class ClaimValueTypes
-    {
-        public const string Json = "json";
-    }
-
-    public static class ParsedSecretTypes
-    {
-        public const string NoSecret = "NoSecret";
-        public const string SharedSecret = "SharedSecret";
-        public const string X509Certificate = "X509Certificate";
-        public const string JwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-    }
-
-    public static class SecretTypes
-    {
-        public const string SharedSecret = "SharedSecret";
-        public const string X509CertificateThumbprint = "X509Thumbprint";
-        public const string X509CertificateName = "X509Name";
-        public const string X509CertificateBase64 = "X509CertificateBase64";
-        public const string JsonWebKey = "JWK";
-    }
-
-    [Redesign("Remover e usar outra abordagem se necessário, focada na função em vez do caller")]
-    public static class ProfileIsActiveCallers
-    {
-        public const string AuthorizeEndpoint = "AuthorizeEndpoint";
-        public const string IdentityTokenValidation = "IdentityTokenValidation";
-        public const string AccessTokenValidation = "AccessTokenValidation";
-        public const string ResourceOwnerValidation = "ResourceOwnerValidation";
-        public const string ExtensionGrantValidation = "ExtensionGrantValidation";
-        public const string RefreshTokenValidation = "RefreshTokenValidation";
-        public const string AuthorizationCodeValidation = "AuthorizationCodeValidation";
-        public const string UserInfoRequestValidation = "UserInfoRequestValidation";
-        public const string DeviceCodeValidation = "DeviceCodeValidation";
-    }
-
-    public static class StandardScopes
-    {
-        /// <summary>
-        /// REQUIRED. 
-        /// Informs the Authorization Server that the Client is making an OpenID Connect request. 
-        /// If the <c>openid</c> scope value is not present, the behavior is entirely unspecified.
-        /// </summary>
-        public const string OpenId = "openid";
-
-        /// <summary>
-        /// OPTIONAL. 
-        /// This scope value requests access to the End-User's default profile Claims, which are: 
-        /// <c>name</c>, <c>family_name</c>, <c>given_name</c>, <c>middle_name</c>, 
-        /// <c>nickname</c>, <c>preferred_username</c>, <c>profile</c>, <c>picture</c>, 
-        /// <c>website</c>, <c>gender</c>, <c>birthdate</c>, <c>zoneinfo</c>, <c>locale</c>, and <c>updated_at</c>.
-        /// </summary>
-        public const string Profile = "profile";
-
-        /// <summary>
-        /// OPTIONAL. This scope value requests access to the <c>email</c> and <c>email_verified</c> Claims.
-        /// </summary>
-        public const string Email = "email";
-
-        /// <summary>
-        /// OPTIONAL. This scope value requests access to the <c>address</c> Claim.
-        /// </summary>
-        public const string Address = "address";
-
-        /// <summary>
-        /// OPTIONAL. This scope value requests access to the <c>phone_number</c> and <c>phone_number_verified</c> Claims.
-        /// </summary>
-        public const string Phone = "phone";
-
-        /// <summary>
-        /// This scope value MUST NOT be used with the OpenID Connect Implicit Client Implementer's Guide 1.0.
-        /// See the OpenID Connect Basic Client Implementer's Guide 1.0
-        /// (http://openid.net/specs/openid-connect-implicit-1_0.html#OpenID.Basic) 
-        /// for its usage in that subset of OpenID Connect.
-        /// </summary>
-        public const string OfflineAccess = "offline_access";
-    }
-
-    public static class HttpClients
-    {
-        public const int DefaultTimeoutSeconds = 10;
-        public const string JwtRequestUriHttpClient = "RoyalIdentity:JwtRequestUriClient";
-        public const string BackChannelLogoutHttpClient = "RoyalIdentity:BackChannelLogoutClient";
-
-        public static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
-        {
-            return Policy
-                .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode) // Define a condição de erro
-                .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))); // Retry 3 vezes, com backoff exponencial
-        }
-
-        public static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
-        {
-            return Policy
-                .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)  // Define a condição de erro
-                .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));  // Após 5 falhas consecutivas, quebra por 30 segundos
-        }
-    }
-}

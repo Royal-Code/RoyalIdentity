@@ -1,7 +1,6 @@
 ﻿using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Options;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Models;
 
@@ -51,7 +50,7 @@ public class Client
     /// <value>
     /// The protocol type.
     /// </value>
-    public string ProtocolType { get; set; } = ServerConstants.ProtocolTypes.OpenIdConnect;
+    public string ProtocolType { get; set; } = Server.ProtocolTypes.OpenIdConnect;
 
     /// <summary>
     /// Specifies whether a proof key is required for authorization code based token requests (defaults to <c>true</c>).
@@ -78,7 +77,7 @@ public class Client
     /// <summary>
     /// Specifies the response types that the client is allowed to request. If empty, the client can't access any scope
     /// </summary>
-    public HashSet<string> AllowedResponseTypes { get; } = [ ResponseTypes.Code ];
+    public HashSet<string> AllowedResponseTypes { get; } = [ Oidc.ResponseTypes.Code ];
 
     /// <summary>
     /// Signing algorithm for identity token. If empty, will use the server default signing algorithm.

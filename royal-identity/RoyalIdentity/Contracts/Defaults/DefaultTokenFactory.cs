@@ -75,7 +75,7 @@ public class DefaultTokenFactory : ITokenFactory
             clock.GetUtcNow().UtcDateTime,
             request.Client.AccessTokenLifetime,
             jti,
-            TokenResponse.BearerTokenType)
+            Oidc.Token.Response.BearerTokenType)
         {
             AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
         };
@@ -170,7 +170,7 @@ public class DefaultTokenFactory : ITokenFactory
         // add s_hash claim
         if (request.StateHash.IsPresent())
         {
-            claims.Add(new Claim(JwtClaimTypes.StateHash, request.StateHash));
+            claims.Add(new Claim(Jwt.ClaimTypes.StateHash, request.StateHash));
         }
 
         // add sid

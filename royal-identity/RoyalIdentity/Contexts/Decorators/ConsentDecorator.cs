@@ -25,8 +25,8 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         context.ClientParameters.AssertHasClient();
 
         if (context.PromptModes.Count is not 0 &&
-            !context.PromptModes.Contains(OidcConstants.PromptModes.None) &&
-            !context.PromptModes.Contains(OidcConstants.PromptModes.Consent))
+            !context.PromptModes.Contains(Oidc.PromptModes.None) &&
+            !context.PromptModes.Contains(Oidc.PromptModes.Consent))
         {
             logger.LogError(context, "Invalid prompt mode", context.PromptModes.ToSpaceSeparatedString());
 
@@ -41,7 +41,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
             context.Scopes,
             ct);
 
-        if (consentRequired && context.PromptModes.Contains(OidcConstants.PromptModes.None))
+        if (consentRequired && context.PromptModes.Contains(Oidc.PromptModes.None))
         {
             logger.LogError(context, "Error: prompt=none requested, but consent is required.", context.PromptModes.ToSpaceSeparatedString());
 
@@ -50,7 +50,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
             return;
         }
 
-        if (context.PromptModes.Contains(OidcConstants.PromptModes.Consent) || consentRequired)
+        if (context.PromptModes.Contains(Oidc.PromptModes.Consent) || consentRequired)
         {
             logger.LogInformation("Showing consent: User has not yet consented");
 

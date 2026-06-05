@@ -42,7 +42,7 @@ public class EvaluateClient : IDecorator<IWithClient>
         }
 
         if (evaluatedClient.Client.RequireClientSecret && 
-            evaluatedClient.Credential.Type is ServerConstants.ParsedSecretTypes.NoSecret)
+            evaluatedClient.Credential.Type is Server.ParsedSecretTypes.NoSecret)
         {
             logger.LogError("Client secret not informed for client: {Name} ({Id})",
                 evaluatedClient.Client.Name,

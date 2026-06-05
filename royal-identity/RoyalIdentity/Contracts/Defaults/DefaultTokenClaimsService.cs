@@ -75,7 +75,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
 
         var outputClaims = new List<Claim>
         {
-            new(JwtClaimTypes.ClientId, client.Id)
+            new(Jwt.ClaimTypes.ClientId, client.Id)
         };
 
         // check for client claims

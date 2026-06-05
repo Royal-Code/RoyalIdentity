@@ -46,7 +46,7 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
 
         var accessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);
 
-        var atEvent = new AccessTokenIssuedEvent(context, new Token(TokenTypes.AccessToken, accessToken.Token));
+        var atEvent = new AccessTokenIssuedEvent(context, new Token(Oidc.Token.Types.AccessToken, accessToken.Token));
 
         logger.LogDebug("Access token issued");
 

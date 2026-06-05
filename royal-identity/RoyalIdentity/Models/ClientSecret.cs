@@ -45,7 +45,7 @@ public class ClientSecret
     /// <param name="expiration">The expiration.</param>
     public ClientSecret(string value, string? description = null, DateTime? expiration = null)
     {
-        Type = ServerConstants.SecretTypes.SharedSecret;
+        Type = Server.SecretTypes.SharedSecret;
         Description = description;
         Value = value;
         Expiration = expiration;

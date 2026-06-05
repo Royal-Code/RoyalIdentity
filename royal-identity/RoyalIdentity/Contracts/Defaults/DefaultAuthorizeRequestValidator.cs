@@ -37,7 +37,7 @@ public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
             {
                 Error = new ErrorDetails()
                 {
-                    Error = problems.Title ?? AuthorizeErrors.InvalidRequest,
+                    Error = problems.Title ?? Oidc.Authorize.Errors.InvalidRequest,
                     ErrorDescription = problems.Detail,
                     ErrorUri = problems.Instance
                 }

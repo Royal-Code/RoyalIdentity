@@ -1,10 +1,9 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Endpoints;
 
@@ -40,7 +39,7 @@ public class UserInfoEndpoint : IEndpointHandler
 
             return EndpointErrorResults.BadRequest(
                 httpContext,
-                ProtectedResourceErrors.InvalidToken,
+                Oidc.ProtectedResource.Errors.InvalidToken,
                 "Invalid HTTP request for user info endpoint, no access token found.");
         }
 

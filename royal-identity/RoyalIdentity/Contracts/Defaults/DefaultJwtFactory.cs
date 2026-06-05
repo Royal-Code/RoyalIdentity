@@ -57,7 +57,7 @@ public class DefaultJwtFactory : IJwtFactory
 
         var header = new JwtHeader(credential)
         {
-            [JwtClaimTypes.TokenType] = options.AccessTokenJwtType
+            [JwtRegisteredClaimNames.Typ] = options.AccessTokenJwtType
         };
 
         // emit x5t claim for backwards compatibility with v4 of MS JWT library
@@ -127,12 +127,12 @@ public class DefaultJwtFactory : IJwtFactory
         }
 
         var scopeClaims = token.Claims.Where(x => x.Type == Jwt.ClaimTypes.Scope).ToArray();
-        var jsonClaims = token.Claims.Where(x => x.ValueType == ServerConstants.ClaimValueTypes.Json).ToList();
+        var jsonClaims = token.Claims.Where(x => x.ValueType == Server.ClaimValueTypes.Json).ToList();
 
         // add confirmation claim if present (it's JSON valued)
         if (token.Confirmation.IsPresent())
         {
-            jsonClaims.Add(new Claim(Jwt.ClaimTypes.Confirmation, token.Confirmation, ServerConstants.ClaimValueTypes.Json));
+            jsonClaims.Add(new Claim(Jwt.ClaimTypes.Confirmation, token.Confirmation, Server.ClaimValueTypes.Json));
         }
 
         var normalClaims = token.Claims

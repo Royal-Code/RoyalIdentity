@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
@@ -204,18 +204,18 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <param name="logger">The logger.</param>
     public virtual void Load(NameValueCollection raw, ILogger logger)
     {
-        Scope = raw.Get(AuthorizeRequest.Scope);
+        Scope = raw.Get(Oidc.Authorize.Request.Scope);
         Scopes.Scopes.AddRange(Scope.FromSpaceSeparatedString());
 
-        var responseType = raw.Get(AuthorizeRequest.ResponseType);
+        var responseType = raw.Get(Oidc.Authorize.Request.ResponseType);
         ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
-        ClientId = raw.Get(AuthorizeRequest.ClientId);
-        RedirectUri = raw.Get(AuthorizeRequest.RedirectUri);
-        State = raw.Get(AuthorizeRequest.State);
-        ResponseMode = raw.Get(AuthorizeRequest.ResponseMode);
-        Nonce = raw.Get(AuthorizeRequest.Nonce);
+        ClientId = raw.Get(Oidc.Authorize.Request.ClientId);
+        RedirectUri = raw.Get(Oidc.Authorize.Request.RedirectUri);
+        State = raw.Get(Oidc.Authorize.Request.State);
+        ResponseMode = raw.Get(Oidc.Authorize.Request.ResponseMode);
+        Nonce = raw.Get(Oidc.Authorize.Request.Nonce);
 
-        var display = raw.Get(AuthorizeRequest.Display);
+        var display = raw.Get(Oidc.Authorize.Request.Display);
         if (display.IsPresent())
         {
             if (Options.Discovery.DisplayModeIsSupported(display))
@@ -228,7 +228,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
             }
         }
 
-        var prompt = raw.Get(AuthorizeRequest.Prompt);
+        var prompt = raw.Get(Oidc.Authorize.Request.Prompt);
         if (prompt.IsPresent())
         {
             var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -245,7 +245,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
             }
         }
 
-        var maxAge = raw.Get(AuthorizeRequest.MaxAge);
+        var maxAge = raw.Get(Oidc.Authorize.Request.MaxAge);
         if (maxAge.IsPresent())
         {
             if (int.TryParse(maxAge, out var seconds) && seconds >= 0)
@@ -258,15 +258,15 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
             }
         }
 
-        UiLocales = raw.Get(AuthorizeRequest.UiLocales);
-        IdTokenHint = raw.Get(AuthorizeRequest.IdTokenHint);
-        LoginHint = raw.Get(AuthorizeRequest.LoginHint);
+        UiLocales = raw.Get(Oidc.Authorize.Request.UiLocales);
+        IdTokenHint = raw.Get(Oidc.Authorize.Request.IdTokenHint);
+        LoginHint = raw.Get(Oidc.Authorize.Request.LoginHint);
 
-        var acrValues = raw.Get(AuthorizeRequest.AcrValues);
+        var acrValues = raw.Get(Oidc.Authorize.Request.AcrValues);
         AcrValues.AddRange(acrValues.FromSpaceSeparatedString());
 
-        CodeChallenge = raw.Get(AuthorizeRequest.CodeChallenge);
-        CodeChallengeMethod = raw.Get(AuthorizeRequest.CodeChallengeMethod);
+        CodeChallenge = raw.Get(Oidc.Authorize.Request.CodeChallenge);
+        CodeChallengeMethod = raw.Get(Oidc.Authorize.Request.CodeChallengeMethod);
     }
 
     [MemberNotNull(nameof(RedirectUri))]

@@ -9,6 +9,7 @@ using RoyalIdentity.Utils;
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using static RoyalIdentity.Options.Constants;
 
 namespace RoyalIdentity.Storage.InMemory;
 
@@ -38,9 +39,9 @@ public class RealmMemoryStore
 
     public ConcurrentDictionary<string, IdentityScope> IdentityResources { get; } = new()
     {
-        [ServerConstants.StandardScopes.OpenId] = new IdentityScope(
+        [Server.StandardScopes.OpenId] = new IdentityScope(
             ScopeVisibility.Public,
-            ServerConstants.StandardScopes.OpenId,
+            Server.StandardScopes.OpenId,
             "Your user identifier",
             "Your user identifier",
             [JwtRegisteredClaimNames.Sub])
@@ -49,65 +50,65 @@ public class RealmMemoryStore
             Emphasize = false,
             ShowInDiscoveryDocument = true,
         },
-        [ServerConstants.StandardScopes.Profile] = new IdentityScope(
+        [Server.StandardScopes.Profile] = new IdentityScope(
             ScopeVisibility.Public,
-            ServerConstants.StandardScopes.Profile,
+            Server.StandardScopes.Profile,
             "Your profile data",
             "Your profile data, which are: name, family_name, given_name, middle_name, nickname, preferred_username, profile, picture, website, gender, birthdate, zoneinfo, locale, and updated_at.0",
             [
-                JwtClaimTypes.Name,
-                JwtClaimTypes.FamilyName,
-                JwtClaimTypes.GivenName,
-                JwtClaimTypes.MiddleName,
-                JwtClaimTypes.NickName,
-                JwtClaimTypes.PreferredUserName,
-                JwtClaimTypes.Profile,
-                JwtClaimTypes.Picture,
-                JwtClaimTypes.WebSite,
-                JwtClaimTypes.Gender,
-                JwtClaimTypes.BirthDate,
-                JwtClaimTypes.ZoneInfo,
-                JwtClaimTypes.Locale,
-                JwtClaimTypes.UpdatedAt
+                JwtRegisteredClaimNames.Name,
+                JwtRegisteredClaimNames.FamilyName,
+                JwtRegisteredClaimNames.GivenName,
+                Jwt.ClaimTypes.MiddleName,
+                Jwt.ClaimTypes.NickName,
+                Jwt.ClaimTypes.PreferredUserName,
+                Jwt.ClaimTypes.Profile,
+                Jwt.ClaimTypes.Picture,
+                JwtRegisteredClaimNames.Website,
+                Jwt.ClaimTypes.Gender,
+                JwtRegisteredClaimNames.Birthdate,
+                Jwt.ClaimTypes.ZoneInfo,
+                Jwt.ClaimTypes.Locale,
+                Jwt.ClaimTypes.UpdatedAt
             ])
         {
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
         },
-        [ServerConstants.StandardScopes.Email] = new IdentityScope(
+        [Server.StandardScopes.Email] = new IdentityScope(
             ScopeVisibility.Public,
-            ServerConstants.StandardScopes.Email,
+            Server.StandardScopes.Email,
             "Your email address",
             "Your email address",
             [
-                JwtClaimTypes.Email,
-                JwtClaimTypes.EmailVerified
+                JwtRegisteredClaimNames.Email,
+                Jwt.ClaimTypes.EmailVerified
             ])
         {
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true,
         },
-        [ServerConstants.StandardScopes.Address] = new IdentityScope(
+        [Server.StandardScopes.Address] = new IdentityScope(
             ScopeVisibility.Public,
-            ServerConstants.StandardScopes.Address, 
+            Server.StandardScopes.Address, 
             "Your address",
             "Your address",
-            [JwtClaimTypes.Address])
+            [Jwt.ClaimTypes.Address])
         {
             Required = false,
             Emphasize = false,
             ShowInDiscoveryDocument = true
         },
-        [ServerConstants.StandardScopes.Phone] = new IdentityScope(
+        [Server.StandardScopes.Phone] = new IdentityScope(
             ScopeVisibility.Public,
-            ServerConstants.StandardScopes.Phone,
+            Server.StandardScopes.Phone,
             "Your phone number",
             "Your phone number",
             [
-                JwtClaimTypes.PhoneNumber,
-                JwtClaimTypes.PhoneNumberVerified
+                Jwt.ClaimTypes.PhoneNumber,
+                Jwt.ClaimTypes.PhoneNumberVerified
             ])
         {
             Required = false,

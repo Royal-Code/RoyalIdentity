@@ -70,7 +70,7 @@ internal static class ClaimsExtensions
             return boolValue;
         }
 
-        if (claim.ValueType == ServerConstants.ClaimValueTypes.Json)
+        if (claim.ValueType == Server.ClaimValueTypes.Json)
         {
             try
             {

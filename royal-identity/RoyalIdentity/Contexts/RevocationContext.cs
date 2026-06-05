@@ -1,4 +1,4 @@
-using System.Collections.Specialized;
+﻿using System.Collections.Specialized;
 using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
@@ -12,8 +12,8 @@ public class RevocationContext : EndpointContextBase, IWithClient
     public RevocationContext(HttpContext httpContext, NameValueCollection raw, ContextItems items)
         : base(httpContext, raw, items)
     {
-        Token = Raw.Get(OidcConstants.RevocationRequest.Token);
-        TokenTypeHint = Raw.Get(OidcConstants.RevocationRequest.TokenTypeHint);
+        Token = Raw.Get(Oidc.Revocation.Request.Token);
+        TokenTypeHint = Raw.Get(Oidc.Revocation.Request.TokenTypeHint);
     }
 
     public string? Token { get; }

@@ -35,7 +35,7 @@ public class DefaultClientSecretChecker : IClientSecretChecker
 
             evaluation = evaluatedClient;
 
-            if (evaluatedClient.Credential.Type is not ServerConstants.ParsedSecretTypes.NoSecret)
+            if (evaluatedClient.Credential.Type is not Server.ParsedSecretTypes.NoSecret)
                 break;
         }
 

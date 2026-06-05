@@ -9,7 +9,6 @@ using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Handlers;
 

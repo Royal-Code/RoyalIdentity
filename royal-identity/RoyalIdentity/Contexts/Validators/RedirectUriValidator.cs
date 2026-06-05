@@ -47,10 +47,10 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         //////////////////////////////////////////////////////////
         // check if client protocol type is oidc
         //////////////////////////////////////////////////////////
-        if (client.ProtocolType is not ServerConstants.ProtocolTypes.OpenIdConnect)
+        if (client.ProtocolType is not Server.ProtocolTypes.OpenIdConnect)
         {
             logger.LogError(context, "Invalid protocol type for OIDC authorize endpoint", client.ProtocolType);
-            context.InvalidRequest(OidcConstants.AuthorizeErrors.UnauthorizedClient, "Invalid protocol");
+            context.InvalidRequest(Oidc.Authorize.Errors.UnauthorizedClient, "Invalid protocol");
 
             return;
         }
@@ -61,7 +61,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         if (!await uriValidator.IsRedirectUriValidAsync(context.RedirectUri, client))
         {
             logger.LogError(context, "Invalid redirect_uri", context.RedirectUri);
-            context.InvalidRequest(OidcConstants.AuthorizeErrors.InvalidRequest, "Invalid redirect_uri");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidRequest, "Invalid redirect_uri");
 
             return;
         }

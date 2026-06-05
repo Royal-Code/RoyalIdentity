@@ -6,7 +6,6 @@ using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Events;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Handlers;
 
@@ -45,20 +44,20 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
         AccessTokenIssuedEvent? atEvent = null;
         IdentityTokenIssuedEvent? idEvent = null;
 
-        if (context.ResponseTypes.Contains(ResponseTypes.Code))
+        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.Code))
         {
             var code = await codeFactory.CreateCodeAsync(context, ct);
             codeValue = code.Code;
             sessionState = code.SessionState;
 
-            var token = new Token(TokenTypes.Code, codeValue);
+            var token = new Token(Oidc.Token.Types.Code, codeValue);
             context.Items.AddToken(token);
             codeEvent = new CodeIssuedEvent(context, token);
 
             logger.LogDebug("Code generated");
         }
 
-        if (context.ResponseTypes.Contains(ResponseTypes.Token))
+        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.Token))
         {
             var request = new AccessTokenRequest()
             {
@@ -72,7 +71,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             var accessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);
             accessTokenValue = accessToken.Token;
 
-            var token = new Token(TokenTypes.AccessToken, accessTokenValue);
+            var token = new Token(Oidc.Token.Types.AccessToken, accessTokenValue);
             context.Items.AddToken(token);
 
             atEvent = new AccessTokenIssuedEvent(context, token);
@@ -80,7 +79,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             logger.LogDebug("Access Token generated");
         }
 
-        if (context.ResponseTypes.Contains(ResponseTypes.IdToken))
+        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.IdToken))
         {
             var tokenRequest = new IdentityTokenRequest
             {
@@ -97,7 +96,7 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             var idToken = await tokenFactory.CreateIdentityTokenAsync(tokenRequest, ct);
             identityTokenValue = idToken.Token;
 
-            var token = new Token(TokenTypes.IdentityToken, identityTokenValue);
+            var token = new Token(Oidc.Token.Types.IdentityToken, identityTokenValue);
             context.Items.AddToken(token);
 
             idEvent = new IdentityTokenIssuedEvent(context, token);

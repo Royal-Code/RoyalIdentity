@@ -26,15 +26,15 @@ public class NoSecretEvaluator : SecretEvaluatorBase
         logger.LogDebug("Start parsing and evaluate No secret");
 
         // when there is a secret, assertion, or authorization header, the client will not be evaluated
-        if (context.Raw.TryGet(OidcConstants.TokenRequest.ClientAssertion, out _) ||
-            context.Raw.TryGet(OidcConstants.TokenRequest.ClientSecret, out _) ||
+        if (context.Raw.TryGet(Oidc.Token.Request.ClientAssertion, out _) ||
+            context.Raw.TryGet(Oidc.Token.Request.ClientSecret, out _) ||
             context.HttpContext.Request.Headers.Authorization.FirstOrDefault().IsPresent())
         {
             logger.LogDebug("Client assertion, or secret, or authorization header found in post body, aborting client evaluation");
             return null;
         }
 
-        var hasClientId = context.Raw.TryGet(OidcConstants.TokenRequest.ClientId, out var clientId);
+        var hasClientId = context.Raw.TryGet(Oidc.Token.Request.ClientId, out var clientId);
         if (!hasClientId)
         {
             logger.LogDebug("Client id not found in post body");
@@ -62,7 +62,7 @@ public class NoSecretEvaluator : SecretEvaluatorBase
             return null;
         }
 
-        return new EvaluatedClient(client, new EvaluatedCredential(ServerConstants.ParsedSecretTypes.NoSecret, true), string.Empty);
+        return new EvaluatedClient(client, new EvaluatedCredential(Server.ParsedSecretTypes.NoSecret, true), string.Empty);
     }
 
 }

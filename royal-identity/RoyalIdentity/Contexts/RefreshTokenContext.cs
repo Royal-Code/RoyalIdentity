@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts.Parameters;
@@ -6,7 +6,6 @@ using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Pipelines.Abstractions;
 using System.Collections.Specialized;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts;
 
@@ -36,8 +35,8 @@ public class RefreshTokenContext : TokenEndpointContextBase, IWithRefreshToken
 
     public override void Load(ILogger logger)
     {
-        ClientId = Raw.Get(TokenRequest.ClientId);
-        Scope = Raw.Get(TokenRequest.Scope);
-        Token = Raw.Get(TokenRequest.RefreshToken);
+        ClientId = Raw.Get(Oidc.Token.Request.ClientId);
+        Scope = Raw.Get(Oidc.Token.Request.Scope);
+        Token = Raw.Get(Oidc.Token.Request.RefreshToken);
     }
 }

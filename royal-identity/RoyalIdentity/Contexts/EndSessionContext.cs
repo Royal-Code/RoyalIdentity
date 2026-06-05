@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
@@ -9,7 +9,6 @@ using RoyalIdentity.Models;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts;
 
@@ -23,22 +22,22 @@ public class EndSessionContext : EndpointContextBase, IWithClient
     {
         Principal = principal;
 
-        raw.TryGet(EndSessionRequest.IdTokenHint, out var idTokenHint);
+        raw.TryGet(Oidc.EndSession.Request.IdTokenHint, out var idTokenHint);
         IdTokenHint = idTokenHint;
 
-        raw.TryGet(EndSessionRequest.LogoutHint, out var logoutHint);
+        raw.TryGet(Oidc.EndSession.Request.LogoutHint, out var logoutHint);
         LogoutHint = logoutHint;
 
-        raw.TryGet(EndSessionRequest.ClientId, out var clientId);
+        raw.TryGet(Oidc.EndSession.Request.ClientId, out var clientId);
         ClientId = clientId;
 
-        raw.TryGet(EndSessionRequest.PostLogoutRedirectUri, out var postLogoutRedirectUri);
+        raw.TryGet(Oidc.EndSession.Request.PostLogoutRedirectUri, out var postLogoutRedirectUri);
         PostLogoutRedirectUri = postLogoutRedirectUri;
 
-        raw.TryGet(EndSessionRequest.State, out var state);
+        raw.TryGet(Oidc.EndSession.Request.State, out var state);
         State = state;
 
-        raw.TryGet(EndSessionRequest.UiLocales, out  var uiLocales);
+        raw.TryGet(Oidc.EndSession.Request.UiLocales, out  var uiLocales);
         UiLocales = uiLocales;
     }
 

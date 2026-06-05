@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
@@ -59,7 +59,7 @@ public sealed class DefaultIdentityUser : IdentityUser
         }
 
         // start a new session
-        var session = await sessionStore.StartSessionAsync(this, AuthenticationMethods.Password, ct);
+        var session = await sessionStore.StartSessionAsync(this, Oidc.AuthMethods.Password, ct);
 
         return session;
     }
@@ -96,10 +96,10 @@ public sealed class DefaultIdentityUser : IdentityUser
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, details.Username),
-            new(JwtClaimTypes.Name, details.DisplayName),
+            new(JwtRegisteredClaimNames.Name, details.DisplayName),
             new(JwtRegisteredClaimNames.AuthTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
             new(JwtRegisteredClaimNames.Sid, currentSession.Id),
-            new(Jwt.ClaimTypes.IdentityProvider, ServerConstants.LocalIdentityProvider),
+            new(Jwt.ClaimTypes.IdentityProvider, Server.LocalIdentityProvider),
             new(JwtRegisteredClaimNames.Amr, currentSession.Amr)
         };
 

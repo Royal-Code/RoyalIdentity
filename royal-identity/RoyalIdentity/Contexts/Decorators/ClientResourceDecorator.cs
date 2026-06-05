@@ -2,7 +2,6 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
-using static RoyalIdentity.Options.OidcConstants;
 
 namespace RoyalIdentity.Contexts.Decorators;
 
@@ -41,21 +40,21 @@ public class ClientResourceDecorator : IDecorator<ClientCredentialsContext>
             if (resourcesFromStore.MissingScopes.Count is not 0)
             {
                 logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", string.Join(" ", resourcesFromStore.MissingScopes));
-                context.InvalidRequest(TokenErrors.InvalidScope, "scopes requested are invalid or inactive");
+                context.InvalidRequest(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
                 return;
             }
 
             if (resourcesFromStore.IdentityResources.Count is not 0)
             {
                 logger.LogError(context, "Client cannot request OpenID scopes in client credentials flow");
-                context.InvalidRequest(TokenErrors.InvalidScope, "scopes requested are invalid or inactive");
+                context.InvalidRequest(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
                 return;
             }
 
             if (resourcesFromStore.OfflineAccess)
             {
                 logger.LogError(context, "Client cannot request a refresh token in client credentials flow");
-                context.InvalidRequest(TokenErrors.InvalidScope, "scopes requested are invalid or inactive");
+                context.InvalidRequest(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
             }
 
             resourcesFromStore.CopyTo(context.Scopes);

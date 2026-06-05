@@ -1,11 +1,10 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Pipelines.Abstractions;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using static RoyalIdentity.Options.OidcConstants;
 using RoyalIdentity.Contexts.Parameters;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
@@ -34,9 +33,9 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithAuthoriza
     public override void Load(ILogger logger)
     {
         LoadBase(logger);
-        RedirectUri = Raw.Get(TokenRequest.RedirectUri);
-        Code = Raw.Get(TokenRequest.Code);
-        CodeVerifier = Raw.Get(TokenRequest.CodeVerifier);
+        RedirectUri = Raw.Get(Oidc.Token.Request.RedirectUri);
+        Code = Raw.Get(Oidc.Token.Request.Code);
+        CodeVerifier = Raw.Get(Oidc.Token.Request.CodeVerifier);
     }
 
     public void RedirectUriValidated() => redirectUriValidated = true;

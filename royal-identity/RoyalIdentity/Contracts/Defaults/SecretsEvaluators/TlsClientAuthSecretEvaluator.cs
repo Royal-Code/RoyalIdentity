@@ -11,7 +11,7 @@ namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
 {
     private static readonly EvaluatedCredential X509InvalidCredentials =
-        new(ServerConstants.ParsedSecretTypes.X509Certificate, false);
+        new(Server.ParsedSecretTypes.X509Certificate, false);
 
     public TlsClientAuthSecretEvaluator(
         IStorage storage,
@@ -39,15 +39,15 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
         }
 
         // when there is a secret, assertion, or authorization header, the client will not be evaluated
-        if (context.Raw.TryGet(OidcConstants.TokenRequest.ClientAssertion, out _) ||
-            context.Raw.TryGet(OidcConstants.TokenRequest.ClientSecret, out _) ||
+        if (context.Raw.TryGet(Oidc.Token.Request.ClientAssertion, out _) ||
+            context.Raw.TryGet(Oidc.Token.Request.ClientSecret, out _) ||
             context.HttpContext.Request.Headers.Authorization.FirstOrDefault().IsPresent())
         {
             logger.LogDebug("Client assertion, or secret, or authorization header found in post body, aborting client evaluation");
             return null;
         }
 
-        var hasClientId = context.Raw.TryGet(OidcConstants.TokenRequest.ClientId, out var clientId);
+        var hasClientId = context.Raw.TryGet(Oidc.Token.Request.ClientId, out var clientId);
         if (!hasClientId)
         {
             logger.LogDebug("Client id not found in post body");
@@ -73,11 +73,11 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
         var name = clientCertificate.Subject;
         if (name.IsPresent())
         {
-            var result = client.ClientSecrets.Where(s => s.Type == ServerConstants.SecretTypes.X509CertificateName)
+            var result = client.ClientSecrets.Where(s => s.Type == Server.SecretTypes.X509CertificateName)
                 .Where(s => name.Equals(s.Value, StringComparison.Ordinal))
                 .Select(s => new EvaluatedClient(
                     client,
-                    new EvaluatedCredential(ServerConstants.ParsedSecretTypes.X509Certificate, true, s),
+                    new EvaluatedCredential(Server.ParsedSecretTypes.X509Certificate, true, s),
                     AuthenticationMethod))
                 .FirstOrDefault();
 
@@ -88,12 +88,12 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
         var thumbprint = clientCertificate.Thumbprint;
         if (thumbprint.IsPresent())
         {
-            var result = client.ClientSecrets.Where(s => s.Type == ServerConstants.SecretTypes.X509CertificateThumbprint)
+            var result = client.ClientSecrets.Where(s => s.Type == Server.SecretTypes.X509CertificateThumbprint)
                 .Where(s => thumbprint.Equals(s.Value, StringComparison.OrdinalIgnoreCase))
                 .Select(secret => new EvaluatedClient(
                     client,
                     new EvaluatedCredential(
-                        ServerConstants.ParsedSecretTypes.X509Certificate,
+                        Server.ParsedSecretTypes.X509Certificate,
                         true,
                         secret,
                         clientCertificate.CreateThumbprintCnf()),
