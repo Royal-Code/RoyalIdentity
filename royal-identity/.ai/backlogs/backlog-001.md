@@ -78,6 +78,7 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 **Deferral:** O básico (LogoUri, FaviconUri, PrimaryColor) é implementado no `plan-realm-hardening.md`. O avançado fica para depois.
 **Quando revisitar:** Quando houver demanda de white-labeling ou quando stakeholders priorizarem customização visual.
 **Nota de design:**
+- **Demo logo ausente:** O plano pedia `DemoRealm.Options.Branding.LogoUri = "/images/demo-logo.png"` em `MemoryStorage.cs`. O ativo `/images/demo-logo.png` não existe em `wwwroot` — optou-se por não adicionar uma URI apontando para arquivo inexistente, pois renderizaria `<img>` quebrada. Quando o ativo existir (upload ou asset estático incluído), basta adicionar a linha em `MemoryStorage.cs` estático e o layout já o renderiza corretamente.
 - **Upload de imagens:** logo e favicon via upload (armazenados por realm), não apenas URI externo. Requer endpoint de upload e storage de assets.
 - **CSS injetável:** campo `string? CustomCss` em `RealmBrandingOptions` — CSS injetado em `<style>` no layout, permitindo override de qualquer estilo. Sem sanitização obrigatória (é configuração de admin).
 - **Theming avançado (Keycloak-style):** motor de templates HTML/CSS com themes por realm — escopo alto, avaliar quando a base de usuários justificar.
@@ -89,3 +90,16 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 **Área:** Gestão de Realms
 **Deferral:** Modelo `Realm.ParentRealmId` com merge de options em runtime. Avaliado e rejeitado para o médio prazo: a complexidade de override/fallback em runtime e a definição de "o que propaga quando o template muda" não justifica o benefício para a maioria dos casos de uso. O modelo copy-on-create (descrito em Realm Templates) cobre 90% dos casos.
 **Quando revisitar:** Somente se houver demanda explícita de herança dinâmica (ex: dezenas de realms que precisam mudar em sincronia).
+
+---
+
+## Reference Token (AccessTokenType.Reference) no DefaultTokenFactory
+
+**Área:** Tokens / DefaultTokenFactory
+**Deferral:** `DefaultTokenFactory.CreateAccessTokenAsync` hardcoda `AccessTokenType.Jwt` (linha 71). Não há suporte a emissão de reference tokens (token opaco, armazenado no store com lookup por string opaca, não por JTI extraído do JWT). O modelo `AccessToken` já tem a propriedade `AccessTokenType`, e a infraestrutura de store já existe — falta apenas a lógica de derivação do tipo a partir de `Client.AccessTokenType` e a geração do token opaco no lugar do JWT assinado.
+**Quando revisitar:** Quando houver demanda de clientes que não podem validar JWTs localmente, ou quando a introspection endpoint for implementada (que é o mecanismo de validação natural de reference tokens).
+**Nota de design:**
+- Derivar tipo: `var tokenType = request.Client.AccessTokenType;` em vez do valor fixo `AccessTokenType.Jwt`.
+- Para `AccessTokenType.Reference`: gerar string opaca aleatória como `token.Token`, não assinar via `jwtFactory`. O token é armazenado no store e o `access_token` retornado ao cliente é a string opaca.
+- Introspection endpoint (`/{realm}/connect/introspect`) é o mecanismo de validação para resource servers que recebem reference tokens.
+- O teste `AccessTokenStoreIsolation_JtiFromRealmA_NotFoundInRealmB` testa isolamento do store por JTI; quando reference tokens forem implementados, adicionar teste específico com token opaco.

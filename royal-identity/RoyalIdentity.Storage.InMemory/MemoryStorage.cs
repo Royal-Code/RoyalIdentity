@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Storage.InMemory;
@@ -42,6 +41,11 @@ public partial class MemoryStorage
         false,
         new RealmOptions(serverOptions));
 
+    static MemoryStorage()
+    {
+        DemoRealm.Options.Branding.PrimaryColor = "#6366F1";
+    }
+
     public ServerOptions ServerOptions => serverOptions;
 
     public ConcurrentDictionary<string, Realm> Realms { get; } = new()
@@ -52,13 +56,5 @@ public partial class MemoryStorage
         ["demo_realm"] = DemoRealm
     };
 
-    public ConcurrentDictionary<string, AccessToken> AccessTokens { get; } = new();
-
-    public ConcurrentDictionary<string, AuthorizationCode> AuthorizationCodes { get; } = new();
-
     public ConcurrentDictionary<string, NameValueCollection> AuthorizeParameters { get; } = new();
-
-    public ConcurrentDictionary<string, Consent> Consents { get; } = new();
-
-    public ConcurrentDictionary<string, RefreshToken> RefreshTokens { get; } = new();
 }

@@ -45,12 +45,12 @@ public class Realm
     /// The realm domain.
     /// Example: "example.com"
     /// </summary>
-    public string Domain { get; set; }
+    public string Domain { get; init; }
 
     /// <summary>
     /// The realm Path. Used to identify the realm in the URL.
     /// </summary>
-    public string Path { get; set; }
+    public string Path { get; init; }
 
     /// <summary>
     /// The realm display name.

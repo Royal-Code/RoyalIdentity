@@ -64,6 +64,9 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IClientSecretEvaluator, TlsClientAuthSecretEvaluator>();
         services.AddTransient<IClientSecretEvaluator, NoSecretEvaluator>();
 
+        // Realm management
+        services.AddScoped<IRealmManager, RealmManager>();
+
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();
         services.AddScoped<ISignOutManager, DefaultSignOutManager>();

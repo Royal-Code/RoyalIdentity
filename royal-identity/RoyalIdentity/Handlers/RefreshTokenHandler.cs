@@ -43,6 +43,8 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         var client = context.ClientParameters.Client;
         var refreshToken = context.RefreshParameters.RefreshToken;
         var resourceStore = storage.GetResourceStore(context.Realm);
+        var accessTokenStore = storage.GetAccessTokenStore(context.Realm);
+        var refreshTokenStore = storage.GetRefreshTokenStore(context.Realm);
 
         logger.LogDebug("Processing refresh token request.");
 
@@ -54,7 +56,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         // Access Token
         /////////////////////////////////////
 
-        var accessToken = await storage.AccessTokens.GetAsync(refreshToken.AccessTokenId!, ct);
+        var accessToken = await accessTokenStore.GetAsync(refreshToken.AccessTokenId!, ct);
         if (accessToken is null)
         {
             logger.LogError("Access token not found: {AccessTokenId}", refreshToken.AccessTokenId);
@@ -97,7 +99,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
                 await jwtFactory.CreateTokenAsync(context.Realm, newAccessToken, ct);
             }
 
-            await storage.AccessTokens.StoreAsync(newAccessToken, ct);
+            await accessTokenStore.StoreAsync(newAccessToken, ct);
         }
 
         var subject = newAccessToken.CreatePrincipal();
@@ -109,7 +111,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         if (refreshToken.ConsumedTime is null)
         {
             refreshToken.ConsumedTime = clock.GetUtcNow().DateTime;
-            await storage.RefreshTokens.UpdateAsync(refreshToken, ct);
+            await refreshTokenStore.UpdateAsync(refreshToken, ct);
         }
 
         if (client.RefreshTokenExpiration == Models.TokenExpiration.Sliding
@@ -122,7 +124,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             newRefreshToken.Claims.RemoveWhere(c => c.Type == JwtRegisteredClaimNames.Jti);
             newRefreshToken.Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, accessToken.Id));
 
-            await storage.RefreshTokens.UpdateAsync(refreshToken, ct);
+            await refreshTokenStore.UpdateAsync(refreshToken, ct);
         }
         else
         {
@@ -133,7 +135,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
                 HttpContext = context.HttpContext,
                 Subject = subject,
                 Client = client,
-                AccessToken = accessToken
+                AccessToken = newAccessToken
             };
 
             newRefreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);

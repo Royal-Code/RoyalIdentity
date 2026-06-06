@@ -133,4 +133,9 @@ public class AuthorizationCode
     /// The properties
     /// </value>
     public IDictionary<string, string>? Properties { get; set; }
+
+    /// <summary>
+    /// The realm this authorization code belongs to.
+    /// </summary>
+    public string? RealmId { get; set; }
 }

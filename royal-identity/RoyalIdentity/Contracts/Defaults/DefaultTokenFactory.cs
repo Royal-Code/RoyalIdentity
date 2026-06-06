@@ -110,6 +110,8 @@ public class DefaultTokenFactory : ITokenFactory
             }
         }
 
+        token.RealmId = request.Client.Realm.Id;
+
         if (token.AccessTokenType == AccessTokenType.Jwt)
         {
             logger.LogDebug("Creating JWT access token");
@@ -117,7 +119,7 @@ public class DefaultTokenFactory : ITokenFactory
             await jwtFactory.CreateTokenAsync(request.Client.Realm, token, ct);
         }
 
-        await storage.AccessTokens.StoreAsync(token, ct);
+        await storage.GetAccessTokenStore(request.Client.Realm).StoreAsync(token, ct);
 
         return token;
     }
@@ -197,7 +199,8 @@ public class DefaultTokenFactory : ITokenFactory
             clock.GetUtcNow().UtcDateTime,
             client.IdentityTokenLifetime)
         {
-            AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
+            AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms(),
+            RealmId = request.Client.Realm.Id,
         };
 
         idToken.Claims.AddRange(claims);
@@ -252,7 +255,9 @@ public class DefaultTokenFactory : ITokenFactory
             lifetime, 
             tokenItSelf);
 
-        await storage.RefreshTokens.StoreAsync(refreshToken, ct);
+        refreshToken.RealmId = request.Client.Realm.Id;
+
+        await storage.GetRefreshTokenStore(request.Client.Realm).StoreAsync(refreshToken, ct);
 
         return refreshToken;
     }

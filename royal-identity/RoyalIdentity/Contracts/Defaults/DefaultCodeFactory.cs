@@ -50,9 +50,10 @@ public class DefaultCodeFactory : ICodeFactory
             CodeChallengeMethod = context.CodeChallengeMethod,
             Nonce = context.Nonce,
             StateHash = context.StateHash,
+            RealmId = context.Realm.Id,
         };
 
-        await storage.AuthorizationCodes.StoreAuthorizationCodeAsync(code, ct);
+        await storage.GetAuthorizationCodeStore(context.Realm).StoreAuthorizationCodeAsync(code, ct);
 
         var userSessionStore = storage.GetUserSessionStore(context.Realm);
         await userSessionStore.AddClientIdAsync(sid, context.ClientId!, ct);

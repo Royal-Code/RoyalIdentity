@@ -40,17 +40,21 @@ public partial class MemoryStorage : IStorage
 
     public RealmMemoryStore GetDemoRealmStore() => GetRealmMemoryStore(DemoRealm);
 
-    IRealmStore IStorage.Realms => new RealmStore(Realms);
-
-    IUserConsentStore IStorage.UserConsents => new UserConsentStore(Consents);
-
-    IAccessTokenStore IStorage.AccessTokens => new AccessTokenStore(AccessTokens);
-
-    IRefreshTokenStore IStorage.RefreshTokens => new RefreshTokenStore(RefreshTokens);
-
-    IAuthorizationCodeStore IStorage.AuthorizationCodes => new AuthorizationCodeStore(AuthorizationCodes);
+    IRealmStore IStorage.Realms => new RealmStore(Realms, realmMemoryStore);
 
     IAuthorizeParametersStore IStorage.AuthorizeParameters => new AuthorizeParametersStore(AuthorizeParameters);
+
+    public IAccessTokenStore GetAccessTokenStore(Realm realm)
+        => new AccessTokenStore(GetRealmMemoryStore(realm).AccessTokens);
+
+    public IRefreshTokenStore GetRefreshTokenStore(Realm realm)
+        => new RefreshTokenStore(GetRealmMemoryStore(realm).RefreshTokens);
+
+    public IAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm)
+        => new AuthorizationCodeStore(GetRealmMemoryStore(realm).AuthorizationCodes);
+
+    public IUserConsentStore GetUserConsentStore(Realm realm)
+        => new UserConsentStore(GetRealmMemoryStore(realm).UserConsents);
 
     public IClientStore GetClientStore(Realm realm)
     {

@@ -2,6 +2,9 @@
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using RoyalIdentity.Contracts;
+using RoyalIdentity.Events;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 
@@ -28,9 +31,17 @@ public class RealmDiscoveryMiddleware
             }
             else
             {
-                // if realm is not found, return 404
-                // TODO: generate a proper error response and a event
-                context.Response.StatusCode = 404;
+                var dispatcher = context.RequestServices.GetService<IEventDispatcher>();
+                if (dispatcher is not null)
+                    await dispatcher.DispatchAsync(new RealmNotFoundEvent(realm));
+
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = "realm_not_found",
+                    error_description = $"The realm '{realm}' was not found"
+                });
             }
 
             return;

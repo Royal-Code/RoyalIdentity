@@ -98,13 +98,13 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             identityToken, 
             code.Scopes.Scopes.ToSpaceSeparatedString());
 
-        await eventDispatcher.DispatchAsync(atEvent);
+        await eventDispatcher.DispatchAsync(atEvent, context.Realm);
 
         if (rtEvent is not null)
-            await eventDispatcher.DispatchAsync(rtEvent);
+            await eventDispatcher.DispatchAsync(rtEvent, context.Realm);
 
         if (idEvent is not null)
-            await eventDispatcher.DispatchAsync(idEvent);
+            await eventDispatcher.DispatchAsync(idEvent, context.Realm);
 
         logger.LogDebug("Handle authorize code context finished");
     }

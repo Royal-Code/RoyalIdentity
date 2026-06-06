@@ -60,6 +60,11 @@ public class RealmOptions
     public AccountOptions Account { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the visual branding options for this realm.
+    /// </summary>
+    public RealmBrandingOptions Branding { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the unique name of this server/realm instance, e.g. https://myissuer.com or https://myissuer.com/myrealm.
     /// If not set, the issuer name is inferred from the request
     /// </summary>

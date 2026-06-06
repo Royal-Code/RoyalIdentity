@@ -21,7 +21,7 @@ public abstract class IdentityUser
     /// The display name is the name that will be displayed to the user.
     /// In the OpenID Connect specification, it is called "name".
     /// </summary>
-    public abstract string DysplayName { get; }
+    public abstract string DisplayName { get; }
 
     /// <summary>
     /// Determines whether the user is active.

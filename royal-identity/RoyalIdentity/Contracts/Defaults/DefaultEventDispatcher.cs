@@ -1,5 +1,6 @@
 ﻿using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Events;
+using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -24,6 +25,12 @@ public class DefaultEventDispatcher : IEventDispatcher
         var dispatcher = (IEventDispatcher)sp.GetService(type)!;
         await dispatcher.DispatchAsync(evt);
     }
+
+    public ValueTask DispatchAsync(Event evt, Realm realm)
+    {
+        evt.RealmId = realm.Id;
+        return DispatchAsync(evt);
+    }
 }
 
 internal class DefaultEventDispatcher<TEvent>(IEnumerable<IEventObserver<TEvent>> observers) : IEventDispatcher
@@ -34,5 +41,11 @@ internal class DefaultEventDispatcher<TEvent>(IEnumerable<IEventObserver<TEvent>
         var e = (TEvent)evt;
         foreach (var observer in observers)
             await observer.HandleAsync(e);
+    }
+
+    public ValueTask DispatchAsync(Event evt, Realm realm)
+    {
+        evt.RealmId = realm.Id;
+        return DispatchAsync(evt);
     }
 }

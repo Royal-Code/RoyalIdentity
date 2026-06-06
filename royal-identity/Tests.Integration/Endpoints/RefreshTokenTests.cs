@@ -69,10 +69,25 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenDoNotHasRefreshTokenGrantTypeAllowed_ShouldReturnBadRequest()
     {
-        // Arrange
+        // Arrange — dedicated client: offline_access allowed, but "refresh_token" grant type is not
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var clientId = "no_refresh_grant_type_client";
+        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "No Refresh Grant Client",
+            RequireClientSecret = false,
+            AllowOfflineAccess = true,
+            AllowedScopes = { "openid", "profile" },
+            AllowedResponseTypes = { "code" },
+            AllowedGrantTypes = ["authorization_code"],
+            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
+        });
+
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
-        var tokens = await client.GetTokensAsync();
+        var tokens = await client.GetTokensAsync(clientId: clientId);
         var refreshToken = tokens.RefreshToken!;
 
         var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
@@ -84,7 +99,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
                 {
                     ["grant_type"] = "refresh_token",
                     ["refresh_token"] = refreshToken,
-                    ["client_id"] = "demo_client",
+                    ["client_id"] = clientId,
                 }));
 
         var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();

@@ -88,7 +88,8 @@ public class DefaultSignOutManager : ISignOutManager
 
             // raise the logout event
             await eventDispatcher.DispatchAsync(
-                new UserLogoutSuccessEvent(httpContext.User.GetSubjectId(), session?.Id));
+                new UserLogoutSuccessEvent(httpContext.User.GetSubjectId(), session?.Id),
+                realm);
 
             logger.LogDebug("User logout success");
         }

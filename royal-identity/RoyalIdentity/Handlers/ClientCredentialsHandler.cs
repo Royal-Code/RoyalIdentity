@@ -56,7 +56,7 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
             null,
             context.Scopes.Scopes.ToSpaceSeparatedString());
 
-        await eventDispatcher.DispatchAsync(atEvent);
+        await eventDispatcher.DispatchAsync(atEvent, context.Realm);
 
         logger.LogDebug("Handle client credentials context end");
     }

@@ -1,10 +1,10 @@
 # Plan: Realm Hardening & Configuration
 
-## Status: PENDING
+## Status: COMPLETED
 
 ## Progresso
 
-`░░░░░░░░░░` **0%** — 0 de 8 fases concluídas
+`██████████` **100%** — 8 de 8 fases concluídas
 
 ---
 
@@ -510,6 +510,8 @@ Itens prováveis de serem realm-level mas hoje não são:
 
 Na seção de "Active Design Debt" do arquivo `.ai/foundation/product.md`, adicionar os gaps encontrados como itens pendentes de design.
 
+> **Decisão posterior:** a auditoria foi inicialmente registrada em `product.md`, mas foi movida para um plano dedicado para manter a foundation mais estável e deixar a refatoração executável por fases. O conteúdo atual vive em `.ai/plans/plan-realm-options-redesign.md`, incluindo `ServerOptions` vs `RealmOptions`, CORS parcialmente iniciado e a proposta de `AllowedCorsOrigins`.
+
 ### 7.3 — Sem alterações de código obrigatórias
 
 Se forem encontrados campos pequenos que claramente deveriam ser por realm (sem impacto em pipeline), mover neste momento. Gaps maiores (federation, external IdPs) ficam documentados para o backlog.
@@ -519,9 +521,27 @@ Se forem encontrados campos pequenos que claramente deveriam ser por realm (sem 
 ## Fase 8: Testes de Isolamento de Realm
 
 **Projeto:** `Tests.Integration`
-**Arquivo sugerido:** `Tests.Integration/Realm/RealmIsolationTests.cs`
+**Arquivo:** `Tests.Integration/Realm/RealmIsolationTests.cs` (criado na Fase 2)
 
-Cada teste deve usar dois realms distintos (podem ser os `DemoRealm` e um segundo realm criado na fixture).
+Cada teste usa dois realms distintos — `DemoRealm` como realm A e um segundo realm criado na fixture.
+
+> `UnknownRealm_Returns404_WithJsonErrorBody` — **já implementado** na Fase 2.
+
+---
+
+### 8.0 — Infraestrutura: captura de eventos em testes
+
+Os testes da §8.7 requerem interceptação de eventos em tempo de teste.
+
+A implementação atual usa `Tests.Integration/Prepare/TestEventCapture.cs` com:
+
+- `TestEventCapture`, responsável por armazenar e limpar os eventos capturados.
+- `CapturingEventDispatcher`, decorator de `IEventDispatcher` que encaminha o evento ao dispatcher real e registra uma cópia observável pelo teste.
+- `EventCapturingAppFactory`, fixture que registra a infraestrutura de captura para os testes de evento.
+
+Essa decisão substitui a ideia inicial de `TestEventObserver`. A captura no nível de `IEventDispatcher` preserva o caminho real de dispatch da aplicação e evita adicionar uma abstração de observer apenas para testes.
+
+---
 
 ### 8.1 — Isolamento de clients
 
@@ -537,6 +557,8 @@ ClientIsolation_SameClientId_DifferentRealms_ReturnDifferentClients
 - Setup: realm A e realm B com client "shared-app" com `RedirectUris` distintas.
 - Act: lookup em cada store retorna o client do próprio realm.
 
+---
+
 ### 8.2 — Isolamento de sessão / cookie
 
 ```
@@ -546,14 +568,62 @@ SessionIsolation_LoginInRealmA_DoesNotAuthenticateRealmB
 - Act: completar login HTTP em realm A (obter cookie); fazer request autenticado para `/{realmB}/account/...` com esse cookie.
 - Assert: 401 ou redirect para login do realm B.
 
-### 8.3 — Isolamento de authorization code (requer Fase 3)
+---
+
+### 8.3 — Isolamento de token stores (requer Fase 3)
+
+```
+TokenStoreIsolation_AccessTokenStoredOnlyInIssuingRealm
+```
+- Act: emitir access token no realm A via fluxo `client_credentials`.
+- Assert: `storage.GetAccessTokenStore(realmA).GetAsync(jti, ct)` → encontra; `storage.GetAccessTokenStore(realmB).GetAsync(jti, ct)` → `null`.
+
+```
+RefreshTokenIsolation_TokenFromRealmA_NotAcceptedInRealmB
+```
+- Act: emitir refresh token no realm A; tentar `POST /{realmB}/connect/token` com esse token.
+- Assert: resposta de erro `invalid_grant` ou equivalente.
+
+```
+RefreshTokenRenewal_NewAccessToken_KeepsRealmId
+```
+- Act: emitir refresh token no realm A; usá-lo em `POST /{realmA}/connect/token`.
+- Assert: novo access token tem `RealmId == realmA.Id`.
+
+```
+RevocationIsolation_AccessTokenFromRealmA_NotRevokedFromRealmB
+```
+- Act: emitir access token no realm A; chamar `POST /{realmB}/connect/revocation` com o token.
+- Assert: endpoint retorna **200** (RFC 7009 — sempre 200, mesmo para token desconhecido); `storage.GetAccessTokenStore(realmA).GetAsync(jti, ct)` → token **ainda existe**.
+
+```
+RevocationIsolation_RefreshTokenFromRealmA_NotRevokedFromRealmB
+```
+- Idem, com refresh token.
+- Assert: 200; `storage.GetRefreshTokenStore(realmA).GetAsync(token, ct)` → token **ainda existe**.
 
 ```
 AuthCodeIsolation_CodeFromRealmA_NotRedeemableInRealmB
 ```
-- Setup: completar authorize flow em realm A → obter `code`.
-- Act: tentar `POST /{realmB}/connect/token` com esse code.
-- Assert: resposta de erro (invalid_grant ou equivalent).
+- Act: completar authorize flow em realm A → obter `code`; tentar `POST /{realmB}/connect/token`.
+- Assert: `invalid_grant` ou equivalente.
+
+```
+AuthCodeIsolation_Code_StoredOnlyInIssuingRealmStore
+```
+- Act: completar authorize flow em realm A → obter `code`.
+- Assert: `storage.GetAuthorizationCodeStore(realmA).GetAuthorizationCodeAsync(code, ct)` → encontra; `storage.GetAuthorizationCodeStore(realmB).GetAuthorizationCodeAsync(code, ct)` → `null`.
+
+```
+AccessTokenStoreIsolation_JtiFromRealmA_NotFoundInRealmB
+```
+- Setup: client configurado para `client_credentials`.
+- Act: emitir access token no realm A; extrair o `jti`; consultar o access token store do realm B.
+- Assert: `storage.GetAccessTokenStore(realmB).GetAsync(jti, ct)` retorna `null`.
+
+> **Decisão posterior:** `DefaultTokenFactory` ainda emite access tokens JWT. O teste de reference token real fica adiado até `AccessTokenType.Reference` ser suportado pelo factory. O backlog registra esse gap e a expectativa de adicionar o teste opaco específico quando a emissão existir.
+
+---
 
 ### 8.4 — Isolamento de consent (requer Fase 3)
 
@@ -561,23 +631,137 @@ AuthCodeIsolation_CodeFromRealmA_NotRedeemableInRealmB
 ConsentIsolation_ConsentInRealmA_NotVisibleInRealmB
 ```
 - Setup: gravar consent `{SubjectId="alice", ClientId="app", RealmId=realmA.Id}` via `storage.GetUserConsentStore(realmA)`.
-- Act: `await storage.GetUserConsentStore(realmB).GetUserConsentAsync("alice", "app", ct)` → `null`.
-
-### 8.5 — Error response para realm desconhecido (requer Fase 2)
+- Act: `storage.GetUserConsentStore(realmB).GetUserConsentAsync("alice", "app", ct)` → `null`.
 
 ```
-UnknownRealm_Returns404_WithJsonErrorBody
+DefaultConsentService_StoresConsent_WithRealmId
 ```
-- Act: `GET /nonexistent-realm/connect/authorize`.
-- Assert: 404, `Content-Type: application/json`, body com `"error": "realm_not_found"`.
+- Act: executar fluxo de consentimento no realm A via `DefaultConsentService`.
+- Assert: consent gravado tem `RealmId == realmA.Id`.
 
-### 8.6 — `RealmId` preenchido nos tokens (requer Fase 3)
+---
+
+### 8.5 — RealmId preenchido nos tokens criados (requer Fase 3)
 
 ```
 TokenCreation_AccessToken_HasCorrectRealmId
 ```
 - Act: completar fluxo de authorization code em realm A.
 - Assert: `accessToken.RealmId == realmA.Id`.
+
+```
+DefaultCodeFactory_CreatesCode_WithCorrectRealmId
+```
+- Act: chamar `DefaultCodeFactory.CreateCodeAsync` em contexto do realm A.
+- Assert: `code.RealmId == realmA.Id`.
+
+---
+
+### 8.6 — IRealmManager (requer Fase 4)
+
+```
+RealmManager_CreateAsync_CreatesRealmAndInitializesRealmStores
+```
+- Act: `await manager.CreateAsync("new-realm", "new.example.com", "New Realm", ct)`.
+- Assert: realm encontrável via `GetByPathAsync`; `GetClientStore`, `GetAccessTokenStore` etc. retornam stores funcionais sem exceção.
+
+```
+RealmManager_CreateAsync_DuplicatePath_ThrowsOrFails
+```
+- Act: criar dois realms com o mesmo path.
+- Assert: segunda chamada lança exceção ou retorna falha.
+
+```
+RealmManager_DisableAsync_InternalRealm_IsRejected
+```
+- Act: tentar desabilitar realm interno (e.g. `DemoRealm`).
+- Assert: operação rejeitada.
+
+```
+RealmManager_DeleteAsync_InternalRealm_ReturnsFalse
+```
+- Act: `await realmStore.DeleteAsync(DemoRealm.Id, ct)`.
+- Assert: retorna `false`; realm ainda existe no store.
+
+```
+RealmStore_DeleteAsync_RemovesRealmDataStore
+```
+- Setup: criar realm via `manager.CreateAsync`; gravar access token no novo realm.
+- Act: `await realmStore.DeleteAsync(newRealm.Id, ct)`.
+- Assert: realm não encontrado; store de dados removido (dados não acessíveis).
+
+```
+RealmManager_EnableAsync_EnablesDisabledRealm
+```
+- Setup: criar realm; `manager.DisableAsync`.
+- Act: `manager.EnableAsync`.
+- Assert: `realm.Enabled == true`.
+
+```
+RealmManager_UpdateAsync_UpdatesRealmOptions
+```
+- Act: criar realm; alterar `Branding.PrimaryColor`; `manager.UpdateAsync`.
+- Assert: lookup após update retorna `PrimaryColor` alterado.
+
+---
+
+### 8.7 — Eventos realm-scoped (requer Fase 5, requer §8.0)
+
+```
+EventDispatcher_DispatchAsyncWithRealm_SetsRealmId
+```
+- Act: resolver `IEventDispatcher`; chamar `DispatchAsync(evt, realmA)`.
+- Assert: `evt.RealmId == realmA.Id`.
+
+```
+EventDispatcher_DispatchAsyncWithoutRealm_KeepsRealmIdNull
+```
+- Act: chamar overload original `DispatchAsync(evt)`.
+- Assert: `evt.RealmId == null`.
+
+```
+ClientCredentialsFlow_EventsContainRealmId
+```
+- Setup: usar `EventCapturingAppFactory`; emitir token via fluxo `client_credentials` no realm A.
+- Assert: todos os eventos capturados têm `RealmId == realmA.Id`.
+
+```
+UnknownRealmEvent_HasNoRealmId
+```
+- Setup: usar `EventCapturingAppFactory`.
+- Act: `GET /nonexistent-realm/connect/authorize`.
+- Assert: `RealmNotFoundEvent` capturado tem `RealmId == null` (sem realm no contexto) e `Realm == "nonexistent-realm"` (campo próprio do evento).
+
+---
+
+### 8.8 — Branding por realm (requer Fase 6)
+
+```
+AccountLayout_WithRealmBranding_RendersRealmLogo
+```
+- Setup: realm A com `Branding.LogoUri = "/logo.png"`.
+- Act: `GET /{realmA}/account/login`.
+- Assert: HTML contém `<img src="/logo.png"`.
+
+```
+AccountLayout_WithRealmBranding_InjectsFaviconAndPrimaryColor
+```
+- Setup: realm A com `Branding.FaviconUri = "/fav.ico"` e `Branding.PrimaryColor = "#FF0000"`.
+- Act: `GET /{realmA}/account/login`.
+- Assert: HTML contém `<link rel="icon" href="/fav.ico">` e `--primary-color: #FF0000`.
+
+```
+AccountLayout_WithoutRealm_DoesNotThrow
+```
+- Act: acessar rota sem realm (raiz ou seleção de domínio).
+- Assert: resposta sem exceção.
+
+```
+AccountLayout_WithoutBranding_UsesDefaultLogo
+```
+- Setup: realm sem `Branding` configurado.
+- Act: `GET /{realmA}/account/login`.
+- Assert: HTML contém `src="icon.png"`.
 
 ---
 

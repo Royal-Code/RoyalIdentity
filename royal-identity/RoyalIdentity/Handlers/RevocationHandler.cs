@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Pipelines.Abstractions;
-using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
+using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Pipelines.Defaults;
 
 namespace RoyalIdentity.Handlers;
 
@@ -38,6 +38,8 @@ public class RevocationHandler : IHandler<RevocationContext>
     {
         logger.LogDebug("Handling revocation request");
 
+        var accessTokenStore = storage.GetAccessTokenStore(context.Realm);
+        var refreshTokenStore = storage.GetRefreshTokenStore(context.Realm);
         bool success = false;
 
         // revoke tokens
@@ -45,13 +47,13 @@ public class RevocationHandler : IHandler<RevocationContext>
         {
             logger.LogDebug("Hint was for access token");
 
-            success = await RevokeAccessTokenAsync(context.Token!, context.ClientId!, ct);
+            success = await RevokeAccessTokenAsync(accessTokenStore, context.Token!, context.ClientId!, ct);
         }
         else if (context.TokenTypeHint == Oidc.TokenTypeHints.RefreshToken)
         {
             logger.LogDebug("Hint was for refresh token");
 
-            success = await RevokeRefreshTokenAsync(context.Token!, context.ClientId!, ct);
+            success = await RevokeRefreshTokenAsync(refreshTokenStore, accessTokenStore, context.Token!, context.ClientId!, ct);
         }
         else if (context.TokenTypeHint.IsPresent())
         {
@@ -70,10 +72,10 @@ public class RevocationHandler : IHandler<RevocationContext>
         {
             logger.LogDebug("No hint for token type");
 
-            success = await RevokeAccessTokenAsync(context.Token!, context.ClientId!, ct);
+            success = await RevokeAccessTokenAsync(accessTokenStore, context.Token!, context.ClientId!, ct);
 
             if (!success)
-                success = await RevokeRefreshTokenAsync(context.Token!, context.ClientId!, ct);
+                success = await RevokeRefreshTokenAsync(refreshTokenStore, accessTokenStore, context.Token!, context.ClientId!, ct);
         }
 
         if (success)
@@ -96,9 +98,10 @@ public class RevocationHandler : IHandler<RevocationContext>
     /// <summary>
     /// Revoke access token only if it belongs to client doing the request.
     /// </summary>
-    private async Task<bool> RevokeAccessTokenAsync(string token, string clientId, CancellationToken ct)
+    private async Task<bool> RevokeAccessTokenAsync(
+        IAccessTokenStore accessTokenStore, string token, string clientId, CancellationToken ct)
     {
-        var accessToken = await storage.AccessTokens.GetAsync(token, ct);
+        var accessToken = await accessTokenStore.GetAsync(token, ct);
 
         if (accessToken is null)
             return false;
@@ -107,7 +110,7 @@ public class RevocationHandler : IHandler<RevocationContext>
         {
             logger.LogDebug("Access token revoked");
 
-            await storage.AccessTokens.RemoveAsync(token, ct);
+            await accessTokenStore.RemoveAsync(token, ct);
         }
         else
         {
@@ -123,9 +126,11 @@ public class RevocationHandler : IHandler<RevocationContext>
     /// <summary>
     /// Revoke refresh token only if it belongs to client doing the request
     /// </summary>
-    private async Task<bool> RevokeRefreshTokenAsync(string token, string clientId, CancellationToken ct)
+    private async Task<bool> RevokeRefreshTokenAsync(
+        IRefreshTokenStore refreshTokenStore, IAccessTokenStore accessTokenStore,
+        string token, string clientId, CancellationToken ct)
     {
-        var refreshToken = await storage.RefreshTokens.GetAsync(token, ct);
+        var refreshToken = await refreshTokenStore.GetAsync(token, ct);
 
         if (refreshToken == null)
             return false;
@@ -134,8 +139,8 @@ public class RevocationHandler : IHandler<RevocationContext>
         {
             logger.LogDebug("Refresh token revoked");
 
-            await storage.RefreshTokens.RemoveAsync(token, ct);
-            await storage.AccessTokens.RemoveReferenceTokensAsync(refreshToken.SubjectId!, refreshToken.ClientId, ct);
+            await refreshTokenStore.RemoveAsync(token, ct);
+            await accessTokenStore.RemoveReferenceTokensAsync(refreshToken.SubjectId!, refreshToken.ClientId, ct);
         }
         else
         {

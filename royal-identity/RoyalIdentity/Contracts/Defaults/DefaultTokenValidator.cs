@@ -87,7 +87,7 @@ public class DefaultTokenValidator : ITokenValidator
 
     public async Task<TokenEvaluationResult> ValidateReferenceAccessTokenAsync(Realm realm, string jti, CancellationToken ct = default)
     {
-        var token = await storage.AccessTokens.GetAsync(jti, ct);
+        var token = await storage.GetAccessTokenStore(realm).GetAsync(jti, ct);
 
         if (token is null)
         {

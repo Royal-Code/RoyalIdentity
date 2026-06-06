@@ -44,7 +44,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         }
 
         // load the authorization code.
-        var authorizationCode = await storage.AuthorizationCodes.GetAuthorizationCodeAsync(code, ct);
+        var authorizationCode = await storage.GetAuthorizationCodeStore(context.Realm).GetAuthorizationCodeAsync(code, ct);
 
         if (authorizationCode == null)
         {
@@ -68,7 +68,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         }
 
         // Removes the authorization code.
-        await storage.AuthorizationCodes.RemoveAuthorizationCodeAsync(code, ct);
+        await storage.GetAuthorizationCodeStore(context.Realm).RemoveAuthorizationCodeAsync(code, ct);
 
         if (authorizationCode.CreationTime.HasExceeded(authorizationCode.Lifetime, clock.GetUtcNow().DateTime))
         {

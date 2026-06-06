@@ -111,13 +111,13 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
         // events should only be dispatched after AuthorizeResponse has been created
 
         if (codeEvent is not null)
-            await eventDispatcher.DispatchAsync(codeEvent);
+            await eventDispatcher.DispatchAsync(codeEvent, context.Realm);
 
         if (atEvent is not null)
-            await eventDispatcher.DispatchAsync(atEvent);
+            await eventDispatcher.DispatchAsync(atEvent, context.Realm);
 
         if (idEvent is not null)
-            await eventDispatcher.DispatchAsync(idEvent);
+            await eventDispatcher.DispatchAsync(idEvent, context.Realm);
 
         logger.LogDebug("Handle authorize context finished");
     }

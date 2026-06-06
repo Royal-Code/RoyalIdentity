@@ -46,7 +46,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
             return;
         }
 
-        var refreshToken = await storage.RefreshTokens.GetAsync(token, ct);
+        var refreshToken = await storage.GetRefreshTokenStore(context.Realm).GetAsync(token, ct);
         if (refreshToken is null)
         {
             logger.LogWarning("Invalid refresh token");

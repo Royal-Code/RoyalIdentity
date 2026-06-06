@@ -1,9 +1,30 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
+@using RoyalIdentity.Models
+@using RoyalIdentity.Options
+@using RoyalIdentity.Extensions
+
+<HeadContent>
+    @if (Branding?.FaviconUri is { } fav)
+    {
+        <link rel="icon" href="@fav" />
+    }
+    @if (SafePrimaryColor is { } color)
+    {
+        <style>:root { --primary-color: @color; }</style>
+    }
+</HeadContent>
 
 <div class="account-page">
     <header class="brand-header">
-        <img src="icon.png" alt="Royal Identity" />
+        @if (Branding?.LogoUri is { } logo)
+        {
+            <img src="@logo" alt="@CurrentRealm?.DisplayName" class="realm-logo" />
+        }
+        else
+        {
+            <img src="icon.png" alt="Royal Identity" />
+        }
     </header>
     <main>
         @if (HttpContext is null)
@@ -23,6 +44,14 @@
 @code {
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
+
+    private Realm? CurrentRealm =>
+        HttpContext is not null && HttpContext.TryGetCurrentRealm(out var realm) ? realm : null;
+
+    private RealmBrandingOptions? Branding => CurrentRealm?.Options.Branding;
+
+    private string? SafePrimaryColor =>
+        Branding?.PrimaryColor is { Length: 4 or 7 } c && c[0] == '#' && c[1..].All(char.IsAsciiHexDigit) ? c : null;
 
     protected override void OnParametersSet()
     {

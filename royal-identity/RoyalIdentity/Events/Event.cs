@@ -107,6 +107,12 @@ public abstract class Event
     public string? RemoteIpAddress { get; set; }
 
     /// <summary>
+    /// Gets or sets the realm identifier associated with this event.
+    /// Null for server-level events raised outside a realm context.
+    /// </summary>
+    public string? RealmId { get; set; }
+
+    /// <summary>
     /// Obfuscates a token.
     /// </summary>
     /// <param name="value">The token.</param>

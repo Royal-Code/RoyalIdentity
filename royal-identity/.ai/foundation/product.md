@@ -33,7 +33,7 @@ A **Realm** is the top-level organizational boundary. All data and configuration
 - **Known internal realms**: ServerRealm, AccountRealm, AdminRealm
 - **Demo realm** provided in in-memory storage for development
 
-A middleware (`RealmDiscoveryMiddleware`) identifies the realm from the route before any authentication or pipeline processing. The `Realm` model carries `RealmOptions`, which inherits from `ServerOptions` — realm-level config overrides server defaults.
+A middleware (`RealmDiscoveryMiddleware`) identifies the realm from the route before any authentication or pipeline processing. The `Realm` model carries `RealmOptions`, which **composes** `ServerOptions` via a property (`RealmOptions.ServerOptions`) — realm-level options supplement server defaults but do not automatically override them. Promoting a setting to realm-level requires explicit work: adding the property to `RealmOptions` and updating every service that currently reads from `storage.ServerOptions` directly.
 
 **Implication**: Any feature that accesses data (clients, keys, users, scopes) MUST pass through realm-scoped storage. Cross-realm data access is architecturally forbidden.
 
@@ -176,5 +176,4 @@ From redesign-todo.md and `[Redesign]` attributes in code:
 
 1. **Scope/Resource model**: `Client.AllowedScopes` and `Client.AllowOfflineAccess` need replacement with an `AllowedResources` model following ResourceServer → Resource → Scope hierarchy
 2. **User/session unification**: Merge `IdentityUser`, `UserDetails`, `IUserStore`, `IUserDetailsStore`
-3. **UI service extraction**: Move logic from Razor components to dedicated UI services
-4. **Localization**: Add localization support for all UI text
+3. **Localization**: Add localization support for all UI text

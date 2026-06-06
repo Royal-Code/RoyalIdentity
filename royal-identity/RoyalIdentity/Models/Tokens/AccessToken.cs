@@ -57,6 +57,7 @@ public class AccessToken : TokenBase
             AllowedSigningAlgorithms = AllowedSigningAlgorithms,
             Confirmation = Confirmation,
             Audiences = Audiences,
+            RealmId = RealmId,
         };
 
         newToken.Claims.AddRange(Claims.Where(c => c.Type != "jti"));

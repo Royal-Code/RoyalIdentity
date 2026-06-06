@@ -2,6 +2,7 @@
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Scopes;
+using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
@@ -21,7 +22,19 @@ public class RealmMemoryStore
     {
         this.realm = realm;
         Clients = isServer ? ServerClients(realm) : DemoClients(realm);
+        InitializeResources();
+    }
 
+    /// <summary>Constructor for programmatically created realms — starts with no clients.</summary>
+    internal RealmMemoryStore(Realm realm)
+    {
+        this.realm = realm;
+        Clients = new ConcurrentDictionary<string, Client>();
+        InitializeResources();
+    }
+
+    private void InitializeResources()
+    {
         var apiResource = ResourceServers.First().Value.Resources.First();
         ApiResources[apiResource.Name] = apiResource;
         var apiscopes = apiResource.Scopes;
@@ -34,6 +47,14 @@ public class RealmMemoryStore
     public ConcurrentDictionary<string, Client> Clients { get; }
 
     public ConcurrentDictionary<string, KeyParameters> KeyParameters { get; } = new();
+
+    public ConcurrentDictionary<string, AccessToken> AccessTokens { get; } = new();
+
+    public ConcurrentDictionary<string, RefreshToken> RefreshTokens { get; } = new();
+
+    public ConcurrentDictionary<string, AuthorizationCode> AuthorizationCodes { get; } = new();
+
+    public ConcurrentDictionary<string, Consent> UserConsents { get; } = new();
 
     public ConcurrentDictionary<string, IdentitySession> UserSessions { get; } = new();
 
@@ -220,6 +241,7 @@ public class RealmMemoryStore
                 Name = "Demo Client",
                 RequireClientSecret = false,
                 AllowOfflineAccess = true,
+                AllowedGrantTypes = ["authorization_code", "refresh_token"],
                 AllowedScopes = { "openid", "profile", "email" },
                 AllowedResponseTypes = { "code" },
                 RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" }
@@ -231,6 +253,7 @@ public class RealmMemoryStore
                 Name = "Demo Consent Client",
                 RequireClientSecret = false,
                 AllowOfflineAccess = true,
+                AllowedGrantTypes = ["authorization_code", "refresh_token"],
                 AllowedScopes = { "openid", "profile", "email", "api", "api:read", "api:write" },
                 AllowedResponseTypes = { "code" },
                 RequireConsent = true,

@@ -30,11 +30,13 @@ public class Consent
     public IList<ConsentedScope>? Scopes { get; set; }
 
     /// <summary>
+    /// The realm this consent belongs to.
+    /// </summary>
+    public required string RealmId { get; set; }
+
+    /// <summary>
     /// Gets or sets the creation time.
     /// </summary>
-    /// <value>
-    /// The creation time.
-    /// </value>
     public required DateTime CreationTime { get; set; }
 
     /// <summary>

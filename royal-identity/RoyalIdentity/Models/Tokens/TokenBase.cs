@@ -85,6 +85,11 @@ public abstract class TokenBase
     public HashSet<string> Audiences { get; set; } = [];
 
     /// <summary>
+    /// The realm this token belongs to.
+    /// </summary>
+    public string? RealmId { get; set; }
+
+    /// <summary>
     /// Gets the subject identifier.
     /// </summary>
     /// <value>

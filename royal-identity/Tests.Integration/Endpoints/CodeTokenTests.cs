@@ -27,7 +27,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     {
         // Arrange
         var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.AuthorizationCodes;
+        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
         var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
@@ -74,7 +74,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     {
         // Arrange
         var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.AuthorizationCodes;
+        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
         var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
@@ -130,7 +130,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     {
         // Arrange
         var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.AuthorizationCodes;
+        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
         var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
@@ -176,7 +176,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     {
         // Arrange
         var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.AuthorizationCodes;
+        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
         var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
@@ -216,7 +216,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         // Arrange
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.AuthorizationCodes;
+        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
         var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var clientId = "code_grant_type_client_1";
@@ -283,7 +283,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         // Arrange
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.AuthorizationCodes;
+        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
         var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
 
         var clientId = "code_grant_type_client_2";

@@ -32,7 +32,7 @@ public sealed class DefaultIdentityUser : IdentityUser
 
     public override string UserName => details.Username;
 
-    public override string DysplayName => details.DisplayName;
+    public override string DisplayName => details.DisplayName;
 
     public override bool IsActive => details.IsActive;
 
