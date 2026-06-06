@@ -60,7 +60,9 @@ Itens de prioridade alta representam gaps bloqueantes para deployments multi-ten
 
 ### Impedimento Estrutural
 
-Varios servicos resolvem `storage.ServerOptions` uma vez no construtor, via DI, e ficam cegos para overrides por realm:
+Hoje o valor lido é sempre o `ServerOptions` global porque `RealmOptions.ServerOptions` aponta para a **mesma instância** em todos os realms (injetada via `storage.ServerOptions`). Migrar uma propriedade para `RealmOptions` não basta: é preciso mudar **cada consumidor** para resolver a opção efetiva pelo realm da request. E os consumidores usam **quatro padrões de resolução distintos** — o plano precisa tratar todos, não só o primeiro.
+
+**Padrão 1 — captura de `storage.ServerOptions` no construtor (via DI).** Estes serviços guardam o `ServerOptions` global num campo e ficam cegos para o realm:
 
 - `DefaultJwtFactory`
 - `DefaultTokenValidator`
@@ -72,7 +74,19 @@ Varios servicos resolvem `storage.ServerOptions` uma vez no construtor, via DI, 
 - `SecretEvaluatorBase`
 - `ConfigureRealmCookieAuthenticationOptions`
 
-Quando uma propriedade migrar para `RealmOptions`, esses servicos devem ler a opcao efetiva a partir do contexto da request, por exemplo `context.Options`, `context.ServerOptions` enquanto ainda for fallback global, ou um resolvedor explicito de opcoes efetivas.
+**Padrão 2 — resolução via `IServiceProvider` no momento do uso (singleton).** Não capturam no construtor, mas resolvem o `ServerOptions` global a cada execução:
+
+- `CheckSessionResult` — `httpContext.RequestServices.GetRequiredService<ServerOptions>()`, usa `.Csp` e `.Authentication.CheckSessionCookieName`.
+
+**Padrão 3 — resolução via `IOptions<ServerOptions>`.**
+
+- `ResponseToFormPostResult` — `GetRequiredService<IOptions<ServerOptions>>().Value.Csp`.
+
+**Padrão 4 — resolução via `ContextItems`.** O `ServerOptions` é colocado no `ContextItems` (ex.: `AuthorizeCallbackEndpoint` faz `ContextItems.From(realm.Options.ServerOptions)`) e lido depois:
+
+- `LoggerExtensions` — `context.Items.GetOrCreate<ServerOptions>()`, usa `.Logging.SensitiveValuesFilter` e `.Logging.UseLogService`.
+
+> **Consequência prática:** corrigir apenas o Padrão 1 **não** torna CSP nem Logging per-realm — seus consumidores reais estão nos Padrões 2, 3 e 4. CSP vive em response handlers que só têm `HttpContext` (sem `context.Options`), portanto a resolução por realm aqui precisa passar por `httpContext.GetCurrentRealm()`, não por `context.Options`. Cada fase que migra uma propriedade deve mapear o padrão de cada consumidor antes de implementar.
 
 ### CORS Parcialmente Iniciado
 
@@ -91,22 +105,39 @@ Decisao de design a validar antes de implementar:
 
 ---
 
+## Ordem de Execução e Dependências
+
+As fases não são todas independentes. A ordem obrigatória:
+
+1. **Fase 1 (decisão de modelo)** — pré-requisito de **todas** as demais. Define como cada consumidor resolve a opção efetiva; sem ela, as Fases 2-5 não têm padrão a seguir.
+2. **Fases 2, 3, 4 e 5** — independentes entre si; podem ser executadas em qualquer ordem (ou em paralelo), desde que a Fase 1 esteja concluída.
+3. **Fase 6 (testes de isolamento)** — depende de 2-5; cada teste exige a propriedade correspondente já migrada.
+
+Notas:
+
+- A **Fase 5 (CORS)** é a única majoritariamente nova: não depende de migração de opção existente, apenas da decisão de modelo para onde guardar `CorsOptions`.
+- Dentro da **Fase 3**, **CSP é o item mais caro** (consumido em response handlers que resolvem opções por caminhos distintos — ver "Impedimento Estrutural"), enquanto `DispatchEvents` e `InputLengthRestrictions` são baratos mas de prioridade Baixa. Recomendado: atacar CSP logo após a Fase 2 e tratar os itens Baixa como incremento opcional.
+
+---
+
 ## Fase 1: Auditoria Final e Decisao de Modelo
 
-1. Confirmar todos os usos atuais de `storage.ServerOptions`:
+> **Precedente já existente no código (ponto de partida da decisão):** `RealmOptions` **já** duplica `Discovery`, `Endpoints`, `MutualTls`, `Keys` e `UI` como instâncias próprias e independentes (`= new()`), enquanto `RealmOptions.ServerOptions` mantém apenas a referência global compartilhada. Ou seja, a **opção A já está em uso** para as opções promovidas até hoje. A decisão abaixo deve confirmar/estender esse precedente ou justificar romper com ele — não tratá-lo como página em branco.
+
+1. Confirmar todos os usos atuais de `ServerOptions`, cobrindo os quatro padrões de resolução (ver "Impedimento Estrutural"), não só a captura no construtor:
    ```powershell
-   rg "storage\.ServerOptions|ServerOptions" RoyalIdentity --type cs
+   rg "storage\.ServerOptions|GetRequiredService<ServerOptions>|IOptions<ServerOptions>|GetOrCreate<ServerOptions>" RoyalIdentity --type cs
    ```
-2. Classificar cada uso em uma destas categorias:
+2. Para cada uso, registrar **qual padrão** (1-4) ele usa, além de classificar em uma destas categorias:
    - global de servidor, nao deve variar por realm;
    - default global com override por realm;
    - realm-only, deve sair do fluxo global em requests com realm.
-3. Decidir o padrao de fallback:
+3. Decidir o padrao de fallback (recomendado: **opção A**, seguindo o precedente já existente):
    - opcao A: `RealmOptions` possui valores independentes e `ServerOptions` e usado apenas como template de criacao;
    - opcao B: `RealmOptions` possui overrides nullable e um resolvedor monta opcoes efetivas.
 4. Registrar a decisao no proprio plano antes de implementar as fases seguintes.
 
-Critério de aceite: cada propriedade da tabela deve ter destino definido e call sites mapeados.
+Critério de aceite: cada propriedade da tabela deve ter destino definido, **padrão de resolução de cada call site identificado**, e os call sites mapeados.
 
 ---
 
@@ -122,10 +153,13 @@ Arquivos prováveis:
 
 Passos:
 
-1. Promover ou resolver `AuthenticationOptions` por realm.
-2. Garantir que cookie lifetime, sliding expiration, SameSite e nome de cookie usem o realm correto.
-3. Revisar `AccessDeniedPath`: se for uma rota de UI por realm, deve vir de `RealmOptions.UI` ou de um resolvedor de UI efetiva.
-4. Adicionar testes com dois realms usando lifetimes/paths diferentes.
+1. Adicionar `AuthenticationOptions` a `RealmOptions`, seguindo a decisão da Fase 1.
+2. Promover ou resolver `AuthenticationOptions` por realm.
+3. Garantir que cookie lifetime, sliding expiration, SameSite e nome de cookie usem o realm correto.
+4. Revisar `AccessDeniedPath`: hoje vem de `ServerUIOptions` (`storage.ServerOptions.UI.AccessDeniedPath`), enquanto `LoginPath`/`LogoutPath` já vêm de `realm.Routes` e `LoginParameter` de `RealmUIOptions`. Decidir se `AccessDeniedPath` migra para `RealmUIOptions`/`realm.Routes`.
+5. Adicionar testes com dois realms usando lifetimes/paths diferentes.
+
+> **Nota de implementação:** em `ConfigureRealmCookieAuthenticationOptions`, o realm **já é resolvido** (`storage.Realms.GetByPath(realmPath)`), porém **depois** de o nome/SameSite/lifetime do cookie já terem sido atribuídos a partir do `ServerOptions` global. Para usar `AuthenticationOptions` por realm será preciso **reordenar**: resolver o realm primeiro e então derivar as opções de cookie de `realm.Options.Authentication`.
 
 Critério de aceite: `ConfigureRealmCookieAuthenticationOptions` nao deve depender de `storage.ServerOptions.Authentication` para decisoes que variam por realm.
 
@@ -133,21 +167,23 @@ Critério de aceite: `ConfigureRealmCookieAuthenticationOptions` nao deve depend
 
 ## Fase 3: CSP, Logging, Eventos e Limites
 
+> Antes de implementar, mapear o **padrão de resolução** (1-4) de cada consumidor abaixo — ver "Impedimento Estrutural". O grosso do trabalho desta fase está em consumidores fora do Padrão 1.
+
 Arquivos prováveis:
 
 - `RoyalIdentity/Options/RealmOptions.cs`
-- `RoyalIdentity/Options/CspOptions.cs`
-- `RoyalIdentity/Options/LoggingOptions.cs`
-- `RoyalIdentity/Options/InputLengthRestrictions.cs`
-- `RoyalIdentity/Contracts/Defaults/DefaultEventDispatcher.cs`
-- validators em `RoyalIdentity/Contexts/Validators/`
+- `RoyalIdentity/Options/CspOptions.cs`, `LoggingOptions.cs`, `InputLengthRestrictions.cs`
+- **CSP (consumidores reais):** `RoyalIdentity/Responses/HttpResults/CheckSessionResult.cs` (Padrão 2), `RoyalIdentity/Responses/HttpResults/ResponseToFormPostResult.cs` (Padrão 3)
+- **Logging (consumidor real):** `RoyalIdentity/Extensions/LoggerExtensions.cs` (Padrão 4 — lê de `ContextItems`)
+- **Eventos:** `RoyalIdentity/Contracts/Defaults/DefaultEventDispatcher.cs`
+- **InputLengthRestrictions (consumidores reais, além de validators):** `Endpoints/TokenEndpoint.cs`, `Contracts/Defaults/SecretsEvaluators/*`, decorators `LoadClient.cs`, `EvaluateBearerToken.cs`, `LoadCode.cs`, `LoadRefreshToken.cs`
 
 Passos:
 
-1. Resolver `CspOptions` por realm, considerando dominio, branding e assets externos.
-2. Avaliar `LoggingOptions` por realm sem quebrar o logging global da aplicacao.
-3. Avaliar `DispatchEvents` por realm no `DefaultEventDispatcher`.
-4. Avaliar `InputLengthRestrictions` nos validators que dependem de limites.
+1. **CSP** (prioridade Alta) — resolver `CspOptions` por realm. Os consumidores são response handlers sem `context.Options`; resolver via `httpContext.GetCurrentRealm()`. Atenção: `CheckSessionResult` lê tanto `.Csp` quanto `.Authentication` do mesmo `ServerOptions` global — alinhar com a Fase 2.
+2. **Logging** — `LoggerExtensions` lê `ServerOptions` do `ContextItems`. Para tornar per-realm: ou colocar o `LoggingOptions`/`RealmOptions` correto no `ContextItems` na criação do contexto, ou ler o realm diretamente. Não quebrar o logging de requests sem realm.
+3. **DispatchEvents** — o overload `DispatchAsync(evt, realm)` **já existe**, mas delega para `DispatchAsync(evt)`, que checa o **global** `options.DispatchEvents`. Mover a propriedade para `RealmOptions` exige **mover o check para o caminho realm-aware** (o overload sem realm permanece no fallback global).
+4. **InputLengthRestrictions** (prioridade Baixa) — consumido em ~14 sites (endpoints, secret evaluators, decorators e validators), não só em validators. Dado o custo/benefício, considerar **adiar** ou tratar como incremento isolado.
 5. Adicionar testes focados no comportamento observavel, nao apenas em propriedades.
 
 Critério de aceite: um realm deve conseguir ter CSP/event dispatch/input limits diferentes de outro sem recriar o servidor.
@@ -165,8 +201,8 @@ Arquivos prováveis:
 
 Passos:
 
-1. Resolver `AccessTokenJwtType` por realm no momento de criar JWT.
-2. Resolver `EmitScopesAsSpaceDelimitedStringInJwt` por realm no momento de serializar scopes.
+1. Resolver `AccessTokenJwtType` por realm no momento de criar JWT. **Facilitador:** `DefaultJwtFactory.CreateHeaderAsync(Realm realm, ...)` já recebe o realm exatamente onde `AccessTokenJwtType` é usado — basta ler `realm.Options...` em vez do campo `options` capturado.
+2. Resolver `EmitScopesAsSpaceDelimitedStringInJwt` por realm no momento de serializar scopes. **Atenção:** isso é usado em `CreatePayloadAsync`, que **não recebe** o realm hoje — será preciso propagar o `Realm` (ou o valor já resolvido) até esse método.
 3. Remover capturas de `storage.ServerOptions` onde o valor usado depende do realm da request.
 4. Criar testes com dois realms emitindo tokens com formatos diferentes.
 
