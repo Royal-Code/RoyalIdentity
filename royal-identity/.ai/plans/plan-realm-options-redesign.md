@@ -160,6 +160,7 @@ Decisão fechada:
   ```
   Assim `Id`/`Domain`/`Path`, `Routes`, `Enabled`, `Internal` (e o futuro `IsTemplate`) nascem frescos pelo ctor do `Realm`.
 - **`ServerOptions` continua compartilhado.** Nos dois construtores, `ServerOptions = ...ServerOptions` mantém a instância global (template/fallback). Só os sub-options são clonados; nunca clonar o `ServerOptions` por realm.
+- **Execução faseada:** cada fase implementa a cópia das opções que ela promove ou passa a depender. A Fase 2 cobre `Authentication`; Fase 3 cobre CSP/logging/eventos/limites; Fase 4 cobre formato de token; a Fase 6 fecha a suíte de cópia/propagação. Não antecipar copy-ctors amplos fora da fase certa.
 - **Sub-options:** um construtor de cópia por tipo, recebendo **o próprio tipo** (`new CspOptions(source.Csp)`), nunca o `ServerOptions` inteiro. **Cópia profunda onde houver coleção** — entre as promovidas, isso inclui pelo menos `LoggingOptions.SensitiveValuesFilter`, `DiscoveryOptions.CustomEntries`, os `HashSet<string>` de `DiscoveryOptions` e `KeyOptions.SigningCredentialsAlgorithms`; para o caminho realm-source, conferir também `RealmUIOptions`, `CacheOptions`, `AccountOptions`, `PasswordOptions` e `RealmBrandingOptions`.
 - **Mudança de comportamento a registrar:** hoje `Discovery`/`Endpoints`/`MutualTls`/`Keys` em `RealmOptions` são `= new()` (defaults de tipo, não herdam valores configurados do server). Ao copiar de `ServerOptions`, passam a herdar os configurados. Hoje é invisível (o host nunca configura `ServerOptions` — ver "Dívida de DI"), mas é uma escolha semântica intencional.
 - **Manutenção:** copy-ctor à mão derruba campo novo silenciosamente; por isso a Fase 6 inclui um teste de **propagação** (não só de não-compartilhamento).
@@ -237,14 +238,14 @@ Notas:
 
 **CheckSession:** nao mapear `CheckSessionEndpoint` neste plano. `CheckSessionResult` fica registrado como divida de codigo inalcançavel; so entra em migracao/teste se um plano futuro mapear o endpoint.
 
-**AccessDeniedPath:** promover para `RealmUIOptions` na Fase 2. `ServerUIOptions.AccessDeniedPath` permanece como fallback global para fluxos sem realm.
+**AccessDeniedPath:** promover para `RealmUIOptions` na Fase 2. O fallback correto é o path do próprio realm (`/{realm}/account/access-denied`); para o scheme default, o realm efetivo é o `ServerRealm` (`/server/account/access-denied`). `ServerUIOptions.AccessDeniedPath` não deve ser usado como fallback de cookie auth e fica como legado/pendência de remoção ou repropósito.
 
 #### Matriz de Destino por Propriedade
 
 | Propriedade | Destino | Categoria | Novo padrao de leitura |
 |---|---|---|---|
 | `AuthenticationOptions Authentication` | `RealmOptions.Authentication` | default global com override por realm | `realm.Options.Authentication`; fallback `storage.ServerOptions.Authentication` apenas sem realm |
-| `ServerUIOptions.AccessDeniedPath` | `RealmUIOptions.AccessDeniedPath` | default global com override por realm | `realm.Options.UI.AccessDeniedPath`; fallback `storage.ServerOptions.UI.AccessDeniedPath` apenas sem realm |
+| `ServerUIOptions.AccessDeniedPath` | `RealmUIOptions.AccessDeniedPath` | realm-owned | `realm.Routes.AccessDeniedPath`; scheme default usa o `ServerRealm`; sem fallback plano em `ServerUIOptions` para cookie auth |
 | `CspOptions Csp` | `RealmOptions.Csp` | default global com override por realm | `httpContext.GetCurrentRealm().Options.Csp` ou `context.Options.Csp` |
 | `LoggingOptions Logging` | `RealmOptions.Logging` | default global com override por realm | `context.Options.Logging` ou item explicito de logging do realm |
 | `bool DispatchEvents` | `RealmOptions.DispatchEvents` | default global com override por realm | `realm.Options.DispatchEvents` no overload realm-aware |
@@ -256,7 +257,7 @@ Notas:
 
 | Arquivo / tipo | Padrao atual | Propriedade(s) | Decisao para proximas fases |
 |---|---|---|---|
-| `ConfigureRealmCookieAuthenticationOptions` | P1, captura `storage.ServerOptions` | `Authentication`, `ServerUIOptions.AccessDeniedPath` | resolver realm antes de aplicar cookie; usar `realm.Options.Authentication` e `realm.Options.UI.AccessDeniedPath` |
+| `ConfigureRealmCookieAuthenticationOptions` | P1, captura `storage.ServerOptions` | `Authentication`, `ServerUIOptions.AccessDeniedPath` | resolver realm antes de aplicar cookie; usar `realm.Options.Authentication` para schemes de realm e `realm.Routes.AccessDeniedPath` para o redirect |
 | `ResponseToFormPostResult` | P3, `IOptions<ServerOptions>` | `Csp` | trocar por `httpContext.GetCurrentRealm().Options.Csp` |
 | `CheckSessionResult` | P2, `GetRequiredService<ServerOptions>` | `Csp`, `Authentication.CheckSessionCookieName` | nao migrar enquanto endpoint nao estiver mapeado; registrar como divida inalcançavel |
 | `LoggerExtensions` | P4, `ContextItems.GetOrCreate<ServerOptions>()` | `Logging` | ler `context.Options.Logging` ou receber `LoggingOptions` realm-aware explicitamente |
@@ -322,7 +323,7 @@ Tarefas marcaveis:
 - [x] Adicionar `AuthenticationOptions` a `RealmOptions` conforme o contrato da Fase 1.
 - [x] Atualizar a criacao/copia de `RealmOptions` para copiar defaults de autenticacao sem compartilhar a instancia global.
 - [x] Reordenar `ConfigureRealmCookieAuthenticationOptions` para resolver o realm antes de aplicar nome, SameSite, lifetime e sliding expiration.
-- [x] Implementar `AccessDeniedPath` em `RealmUIOptions`, mantendo `ServerUIOptions.AccessDeniedPath` como fallback global sem realm.
+- [x] Implementar `AccessDeniedPath` em `RealmUIOptions`, usando fallback do próprio realm (`/{realm}/account/access-denied`); o scheme default usa o `ServerRealm`.
 - [x] Criar testes com dois realms usando lifetimes e paths diferentes.
 
 Critério de aceite: `ConfigureRealmCookieAuthenticationOptions` nao deve depender de `storage.ServerOptions.Authentication` para decisoes que variam por realm, e os cookies de dois realms devem refletir configuracoes independentes.
@@ -331,7 +332,7 @@ Critério de aceite: `ConfigureRealmCookieAuthenticationOptions` nao deve depend
 
 **Status:** concluida.
 
-**Implementacao:** `RealmOptions.Authentication` agora e instancia propria criada a partir de copia de `ServerOptions.Authentication`. `ConfigureRealmCookieAuthenticationOptions` resolve o realm antes de aplicar nome, lifetime, SameSite e sliding expiration; para schemes de realm usa `realm.Options.Authentication`, e o scheme default continua usando fallback global server-wide. `RealmUIOptions.AccessDeniedPath` foi adicionado com default realm-aware (`/{realm}/account/access-denied`), exposto por `RealmRoutes.AccessDeniedPath` e usado no cookie auth.
+**Implementacao:** `RealmOptions.Authentication` agora e instancia propria criada a partir de copia de `ServerOptions.Authentication`. `ConfigureRealmCookieAuthenticationOptions` resolve o realm antes de aplicar nome, lifetime, SameSite e sliding expiration; para schemes de realm usa `realm.Options.Authentication`, e o scheme default continua usando `ServerOptions.Authentication` para as opções globais de autenticação. `RealmUIOptions.AccessDeniedPath` foi adicionado com default realm-aware (`/{realm}/account/access-denied`), exposto por `RealmRoutes.AccessDeniedPath` e usado no cookie auth; para o scheme default, o realm efetivo é o `ServerRealm`.
 
 **Correcao adicional da avaliacao:** `EndpointContextBase.ServerOptions` e `IEndpointContextBase.ServerOptions` foram sinalizados como acesso a opcoes globais; consumidores realm-specific devem preferir `Options`.
 
@@ -596,7 +597,13 @@ Após avaliar faça:
 1. O access-denied do scheme default ir para `/server/account/access-denied` é o desejado? Se sim, atualizar a decisão da Fase 1 (deixou de existir fallback plano server-wide).
 2. `ServerUIOptions.AccessDeniedPath` deve ser removido ou repropósito? Manter uma propriedade que o plano chama de "fallback global" mas que ninguém lê é enganoso.
 
-**Status:** avaliar
+**Validação:** os fatos estão corretos: a busca por `AccessDeniedPath` mostra leitura efetiva apenas via `realm.Routes.AccessDeniedPath`, e `ServerUIOptions.AccessDeniedPath` ficou só como definição.
+
+**Decisão:** usar sempre o fallback do próprio realm para cookie auth. Para schemes de realm, o redirect é `/{realm}/account/access-denied`; para o scheme default, o realm efetivo é o `ServerRealm`, logo `/server/account/access-denied`. `ServerUIOptions.AccessDeniedPath` não é fallback de cookie auth e fica como legado/pendência de remoção ou repropósito.
+
+**Correção aplicada:** a decisão da Fase 1, a matriz de destino, a tarefa marcável da Fase 2 e o resultado da Fase 2 foram atualizados para remover o fallback plano global.
+
+**Status:** corrigido
 
 #### Copy-ctor copia só `Authentication`; `Discovery`/`Endpoints`/`MutualTls`/`Keys` seguem `= new()`
 
@@ -606,7 +613,11 @@ Após avaliar faça:
 
 **Sugestão:** ao montar o copy-ctor completo na Fase 3/4, incluir Discovery/Endpoints/MutualTls/Keys com deep-copy das coleções; ou, se a decisão for mantê-los como type-defaults, removê-los da lista da "Padrao de Copia". Não deixar plano e código divergentes.
 
-**Status:** avaliar
+**Validação:** válido. `RealmOptions(ServerOptions)` hoje copia apenas `Authentication`; `Discovery`, `Endpoints`, `MutualTls` e `Keys` seguem inicializadores próprios. Isso não invalida a Fase 2, porque a tarefa marcável da fase falava especificamente dos defaults de autenticação, mas deixa uma divergência real com o contrato amplo de copy-on-create definido na Fase 1.
+
+**Decisão:** deixar para cada fase implementar a cópia das opções que ela promove ou passa a depender. A Fase 2 cobre `Authentication`; as próximas fases completam os demais grupos, e a Fase 6 fecha os testes de propagação/não-compartilhamento.
+
+**Status:** corrigido
 
 #### `RealmOptions(RealmOptions other)` ainda não implementado
 
@@ -614,4 +625,8 @@ Após avaliar faça:
 
 **Avaliação:** correto deixar pendente — não é tarefa da Fase 2; o único consumidor é a feature futura e o teste `RealmOptions_CopyFromRealm_IsIndependent` (Fase 6). Registrado apenas para acompanhamento.
 
-**Status:** avaliar
+**Validação:** válido como pendência de acompanhamento. A ausência de `RealmOptions(RealmOptions other)` contradiz o contrato-alvo completo da Fase 1, mas não bloqueia a Fase 2 porque nenhum fluxo de autenticação/UI depende de clonar options a partir de outro realm.
+
+**Decisão:** deixar para a fase certa: implementar junto da suíte de cópia da Fase 6 ou quando a base de Realm Templates exigir esse clone.
+
+**Status:** corrigido
