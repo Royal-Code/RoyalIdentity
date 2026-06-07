@@ -87,6 +87,7 @@ public class RealmRoutes
     private string? logoutPath;
     private string? loggingOutPath;
     private string? loggedOutPath;
+    private string? accessDeniedPath;
     private string? consentPath;
     private string? deviceVerificationPath;
 
@@ -114,6 +115,11 @@ public class RealmRoutes
     /// Gets the logged out Path (Url) for the realm.
     /// </summary>
     public string LoggedOutPath => loggedOutPath ??= realm.Options.UI.LoggedOutPath.ReplaceRealmRouterParameter(realm.Path);
+
+    /// <summary>
+    /// Gets the access denied Path (Url) for the realm.
+    /// </summary>
+    public string AccessDeniedPath => accessDeniedPath ??= realm.Options.UI.AccessDeniedPath.ReplaceRealmRouterParameter(realm.Path);
 
     /// <summary>
     /// Gets the consent Path (Url) for the realm.

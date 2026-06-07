@@ -26,7 +26,7 @@ public interface IEndpointContextBase : IContextBase
     public RealmOptions Options => Realm.Options;
 
     /// <summary>
-    /// The options for the server.
+    /// The global server options. For realm-specific settings, prefer <see cref="Options"/>.
     /// </summary>
     public ServerOptions ServerOptions => Options.ServerOptions;
 }

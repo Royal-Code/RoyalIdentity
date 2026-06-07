@@ -1,10 +1,10 @@
 # Plan: RealmOptions e CORS por Realm
 
-## Status: PLANNED
+## Status: IN_PROGRESS
 
 ## Progresso
 
-`----------` **0%** - 0 de 6 fases concluidas
+`██----` **33%** - 2 de 6 fases concluidas
 
 ---
 
@@ -138,7 +138,7 @@ Matriz minima esperada apos a decisao. **É o contrato-alvo, não o estado atual
 - **Fonte única = storage.** Valores server-wide vêm de `storage.ServerOptions`; valores por realm, de `realm.Options` (via `context.Options` / `httpContext.GetCurrentRealm().Options`).
 - **Não registrar `ServerOptions` em DI** — sempre obter do storage. (Avaliou-se uma factory storage-backed scoped; descartada por não ser necessária. Manter `ServerOptions` fora do DI ainda facilita o cache futuro — ver abaixo.)
 - **Eliminar** os atalhos de DI, migrando cada consumidor para a fonte correta:
-  - `GetRequiredService<ServerOptions>()` (`CheckSessionResult`) e `GetRequiredService<IOptions<ServerOptions>>()` (`ResponseToFormPostResult`) → leitura **realm-aware** via `httpContext.GetCurrentRealm()` (CSP é por realm).
+  - `GetRequiredService<IOptions<ServerOptions>>()` (`ResponseToFormPostResult`) → leitura **realm-aware** via `httpContext.GetCurrentRealm()` (CSP é por realm). `GetRequiredService<ServerOptions>()` em `CheckSessionResult` fica como divida inalcançavel enquanto `CheckSessionEndpoint` nao for mapeado.
   - campos capturados no construtor a partir de `storage.ServerOptions` → ler **em tempo de uso**.
   - `ContextItems.From(realm.Options.ServerOptions)` quando o item for usado para logging/CSP/limites/qualquer valor realm-specific → carregar a opção do realm, não o `ServerOptions` global.
 - **Princípio geral:** ler options **em tempo de uso** (do realm/storage), nunca capturar na construção. `IStorage` é registrado como transient (orientado a sessão); serviços de vida longa que capturam `storage.ServerOptions` no construtor ficam stale se o storage passar a carregar por sessão.
@@ -223,15 +223,75 @@ Notas:
    - opcao B: `RealmOptions` possui overrides nullable e um resolvedor monta opcoes efetivas.
 4. Registrar a decisao no proprio plano antes de implementar as fases seguintes.
 
+### Resultado da Fase 1
+
+**Status:** concluida.
+
+**Decisao final:** seguir a **opcao A**. `RealmOptions` possui instancias independentes para toda option promovida; `ServerOptions` permanece como fonte global/server-wide e template de criacao. Nao sera criado resolvedor nullable/merge-runtime nesta refatoracao.
+
+**Fonte de verdade:** valores server-wide vem de `storage.ServerOptions`; valores de request com realm vem de `realm.Options` (`context.Options`, `context.Realm.Options` ou `httpContext.GetCurrentRealm().Options`). `ServerOptions` nao deve ser registrado em DI para resolver valores realm-specific.
+
+**Copy-on-create:** usar construtores de copia em `RealmOptions` e nos sub-options. `RealmOptions(ServerOptions)` copia defaults server-wide para instancias realm-owned; `RealmOptions(RealmOptions other)` copia tudo para clonar a partir de outro realm. `ServerOptions` continua compartilhado como referencia global/fallback, mas seus sub-options nao devem ser compartilhados entre realms.
+
+**Fallback sem realm:** permitido apenas para fluxos realmente server-wide, usando `storage.ServerOptions`. Requests OIDC/account com realm devem falhar se o realm nao estiver resolvido, em vez de cair silenciosamente no global.
+
+**CheckSession:** nao mapear `CheckSessionEndpoint` neste plano. `CheckSessionResult` fica registrado como divida de codigo inalcançavel; so entra em migracao/teste se um plano futuro mapear o endpoint.
+
+**AccessDeniedPath:** promover para `RealmUIOptions` na Fase 2. `ServerUIOptions.AccessDeniedPath` permanece como fallback global para fluxos sem realm.
+
+#### Matriz de Destino por Propriedade
+
+| Propriedade | Destino | Categoria | Novo padrao de leitura |
+|---|---|---|---|
+| `AuthenticationOptions Authentication` | `RealmOptions.Authentication` | default global com override por realm | `realm.Options.Authentication`; fallback `storage.ServerOptions.Authentication` apenas sem realm |
+| `ServerUIOptions.AccessDeniedPath` | `RealmUIOptions.AccessDeniedPath` | default global com override por realm | `realm.Options.UI.AccessDeniedPath`; fallback `storage.ServerOptions.UI.AccessDeniedPath` apenas sem realm |
+| `CspOptions Csp` | `RealmOptions.Csp` | default global com override por realm | `httpContext.GetCurrentRealm().Options.Csp` ou `context.Options.Csp` |
+| `LoggingOptions Logging` | `RealmOptions.Logging` | default global com override por realm | `context.Options.Logging` ou item explicito de logging do realm |
+| `bool DispatchEvents` | `RealmOptions.DispatchEvents` | default global com override por realm | `realm.Options.DispatchEvents` no overload realm-aware |
+| `string AccessTokenJwtType` | `RealmOptions.AccessTokenJwtType` | default global com override por realm | `realm.Options.AccessTokenJwtType` |
+| `bool EmitScopesAsSpaceDelimitedStringInJwt` | `RealmOptions.EmitScopesAsSpaceDelimitedStringInJwt` | default global com override por realm | `realm.Options.EmitScopesAsSpaceDelimitedStringInJwt` |
+| `InputLengthRestrictions InputLengthRestrictions` | `RealmOptions.InputLengthRestrictions` | default global com override por realm | `context.Options.InputLengthRestrictions`; prioridade baixa, pode ser incremento isolado |
+
+#### Mapeamento de Call Sites
+
+| Arquivo / tipo | Padrao atual | Propriedade(s) | Decisao para proximas fases |
+|---|---|---|---|
+| `ConfigureRealmCookieAuthenticationOptions` | P1, captura `storage.ServerOptions` | `Authentication`, `ServerUIOptions.AccessDeniedPath` | resolver realm antes de aplicar cookie; usar `realm.Options.Authentication` e `realm.Options.UI.AccessDeniedPath` |
+| `ResponseToFormPostResult` | P3, `IOptions<ServerOptions>` | `Csp` | trocar por `httpContext.GetCurrentRealm().Options.Csp` |
+| `CheckSessionResult` | P2, `GetRequiredService<ServerOptions>` | `Csp`, `Authentication.CheckSessionCookieName` | nao migrar enquanto endpoint nao estiver mapeado; registrar como divida inalcançavel |
+| `LoggerExtensions` | P4, `ContextItems.GetOrCreate<ServerOptions>()` | `Logging` | ler `context.Options.Logging` ou receber `LoggingOptions` realm-aware explicitamente |
+| `DefaultEventDispatcher` | P1, captura `storage.ServerOptions` | `DispatchEvents` | overload sem realm usa global; overload com realm deve aplicar `realm.Options.DispatchEvents` |
+| `DefaultJwtFactory` | P1, captura `storage.ServerOptions` | `AccessTokenJwtType`, `EmitScopesAsSpaceDelimitedStringInJwt` | ler opcoes do realm recebido na criacao do JWT; propagar realm/valor ate payload |
+| `DefaultTokenValidator` | P1, captura `storage.ServerOptions` | `AccessTokenJwtType`, `InputLengthRestrictions.Jwt` | validar `typ` e limites usando opcoes do realm validado |
+| `TokenEndpoint` | `realm.Options.ServerOptions` + `ContextItems.From(...)` | `InputLengthRestrictions.GrantType` | ler `realm.Options.InputLengthRestrictions`; semear contexto com fonte realm-aware |
+| `AuthorizeEndpoint`, `AuthorizeCallbackEndpoint`, `DiscoveryEndpoint`, `JwkEndpoint`, `RevocationEndpoint`, `EndSessionEndpoint`, `UserInfoEndpoint` | `ContextItems.From(realm.Options.ServerOptions)` | logging/limites usados depois | trocar seed para `RealmOptions` ou opcoes especificas conforme contrato |
+| `LoadClient`, `EvaluateBearerToken`, `AuthorizeMainValidator`, `RedirectUriValidator`, `SecretEvaluatorBase` e derivados | P1, captura `storage.ServerOptions` | `InputLengthRestrictions` | ler `context.Options.InputLengthRestrictions` em tempo de uso |
+| `LoadCode`, `LoadRefreshToken` | P4, `ContextItems.GetOrCreate<ServerOptions>()` | `InputLengthRestrictions` | trocar para `context.Options.InputLengthRestrictions` |
+| `PkceValidator` | P3, `IOptions<ServerOptions>` | `InputLengthRestrictions` | trocar para `context.Options.InputLengthRestrictions` |
+| `CustomRedirectResult` | `context.Realm.Options.ServerOptions.UI` | `ServerUIOptions.CustomRedirectParameter` | permanece server-wide por enquanto; nao e propriedade promovida nesta fase |
+| `MemoryStorage` | seed com `new RealmOptions(serverOptions)` | criacao de realms internos/demo | apos copy-ctor, passa a copiar defaults sem compartilhar sub-options |
+| `RealmManager.CreateAsync` | `new RealmOptions(storage.ServerOptions)` | novos realms | apos copy-ctor, passa a copiar defaults sem compartilhar sub-options |
+
+#### Auditoria Executada
+
+Comandos usados:
+
+```powershell
+rg "storage\.ServerOptions|GetRequiredService<ServerOptions>|IOptions<ServerOptions>|GetOrCreate<ServerOptions>|ContextItems\.From\([^\r\n]*ServerOptions" RoyalIdentity RoyalIdentity.Storage.InMemory RoyalIdentity.Server --type cs
+rg "\.ServerOptions|ServerOptions" RoyalIdentity/Endpoints RoyalIdentity/Contexts RoyalIdentity/Contracts RoyalIdentity/Authentication RoyalIdentity/Responses RoyalIdentity/Extensions RoyalIdentity/Options RoyalIdentity.Storage.InMemory --type cs
+rg "new RealmOptions|RealmOptions\(" RoyalIdentity RoyalIdentity.Storage.InMemory Tests.Integration Tests.Identity Tests.Host Tests.Endpoints --type cs
+rg "MapPipeline<CheckSessionEndpoint>|CheckSessionEndpoint|CheckSessionResult|CheckSessionResponse|EnableCheckSessionEndpoint" RoyalIdentity --type cs
+```
+
 Tarefas marcaveis:
 
-- [ ] Rodar a busca de `ServerOptions` e ampliar manualmente para usos indiretos (`context.ServerOptions`, `realm.Options.ServerOptions`, `ContextItems.From(...)`).
-- [ ] Montar matriz por propriedade: destino, fallback, padrao atual, novo padrao de leitura e arquivos afetados.
-- [ ] Confirmar opcao A ou B; recomendacao atual: opcao A com copy-on-create.
-- [ ] Definir o ponto unico de criacao/copia de `RealmOptions` a partir de `ServerOptions`.
-- [ ] Definir como requests sem realm continuam usando defaults globais.
-- [ ] Decidir se `CheckSessionEndpoint` sera mapeado nesta refatoracao ou se seus testes ficam adiados.
-- [ ] Registrar a decisao final no proprio plano antes da Fase 2.
+- [x] Rodar a busca de `ServerOptions` e ampliar manualmente para usos indiretos (`context.ServerOptions`, `realm.Options.ServerOptions`, `ContextItems.From(...)`).
+- [x] Montar matriz por propriedade: destino, fallback, padrao atual, novo padrao de leitura e arquivos afetados.
+- [x] Confirmar opcao A ou B; recomendacao atual: opcao A com copy-on-create.
+- [x] Definir o ponto unico de criacao/copia de `RealmOptions` a partir de `ServerOptions`.
+- [x] Definir como requests sem realm continuam usando defaults globais.
+- [x] Decidir se `CheckSessionEndpoint` sera mapeado nesta refatoracao ou se seus testes ficam adiados.
+- [x] Registrar a decisao final no proprio plano antes da Fase 2.
 
 Critério de aceite: cada propriedade da tabela deve ter destino definido, **padrão de resolução de cada call site identificado**, call sites mapeados, contrato de fallback documentado e estratégia de cópia de `RealmOptions` definida.
 
@@ -252,20 +312,30 @@ Passos:
 1. Adicionar `AuthenticationOptions` a `RealmOptions`, seguindo a decisão da Fase 1.
 2. Promover ou resolver `AuthenticationOptions` por realm.
 3. Garantir que cookie lifetime, sliding expiration, SameSite e nome de cookie usem o realm correto.
-4. Revisar `AccessDeniedPath`: hoje vem de `ServerUIOptions` (`storage.ServerOptions.UI.AccessDeniedPath`), enquanto `LoginPath`/`LogoutPath` já vêm de `realm.Routes` e `LoginParameter` de `RealmUIOptions`. Decidir se `AccessDeniedPath` migra para `RealmUIOptions`/`realm.Routes`.
+4. Migrar `AccessDeniedPath` para `RealmUIOptions`, conforme decisao da Fase 1. Hoje vem de `ServerUIOptions` (`storage.ServerOptions.UI.AccessDeniedPath`), enquanto `LoginPath`/`LogoutPath` ja vêm de `realm.Routes` e `LoginParameter` de `RealmUIOptions`.
 5. Adicionar testes com dois realms usando lifetimes/paths diferentes.
 
 > **Nota de implementação:** em `ConfigureRealmCookieAuthenticationOptions`, o realm **já é resolvido** (`storage.Realms.GetByPath(realmPath)`), porém **depois** de o nome/SameSite/lifetime do cookie já terem sido atribuídos a partir do `ServerOptions` global. Para usar `AuthenticationOptions` por realm será preciso **reordenar**: resolver o realm primeiro e então derivar as opções de cookie de `realm.Options.Authentication`.
 
 Tarefas marcaveis:
 
-- [ ] Adicionar `AuthenticationOptions` a `RealmOptions` conforme o contrato da Fase 1.
-- [ ] Atualizar a criacao/copia de `RealmOptions` para copiar defaults de autenticacao sem compartilhar a instancia global.
-- [ ] Reordenar `ConfigureRealmCookieAuthenticationOptions` para resolver o realm antes de aplicar nome, SameSite, lifetime e sliding expiration.
-- [ ] Decidir e implementar o destino de `AccessDeniedPath` (`RealmUIOptions`, `realm.Routes` ou fallback global documentado).
-- [ ] Criar testes com dois realms usando lifetimes e paths diferentes.
+- [x] Adicionar `AuthenticationOptions` a `RealmOptions` conforme o contrato da Fase 1.
+- [x] Atualizar a criacao/copia de `RealmOptions` para copiar defaults de autenticacao sem compartilhar a instancia global.
+- [x] Reordenar `ConfigureRealmCookieAuthenticationOptions` para resolver o realm antes de aplicar nome, SameSite, lifetime e sliding expiration.
+- [x] Implementar `AccessDeniedPath` em `RealmUIOptions`, mantendo `ServerUIOptions.AccessDeniedPath` como fallback global sem realm.
+- [x] Criar testes com dois realms usando lifetimes e paths diferentes.
 
 Critério de aceite: `ConfigureRealmCookieAuthenticationOptions` nao deve depender de `storage.ServerOptions.Authentication` para decisoes que variam por realm, e os cookies de dois realms devem refletir configuracoes independentes.
+
+### Resultado da Fase 2
+
+**Status:** concluida.
+
+**Implementacao:** `RealmOptions.Authentication` agora e instancia propria criada a partir de copia de `ServerOptions.Authentication`. `ConfigureRealmCookieAuthenticationOptions` resolve o realm antes de aplicar nome, lifetime, SameSite e sliding expiration; para schemes de realm usa `realm.Options.Authentication`, e o scheme default continua usando fallback global server-wide. `RealmUIOptions.AccessDeniedPath` foi adicionado com default realm-aware (`/{realm}/account/access-denied`), exposto por `RealmRoutes.AccessDeniedPath` e usado no cookie auth.
+
+**Correcao adicional da avaliacao:** `EndpointContextBase.ServerOptions` e `IEndpointContextBase.ServerOptions` foram sinalizados como acesso a opcoes globais; consumidores realm-specific devem preferir `Options`.
+
+**Teste focado executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "AuthenticationOptions|RealmOptions_CopyOnCreate"` — aprovado, 2 testes.
 
 ---
 
@@ -277,14 +347,14 @@ Arquivos prováveis:
 
 - `RoyalIdentity/Options/RealmOptions.cs`
 - `RoyalIdentity/Options/CspOptions.cs`, `LoggingOptions.cs`, `InputLengthRestrictions.cs`
-- **CSP (consumidor vivo):** `RoyalIdentity/Responses/HttpResults/ResponseToFormPostResult.cs` (Padrão 3). `CheckSessionResult.cs` (Padrão 2) deve ser migrado/testado somente se `CheckSessionEndpoint` for mapeado nesta refatoração; caso contrário, registrar como dívida de código inalcançável.
+- **CSP (consumidor vivo):** `RoyalIdentity/Responses/HttpResults/ResponseToFormPostResult.cs` (Padrão 3). `CheckSessionResult.cs` (Padrão 2) fica fora desta refatoração porque `CheckSessionEndpoint` não será mapeado neste plano; registrar como dívida de código inalcançável.
 - **Logging (consumidor real):** `RoyalIdentity/Extensions/LoggerExtensions.cs` (Padrão 4 — lê de `ContextItems`)
 - **Eventos:** `RoyalIdentity/Contracts/Defaults/DefaultEventDispatcher.cs`
 - **InputLengthRestrictions (consumidores reais, além de validators):** `Endpoints/TokenEndpoint.cs`, `Contracts/Defaults/SecretsEvaluators/*`, decorators `LoadClient.cs`, `EvaluateBearerToken.cs`, `LoadCode.cs`, `LoadRefreshToken.cs`
 
 Passos:
 
-1. **CSP** (prioridade Alta) — resolver `CspOptions` por realm. O consumidor HTTP observável hoje é `ResponseToFormPostResult`, um response handler sem `context.Options`; resolver via `httpContext.GetCurrentRealm()`. `CheckSessionResult` lê tanto `.Csp` quanto `.Authentication` do mesmo `ServerOptions` global, mas só deve entrar nesta fase se `CheckSessionEndpoint` for mapeado; se não for, registrar como dívida técnica.
+1. **CSP** (prioridade Alta) — resolver `CspOptions` por realm. O consumidor HTTP observável hoje é `ResponseToFormPostResult`, um response handler sem `context.Options`; resolver via `httpContext.GetCurrentRealm()`. `CheckSessionResult` lê tanto `.Csp` quanto `.Authentication` do mesmo `ServerOptions` global, mas fica fora deste plano porque `CheckSessionEndpoint` não será mapeado agora; registrar como dívida técnica.
 2. **Logging** — `LoggerExtensions` lê `ServerOptions` do `ContextItems`. Para tornar per-realm: ou colocar o `LoggingOptions`/`RealmOptions` correto no `ContextItems` na criação do contexto, ou ler o realm diretamente. Não quebrar o logging de requests sem realm.
 3. **DispatchEvents** — o overload `DispatchAsync(evt, realm)` **já existe**, mas delega para `DispatchAsync(evt)`, que checa o **global** `options.DispatchEvents`. Mover a propriedade para `RealmOptions` exige **mover o check para o caminho realm-aware** (o overload sem realm permanece no fallback global).
 4. **InputLengthRestrictions** (prioridade Baixa) — consumido em ~14 sites (endpoints, secret evaluators, decorators e validators), não só em validators. Dado o custo/benefício, considerar **adiar** ou tratar como incremento isolado.
@@ -295,8 +365,7 @@ Tarefas marcaveis:
 - [ ] Promover `CspOptions`, `LoggingOptions`, `DispatchEvents` e, se aprovado, `InputLengthRestrictions` para `RealmOptions`.
 - [ ] Atualizar a criacao/copia de `RealmOptions` para copiar esses defaults sem compartilhar instancias globais.
 - [ ] Alterar `ResponseToFormPostResult` para nao depender de `IOptions<ServerOptions>` em requests com realm.
-- [ ] Se `CheckSessionEndpoint` for mapeado nesta refatoracao, alterar tambem `CheckSessionResult` para nao depender de `ServerOptions`; se nao for, registrar `CheckSessionResult` como divida de codigo inalcançavel.
-- [ ] Confirmar se `CheckSessionEndpoint` sera mapeado agora; se nao for, nao usar check-session como teste HTTP obrigatorio desta fase.
+- [ ] Registrar `CheckSessionResult` como divida de codigo inalcançavel, sem teste HTTP obrigatorio nesta fase.
 - [ ] Alterar logging para usar `context.Options.Logging`, `RealmOptions` no `ContextItems`, ou outra fonte realm-aware definida na Fase 1.
 - [ ] Alterar `DefaultEventDispatcher.DispatchAsync(evt, realm)` para aplicar o gate de eventos por realm antes de despachar aos observers.
 - [ ] Ajustar testes de eventos para observar dispatch apos o gate; nao usar captura que registra evento antes do dispatcher interno aplicar `DispatchEvents`.
@@ -410,7 +479,7 @@ Adicionar testes em `Tests.Integration`, preferencialmente em uma classe dedicad
 10. `RealmOptions_CopyOnCreate_DoesNotSharePromotedOptions` — mutar uma option promovida no realm A nao afeta realm B nem os defaults globais (sem referencia compartilhada).
 11. `RealmOptions_CopyFromServer_PropagatesConfiguredValues` — setar valor nao-default em `ServerOptions`, criar realm e provar que o realm recebeu o valor (pega campo esquecido no copy-ctor).
 12. `RealmOptions_CopyFromRealm_IsIndependent` — criar realm B via `new RealmOptions(a.Options)`; mutar A e provar que B nao muda (groundwork de Realm Templates).
-13. `CheckSession_UsesRealmSpecificCspAndCookieName` — somente se `CheckSessionEndpoint` for mapeado nesta refatoracao.
+13. `CheckSession_UsesRealmSpecificCspAndCookieName` — teste futuro fora do aceite deste plano, pois a Fase 1 decidiu nao mapear `CheckSessionEndpoint` nesta refatoracao.
 
 Notas para testes:
 
@@ -446,4 +515,103 @@ dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "Co
 - Fase 1 pode ser concluida com documentacao/decisao, sem alteracao de codigo, desde que a matriz e o contrato de resolucao estejam registrados.
 - Fases 2 a 5 exigem implementacao e teste focado correspondente.
 - Fase 6 exige os testes de isolamento/regressao e o comando final, ou registro claro do motivo pelo qual o comando final nao pode rodar localmente.
-- Ao concluir uma fase, atualizar `Progresso` no topo de `0 de 6` para a contagem real e substituir um `-` por `█` na barra visual (mesmo caractere usado em `plan-realm-hardening.md`).
+- Ao concluir uma fase, atualizar `Progresso` no topo de `0 de 6` para a contagem real e substituir um `-` por `█` na barra visual (barra de 6 segmentos, um por fase; mesmo caractere usado em `plan-realm-hardening.md`).
+
+---
+
+## Avaliação do progresso
+
+Apontamentos levantados na revisão da execução, por fase. Cada item traz o problema, a solução proposta e um `Status`.
+
+`Status` pode ser: `avaliar`, `questionado`, `rejeitado`, `válido`, `corrigido`.
+
+Ao criar usar o `avaliar`.
+Quem cria a avaliação deve deixá-la como `avaliar`. O humano ou em outra seção a IA poderá avaliar a avaliação e trocar o `status`.
+
+Ao avaliar:
+- não assuma que o problema é válido, verifique a veracidade das afirmações e valida se o problema é real;
+- verificar:
+  - se há coerência interna com os documentos já existentes,
+  - se existem riscos, lacunas ou contradições relevantes,
+  - se há alternativas melhores ou trade-offs não considerados;
+- preferir uma resposta tecnicamente honesta a uma resposta meramente concordante;
+- quando discordar, sempre faça:
+  - explicar o motivo,
+  - apontar o impacto,
+  - sugerir correção ou alternativa,
+  - preservar o objetivo do humano sempre que possível.
+
+Após avaliar faça:
+- se é válida, mude o `status` para `válido`;
+- se é questionável, mude o `status` para `questionado` e apresente as quetões na própria seção;
+- se rejeitar, apresenta a justificativa, mostrando o erro na argumentação do problema e mude o `status` para `rejeitado`.
+
+### Fase 1
+
+#### Accessor `EndpointContextBase.ServerOptions` fora do Mapeamento de Call Sites
+
+**Problema:** `EndpointContextBase.ServerOptions => Options.ServerOptions` (e o mesmo em `IEndpointContextBase`) é um accessor realm-cego: devolve o `ServerOptions` global. O contrato manda ler propriedades promovidas de `context.Options.X` (realm), mas esse accessor permite continuar lendo o global por engano, e ele não aparece na tabela "Mapeamento de Call Sites" da Fase 1.
+
+**Solução:** tratar `context.ServerOptions` como **global-only**; auditar consumidores que o usem para ler propriedades promovidas (`Authentication`, `Csp`, `Logging`, `AccessTokenJwtType`, `EmitScopesAsSpaceDelimitedStringInJwt`, `DispatchEvents`, `InputLengthRestrictions`) e trocar por `context.Options.X`. Opcionalmente sinalizar o accessor (comentário ou `[Redesign]`) como "apenas server-wide".
+
+**Avaliação:** válido. O accessor existe em `EndpointContextBase` e em `IEndpointContextBase` e retorna `Options.ServerOptions`, que é a referência global. A busca atual não encontrou consumidores diretos de `context.ServerOptions` fora das declarações, então o risco é preventivo, mas real: ele preserva uma saída fácil para reintroduzir leituras globais após a promoção de opções para realm. A correção proposta preserva o objetivo da Fase 1: manter `ServerOptions` como fallback/global-only e orientar consumidores de request para `context.Options.X`.
+
+**Correção aplicada:** `EndpointContextBase.ServerOptions` e `IEndpointContextBase.ServerOptions` agora documentam que retornam as opções globais e orientam o uso de `Options` para configurações por realm.
+
+**Status:** corrigido
+
+#### `AccessDeniedPath` como path de cookie — prefixo de realm
+
+**Problema:** a Fase 1 decidiu promover `AccessDeniedPath` para `RealmUIOptions`, mas é um *path* de cookie. `LoginPath`/`LogoutPath` vêm de `realm.Routes`, que aplicam o prefixo do realm via `ReplaceRealmRouterParameter`. Se `RealmUIOptions.AccessDeniedPath` for path plano (sem prefixo), o redirect de access-denied pode apontar para fora do realm, divergindo do comportamento de Login/Logout.
+
+**Solução:** na Fase 2, decidir se `AccessDeniedPath` entra no `RealmRoutes` (com `ReplaceRealmRouterParameter`, como Login/Logout) e é lido via `realm.Routes.AccessDeniedPath` em `ConfigureRealmCookieAuthenticationOptions`, ou se permanece path plano server-wide. Documentar a escolha.
+
+**Avaliação:** válido. `RealmRoutes` hoje aplica `ReplaceRealmRouterParameter` para `LoginPath`, `LogoutPath`, `LoggingOutPath`, `LoggedOutPath`, `ConsentPath` e `DeviceVerificationPath`, mas não existe `AccessDeniedPath` em `RealmRoutes`. Como `CookieAuthenticationOptions.AccessDeniedPath` é usado para redirect de cookie auth, promover a propriedade para `RealmUIOptions` sem rota realm-aware pode mandar o usuário para `/account/access-denied` em vez de `/{realm}/account/access-denied`. A decisão da Fase 1 de promover para `RealmUIOptions` continua boa, mas a Fase 2 deve implementar também `realm.Routes.AccessDeniedPath` ou documentar explicitamente por que esse path permaneceria server-wide.
+
+**Correção aplicada:** `RealmUIOptions.AccessDeniedPath` foi criado com default realm-aware, `RealmRoutes.AccessDeniedPath` aplica `ReplaceRealmRouterParameter`, e `ConfigureRealmCookieAuthenticationOptions` passa a usar `realm.Routes.AccessDeniedPath`.
+
+**Status:** corrigido
+
+#### Seam do `ContextItems<ServerOptions>` — mudança acoplada
+
+**Problema:** os 8 endpoints semeiam o `ServerOptions` global no contexto via `ContextItems.From(serverOptions)`, e três consumidores leem via `ContextItems.GetOrCreate<ServerOptions>()` (`LoggerExtensions`, `LoadCode`, `LoadRefreshToken`). Trocar o seed sem trocar os leitores (ou vice-versa) quebra logging/limites — precisa ser feito em conjunto.
+
+**Solução:** na Fase 3, mudar leitores e seed juntos. Caminho preferido: os leitores passam a usar `context.Options.X` direto (`LoggerExtensions` → `context.Options.Logging`; `LoadCode`/`LoadRefreshToken` → `context.Options.InputLengthRestrictions`), e o seed de `ServerOptions` no `ContextItems` é aposentado quando ninguém mais o consumir.
+
+**Avaliação:** válido. A auditoria confirma o acoplamento: os endpoints semeiam `ContextItems.From(serverOptions)` e os leitores atuais incluem `LoggerExtensions`, `LoadCode` e `LoadRefreshToken`. Se apenas o seed for trocado, os leitores podem criar defaults via `GetOrCreate<ServerOptions>()`; se apenas os leitores forem trocados, o seed global fica morto e confuso. O melhor caminho é mesmo mudar leitores e seed na mesma fase, e remover o seed de `ServerOptions` quando não houver mais consumidor.
+
+**Nota de execução:** não corrigido na Fase 2 porque a mudança precisa ocorrer em conjunto com os consumidores de Logging/InputLengthRestrictions na Fase 3.
+
+**Status:** válido
+
+### Fase 2
+
+#### Scheme default usa `realm.Routes.AccessDeniedPath`; `ServerUIOptions.AccessDeniedPath` ficou órfão
+
+**Observação:** `ConfigureRealmCookieAuthenticationOptions` passou a usar `realm.Routes.AccessDeniedPath` para **todos** os schemes, inclusive o default (que resolve para o ServerRealm). Efeitos: (a) o scheme default agora redireciona access-denied para `/server/account/access-denied` (prefixado pelo realm server), não mais para o `/account/access-denied` plano; (b) `ServerUIOptions.AccessDeniedPath` não é lido por nenhum consumidor — virou código órfão.
+
+**Avaliação:** confirmado por leitura — `AccessDeniedPath` só é escrito em `ConfigureRealmCookieAuthenticationOptions` lendo de `realm.Routes`, e `ServerUIOptions.AccessDeniedPath` só é definido, nunca lido. Antes, o scheme default usava `storage.ServerOptions.UI.AccessDeniedPath` (plano), enquanto seu `LoginPath` já era `/server/account/login` — havia inconsistência. A mudança torna os dois consistentes e provavelmente corrige um path que talvez nem casasse com rota (páginas de account são realm-scoped `/{realm}/account/...`). **Porém contradiz a decisão da Fase 1 e a própria tarefa marcável da Fase 2** ("manter `ServerUIOptions.AccessDeniedPath` como fallback global sem realm"): hoje esse fallback não existe mais. O novo comportamento do scheme default também não tem teste (o teste cobre só schemes de realm).
+
+**Questões:**
+1. O access-denied do scheme default ir para `/server/account/access-denied` é o desejado? Se sim, atualizar a decisão da Fase 1 (deixou de existir fallback plano server-wide).
+2. `ServerUIOptions.AccessDeniedPath` deve ser removido ou repropósito? Manter uma propriedade que o plano chama de "fallback global" mas que ninguém lê é enganoso.
+
+**Status:** avaliar
+
+#### Copy-ctor copia só `Authentication`; `Discovery`/`Endpoints`/`MutualTls`/`Keys` seguem `= new()`
+
+**Observação:** a seção "Padrao de Copia de RealmOptions" diz que `RealmOptions(ServerOptions)` copia o subconjunto server-wide incluindo `Discovery`, `Endpoints`, `MutualTls`, `Keys`. A implementação copia só `Authentication`; os quatro continuam `= new()` (type-defaults). Csp/Logging/AccessTokenJwtType/EmitScopes/DispatchEvents ainda não existem em `RealmOptions` (chegam na Fase 3/4).
+
+**Avaliação:** gap de coerência plano↔código, **invisível em runtime hoje** — como `ServerOptions` nunca é configurado (ver "Dívida de DI"), copiar vs `= new()` dá o mesmo resultado. Mas quando houver entry point de configuração, esses quatro não herdarão o valor configurado, contrariando a "Mudança de comportamento a registrar". Fica também pendente o deep-copy das coleções previstas (DiscoveryOptions HashSets/CustomEntries, KeyOptions.SigningCredentialsAlgorithms).
+
+**Sugestão:** ao montar o copy-ctor completo na Fase 3/4, incluir Discovery/Endpoints/MutualTls/Keys com deep-copy das coleções; ou, se a decisão for mantê-los como type-defaults, removê-los da lista da "Padrao de Copia". Não deixar plano e código divergentes.
+
+**Status:** avaliar
+
+#### `RealmOptions(RealmOptions other)` ainda não implementado
+
+**Observação:** a decisão da Fase 1 prevê dois construtores; só `RealmOptions(ServerOptions)` existe. O `RealmOptions(RealmOptions)` (groundwork de Realm Templates) está pendente.
+
+**Avaliação:** correto deixar pendente — não é tarefa da Fase 2; o único consumidor é a feature futura e o teste `RealmOptions_CopyFromRealm_IsIndependent` (Fase 6). Registrado apenas para acompanhamento.
+
+**Status:** avaliar

@@ -8,6 +8,29 @@ namespace RoyalIdentity.Options;
 public class AuthenticationOptions
 {
     /// <summary>
+    /// Creates a new instance of <see cref="AuthenticationOptions"/>.
+    /// </summary>
+    public AuthenticationOptions()
+    {
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="AuthenticationOptions"/> copying values from another instance.
+    /// </summary>
+    /// <param name="other">The options to copy.</param>
+    public AuthenticationOptions(AuthenticationOptions other)
+    {
+        CookieName = other.CookieName;
+        CookieLifetime = other.CookieLifetime;
+        CookieSlidingExpiration = other.CookieSlidingExpiration;
+        CookieSameSiteMode = other.CookieSameSiteMode;
+        CheckSessionCookieName = other.CheckSessionCookieName;
+        CheckSessionCookieDomain = other.CheckSessionCookieDomain;
+        CheckSessionCookieSameSiteMode = other.CheckSessionCookieSameSiteMode;
+        RequireCspFrameSrcForSignOut = other.RequireCspFrameSrcForSignOut;
+    }
+
+    /// <summary>
     /// Gets or sets the cookie name used to persist the user's session details.
     /// </summary>
     public string CookieName { get; set; } = Server.DefaultCookieName;

@@ -51,6 +51,14 @@ public class RealmUIOptions
     public string LogoutParameter { get; set; } = UI.Routes.Params.LogoutId;
 
     /// <summary>
+    /// Gets or sets the access denied URL. If a local URL, the value must start with a leading slash.
+    /// </summary>
+    /// <value>
+    /// The access denied URL.
+    /// </value>
+    public string AccessDeniedPath { get; set; } = UI.Routes.RealmAccessDenied;
+
+    /// <summary>
     /// Gets or sets the consent URL. If a local URL, the value must start with a leading slash.
     /// </summary>
     /// <value>

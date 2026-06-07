@@ -14,6 +14,7 @@ public class RealmOptions
     public RealmOptions(ServerOptions serverOptions)
     {
         ServerOptions = serverOptions;
+        Authentication = new AuthenticationOptions(serverOptions.Authentication);
     }
 
     /// <summary>
@@ -30,6 +31,11 @@ public class RealmOptions
     /// Gets or sets the UI options.
     /// </summary>
     public RealmUIOptions UI { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the authentication options.
+    /// </summary>
+    public AuthenticationOptions Authentication { get; set; }
 
     /// <summary>
     /// Gets or sets the endpoint configuration.

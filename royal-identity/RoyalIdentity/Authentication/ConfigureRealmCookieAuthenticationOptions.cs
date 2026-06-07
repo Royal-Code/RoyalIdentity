@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Authentication;
@@ -20,40 +21,43 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         if (string.IsNullOrEmpty(name))
             return;
 
-        var authOptions = storage.ServerOptions.Authentication;
         var cookie = options.Cookie;
 
-        string? cookieName = null;
         string? realmPath = null;
+        Realm? realm = null;
+        var authOptions = storage.ServerOptions.Authentication;
 
         if (name == Server.DefaultCookieAuthenticationScheme)
         {
-            cookieName = authOptions.CookieName;
+            realmPath = Server.Realms.ServerRealm;
         }
         else if (name.StartsWith(Server.RealmAuthenticationNamePrefix))
         {
             realmPath = name[Server.RealmAuthenticationNamePrefix.Length..];
-            cookieName = $"{authOptions.CookieName}.{realmPath}";
         }
 
-        if (cookieName is null)
+        if (realmPath.IsMissing())
             return;
+
+        realm = storage.Realms.GetByPath(realmPath);
+
+        if (realm is not null && name != Server.DefaultCookieAuthenticationScheme)
+            authOptions = realm.Options.Authentication;
+
+        var cookieName = name == Server.DefaultCookieAuthenticationScheme
+            ? authOptions.CookieName
+            : $"{authOptions.CookieName}.{realmPath}";
 
         cookie.Name = cookieName;
         cookie.SameSite = authOptions.CookieSameSiteMode;
         options.ExpireTimeSpan = authOptions.CookieLifetime;
         options.SlidingExpiration = authOptions.CookieSlidingExpiration;
 
-        if (realmPath.IsMissing())
-            realmPath = Server.Realms.ServerRealm;
-
-        var realm = storage.Realms.GetByPath(realmPath);
-
         if (realm is not null)
         {
             options.LoginPath = realm.Routes.LoginPath;
             options.LogoutPath = realm.Routes.LogoutPath;
-            options.AccessDeniedPath = storage.ServerOptions.UI.AccessDeniedPath;
+            options.AccessDeniedPath = realm.Routes.AccessDeniedPath;
             options.ReturnUrlParameter = realm.Options.UI.LoginParameter;
         }
         

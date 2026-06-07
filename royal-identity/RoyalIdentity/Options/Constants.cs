@@ -159,6 +159,8 @@ public static partial class Constants
 
             public const string AccessDenied = $"/{Names.Account}/{Names.AccessDenied}";
 
+            public const string RealmAccessDenied = $"/{RealmRouteParameter}/{Names.Account}/{Names.AccessDenied}";
+
             public const string Error = $"/{Names.Error}";
 
             private static class Names

@@ -30,6 +30,8 @@ public abstract class EndpointContextBase : AbstractContextBase, IEndpointContex
     /// <inheritdoc />
     public RealmOptions Options => Realm.Options;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Gets the global server options. For realm-specific settings, prefer <see cref="Options"/>.
+    /// </summary>
     public ServerOptions ServerOptions => Options.ServerOptions;
 }
