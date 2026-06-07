@@ -160,7 +160,7 @@ Decisão fechada:
   ```
   Assim `Id`/`Domain`/`Path`, `Routes`, `Enabled`, `Internal` (e o futuro `IsTemplate`) nascem frescos pelo ctor do `Realm`.
 - **`ServerOptions` continua compartilhado.** Nos dois construtores, `ServerOptions = ...ServerOptions` mantém a instância global (template/fallback). Só os sub-options são clonados; nunca clonar o `ServerOptions` por realm.
-- **Sub-options:** um construtor de cópia por tipo, recebendo **o próprio tipo** (`new CspOptions(source.Csp)`), nunca o `ServerOptions` inteiro. **Cópia profunda onde houver coleção** — entre as promovidas, só `LoggingOptions.SensitiveValuesFilter`; para o caminho realm-source, conferir também `RealmUIOptions`, `CacheOptions`, `AccountOptions`, `RealmBrandingOptions`.
+- **Sub-options:** um construtor de cópia por tipo, recebendo **o próprio tipo** (`new CspOptions(source.Csp)`), nunca o `ServerOptions` inteiro. **Cópia profunda onde houver coleção** — entre as promovidas, isso inclui pelo menos `LoggingOptions.SensitiveValuesFilter`, `DiscoveryOptions.CustomEntries`, os `HashSet<string>` de `DiscoveryOptions` e `KeyOptions.SigningCredentialsAlgorithms`; para o caminho realm-source, conferir também `RealmUIOptions`, `CacheOptions`, `AccountOptions`, `PasswordOptions` e `RealmBrandingOptions`.
 - **Mudança de comportamento a registrar:** hoje `Discovery`/`Endpoints`/`MutualTls`/`Keys` em `RealmOptions` são `= new()` (defaults de tipo, não herdam valores configurados do server). Ao copiar de `ServerOptions`, passam a herdar os configurados. Hoje é invisível (o host nunca configura `ServerOptions` — ver "Dívida de DI"), mas é uma escolha semântica intencional.
 - **Manutenção:** copy-ctor à mão derruba campo novo silenciosamente; por isso a Fase 6 inclui um teste de **propagação** (não só de não-compartilhamento).
 
@@ -277,14 +277,14 @@ Arquivos prováveis:
 
 - `RoyalIdentity/Options/RealmOptions.cs`
 - `RoyalIdentity/Options/CspOptions.cs`, `LoggingOptions.cs`, `InputLengthRestrictions.cs`
-- **CSP (consumidores reais):** `RoyalIdentity/Responses/HttpResults/CheckSessionResult.cs` (Padrão 2), `RoyalIdentity/Responses/HttpResults/ResponseToFormPostResult.cs` (Padrão 3)
+- **CSP (consumidor vivo):** `RoyalIdentity/Responses/HttpResults/ResponseToFormPostResult.cs` (Padrão 3). `CheckSessionResult.cs` (Padrão 2) deve ser migrado/testado somente se `CheckSessionEndpoint` for mapeado nesta refatoração; caso contrário, registrar como dívida de código inalcançável.
 - **Logging (consumidor real):** `RoyalIdentity/Extensions/LoggerExtensions.cs` (Padrão 4 — lê de `ContextItems`)
 - **Eventos:** `RoyalIdentity/Contracts/Defaults/DefaultEventDispatcher.cs`
 - **InputLengthRestrictions (consumidores reais, além de validators):** `Endpoints/TokenEndpoint.cs`, `Contracts/Defaults/SecretsEvaluators/*`, decorators `LoadClient.cs`, `EvaluateBearerToken.cs`, `LoadCode.cs`, `LoadRefreshToken.cs`
 
 Passos:
 
-1. **CSP** (prioridade Alta) — resolver `CspOptions` por realm. Os consumidores são response handlers sem `context.Options`; resolver via `httpContext.GetCurrentRealm()`. Atenção: `CheckSessionResult` lê tanto `.Csp` quanto `.Authentication` do mesmo `ServerOptions` global — alinhar com a Fase 2.
+1. **CSP** (prioridade Alta) — resolver `CspOptions` por realm. O consumidor HTTP observável hoje é `ResponseToFormPostResult`, um response handler sem `context.Options`; resolver via `httpContext.GetCurrentRealm()`. `CheckSessionResult` lê tanto `.Csp` quanto `.Authentication` do mesmo `ServerOptions` global, mas só deve entrar nesta fase se `CheckSessionEndpoint` for mapeado; se não for, registrar como dívida técnica.
 2. **Logging** — `LoggerExtensions` lê `ServerOptions` do `ContextItems`. Para tornar per-realm: ou colocar o `LoggingOptions`/`RealmOptions` correto no `ContextItems` na criação do contexto, ou ler o realm diretamente. Não quebrar o logging de requests sem realm.
 3. **DispatchEvents** — o overload `DispatchAsync(evt, realm)` **já existe**, mas delega para `DispatchAsync(evt)`, que checa o **global** `options.DispatchEvents`. Mover a propriedade para `RealmOptions` exige **mover o check para o caminho realm-aware** (o overload sem realm permanece no fallback global).
 4. **InputLengthRestrictions** (prioridade Baixa) — consumido em ~14 sites (endpoints, secret evaluators, decorators e validators), não só em validators. Dado o custo/benefício, considerar **adiar** ou tratar como incremento isolado.
@@ -294,7 +294,8 @@ Tarefas marcaveis:
 
 - [ ] Promover `CspOptions`, `LoggingOptions`, `DispatchEvents` e, se aprovado, `InputLengthRestrictions` para `RealmOptions`.
 - [ ] Atualizar a criacao/copia de `RealmOptions` para copiar esses defaults sem compartilhar instancias globais.
-- [ ] Alterar `CheckSessionResult` e `ResponseToFormPostResult` para nao dependerem de `ServerOptions`/`IOptions<ServerOptions>` em requests com realm.
+- [ ] Alterar `ResponseToFormPostResult` para nao depender de `IOptions<ServerOptions>` em requests com realm.
+- [ ] Se `CheckSessionEndpoint` for mapeado nesta refatoracao, alterar tambem `CheckSessionResult` para nao depender de `ServerOptions`; se nao for, registrar `CheckSessionResult` como divida de codigo inalcançavel.
 - [ ] Confirmar se `CheckSessionEndpoint` sera mapeado agora; se nao for, nao usar check-session como teste HTTP obrigatorio desta fase.
 - [ ] Alterar logging para usar `context.Options.Logging`, `RealmOptions` no `ContextItems`, ou outra fonte realm-aware definida na Fase 1.
 - [ ] Alterar `DefaultEventDispatcher.DispatchAsync(evt, realm)` para aplicar o gate de eventos por realm antes de despachar aos observers.
