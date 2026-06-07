@@ -41,11 +41,14 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 ## Realm Templates (copy-on-create)
 
 **Área:** Gestão de Realms
-**Deferral:** Permite criar novos realms a partir de um template. Complexidade baixa (copy-on-create), mas só tem valor quando houver CRUD de realms via UI/API.
+**Deferral:** A máquina de cópia de `RealmOptions` (copy-on-create) foi adiantada no `plan-realm-options-redesign.md` como groundwork. O que resta é a feature em si, que só tem valor quando houver CRUD de realms via UI/API.
 **Quando revisitar:** Junto com a UI administrativa.
 **Nota de design:**
-- Modelo: `Realm.IsTemplate = true` — realms marcados como template não aceitam logins.
-- Operação: "Criar realm a partir de template" = deep-copy das `RealmOptions` + deep-copy dos clients/resources/scopes do template.
+- **Já encaminhado no `plan-realm-options-redesign.md`:** deep-copy de `RealmOptions` via construtores de cópia (`RealmOptions(ServerOptions)` e `RealmOptions(RealmOptions)`); identidade do `Realm` sempre explícita (sem ctor de cópia de `Realm`); `ServerOptions` mantido como instância compartilhada.
+- **Resta nesta feature:**
+  - Modelo: `Realm.IsTemplate = true` — realms marcados como template não aceitam logins.
+  - Operação "Criar realm a partir de template": wiring `IRealmManager.CreateAsync(..., Realm copyFrom)` usando `new RealmOptions(copyFrom.Options)` **+ deep-copy dos clients/resources/scopes** do template (toca os stores, fora do escopo do plano de options).
+  - CRUD de realms via UI/API.
 - Após criação, realm filho e template são independentes (sem herança live).
 - Herança live (realm filho herdando dinamicamente do pai em runtime) foi avaliada e rejeitada por complexidade excessiva para o benefício obtido.
 
