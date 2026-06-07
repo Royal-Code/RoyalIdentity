@@ -32,13 +32,19 @@ public static class LoggerExtensions
 
     internal static void LogError(this ILogger logger,
         ServerOptions options,
-        string message, 
+        string message,
+        IEndpointContextBase context)
+        => logger.LogError(options.Logging, message, context);
+
+    internal static void LogError(this ILogger logger,
+        LoggingOptions options,
+        string message,
         IEndpointContextBase context)
     {
-        var raw = GetRaw(context, options.Logging.SensitiveValuesFilter);
+        var raw = GetRaw(context, options.SensitiveValuesFilter);
         logger.LogError("{Message}\n{Raw}", message, raw);
 
-        if (options.Logging.UseLogService)
+        if (options.UseLogService)
         {
             // TODO: chamar o log sevice
         }
@@ -46,14 +52,21 @@ public static class LoggerExtensions
 
     internal static void LogError(this ILogger logger,
         ServerOptions options,
-        string message, 
-        string? details, 
+        string message,
+        string? details,
+        IEndpointContextBase context)
+        => logger.LogError(options.Logging, message, details, context);
+
+    internal static void LogError(this ILogger logger,
+        LoggingOptions options,
+        string message,
+        string? details,
         IEndpointContextBase context)
     {
-        var raw = GetRaw(context, options.Logging.SensitiveValuesFilter);
+        var raw = GetRaw(context, options.SensitiveValuesFilter);
         logger.LogError("{Message}: {Details}\n{Raw}", message, details, raw);
 
-        if (options.Logging.UseLogService)
+        if (options.UseLogService)
         {
             // TODO: chamar o log sevice
         }
@@ -64,11 +77,18 @@ public static class LoggerExtensions
         Exception ex,
         string message,
         IEndpointContextBase context)
+        => logger.LogError(options.Logging, ex, message, context);
+
+    internal static void LogError(this ILogger logger,
+        LoggingOptions options,
+        Exception ex,
+        string message,
+        IEndpointContextBase context)
     {
-        var raw = GetRaw(context, options.Logging.SensitiveValuesFilter);
+        var raw = GetRaw(context, options.SensitiveValuesFilter);
         logger.LogError(ex, "{Message}\n{Raw}", message, raw);
 
-        if (options.Logging.UseLogService)
+        if (options.UseLogService)
         {
             // TODO: chamar o log sevice
         }
@@ -79,7 +99,7 @@ public static class LoggerExtensions
         string message,
         string? details = null)
     {
-        var options = context.Items.GetOrCreate<ServerOptions>();
+        var options = context.Options.Logging;
         if (details.IsPresent())
             logger.LogError(options, message, details, context);
         else
@@ -91,7 +111,7 @@ public static class LoggerExtensions
         Exception ex,
         string message)
     {
-        var options = context.Items.GetOrCreate<ServerOptions>();
+        var options = context.Options.Logging;
         logger.LogError(options, ex, message, context);
     }
 

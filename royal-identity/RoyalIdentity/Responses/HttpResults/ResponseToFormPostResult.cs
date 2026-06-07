@@ -1,8 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using System.Collections.Specialized;
 using System.Text.Encodings.Web;
 
@@ -44,7 +41,7 @@ public class ResponseToFormPostResult : IResult, IStatusCodeHttpResult
 
     private static void AddSecurityHeaders(HttpContext context)
     {
-        var options = context.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value.Csp;
+        var options = context.GetRealmOptions().Csp;
 
         context.Response.AddScriptCspHeaders(options, "sha256-orD0/VhH8hLqrLxKHD/HUEMdwqX6/0ve7c5hspX5VJ8=");
 

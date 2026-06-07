@@ -6,6 +6,23 @@
 public class CspOptions
 {
     /// <summary>
+    /// Creates a new instance of <see cref="CspOptions"/>.
+    /// </summary>
+    public CspOptions()
+    {
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="CspOptions"/> copying values from another instance.
+    /// </summary>
+    /// <param name="other">The options to copy.</param>
+    public CspOptions(CspOptions other)
+    {
+        Level = other.Level;
+        AddDeprecatedHeader = other.AddDeprecatedHeader;
+    }
+
+    /// <summary>
     /// Gets or sets the minimum CSP level.
     /// </summary>
     public CspLevel Level { get; set; } = CspLevel.Two;

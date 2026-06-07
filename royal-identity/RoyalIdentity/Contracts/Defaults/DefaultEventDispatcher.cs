@@ -21,15 +21,24 @@ public class DefaultEventDispatcher : IEventDispatcher
         if (!options.DispatchEvents)
             return;
 
+        await DispatchCoreAsync(evt);
+    }
+
+    public async ValueTask DispatchAsync(Event evt, Realm realm)
+    {
+        evt.RealmId = realm.Id;
+
+        if (!realm.Options.DispatchEvents)
+            return;
+
+        await DispatchCoreAsync(evt);
+    }
+
+    private async ValueTask DispatchCoreAsync(Event evt)
+    {
         var type = typeof(DefaultEventDispatcher<>).MakeGenericType(evt.GetType());
         var dispatcher = (IEventDispatcher)sp.GetService(type)!;
         await dispatcher.DispatchAsync(evt);
-    }
-
-    public ValueTask DispatchAsync(Event evt, Realm realm)
-    {
-        evt.RealmId = realm.Id;
-        return DispatchAsync(evt);
     }
 }
 

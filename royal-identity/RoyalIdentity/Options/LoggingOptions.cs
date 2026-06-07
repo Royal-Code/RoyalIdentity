@@ -6,6 +6,23 @@
 public class LoggingOptions
 {
     /// <summary>
+    /// Creates a new instance of <see cref="LoggingOptions"/>.
+    /// </summary>
+    public LoggingOptions()
+    {
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="LoggingOptions"/> copying values from another instance.
+    /// </summary>
+    /// <param name="other">The options to copy.</param>
+    public LoggingOptions(LoggingOptions other)
+    {
+        SensitiveValuesFilter = [.. other.SensitiveValuesFilter];
+        UseLogService = other.UseLogService;
+    }
+
+    /// <summary>
     /// 
     /// </summary>
     public ICollection<string> SensitiveValuesFilter { get; set; } =

@@ -15,6 +15,9 @@ public class RealmOptions
     {
         ServerOptions = serverOptions;
         Authentication = new AuthenticationOptions(serverOptions.Authentication);
+        Csp = new CspOptions(serverOptions.Csp);
+        Logging = new LoggingOptions(serverOptions.Logging);
+        DispatchEvents = serverOptions.DispatchEvents;
     }
 
     /// <summary>
@@ -36,6 +39,16 @@ public class RealmOptions
     /// Gets or sets the authentication options.
     /// </summary>
     public AuthenticationOptions Authentication { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Content Security Policy options.
+    /// </summary>
+    public CspOptions Csp { get; set; }
+
+    /// <summary>
+    /// Gets or sets the logging options.
+    /// </summary>
+    public LoggingOptions Logging { get; set; }
 
     /// <summary>
     /// Gets or sets the endpoint configuration.
@@ -93,4 +106,9 @@ public class RealmOptions
     /// Gets or sets whether the authorization parameters should be stored when authorize endpoint requires user interaction.
     /// </summary>
     public bool StoreAuthorizationParameters { get; set; } = true;
+
+    /// <summary>
+    /// Specifies whether events should be dispatched or not.
+    /// </summary>
+    public bool DispatchEvents { get; set; }
 }

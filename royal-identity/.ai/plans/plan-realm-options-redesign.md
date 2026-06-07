@@ -363,16 +363,26 @@ Passos:
 
 Tarefas marcaveis:
 
-- [ ] Promover `CspOptions`, `LoggingOptions`, `DispatchEvents` e, se aprovado, `InputLengthRestrictions` para `RealmOptions`.
-- [ ] Atualizar a criacao/copia de `RealmOptions` para copiar esses defaults sem compartilhar instancias globais.
-- [ ] Alterar `ResponseToFormPostResult` para nao depender de `IOptions<ServerOptions>` em requests com realm.
-- [ ] Registrar `CheckSessionResult` como divida de codigo inalcançavel, sem teste HTTP obrigatorio nesta fase.
-- [ ] Alterar logging para usar `context.Options.Logging`, `RealmOptions` no `ContextItems`, ou outra fonte realm-aware definida na Fase 1.
-- [ ] Alterar `DefaultEventDispatcher.DispatchAsync(evt, realm)` para aplicar o gate de eventos por realm antes de despachar aos observers.
-- [ ] Ajustar testes de eventos para observar dispatch apos o gate; nao usar captura que registra evento antes do dispatcher interno aplicar `DispatchEvents`.
+- [x] Promover `CspOptions`, `LoggingOptions` e `DispatchEvents` para `RealmOptions`; `InputLengthRestrictions` fica como incremento isolado desta fase.
+- [x] Atualizar a criacao/copia de `RealmOptions` para copiar esses defaults sem compartilhar instancias globais.
+- [x] Alterar `ResponseToFormPostResult` para nao depender de `IOptions<ServerOptions>` em requests com realm.
+- [x] Registrar `CheckSessionResult` como divida de codigo inalcançavel, sem teste HTTP obrigatorio nesta fase.
+- [x] Alterar logging para usar `context.Options.Logging`, `RealmOptions` no `ContextItems`, ou outra fonte realm-aware definida na Fase 1.
+- [x] Alterar `DefaultEventDispatcher.DispatchAsync(evt, realm)` para aplicar o gate de eventos por realm antes de despachar aos observers.
+- [x] Ajustar testes de eventos para observar dispatch apos o gate; nao usar captura que registra evento antes do dispatcher interno aplicar `DispatchEvents`.
 - [ ] Se `InputLengthRestrictions` for migrado, atualizar endpoints, decorators, validators e secret evaluators que hoje usam `ServerOptions`.
 
 Critério de aceite: um realm deve conseguir ter CSP/event dispatch/input limits diferentes de outro sem recriar o servidor, e nenhum consumidor migrado deve depender de `ServerOptions` global para decisoes realm-specific.
+
+### Resultado Parcial da Fase 3
+
+**Status:** em progresso.
+
+**Implementacao concluida neste corte:** `RealmOptions` agora possui `Csp`, `Logging` e `DispatchEvents` como instancias/propriedades independentes copiadas dos defaults globais. `ResponseToFormPostResult` usa `context.GetRealmOptions().Csp` em vez de `IOptions<ServerOptions>`. `LoggerExtensions` passou a usar `context.Options.Logging` nos overloads por contexto, mantendo overloads com `ServerOptions` apenas para leitores que ainda dependem de limites globais. `DefaultEventDispatcher.DispatchAsync(evt, realm)` aplica o gate `realm.Options.DispatchEvents` antes de chamar observers.
+
+**Pendente para concluir a fase:** migrar ou rejeitar explicitamente `InputLengthRestrictions`. Se migrado, atualizar endpoints, decorators, validators e secret evaluators que ainda leem `ServerOptions`.
+
+**Teste focado executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "CspOptions|DispatchEvents|Phase3"` — aprovado, 4 testes.
 
 ---
 
@@ -524,12 +534,12 @@ dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "Co
 
 Apontamentos levantados na revisão da execução, por fase. Cada item traz o problema, a solução proposta e um `Status`.
 
-`Status` pode ser: `avaliar`, `questionado`, `rejeitado`, `válido`, `corrigido`.
+`Status` dos apontamentos podem ser: `avaliar`, `questionado`, `rejeitado`, `válido`, `corrigido`.
 
-Ao criar usar o `avaliar`.
-Quem cria a avaliação deve deixá-la como `avaliar`. O humano ou em outra seção a IA poderá avaliar a avaliação e trocar o `status`.
+Ao criar um apontamento usar o `Status` como `avaliar`.
+Quem cria o apontamento deve deixá-la como `avaliar`. O humano ou em outra seção a IA poderá validar o apontamento e trocar o `status`.
 
-Ao avaliar:
+Ao validar os apontamentos:
 - não assuma que o problema é válido, verifique a veracidade das afirmações e valida se o problema é real;
 - verificar:
   - se há coerência interna com os documentos já existentes,
@@ -542,7 +552,7 @@ Ao avaliar:
   - sugerir correção ou alternativa,
   - preservar o objetivo do humano sempre que possível.
 
-Após avaliar faça:
+Após validar os apontamentos faça:
 - se é válida, mude o `status` para `válido`;
 - se é questionável, mude o `status` para `questionado` e apresente as quetões na própria seção;
 - se rejeitar, apresenta a justificativa, mostrando o erro na argumentação do problema e mude o `status` para `rejeitado`.
