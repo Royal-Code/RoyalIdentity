@@ -25,7 +25,7 @@ public class TokenEndpoint : IEndpointHandler
     {
         logger.LogDebug("Processing token request.");
 
-        var servierOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
+        var realmOptions = httpContext.GetRealmOptions();
 
         // validate HTTP method
         if (!HttpMethods.IsPost(httpContext.Request.Method))
@@ -55,7 +55,7 @@ public class TokenEndpoint : IEndpointHandler
             return EndpointErrorResults.InvalidRequest(httpContext, "Grant type parameter not found");
         }
 
-        if (grantType.Length > servierOptions.InputLengthRestrictions.GrantType)
+        if (grantType.Length > realmOptions.InputLengthRestrictions.GrantType)
         {
             logger.LogError("Grant type is too long");
 
@@ -63,7 +63,7 @@ public class TokenEndpoint : IEndpointHandler
         }
 
         // create the context
-        var items = ContextItems.From(servierOptions);
+        var items = new ContextItems();
         ITokenEndpointContextBase? context = null;
         switch (grantType)
         {

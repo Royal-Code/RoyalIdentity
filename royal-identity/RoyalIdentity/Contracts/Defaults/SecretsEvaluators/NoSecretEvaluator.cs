@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
@@ -41,7 +39,7 @@ public class NoSecretEvaluator : SecretEvaluatorBase
             return null;
         }
 
-        if (clientId!.Length > options.InputLengthRestrictions.ClientId)
+        if (clientId!.Length > context.Options.InputLengthRestrictions.ClientId)
         {
             logger.LogError("Client ID exceeds maximum length.");
             return null;

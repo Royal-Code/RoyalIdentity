@@ -40,9 +40,7 @@ public class DiscoveryEndpoint : IEndpointHandler
             return EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled");
         }
 
-        var serverOptions = realmOptions.ServerOptions;
-        var items = ContextItems.From(serverOptions);
-        var context = new DiscoveryContext(httpContext, realmOptions, items);
+        var context = new DiscoveryContext(httpContext, realmOptions);
 
         return new EndpointCreationResult(context);
     }

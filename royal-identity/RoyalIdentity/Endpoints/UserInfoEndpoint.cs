@@ -43,8 +43,7 @@ public class UserInfoEndpoint : IEndpointHandler
                 "Invalid HTTP request for user info endpoint, no access token found.");
         }
 
-        var options = httpContext.GetCurrentRealm().Options.ServerOptions;
-        var items = ContextItems.From(options);
+        var items = new ContextItems();
         var userInfoContext = new UserInfoContext(httpContext, items, bearerTokenResult.Token);
 
         return new EndpointCreationResult(userInfoContext);

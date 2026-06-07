@@ -1,20 +1,15 @@
 ﻿using Microsoft.Extensions.Logging;
-using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Validators;
 
 public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
 {
-    private readonly ServerOptions options;
     private readonly ILogger logger;
 
-    public AuthorizeMainValidator(IStorage storage, ILogger<AuthorizeMainValidator> logger)
+    public AuthorizeMainValidator(ILogger<AuthorizeMainValidator> logger)
     {
-        options = storage.ServerOptions;
-
         this.logger = logger;
     }
 
@@ -22,6 +17,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
     {
         context.ClientParameters.AssertHasClient();
         var client = context.ClientParameters.Client;
+        var restrictions = context.Options.InputLengthRestrictions;
 
         ////////////////////////////////////////////////////////////////////////////
         // response_type must be present and supported and allowed for the client
@@ -102,7 +98,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             return ValueTask.CompletedTask;
         }
 
-        if (context.Scope.Length > options.InputLengthRestrictions.Scope)
+        if (context.Scope.Length > restrictions.Scope)
         {
             logger.LogError(context, "Scopes too long");
             context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "scopes too long");
@@ -115,7 +111,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         if (context.Nonce.IsPresent())
         {
-            if (context.Nonce.Length > options.InputLengthRestrictions.Nonce)
+            if (context.Nonce.Length > restrictions.Nonce)
             {
                 logger.LogError(context, "Nonce too long");
                 context.InvalidRequest("Invalid nonce", "too long");
@@ -145,7 +141,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         // check ui locales
         //////////////////////////////////////////////////////////
-        if (context.UiLocales.IsPresent() && context.UiLocales.Length > options.InputLengthRestrictions.UiLocale)
+        if (context.UiLocales.IsPresent() && context.UiLocales.Length > restrictions.UiLocale)
         {
             logger.LogError(context, "UI locale too long");
             context.InvalidRequest("Invalid ui_locales");
@@ -156,7 +152,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         // check login_hint
         //////////////////////////////////////////////////////////
-        if (context.LoginHint.IsPresent() && context.LoginHint.Length > options.InputLengthRestrictions.LoginHint)
+        if (context.LoginHint.IsPresent() && context.LoginHint.Length > restrictions.LoginHint)
         {
             logger.LogError(context, "Login hint too long");
             context.InvalidRequest("Invalid login_hint", "too long");
@@ -170,7 +166,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (context.AcrValues.Count > 0)
         {
             var acrValues = context.Raw.Get(Oidc.Authorize.Request.AcrValues)!;
-            if (acrValues.Length > options.InputLengthRestrictions.AcrValues)
+            if (acrValues.Length > restrictions.AcrValues)
             {
                 logger.LogError(context, "Acr values too long");
                 context.InvalidRequest("Invalid acr_values", "too long");

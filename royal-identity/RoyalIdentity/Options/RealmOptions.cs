@@ -17,6 +17,7 @@ public class RealmOptions
         Authentication = new AuthenticationOptions(serverOptions.Authentication);
         Csp = new CspOptions(serverOptions.Csp);
         Logging = new LoggingOptions(serverOptions.Logging);
+        InputLengthRestrictions = new InputLengthRestrictions(serverOptions.InputLengthRestrictions);
         DispatchEvents = serverOptions.DispatchEvents;
     }
 
@@ -49,6 +50,11 @@ public class RealmOptions
     /// Gets or sets the logging options.
     /// </summary>
     public LoggingOptions Logging { get; set; }
+
+    /// <summary>
+    /// Gets or sets the max input length restrictions.
+    /// </summary>
+    public InputLengthRestrictions InputLengthRestrictions { get; set; }
 
     /// <summary>
     /// Gets or sets the endpoint configuration.

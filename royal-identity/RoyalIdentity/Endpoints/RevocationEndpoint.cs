@@ -33,8 +33,7 @@ public class RevocationEndpoint : IEndpointHandler
             return new(EndpointErrorResults.UnsupportedMediaType(httpContext));
         }
 
-        var serverOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
-        var items = ContextItems.From(serverOptions);
+        var items = new ContextItems();
         var parameters = httpContext.Request.Form.AsNameValueCollection();
         var context = new RevocationContext(httpContext, parameters, items);
 

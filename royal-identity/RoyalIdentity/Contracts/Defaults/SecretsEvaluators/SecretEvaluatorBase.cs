@@ -3,7 +3,6 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
@@ -11,7 +10,6 @@ namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 public abstract class SecretEvaluatorBase : IClientSecretEvaluator
 {
     protected readonly IStorage storage;
-    protected readonly ServerOptions options;
     protected readonly TimeProvider clock;
     protected readonly ILogger logger;
 
@@ -21,7 +19,6 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
         ILogger logger)
     {
         this.storage = storage;
-        this.options = storage.ServerOptions;
         this.clock = clock;
         this.logger = logger;
     }
@@ -39,13 +36,15 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
         string secretType,
         CancellationToken ct)
     {
-        if (clientId.Length > options.InputLengthRestrictions.ClientId)
+        var restrictions = context.Options.InputLengthRestrictions;
+
+        if (clientId.Length > restrictions.ClientId)
         {
             logger.LogError(context, "Client ID exceeds maximum length.");
             return null;
         }
 
-        if (secret.Length > options.InputLengthRestrictions.ClientSecret)
+        if (secret.Length > restrictions.ClientSecret)
         {
             logger.LogError(context, "Client secret exceeds maximum length.");
             return null;

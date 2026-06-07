@@ -3,7 +3,6 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
@@ -54,7 +53,7 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
             return null;
         }
 
-        if (clientId!.Length > options.InputLengthRestrictions.ClientId)
+        if (clientId!.Length > context.Options.InputLengthRestrictions.ClientId)
         {
             logger.LogError("Client ID exceeds maximum length.");
             return null;

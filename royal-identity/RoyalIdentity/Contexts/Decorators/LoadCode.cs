@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Decorators;
@@ -26,19 +25,19 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
     {
         context.AssertHasRedirectUri();
 
-        var option = context.Items.GetOrCreate<ServerOptions>();
+        var restrictions = context.Options.InputLengthRestrictions;
         var code = context.Code;
 
         if (code.IsMissing())
         {
-            logger.LogError(option, "Authorization code is missing", context);
+            logger.LogError(context, "Authorization code is missing");
             context.InvalidGrant("Authorization code is missing");
             return;
         }
 
-        if (code.Length > option.InputLengthRestrictions.AuthorizationCode)
+        if (code.Length > restrictions.AuthorizationCode)
         {
-            logger.LogError(option, "Authorization code is too long", context);
+            logger.LogError(context, "Authorization code is too long");
             context.InvalidGrant("Authorization code is too long");
             return;
         }
@@ -48,21 +47,21 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
 
         if (authorizationCode == null)
         {
-            logger.LogError(option, "Authorization code is invalid", context);
+            logger.LogError(context, "Authorization code is invalid");
             context.InvalidGrant("Authorization code is invalid");
             return;
         }
 
         if (authorizationCode.ClientId != context.ClientId)
         {
-            logger.LogError(option, "Client is trying to use a code from a different client", context);
+            logger.LogError(context, "Client is trying to use a code from a different client");
             context.InvalidGrant("Authorization code is invalid");
             return;
         }
 
         if (!context.RedirectUri.Equals(authorizationCode.RedirectUri, StringComparison.Ordinal))
         {
-            logger.LogError(option, "Invalid redirect_uri", context);
+            logger.LogError(context, "Invalid redirect_uri");
             context.InvalidGrant("Invalid redirect_uri");
             return;
         }
@@ -72,7 +71,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
 
         if (authorizationCode.CreationTime.HasExceeded(authorizationCode.Lifetime, clock.GetUtcNow().DateTime))
         {
-            logger.LogError(option, "Authorization code expired", context);
+            logger.LogError(context, "Authorization code expired");
             context.InvalidGrant("Authorization code expired");
             return;
         }

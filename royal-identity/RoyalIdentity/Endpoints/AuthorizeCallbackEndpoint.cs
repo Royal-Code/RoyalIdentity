@@ -4,7 +4,6 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Endpoints;
 
@@ -58,8 +57,7 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
             return EndpointErrorResults.BadRequest(httpContext, Oidc.Authorize.Errors.LoginRequired, "Login required");
         }
 
-        var items = ContextItems.From(realm.Options.ServerOptions);
-        var context = new AuthorizeContext(httpContext, parameters, user, items);
+        var context = new AuthorizeContext(httpContext, parameters, user);
 
         context.Load(logger);
 

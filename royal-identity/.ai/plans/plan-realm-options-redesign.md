@@ -4,7 +4,18 @@
 
 ## Progresso
 
-`██----` **33%** - 2 de 6 fases concluidas
+`███---` **50%** - 3 de 6 fases concluidas
+
+**Andamento atual:** Fase 3 concluida. CSP, Logging, DispatchEvents e `InputLengthRestrictions` estao implementados e validados; proxima etapa e a Fase 4 (formato de token por realm).
+
+| Fase | Estado |
+|---|---|
+| Fase 1 - Auditoria Final e Decisao de Modelo | Concluida |
+| Fase 2 - Autenticacao e UI por Realm | Concluida |
+| Fase 3 - CSP, Logging, Eventos e Limites | Concluida |
+| Fase 4 - Formato de Token por Realm | Pendente |
+| Fase 5 - CORS por Realm e por Client | Pendente |
+| Fase 6 - Testes de Isolamento e Regressao | Pendente |
 
 ---
 
@@ -363,26 +374,28 @@ Passos:
 
 Tarefas marcaveis:
 
-- [x] Promover `CspOptions`, `LoggingOptions` e `DispatchEvents` para `RealmOptions`; `InputLengthRestrictions` fica como incremento isolado desta fase.
+- [x] Promover `CspOptions`, `LoggingOptions`, `DispatchEvents` e `InputLengthRestrictions` para `RealmOptions`.
 - [x] Atualizar a criacao/copia de `RealmOptions` para copiar esses defaults sem compartilhar instancias globais.
 - [x] Alterar `ResponseToFormPostResult` para nao depender de `IOptions<ServerOptions>` em requests com realm.
 - [x] Registrar `CheckSessionResult` como divida de codigo inalcançavel, sem teste HTTP obrigatorio nesta fase.
 - [x] Alterar logging para usar `context.Options.Logging`, `RealmOptions` no `ContextItems`, ou outra fonte realm-aware definida na Fase 1.
 - [x] Alterar `DefaultEventDispatcher.DispatchAsync(evt, realm)` para aplicar o gate de eventos por realm antes de despachar aos observers.
 - [x] Ajustar testes de eventos para observar dispatch apos o gate; nao usar captura que registra evento antes do dispatcher interno aplicar `DispatchEvents`.
-- [ ] Se `InputLengthRestrictions` for migrado, atualizar endpoints, decorators, validators e secret evaluators que hoje usam `ServerOptions`.
+- [x] Migrar `InputLengthRestrictions` em endpoints, decorators, validators e secret evaluators que usavam `ServerOptions`.
 
 Critério de aceite: um realm deve conseguir ter CSP/event dispatch/input limits diferentes de outro sem recriar o servidor, e nenhum consumidor migrado deve depender de `ServerOptions` global para decisoes realm-specific.
 
-### Resultado Parcial da Fase 3
+### Resultado da Fase 3
 
-**Status:** em progresso.
+**Status:** concluida.
 
-**Implementacao concluida neste corte:** `RealmOptions` agora possui `Csp`, `Logging` e `DispatchEvents` como instancias/propriedades independentes copiadas dos defaults globais. `ResponseToFormPostResult` usa `context.GetRealmOptions().Csp` em vez de `IOptions<ServerOptions>`. `LoggerExtensions` passou a usar `context.Options.Logging` nos overloads por contexto, mantendo overloads com `ServerOptions` apenas para leitores que ainda dependem de limites globais. `DefaultEventDispatcher.DispatchAsync(evt, realm)` aplica o gate `realm.Options.DispatchEvents` antes de chamar observers.
+**Andamento:** fase concluida para CSP, Logging, DispatchEvents e `InputLengthRestrictions`, incluindo copia dos defaults, migracao dos consumidores vivos e testes focados.
 
-**Pendente para concluir a fase:** migrar ou rejeitar explicitamente `InputLengthRestrictions`. Se migrado, atualizar endpoints, decorators, validators e secret evaluators que ainda leem `ServerOptions`.
+**Implementacao:** `RealmOptions` agora possui `Csp`, `Logging`, `InputLengthRestrictions` e `DispatchEvents` como instancias/propriedades independentes copiadas dos defaults globais. `ResponseToFormPostResult` usa `context.GetRealmOptions().Csp` em vez de `IOptions<ServerOptions>`. `LoggerExtensions` usa `context.Options.Logging` nos overloads por contexto. `DefaultEventDispatcher.DispatchAsync(evt, realm)` aplica o gate `realm.Options.DispatchEvents` antes de chamar observers. `InputLengthRestrictions` foi migrado para leitura por realm em `TokenEndpoint`, decorators (`LoadClient`, `EvaluateBearerToken`, `LoadCode`, `LoadRefreshToken`), validators (`AuthorizeMainValidator`, `RedirectUriValidator`, `PkceValidator`), `DefaultTokenValidator` e secret evaluators.
 
-**Teste focado executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "CspOptions|DispatchEvents|Phase3"` — aprovado, 4 testes.
+**Correcao adicional:** os endpoints internos deixaram de semear `ServerOptions` em `ContextItems`; com isso, logging e limites nao dependem mais do acoplamento `ContextItems<ServerOptions>`.
+
+**Teste focado executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "CspOptions|DispatchEvents|Phase3|InputLengthRestrictions"` — aprovado, 5 testes.
 
 ---
 
@@ -591,9 +604,9 @@ Após validar os apontamentos faça:
 
 **Avaliação:** válido. A auditoria confirma o acoplamento: os endpoints semeiam `ContextItems.From(serverOptions)` e os leitores atuais incluem `LoggerExtensions`, `LoadCode` e `LoadRefreshToken`. Se apenas o seed for trocado, os leitores podem criar defaults via `GetOrCreate<ServerOptions>()`; se apenas os leitores forem trocados, o seed global fica morto e confuso. O melhor caminho é mesmo mudar leitores e seed na mesma fase, e remover o seed de `ServerOptions` quando não houver mais consumidor.
 
-**Nota de execução:** não corrigido na Fase 2 porque a mudança precisa ocorrer em conjunto com os consumidores de Logging/InputLengthRestrictions na Fase 3.
+**Correção aplicada:** na Fase 3, `LoggerExtensions` passou a usar `context.Options.Logging`; `LoadCode` e `LoadRefreshToken` passaram a usar `context.Options.InputLengthRestrictions`; e os endpoints internos deixaram de semear `ServerOptions` via `ContextItems.From(...)`.
 
-**Status:** válido
+**Status:** corrigido
 
 ### Fase 2
 

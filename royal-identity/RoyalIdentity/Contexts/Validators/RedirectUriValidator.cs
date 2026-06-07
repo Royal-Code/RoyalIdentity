@@ -2,25 +2,20 @@
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts;
-using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Validators;
 
 internal class RedirectUriValidator : IValidator<IWithRedirectUri>
 {
-    private readonly ServerOptions options;
     private readonly IRedirectUriValidator uriValidator;
     private readonly ILogger logger;
 
     public RedirectUriValidator(
-        IStorage storage,
         IRedirectUriValidator uriValidator,
         ILogger<RedirectUriValidator> logger) 
     {
-        options = storage.ServerOptions;
         this.uriValidator = uriValidator;
         this.logger = logger;
     }
@@ -30,7 +25,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         context.ClientParameters.AssertHasClient();
         var client = context.ClientParameters.Client;
 
-        if (context.RedirectUri.IsMissingOrTooLong(options.InputLengthRestrictions.RedirectUri))
+        if (context.RedirectUri.IsMissingOrTooLong(context.Options.InputLengthRestrictions.RedirectUri))
         {
             logger.LogError(context, "The parameter redirect_uri is missing or too long");
             context.InvalidRequest("Invalid redirect_uri");

@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Decorators;
@@ -25,7 +24,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
 
         context.ClientParameters.AssertHasClient();
 
-        var options = context.Items.GetOrCreate<ServerOptions>();
+        var restrictions = context.Options.InputLengthRestrictions;
         var client = context.ClientParameters.Client;
         var token = context.Token;
 
@@ -39,7 +38,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
             return;
         }
 
-        if (token.Length > options.InputLengthRestrictions.RefreshToken)
+        if (token.Length > restrictions.RefreshToken)
         {
             logger.LogError(context, "Refresh token too long");
             context.InvalidRequest("Refresh token too long");

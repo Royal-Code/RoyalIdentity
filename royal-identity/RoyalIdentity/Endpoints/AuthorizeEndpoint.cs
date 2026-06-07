@@ -42,9 +42,7 @@ public class AuthorizeEndpoint : IEndpointHandler
             return new(EndpointErrorResults.MethodNotAllowed(httpContext));
         }
 
-        var serverOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
-        var items = ContextItems.From(serverOptions);
-        var context = new AuthorizeContext(httpContext, values, httpContext.User, items);
+        var context = new AuthorizeContext(httpContext, values, httpContext.User);
 
         context.Load(logger);
 

@@ -4,6 +4,32 @@ public class InputLengthRestrictions
 {
     private const int Default = 100;
 
+    public InputLengthRestrictions()
+    { }
+
+    public InputLengthRestrictions(InputLengthRestrictions other)
+    {
+        ClientId = other.ClientId;
+        ClientSecret = other.ClientSecret;
+        Scope = other.Scope;
+        RedirectUri = other.RedirectUri;
+        Nonce = other.Nonce;
+        UiLocale = other.UiLocale;
+        LoginHint = other.LoginHint;
+        AcrValues = other.AcrValues;
+        GrantType = other.GrantType;
+        UserName = other.UserName;
+        Password = other.Password;
+        CspReport = other.CspReport;
+        IdentityProvider = other.IdentityProvider;
+        ExternalError = other.ExternalError;
+        AuthorizationCode = other.AuthorizationCode;
+        DeviceCode = other.DeviceCode;
+        RefreshToken = other.RefreshToken;
+        TokenHandle = other.TokenHandle;
+        Jwt = other.Jwt;
+    }
+
     /// <summary>
     /// Max length for client_id
     /// </summary>

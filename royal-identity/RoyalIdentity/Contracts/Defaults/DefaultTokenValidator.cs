@@ -138,7 +138,7 @@ public class DefaultTokenValidator : ITokenValidator
     {
         logger.LogDebug("Start identity token validation");
 
-        if (token.Length > options.InputLengthRestrictions.Jwt)
+        if (token.Length > realm.Options.InputLengthRestrictions.Jwt)
         {
             logger.LogError("JWT too long");
             return new(new ErrorDetails()

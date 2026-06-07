@@ -1,16 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Decorators;
 
 public class LoadClient : IDecorator<IWithClient>
 {
-    private readonly ServerOptions options;
     private readonly IStorage storage;
     private readonly ILogger logger;
 
@@ -18,8 +15,6 @@ public class LoadClient : IDecorator<IWithClient>
     {
         this.storage = storage;
         this.logger = logger;
-
-        options = storage.ServerOptions;
     }
 
     public async Task Decorate(IWithClient context, Func<Task> next, CancellationToken ct)
@@ -32,7 +27,7 @@ public class LoadClient : IDecorator<IWithClient>
             return;
         }
 
-        if (clientId.IsMissingOrTooLong(options.InputLengthRestrictions.ClientId))
+        if (clientId.IsMissingOrTooLong(context.Options.InputLengthRestrictions.ClientId))
         {
             logger.LogError(context, "The parameter client_id is missing or too long");
             context.InvalidRequest("Invalid client_id");

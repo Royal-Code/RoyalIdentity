@@ -1,22 +1,18 @@
 ﻿// Ignore Spelling: Pkce
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Validators;
 
 public class PkceValidator : IValidator<IWithCodeChallenge>
 {
-    private readonly ServerOptions options;
     private readonly ILogger logger;
 
-    public PkceValidator(IOptions<ServerOptions> options, ILogger<PkceValidator> logger)
+    public PkceValidator(ILogger<PkceValidator> logger)
     {
-        this.options = options.Value;
         this.logger = logger;
     }
 
@@ -58,8 +54,9 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
             return default;
         }
 
-        if (codeChallenge.Length < options.InputLengthRestrictions.CodeChallengeMinLength ||
-            codeChallenge.Length > options.InputLengthRestrictions.CodeChallengeMaxLength)
+        var restrictions = context.Options.InputLengthRestrictions;
+        if (codeChallenge.Length < restrictions.CodeChallengeMinLength ||
+            codeChallenge.Length > restrictions.CodeChallengeMaxLength)
         {
             logger.LogError(context, "The parameter code_challenge is either too short or too long");
             context.InvalidRequest("Invalid code_challenge", "too long");

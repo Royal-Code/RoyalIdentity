@@ -43,8 +43,7 @@ public class EndSessionEndpoint : IEndpointHandler
             return EndpointErrorResults.MethodNotAllowed(httpContext);
         }
 
-        var serverOptions = httpContext.GetCurrentRealm().Options.ServerOptions;
-        var items = ContextItems.From(serverOptions);
+        var items = new ContextItems();
         var context = new EndSessionContext(httpContext, parameters, httpContext.User, items);
 
         return new EndpointCreationResult(context);

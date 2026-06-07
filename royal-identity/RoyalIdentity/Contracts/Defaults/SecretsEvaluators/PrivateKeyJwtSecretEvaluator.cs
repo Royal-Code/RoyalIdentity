@@ -5,7 +5,6 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
@@ -43,7 +42,9 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
             return null;
         }
 
-        if (assertion!.Length > options.InputLengthRestrictions.Jwt)
+        var restrictions = context.Options.InputLengthRestrictions;
+
+        if (assertion!.Length > restrictions.Jwt)
         {
             logger.LogError("Client assertion token exceeds maximum length.");
             return null;
@@ -66,7 +67,7 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
             return null;
         }
 
-        if (clientId.Length > options.InputLengthRestrictions.ClientId)
+        if (clientId.Length > restrictions.ClientId)
         {
             logger.LogError("Client ID exceeds maximum length.");
             return null;

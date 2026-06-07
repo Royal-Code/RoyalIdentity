@@ -41,9 +41,7 @@ public class JwkEndpoint : IEndpointHandler
             return EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled");
         }
 
-        var serverOptions = realmOptions.ServerOptions;
-        var items = ContextItems.From(serverOptions);
-        var context = new JwkContext(httpContext, items);
+        var context = new JwkContext(httpContext);
 
         return new EndpointCreationResult(context);
     }
