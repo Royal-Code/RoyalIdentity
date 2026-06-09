@@ -4,16 +4,16 @@
 
 ## Progresso
 
-`███---` **50%** - 3 de 6 fases concluidas
+`████--` **67%** - 4 de 6 fases concluidas
 
-**Andamento atual:** Fase 3 concluida. CSP, Logging, DispatchEvents e `InputLengthRestrictions` estao implementados e validados; proxima etapa e a Fase 4 (formato de token por realm).
+**Andamento atual:** Fase 4 concluida. O formato de token (`AccessTokenJwtType` e `EmitScopesAsSpaceDelimitedStringInJwt`) agora e resolvido por realm na emissao e validacao de JWTs; proxima etapa e a Fase 5 (CORS por realm e por client).
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Auditoria Final e Decisao de Modelo | Concluida |
 | Fase 2 - Autenticacao e UI por Realm | Concluida |
 | Fase 3 - CSP, Logging, Eventos e Limites | Concluida |
-| Fase 4 - Formato de Token por Realm | Pendente |
+| Fase 4 - Formato de Token por Realm | Concluida |
 | Fase 5 - CORS por Realm e por Client | Pendente |
 | Fase 6 - Testes de Isolamento e Regressao | Pendente |
 
@@ -417,15 +417,27 @@ Passos:
 
 Tarefas marcaveis:
 
-- [ ] Adicionar `AccessTokenJwtType` e `EmitScopesAsSpaceDelimitedStringInJwt` a `RealmOptions`, conforme a decisao da Fase 1.
-- [ ] Atualizar a criacao/copia de `RealmOptions` para copiar os defaults de formato de token sem compartilhar estado global.
-- [ ] Alterar `DefaultJwtFactory.CreateHeaderAsync` para ler `realm.Options.AccessTokenJwtType`.
-- [ ] Propagar `Realm` ou valor resolvido ate `CreatePayloadAsync`/`CreateJwtPayload` para serializacao de scopes.
-- [ ] Alterar `DefaultTokenValidator` para validar o `typ` esperado usando a opcao do realm que esta validando o token.
-- [ ] Remover capturas de `storage.ServerOptions` usadas apenas para formato de token ou limites migrados.
-- [ ] Criar testes com dois realms emitindo JWTs com `typ` e formato de `scope` diferentes.
+- [x] Adicionar `AccessTokenJwtType` e `EmitScopesAsSpaceDelimitedStringInJwt` a `RealmOptions`, conforme a decisao da Fase 1.
+- [x] Atualizar a criacao/copia de `RealmOptions` para copiar os defaults de formato de token sem compartilhar estado global.
+- [x] Alterar `DefaultJwtFactory.CreateHeaderAsync` para ler `realm.Options.AccessTokenJwtType`.
+- [x] Propagar `Realm` ou valor resolvido ate `CreatePayloadAsync`/`CreateJwtPayload` para serializacao de scopes.
+- [x] Alterar `DefaultTokenValidator` para validar o `typ` esperado usando a opcao do realm que esta validando o token.
+- [x] Remover capturas de `storage.ServerOptions` usadas apenas para formato de token ou limites migrados.
+- [x] Criar testes com dois realms emitindo JWTs com `typ` e formato de `scope` diferentes.
 
 Critério de aceite: tokens emitidos por realm A e realm B refletem as opcoes de seus proprios realms, e a validacao de token usa o `typ` esperado do realm em que a validacao esta ocorrendo.
+
+### Resultado da Fase 4
+
+**Status:** concluida.
+
+**Andamento:** fase concluida para formato de token por realm, incluindo copia dos defaults globais, migracao dos consumidores vivos e testes focados.
+
+**Implementacao:** `RealmOptions` agora possui `AccessTokenJwtType` e `EmitScopesAsSpaceDelimitedStringInJwt`, ambos copiados de `ServerOptions` na criacao do realm. `DefaultJwtFactory` nao captura mais `storage.ServerOptions`; `CreateHeaderAsync` le `realm.Options.AccessTokenJwtType` e `CreatePayloadAsync`/`CreateJwtPayload` recebem o realm para serializar `scope` conforme `realm.Options.EmitScopesAsSpaceDelimitedStringInJwt`. `DefaultTokenValidator` valida o `typ` esperado a partir do realm informado na validacao.
+
+**Teste focado executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "Phase4|TokenFormat|TokenValidator_UsesRealmSpecificJwtType|RealmOptions_CopyFromServer_PropagatesPhase4Values"` com `Logging__EventLog__LogLevel__Default=None` — aprovado, 4 testes. A primeira execucao sem esse override falhou por permissao do Windows EventLog no ambiente de teste, antes de expor a excecao real.
+
+**Teste amplo executado:** `dotnet test RoyalIdentity.sln --no-restore` com `Logging__EventLog__LogLevel__Default=None` — aprovado fora do sandbox, 102 testes no total (3 `Tests.Pipelines`, 6 `Tests.Identity`, 93 `Tests.Integration`). A execucao dentro do sandbox foi bloqueada por permissao de escrita das chaves de DataProtection em `%LOCALAPPDATA%\ASP.NET\DataProtection-Keys`.
 
 ---
 

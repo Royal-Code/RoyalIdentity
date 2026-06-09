@@ -18,6 +18,8 @@ public class RealmOptions
         Csp = new CspOptions(serverOptions.Csp);
         Logging = new LoggingOptions(serverOptions.Logging);
         InputLengthRestrictions = new InputLengthRestrictions(serverOptions.InputLengthRestrictions);
+        AccessTokenJwtType = serverOptions.AccessTokenJwtType;
+        EmitScopesAsSpaceDelimitedStringInJwt = serverOptions.EmitScopesAsSpaceDelimitedStringInJwt;
         DispatchEvents = serverOptions.DispatchEvents;
     }
 
@@ -112,6 +114,16 @@ public class RealmOptions
     /// Gets or sets whether the authorization parameters should be stored when authorize endpoint requires user interaction.
     /// </summary>
     public bool StoreAuthorizationParameters { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the value for the JWT 'typ' header for access tokens.
+    /// </summary>
+    public string AccessTokenJwtType { get; set; }
+
+    /// <summary>
+    /// Specifies whether scopes in JWTs are emitted as array or string.
+    /// </summary>
+    public bool EmitScopesAsSpaceDelimitedStringInJwt { get; set; }
 
     /// <summary>
     /// Specifies whether events should be dispatched or not.

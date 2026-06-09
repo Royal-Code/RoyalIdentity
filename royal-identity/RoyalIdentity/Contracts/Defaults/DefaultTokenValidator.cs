@@ -1,7 +1,6 @@
 ﻿// Ignore Spelling: jti
 
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Models;
@@ -17,7 +16,6 @@ public class DefaultTokenValidator : ITokenValidator
     private readonly IKeyManager keys;
     private readonly IStorage storage;
     private readonly ILogger logger;
-    private readonly ServerOptions options;
     private readonly TimeProvider clock;
 
     public DefaultTokenValidator(
@@ -30,7 +28,6 @@ public class DefaultTokenValidator : ITokenValidator
         this.storage = storage;
         this.logger = logger;
         this.clock = clock;
-        options = storage.ServerOptions;
     }
 
     public async Task<TokenEvaluationResult> ValidateJwtAccessTokenAsync(
@@ -45,10 +42,11 @@ public class DefaultTokenValidator : ITokenValidator
         }
 
         // if no audience is specified, we make at least sure that it is an access token
+        var expectedAccessTokenJwtType = realm.Options.AccessTokenJwtType;
         if (audience.IsMissing() &&
-            options.AccessTokenJwtType.IsPresent() &&
+            expectedAccessTokenJwtType.IsPresent() &&
             securityToken is JwtSecurityToken jwtSecurityToken &&
-            !string.Equals(jwtSecurityToken.Header.Typ, options.AccessTokenJwtType))
+            !string.Equals(jwtSecurityToken.Header.Typ, expectedAccessTokenJwtType))
         {
             return new(new ErrorDetails()
             {

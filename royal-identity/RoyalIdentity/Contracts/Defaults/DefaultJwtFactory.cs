@@ -1,10 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
-using RoyalIdentity.Options;
 using RoyalIdentity.Utils;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
@@ -17,18 +15,15 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultJwtFactory : IJwtFactory
 {
-    private readonly ServerOptions options;
     private readonly IKeyManager keys;
     private readonly TimeProvider clock;
     private readonly ILogger logger;
 
     public DefaultJwtFactory(
-        IStorage storage, 
         IKeyManager keys,
         TimeProvider clock,
         ILogger<DefaultJwtFactory> logger)
     {
-        options = storage.ServerOptions;
         this.keys = keys;
         this.clock = clock;
         this.logger = logger;
@@ -37,7 +32,7 @@ public class DefaultJwtFactory : IJwtFactory
     public async Task CreateTokenAsync(Realm realm, TokenBase token, CancellationToken ct)
     {
         var header = await CreateHeaderAsync(realm, token, ct);
-        var payload = await CreatePayloadAsync(token, ct);
+        var payload = await CreatePayloadAsync(realm, token, ct);
         var jst = new JwtSecurityToken(header, payload);
 
         var jwt = await CreateJwtAsync(jst, ct);
@@ -57,7 +52,7 @@ public class DefaultJwtFactory : IJwtFactory
 
         var header = new JwtHeader(credential)
         {
-            [JwtRegisteredClaimNames.Typ] = options.AccessTokenJwtType
+            [JwtRegisteredClaimNames.Typ] = realm.Options.AccessTokenJwtType
         };
 
         // emit x5t claim for backwards compatibility with v4 of MS JWT library
@@ -83,9 +78,9 @@ public class DefaultJwtFactory : IJwtFactory
     /// </summary>
     /// <param name="token">The token.</param>
     /// <returns>The JWT payload</returns>
-    protected virtual ValueTask<JwtPayload> CreatePayloadAsync(TokenBase token, CancellationToken ct)
+    protected virtual ValueTask<JwtPayload> CreatePayloadAsync(Realm realm, TokenBase token, CancellationToken ct)
     {
-        var payload = CreateJwtPayload(token);
+        var payload = CreateJwtPayload(realm, token);
         return ValueTask.FromResult(payload);
     }
 
@@ -110,7 +105,7 @@ public class DefaultJwtFactory : IJwtFactory
     /// <returns></returns>
     /// <exception cref="Exception">
     /// </exception>
-    protected virtual JwtPayload CreateJwtPayload(TokenBase token)
+    protected virtual JwtPayload CreateJwtPayload(Realm realm, TokenBase token)
     {
         var now = clock.GetUtcNow().UtcDateTime;
 
@@ -146,7 +141,7 @@ public class DefaultJwtFactory : IJwtFactory
         {
             var scopeValues = scopeClaims.Select(x => x.Value).ToArray();
 
-            if (options.EmitScopesAsSpaceDelimitedStringInJwt)
+            if (realm.Options.EmitScopesAsSpaceDelimitedStringInJwt)
             {
                 payload.Add(Jwt.ClaimTypes.Scope, string.Join(" ", scopeValues));
             }
