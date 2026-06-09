@@ -31,12 +31,6 @@ public static class LoggerExtensions
     }
 
     internal static void LogError(this ILogger logger,
-        ServerOptions options,
-        string message,
-        IEndpointContextBase context)
-        => logger.LogError(options.Logging, message, context);
-
-    internal static void LogError(this ILogger logger,
         LoggingOptions options,
         string message,
         IEndpointContextBase context)
@@ -49,13 +43,6 @@ public static class LoggerExtensions
             // TODO: chamar o log sevice
         }
     }
-
-    internal static void LogError(this ILogger logger,
-        ServerOptions options,
-        string message,
-        string? details,
-        IEndpointContextBase context)
-        => logger.LogError(options.Logging, message, details, context);
 
     internal static void LogError(this ILogger logger,
         LoggingOptions options,
@@ -71,13 +58,6 @@ public static class LoggerExtensions
             // TODO: chamar o log sevice
         }
     }
-
-    internal static void LogError(this ILogger logger,
-        ServerOptions options,
-        Exception ex,
-        string message,
-        IEndpointContextBase context)
-        => logger.LogError(options.Logging, ex, message, context);
 
     internal static void LogError(this ILogger logger,
         LoggingOptions options,
