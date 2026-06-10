@@ -103,6 +103,11 @@ public class Client
     public HashSet<string> RedirectUris { get; } = [];
 
     /// <summary>
+    /// Specifies origins allowed to make cross-origin requests as this client.
+    /// </summary>
+    public HashSet<string> AllowedCorsOrigins { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Specifies allowed URIs to redirect to after logout
     /// </summary>
     public HashSet<string> PostLogoutRedirectUris { get; } = [];

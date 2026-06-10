@@ -27,6 +27,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseRealmDiscovery();
+app.UseRealmCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

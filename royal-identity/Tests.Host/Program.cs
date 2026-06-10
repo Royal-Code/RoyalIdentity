@@ -18,6 +18,7 @@ app.UseStaticFiles();
 app.UseExceptionHandler("/Exception", createScopeForErrors: true);
 
 app.UseRealmDiscovery();
+app.UseRealmCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

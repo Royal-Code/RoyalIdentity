@@ -4,9 +4,9 @@
 
 ## Progresso
 
-`████--` **67%** - 4 de 6 fases concluidas
+`█████-` **83%** - 5 de 6 fases concluidas
 
-**Andamento atual:** Fase 4 concluida. O formato de token (`AccessTokenJwtType` e `EmitScopesAsSpaceDelimitedStringInJwt`) agora e resolvido por realm na emissao e validacao de JWTs; proxima etapa e a Fase 5 (CORS por realm e por client).
+**Andamento atual:** Fase 5 concluida. CORS por realm e por client esta implementado e validado; proxima etapa e a Fase 6 (testes finais de isolamento e regressao).
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 2 - Autenticacao e UI por Realm | Concluida |
 | Fase 3 - CSP, Logging, Eventos e Limites | Concluida |
 | Fase 4 - Formato de Token por Realm | Concluida |
-| Fase 5 - CORS por Realm e por Client | Pendente |
+| Fase 5 - CORS por Realm e por Client | Concluida |
 | Fase 6 - Testes de Isolamento e Regressao | Pendente |
 
 ---
@@ -482,20 +482,42 @@ Regras sugeridas:
 4. Nao usar `RedirectUris` como substituto automatico para `AllowedCorsOrigins` sem uma decisao documentada.
 5. Responder com `Vary: Origin` quando refletir a origem.
 
+Decisoes implementadas:
+
+- `RealmOptions.Cors.Enabled = false` por default; quando desligado, o middleware nao aplica politica CORS.
+- `ServerOptions.Cors` existe apenas como template/default global para novos realms; a politica efetiva em request vem de `realm.Options.Cors`.
+- Origem permitida por realm vale para qualquer request CORS nos endpoints listados em `Constants.Oidc.Routes.CorsPaths`.
+- Origem permitida por client so vale quando o `client_id` pode ser identificado. Em requests reais, o middleware pode ler `client_id` da query ou do form; em preflight, le apenas a query.
+- Preflight sem `client_id` **nao** varre todos os clients do realm. Ele so pode ser permitido por `realm.Options.Cors.AllowedOrigins`.
+- `RedirectUris` e `PostLogoutRedirectUris` nao sao inferidos como origens CORS.
+- Wildcard de origem (`*`) nao e aceito quando `AllowCredentials = true`.
+
 Tarefas marcaveis:
 
-- [ ] Criar `CorsOptions` e adicionar `RealmOptions.Cors`, com `Enabled = false` por default salvo decisao contraria registrada.
-- [ ] Adicionar `Client.AllowedCorsOrigins` sem inferir valores de `RedirectUris`.
-- [ ] Criar policy service ou middleware CORS realm-aware no projeto `RoyalIdentity`, sem dependencia do storage in-memory.
-- [ ] Posicionar o wiring depois de `UseRealmDiscovery` e antes de `UseAuthentication`.
-- [ ] Responder preflight `OPTIONS` para paths presentes em `Constants.Oidc.Routes.CorsPaths`.
-- [ ] Validar origem por scheme/host/porta e validar `Access-Control-Request-Method`.
-- [ ] Validar headers solicitados quando `Access-Control-Request-Headers` estiver presente.
-- [ ] Emitir `Vary: Origin` quando refletir origem permitida.
-- [ ] Bloquear wildcard quando `AllowCredentials = true`.
-- [ ] Documentar e testar a decisao para preflight sem `client_id`.
+- [x] Criar `CorsOptions` e adicionar `RealmOptions.Cors`, com `Enabled = false` por default salvo decisao contraria registrada.
+- [x] Adicionar `Client.AllowedCorsOrigins` sem inferir valores de `RedirectUris`.
+- [x] Criar policy service ou middleware CORS realm-aware no projeto `RoyalIdentity`, sem dependencia do storage in-memory.
+- [x] Posicionar o wiring depois de `UseRealmDiscovery` e antes de `UseAuthentication`.
+- [x] Responder preflight `OPTIONS` para paths presentes em `Constants.Oidc.Routes.CorsPaths`.
+- [x] Validar origem por scheme/host/porta e validar `Access-Control-Request-Method`.
+- [x] Validar headers solicitados quando `Access-Control-Request-Headers` estiver presente.
+- [x] Emitir `Vary: Origin` quando refletir origem permitida.
+- [x] Bloquear wildcard quando `AllowCredentials = true`.
+- [x] Documentar e testar a decisao para preflight sem `client_id`.
 
 Critério de aceite: requests cross-origin entre realms nao podem vazar permissoes; origem permitida em realm A nao deve ser aceita automaticamente em realm B; preflight permitido deve retornar os headers CORS esperados; preflight negado nao deve refletir a origem.
+
+### Resultado da Fase 5
+
+**Status:** concluida.
+
+**Andamento:** fase concluida para CORS por realm e por client, incluindo option model, middleware, wiring e testes focados de isolamento.
+
+**Implementacao:** `CorsOptions` foi criado com `Enabled = false` por default e colecoes independentes para origens, metodos e headers. `ServerOptions.Cors` funciona como template global, `RealmOptions.Cors` e a politica efetiva por realm, e `Client.AllowedCorsOrigins` permite origem por client sem inferir de redirects, usando comparador case-insensitive. `RealmCorsMiddleware` roda depois de `UseRealmDiscovery` e antes de `UseAuthentication`; ele avalia apenas `Constants.Oidc.Routes.CorsPaths`, resolve `IStorage` por request, normaliza origem por scheme/host/porta, valida metodo/header de preflight, marca `Vary: Origin` para todo request CORS em path CORS, reflete origem permitida e bloqueia wildcard quando `AllowCredentials = true`.
+
+**Teste focado executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "Cors|Phase5"` com `Logging__EventLog__LogLevel__Default=None` — aprovado, 11 testes.
+
+**Teste amplo executado:** `dotnet test RoyalIdentity.sln --no-restore` com `Logging__EventLog__LogLevel__Default=None` — aprovado fora do sandbox, 113 testes no total (3 `Tests.Pipelines`, 6 `Tests.Identity`, 104 `Tests.Integration`).
 
 ---
 

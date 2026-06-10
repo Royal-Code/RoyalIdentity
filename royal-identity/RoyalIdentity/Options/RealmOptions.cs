@@ -16,6 +16,7 @@ public class RealmOptions
         ServerOptions = serverOptions;
         Authentication = new AuthenticationOptions(serverOptions.Authentication);
         Csp = new CspOptions(serverOptions.Csp);
+        Cors = new CorsOptions(serverOptions.Cors);
         Logging = new LoggingOptions(serverOptions.Logging);
         InputLengthRestrictions = new InputLengthRestrictions(serverOptions.InputLengthRestrictions);
         AccessTokenJwtType = serverOptions.AccessTokenJwtType;
@@ -47,6 +48,11 @@ public class RealmOptions
     /// Gets or sets the Content Security Policy options.
     /// </summary>
     public CspOptions Csp { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CORS options.
+    /// </summary>
+    public CorsOptions Cors { get; set; }
 
     /// <summary>
     /// Gets or sets the logging options.

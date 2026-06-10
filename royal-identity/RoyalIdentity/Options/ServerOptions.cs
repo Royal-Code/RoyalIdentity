@@ -55,6 +55,11 @@ public class ServerOptions
     public CspOptions Csp { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the CORS defaults for new realms.
+    /// </summary>
+    public CorsOptions Cors { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the mutual TLS options.
     /// </summary>
     public MutualTlsOptions MutualTls { get; set; } = new();
