@@ -5,6 +5,36 @@ namespace RoyalIdentity.Options;
 /// </summary>
 public class AccountOptions
 {
+    public AccountOptions()
+    {
+    }
+
+    public AccountOptions(AccountOptions other)
+    {
+        AllowLocalLogin = other.AllowLocalLogin;
+        AllowRememberLogin = other.AllowRememberLogin;
+        RememberMeLoginDuration = other.RememberMeLoginDuration;
+        AllowRegistration = other.AllowRegistration;
+        AllowForgotPassword = other.AllowForgotPassword;
+        AllowChangePassword = other.AllowChangePassword;
+        AllowUpdateProfile = other.AllowUpdateProfile;
+        AllowChangeEmail = other.AllowChangeEmail;
+        AllowChangeUsername = other.AllowChangeUsername;
+        AllowChangePhoneNumber = other.AllowChangePhoneNumber;
+        AllowDeleteAccount = other.AllowDeleteAccount;
+        AllowTwoFactorAuthentication = other.AllowTwoFactorAuthentication;
+        AllowSocialLogin = other.AllowSocialLogin;
+        EmailAsUsername = other.EmailAsUsername;
+        LoginWithEmail = other.LoginWithEmail;
+        AllowDuplicateEmail = other.AllowDuplicateEmail;
+        VerifyEmail = other.VerifyEmail;
+        AutomaticRedirectAfterSignOut = other.AutomaticRedirectAfterSignOut;
+        PasswordOptions = new PasswordOptions(other.PasswordOptions);
+        InvalidCredentialsErrorMessage = other.InvalidCredentialsErrorMessage;
+        InactiveUserErrorMessage = other.InactiveUserErrorMessage;
+        BlockedUserErrorMessage = other.BlockedUserErrorMessage;
+    }
+
     public bool AllowLocalLogin { get; set; } = true;
 
     public bool AllowRememberLogin { get; set; } = true;

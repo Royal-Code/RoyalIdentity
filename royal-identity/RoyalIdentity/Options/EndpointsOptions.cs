@@ -5,6 +5,24 @@
 /// </summary>
 public class EndpointsOptions
 {
+    public EndpointsOptions()
+    {
+    }
+
+    public EndpointsOptions(EndpointsOptions other)
+    {
+        EnableAuthorizeEndpoint = other.EnableAuthorizeEndpoint;
+        EnableJwtRequestUri = other.EnableJwtRequestUri;
+        EnableTokenEndpoint = other.EnableTokenEndpoint;
+        EnableUserInfoEndpoint = other.EnableUserInfoEndpoint;
+        EnableDiscoveryEndpoint = other.EnableDiscoveryEndpoint;
+        EnableEndSessionEndpoint = other.EnableEndSessionEndpoint;
+        EnableCheckSessionEndpoint = other.EnableCheckSessionEndpoint;
+        EnableTokenRevocationEndpoint = other.EnableTokenRevocationEndpoint;
+        EnableIntrospectionEndpoint = other.EnableIntrospectionEndpoint;
+        EnableDeviceAuthorizationEndpoint = other.EnableDeviceAuthorizationEndpoint;
+    }
+
     /// <summary>
     /// Gets or sets a value indicating whether the authorize endpoint is enabled.
     /// </summary>

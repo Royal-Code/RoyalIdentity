@@ -7,6 +7,23 @@ namespace RoyalIdentity.Options;
 /// </summary>
 public class KeyOptions
 {
+    public KeyOptions()
+    {
+    }
+
+    public KeyOptions(KeyOptions other)
+    {
+        MainSigningCredentialsAlgorithm = other.MainSigningCredentialsAlgorithm;
+        DefaultSigningCredentialsLifetime = other.DefaultSigningCredentialsLifetime;
+        RsaKeySizeInBytes = other.RsaKeySizeInBytes;
+
+        SigningCredentialsAlgorithms.Clear();
+        foreach (var algorithm in other.SigningCredentialsAlgorithms)
+        {
+            SigningCredentialsAlgorithms.Add(algorithm);
+        }
+    }
+
     /// <summary>
     /// The main signature credential algorithm
     /// </summary>

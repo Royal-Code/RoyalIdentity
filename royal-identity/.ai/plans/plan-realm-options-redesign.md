@@ -1,12 +1,12 @@
 # Plan: RealmOptions e CORS por Realm
 
-## Status: IN_PROGRESS
+## Status: COMPLETED
 
 ## Progresso
 
-`█████-` **83%** - 5 de 6 fases concluidas
+`██████` **100%** - 6 de 6 fases concluidas
 
-**Andamento atual:** Fase 5 concluida. CORS por realm e por client esta implementado e validado; proxima etapa e a Fase 6 (testes finais de isolamento e regressao).
+**Andamento atual:** plano concluido. Todas as fases foram implementadas e validadas; `RealmOptions` cobre os grupos promovidos, CORS por realm/client esta conectado ao pipeline, e os testes finais de isolamento/regressao foram executados.
 
 | Fase | Estado |
 |---|---|
@@ -15,7 +15,7 @@
 | Fase 3 - CSP, Logging, Eventos e Limites | Concluida |
 | Fase 4 - Formato de Token por Realm | Concluida |
 | Fase 5 - CORS por Realm e por Client | Concluida |
-| Fase 6 - Testes de Isolamento e Regressao | Pendente |
+| Fase 6 - Testes de Isolamento e Regressao | Concluida |
 
 ---
 
@@ -547,11 +547,11 @@ Notas para testes:
 
 Tarefas marcaveis:
 
-- [ ] Criar classe dedicada em `Tests.Integration` para os testes de RealmOptions/CORS.
-- [ ] Adicionar helper de criacao de realm com opcoes independentes.
-- [ ] Adicionar helpers para token request, preflight CORS e actual CORS request quando houver duplicacao.
-- [ ] Executar o recorte focado de testes.
-- [ ] Executar `dotnet test RoyalIdentity.sln --no-restore` antes de concluir o plano.
+- [x] Criar classe dedicada em `Tests.Integration` para os testes de RealmOptions/CORS.
+- [x] Adicionar helper de criacao de realm com opcoes independentes.
+- [x] Adicionar helpers para token request, preflight CORS e actual CORS request quando houver duplicacao.
+- [x] Executar o recorte focado de testes.
+- [x] Executar `dotnet test RoyalIdentity.sln --no-restore` antes de concluir o plano.
 
 Critério de aceite final:
 
@@ -564,6 +564,22 @@ Se o ambiente local bloquear algum logger/plataforma, registrar a limitacao e ro
 ```powershell
 dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "Cors|RealmOptions|TokenFormat|AuthenticationOptions"
 ```
+
+### Resultado da Fase 6
+
+**Status:** concluida.
+
+**Andamento:** fase concluida para testes finais de isolamento e regressao. Os testes ja criados nas Fases 2-5 cobrem autenticacao, CSP, eventos, formato de token e CORS; a Fase 6 adicionou a suite consolidada de copia/propagacao.
+
+**Implementacao:** `RealmOptions(RealmOptions other)` foi implementado para clonar todas as options do realm mantendo apenas a referencia global `ServerOptions`. `RealmOptions(ServerOptions)` agora tambem copia `Discovery`, `Endpoints`, `MutualTls` e `Keys` dos defaults globais. Foram adicionados copy-constructors para `DiscoveryOptions`, `EndpointsOptions`, `MutualTlsOptions`, `KeyOptions`, `RealmUIOptions`, `CacheOptions`, `AccountOptions`, `PasswordOptions` e `RealmBrandingOptions`.
+
+**Testes adicionados:** `RealmOptions_CopyOnCreate_DoesNotSharePromotedOptions`, `RealmOptions_CopyFromServer_PropagatesConfiguredValues` e `RealmOptions_CopyFromRealm_IsIndependent` em `Tests.Integration/Realm/RealmOptionsPhase6Tests.cs`.
+
+**Recorte focado executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "Phase6|RealmOptions_Copy"` com `Logging__EventLog__LogLevel__Default=None` — aprovado, 8 testes.
+
+**Recorte de aceite final executado:** `dotnet test Tests.Integration/Tests.Integration.csproj --no-restore --filter "Cors|RealmOptions|TokenFormat|AuthenticationOptions"` com `Logging__EventLog__LogLevel__Default=None` — aprovado, 26 testes.
+
+**Teste amplo executado:** `dotnet test RoyalIdentity.sln --no-restore` com `Logging__EventLog__LogLevel__Default=None` — aprovado fora do sandbox, 116 testes no total (3 `Tests.Pipelines`, 6 `Tests.Identity`, 107 `Tests.Integration`). A execucao ampla precisa rodar fora do sandbox neste ambiente porque os fluxos de UI gravam chaves de DataProtection em `%LOCALAPPDATA%\ASP.NET\DataProtection-Keys`.
 
 ---
 
@@ -674,6 +690,8 @@ Após validar os apontamentos faça:
 
 **Decisão:** deixar para cada fase implementar a cópia das opções que ela promove ou passa a depender. A Fase 2 cobre `Authentication`; as próximas fases completam os demais grupos, e a Fase 6 fecha os testes de propagação/não-compartilhamento.
 
+**Correção final aplicada:** na Fase 6, `RealmOptions(ServerOptions)` passou a copiar também `Discovery`, `Endpoints`, `MutualTls` e `Keys`, com copy-constructors dedicados e testes de propagação.
+
 **Status:** corrigido
 
 #### `RealmOptions(RealmOptions other)` ainda não implementado
@@ -685,5 +703,7 @@ Após validar os apontamentos faça:
 **Validação:** válido como pendência de acompanhamento. A ausência de `RealmOptions(RealmOptions other)` contradiz o contrato-alvo completo da Fase 1, mas não bloqueia a Fase 2 porque nenhum fluxo de autenticação/UI depende de clonar options a partir de outro realm.
 
 **Decisão:** deixar para a fase certa: implementar junto da suíte de cópia da Fase 6 ou quando a base de Realm Templates exigir esse clone.
+
+**Correção final aplicada:** na Fase 6, `RealmOptions(RealmOptions other)` foi implementado e coberto por `RealmOptions_CopyFromRealm_IsIndependent`.
 
 **Status:** corrigido

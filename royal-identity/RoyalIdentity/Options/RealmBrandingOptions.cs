@@ -5,6 +5,17 @@ namespace RoyalIdentity.Options;
 /// </summary>
 public class RealmBrandingOptions
 {
+    public RealmBrandingOptions()
+    {
+    }
+
+    public RealmBrandingOptions(RealmBrandingOptions other)
+    {
+        LogoUri = other.LogoUri;
+        FaviconUri = other.FaviconUri;
+        PrimaryColor = other.PrimaryColor;
+    }
+
     /// <summary>
     /// URI to the realm's logo image. If null, the default server logo is shown.
     /// </summary>

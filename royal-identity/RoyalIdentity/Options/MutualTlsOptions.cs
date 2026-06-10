@@ -5,6 +5,18 @@ namespace RoyalIdentity.Options;
 /// </summary>
 public class MutualTlsOptions
 {
+    public MutualTlsOptions()
+    {
+    }
+
+    public MutualTlsOptions(MutualTlsOptions other)
+    {
+        Enabled = other.Enabled;
+        ClientCertificateAuthenticationScheme = other.ClientCertificateAuthenticationScheme;
+        DomainName = other.DomainName;
+        AlwaysEmitConfirmationClaim = other.AlwaysEmitConfirmationClaim;
+    }
+
     /// <summary>
     /// Specifies if MTLS support should be enabled
     /// </summary>

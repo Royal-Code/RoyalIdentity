@@ -17,11 +17,44 @@ public class RealmOptions
         Authentication = new AuthenticationOptions(serverOptions.Authentication);
         Csp = new CspOptions(serverOptions.Csp);
         Cors = new CorsOptions(serverOptions.Cors);
+        Discovery = new DiscoveryOptions(serverOptions.Discovery);
+        Endpoints = new EndpointsOptions(serverOptions.Endpoints);
+        MutualTls = new MutualTlsOptions(serverOptions.MutualTls);
+        Keys = new KeyOptions(serverOptions.Keys);
         Logging = new LoggingOptions(serverOptions.Logging);
         InputLengthRestrictions = new InputLengthRestrictions(serverOptions.InputLengthRestrictions);
         AccessTokenJwtType = serverOptions.AccessTokenJwtType;
         EmitScopesAsSpaceDelimitedStringInJwt = serverOptions.EmitScopesAsSpaceDelimitedStringInJwt;
         DispatchEvents = serverOptions.DispatchEvents;
+    }
+
+    /// <summary>
+    /// Creates a new independent copy of another <see cref="RealmOptions"/> instance.
+    /// </summary>
+    /// <param name="other">The realm options to copy.</param>
+    public RealmOptions(RealmOptions other)
+    {
+        ServerOptions = other.ServerOptions;
+        Discovery = new DiscoveryOptions(other.Discovery);
+        UI = new RealmUIOptions(other.UI);
+        Authentication = new AuthenticationOptions(other.Authentication);
+        Csp = new CspOptions(other.Csp);
+        Cors = new CorsOptions(other.Cors);
+        Logging = new LoggingOptions(other.Logging);
+        InputLengthRestrictions = new InputLengthRestrictions(other.InputLengthRestrictions);
+        Endpoints = new EndpointsOptions(other.Endpoints);
+        MutualTls = new MutualTlsOptions(other.MutualTls);
+        Keys = new KeyOptions(other.Keys);
+        Caching = new CacheOptions(other.Caching);
+        Account = new AccountOptions(other.Account);
+        Branding = new RealmBrandingOptions(other.Branding);
+        IssuerUri = other.IssuerUri;
+        LowerCaseIssuerUri = other.LowerCaseIssuerUri;
+        IncludeRealmPathToIssuerUri = other.IncludeRealmPathToIssuerUri;
+        StoreAuthorizationParameters = other.StoreAuthorizationParameters;
+        AccessTokenJwtType = other.AccessTokenJwtType;
+        EmitScopesAsSpaceDelimitedStringInJwt = other.EmitScopesAsSpaceDelimitedStringInJwt;
+        DispatchEvents = other.DispatchEvents;
     }
 
     /// <summary>

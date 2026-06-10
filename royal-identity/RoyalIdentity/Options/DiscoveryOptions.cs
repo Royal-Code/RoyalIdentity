@@ -7,6 +7,69 @@ namespace RoyalIdentity.Options;
 /// </summary>
 public class DiscoveryOptions
 {
+    public DiscoveryOptions()
+    {
+    }
+
+    public DiscoveryOptions(DiscoveryOptions other)
+    {
+        ShowEndpoints = other.ShowEndpoints;
+        ShowKeySet = other.ShowKeySet;
+        ShowIdentityScopes = other.ShowIdentityScopes;
+        ShowApiScopes = other.ShowApiScopes;
+        ShowClaims = other.ShowClaims;
+        ShowResponseTypes = other.ShowResponseTypes;
+        ShowResponseModes = other.ShowResponseModes;
+        ShowGrantTypes = other.ShowGrantTypes;
+        ShowExtensionGrantTypes = other.ShowExtensionGrantTypes;
+        ShowTokenEndpointAuthenticationMethods = other.ShowTokenEndpointAuthenticationMethods;
+        ExpandRelativePathsInCustomEntries = other.ExpandRelativePathsInCustomEntries;
+        ResponseCacheInterval = other.ResponseCacheInterval;
+        CustomEntries = new(other.CustomEntries);
+
+        SupportedResponseTypes.Clear();
+        foreach (var value in other.SupportedResponseTypes)
+        {
+            SupportedResponseTypes.Add(value);
+        }
+
+        CodeChallengeMethodsSupported.Clear();
+        foreach (var value in other.CodeChallengeMethodsSupported)
+        {
+            CodeChallengeMethodsSupported.Add(value);
+        }
+
+        SupportedResponseModes.Clear();
+        foreach (var value in other.SupportedResponseModes)
+        {
+            SupportedResponseModes.Add(value);
+        }
+
+        SupportedSubjectTypes.Clear();
+        foreach (var value in other.SupportedSubjectTypes)
+        {
+            SupportedSubjectTypes.Add(value);
+        }
+
+        SupportedDisplayModes.Clear();
+        foreach (var value in other.SupportedDisplayModes)
+        {
+            SupportedDisplayModes.Add(value);
+        }
+
+        SupportedPromptModes.Clear();
+        foreach (var value in other.SupportedPromptModes)
+        {
+            SupportedPromptModes.Add(value);
+        }
+
+        SupportedTokenTypeHints.Clear();
+        foreach (var value in other.SupportedTokenTypeHints)
+        {
+            SupportedTokenTypeHints.Add(value);
+        }
+    }
+
     /// <summary>
     /// Show endpoints
     /// </summary>

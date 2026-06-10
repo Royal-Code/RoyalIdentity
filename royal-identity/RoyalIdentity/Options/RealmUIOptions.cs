@@ -2,6 +2,25 @@
 
 public class RealmUIOptions
 {
+    public RealmUIOptions()
+    {
+    }
+
+    public RealmUIOptions(RealmUIOptions other)
+    {
+        LoginPath = other.LoginPath;
+        LoginParameter = other.LoginParameter;
+        LogoutPath = other.LogoutPath;
+        LoggingOutPath = other.LoggingOutPath;
+        LoggedOutPath = other.LoggedOutPath;
+        LogoutParameter = other.LogoutParameter;
+        AccessDeniedPath = other.AccessDeniedPath;
+        ConsentPath = other.ConsentPath;
+        ConsentParameter = other.ConsentParameter;
+        DeviceVerificationPath = other.DeviceVerificationPath;
+        DeviceVerificationParameter = other.DeviceVerificationParameter;
+    }
+
     /// <summary>
     /// Gets or sets the login URL. If a local URL, the value must start with a leading slash.
     /// </summary>

@@ -14,16 +14,19 @@ public class CorsOptions
         Enabled = other.Enabled;
         AllowCredentials = other.AllowCredentials;
 
+        AllowedOrigins.Clear();
         foreach (var origin in other.AllowedOrigins)
         {
             AllowedOrigins.Add(origin);
         }
 
+        AllowedHeaders.Clear();
         foreach (var header in other.AllowedHeaders)
         {
             AllowedHeaders.Add(header);
         }
 
+        AllowedMethods.Clear();
         foreach (var method in other.AllowedMethods)
         {
             AllowedMethods.Add(method);

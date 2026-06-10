@@ -5,6 +5,32 @@
 /// </summary>
 public class PasswordOptions
 {
+    public PasswordOptions()
+    {
+    }
+
+    public PasswordOptions(PasswordOptions other)
+    {
+        AllowForgotPassword = other.AllowForgotPassword;
+        AllowChangePassword = other.AllowChangePassword;
+        MaxFailedAccessAttempts = other.MaxFailedAccessAttempts;
+        AccountLockoutDurationMinutes = other.AccountLockoutDurationMinutes;
+        EnablePasswordExpiration = other.EnablePasswordExpiration;
+        PasswordExpirationDays = other.PasswordExpirationDays;
+        EnforcePasswordHistory = other.EnforcePasswordHistory;
+        PasswordHistoryCount = other.PasswordHistoryCount;
+        MinimumLength = other.MinimumLength;
+        MaximumLength = other.MaximumLength;
+        RequireSpecialCharacters = other.RequireSpecialCharacters;
+        RequireDigit = other.RequireDigit;
+        RequireLowercase = other.RequireLowercase;
+        RequireUppercase = other.RequireUppercase;
+        MinimumUniqueCharacters = other.MinimumUniqueCharacters;
+        DisallowUsernameInPassword = other.DisallowUsernameInPassword;
+        DisallowBirthdateInPassword = other.DisallowBirthdateInPassword;
+        DisallowedWordsInPassword = [.. other.DisallowedWordsInPassword];
+    }
+
     /// <summary>
     /// Determines if the forgot password feature is enabled.
     /// Default is true.
