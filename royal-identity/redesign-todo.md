@@ -29,8 +29,8 @@ O componente resources, o qual trata scopes, tem três tipos de recursos ou scop
 
 Para evitar confusões do que se tratam isso, será refatorado da seguinte forma:
 - IdentityResources -> IdentityScopes
-- ApiScopes -> Scopes
-- ApiResources -> Resources
+- ApiScopes -> Scope
+- ApiResources -> ResourceServer
 
 O próprio objeto Resources precisa ser refatorado para RequestedResources.
 
@@ -44,20 +44,17 @@ Então, para controlar o acesso a recursos, será feito da seguinte forma:
 
 - **ResourceServer**: um serviço que disponibiliza recursos para os clientes consumirem, como um WebApi. 
 O servidor de recursos tem o mesmo papel definido o OAuth2, que é fornecer de recursos protegidos aos clientes autorizados.
-- **Resource**: um recurso é uma funcionalidade disponibilizada pelo ResourceServer.
-Pode ser uma página web, um documento ou arquivo, um grupo de endpoints de uma API, etc.
-- **Scope**: é uma operação que pode ser executada sobre um recurso.
-Pode estar relacionado ao verbo HTTP, como GET, POST, PUT, DELETE, etc.
-Pode ser operações que podem ser executadas sobre um recurso, como leitura, escrita, atualização, exclusão, etc.
+- **Scope**: um recurso é uma funcionalidade disponibilizada pelo ResourceServer.
+Pode ser uma página web, um documento ou arquivo, um grupo de endpoints de uma API, etc. Pode ser operações que podem ser executadas sobre um recurso, como leitura, escrita, atualização, exclusão, etc.
 
-Cada um dos tipos de recursos, IdentityScope, ResourceServer, Resource, Scope, terá um nome como recurso.
+Cada um dos tipos de recursos, IdentityScope, ResourceServer, Scope, terá um nome como recurso.
 O *scope* solicitado pelo cliente, será o nome do recurso.
 
-Quando selecionado o recurso, o cliente terá acesso a todos os *scopes* do recurso.
 Quando selecionado o *scope*, o cliente terá acesso apenas a operação do *scope*.
-Quando selecionado o *ResourceServer*, o cliente terá acesso a todos os recursos do *ResourceServer*.
+Quando selecionado o *ResourceServer*, o cliente terá acesso a todos os recursos do *ResourceServer*. (Isso é questionável, depende mais do como funciona a implementação do Resource Server do que pode ser decidido aqui).
+O que melhor pode ser feito é ao adicionar um *ResourceServer* como permitido para o client, todos os *scope* daquele *ResourceServer* podem ser usados nas requisições.
 
-Na hora de adicionar os scopes ao token, apenas os *scopes* do recurso serão adicionados.
+Na hora de adicionar os scopes ao token, apenas os *scopes* requeridos serão adicionados
 
 Para exibir o consentimento, todos os *scopes* do recurso serão exibidos.
 

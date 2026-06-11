@@ -15,14 +15,20 @@ Completed refactoring plans (useful as historical record and for understanding d
 - [.ai/plans/plan-constants-refactoring.md](.ai/plans/plan-constants-refactoring.md) — COMPLETED
 - [.ai/plans/plan-contexts-redesign.md](.ai/plans/plan-contexts-redesign.md) — COMPLETED
 - [.ai/plans/plan-ui-screens-refactoring.md](.ai/plans/plan-ui-screens-refactoring.md) — COMPLETED
+- [.ai/plans/plan-realm-hardening.md](.ai/plans/plan-realm-hardening.md) — COMPLETED (realm isolation, events, branding, IRealmManager)
+- [.ai/plans/plan-realm-options-redesign.md](.ai/plans/plan-realm-options-redesign.md) — COMPLETED (per-realm RealmOptions, copy-on-create, CORS)
 
 Active plans (check status before modifying affected areas):
 
-- [.ai/plans/plan-realm-hardening.md](.ai/plans/plan-realm-hardening.md) — realm isolation, events, branding, IRealmManager
+- [.ai/plans/plan-resources-redesign.md](.ai/plans/plan-resources-redesign.md) — PLANNED (Resources/Scopes model: IdentityScope, ResourceServer, Scope)
+
+Architectural Decision Records (accepted decisions; read before changing the affected area):
+
+- [adrs/](adrs/) — ADR-001..011 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed)
 
 Backlog (deferred items with design notes):
 
-- [.ai/backlogs/backlog.md](.ai/backlogs/backlog.md)
+- [.ai/backlogs/backlog-001.md](.ai/backlogs/backlog-001.md)
 
 ## Commands
 
