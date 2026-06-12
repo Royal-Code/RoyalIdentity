@@ -40,6 +40,11 @@ public class AccessToken : TokenBase
     public string TokenType { get; set; }
 
     /// <summary>
+    /// RFC 8707 protected resource URIs authorized for this access token.
+    /// </summary>
+    public ICollection<string> ResourceUris { get; } = [];
+
+    /// <summary>
     /// Creates a new object that is a copy of the current instance.
     /// </summary>
     /// <returns></returns>
@@ -54,12 +59,13 @@ public class AccessToken : TokenBase
             jti,
             TokenType)
         {
-            AllowedSigningAlgorithms = AllowedSigningAlgorithms,
+            AllowedSigningAlgorithms = [.. AllowedSigningAlgorithms],
             Confirmation = Confirmation,
-            Audiences = Audiences,
+            Audiences = [.. Audiences],
             RealmId = RealmId,
         };
 
+        newToken.ResourceUris.AddRange(ResourceUris);
         newToken.Claims.AddRange(Claims.Where(c => c.Type != "jti"));
         newToken.Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, jti));
 

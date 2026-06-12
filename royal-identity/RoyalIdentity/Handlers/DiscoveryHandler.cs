@@ -199,6 +199,12 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
             }
         }
 
+        var protectedResources = await GetProtectedResourcesPublishedInDiscoveryAsync(context, ct);
+        if (protectedResources.Length is not 0)
+        {
+            entries.Add(Oidc.Discovery.ProtectedResources, protectedResources);
+        }
+
         // grant types
         if (options.Discovery.ShowGrantTypes)
         {
@@ -299,5 +305,20 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         }
 
         context.Response = new DiscoveryResponse(entries);
+    }
+
+    private async Task<string[]> GetProtectedResourcesPublishedInDiscoveryAsync(
+        DiscoveryContext context,
+        CancellationToken ct)
+    {
+        var resources = await storage.GetResourceStore(context.Realm).GetAllEnabledResourcesAsync(ct);
+
+        return resources.ResourceServers
+            .Where(rs => rs.ShowInDiscoveryDocument)
+            .SelectMany(rs => rs.ProtectedResources)
+            .Where(resource => resource.ShowInDiscoveryDocument)
+            .Select(resource => resource.ResourceUri)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 }

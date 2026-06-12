@@ -3,8 +3,10 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Items;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Events;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Pipelines.Abstractions;
 using TokenResponse = RoyalIdentity.Responses.TokenResponse;
@@ -15,15 +17,18 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
 {
     private readonly ITokenFactory tokenFactory;
     private readonly IEventDispatcher eventDispatcher;
+    private readonly IStorage storage;
     private readonly ILogger logger;
 
     public AuthorizationCodeHandler(
         ITokenFactory tokenFactory,
         IEventDispatcher eventDispatcher,
+        IStorage storage,
         ILogger<AuthorizationCodeHandler> logger)
     {
         this.tokenFactory = tokenFactory;
         this.eventDispatcher = eventDispatcher;
+        this.storage = storage;
         this.logger = logger;
     }
 
@@ -35,6 +40,9 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         context.ClientParameters.AssertHasClient();
         var code = context.CodeParameters.AuthorizationCode;
         var client = context.ClientParameters.Client;
+        var resources = await ResolveEffectiveResourcesAsync(context, code.Scopes, ct);
+        if (resources is null)
+            return;
 
         AccessToken accessToken;
         RefreshToken? refreshToken = null;
@@ -47,10 +55,10 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         {
             HttpContext = context.HttpContext,
             User = code.Subject,
-            Resources = code.Scopes,
+            Resources = resources,
             Client = client,
             Confirmation = context.ClientParameters.Confirmation,
-            IdentityType = IdentityProfileTypes.Client,
+            IdentityType = IdentityProfileTypes.User,
         };
 
         accessToken = await tokenFactory.CreateAccessTokenAsync(accessTokenRequest, ct);
@@ -58,7 +66,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
 
         logger.LogDebug("Access token issued");
 
-        if (code.Scopes.OfflineAccess)
+        if (resources.OfflineAccess)
         {
             var refreshTokenRequest = new RefreshTokenRequest()
             {
@@ -74,14 +82,14 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             logger.LogDebug("Refresh token issued");
         }
 
-        if (code.Scopes.IsOpenId)
+        if (resources.IsOpenId)
         {
             var idTokenRequest = new IdentityTokenRequest()
             {
                 HttpContext = context.HttpContext,
                 User = code.Subject,
                 Client = client,
-                Resources = code.Scopes,
+                Resources = resources,
                 Nonce = code.Nonce,
                 AccessTokenToHash = accessToken.Token,
             };
@@ -96,7 +104,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             accessToken, 
             refreshToken, 
             identityToken, 
-            code.Scopes.RequestedScopeNames.ToSpaceSeparatedString());
+            resources.RequestedScopeNames.ToSpaceSeparatedString());
 
         await eventDispatcher.DispatchAsync(atEvent, context.Realm);
 
@@ -107,5 +115,81 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             await eventDispatcher.DispatchAsync(idEvent, context.Realm);
 
         logger.LogDebug("Handle authorize code context finished");
+    }
+
+    private async Task<RequestedResources?> ResolveEffectiveResourcesAsync(
+        AuthorizationCodeContext context,
+        RequestedResources authorizedResources,
+        CancellationToken ct)
+    {
+        if (context.RequestedResourceUris.Count is 0)
+            return authorizedResources;
+
+        var authorizedResourceUris = authorizedResources.ProtectedResources
+            .Select(resource => resource.ResourceUri)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var unauthorizedResourceUris = context.RequestedResourceUris
+            .Where(uri => !authorizedResourceUris.Contains(uri))
+            .ToArray();
+
+        if (unauthorizedResourceUris.Length is not 0)
+        {
+            logger.LogError(
+                "Authorization code resource subset contains unauthorized resources: {Resources}",
+                string.Join(" ", unauthorizedResourceUris));
+            context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested were not authorized");
+            return null;
+        }
+
+        var resourceStore = storage.GetResourceStore(context.Realm);
+        var resources = await resourceStore.FindRequestedResourcesAsync(
+            authorizedResources.RequestedScopeNames,
+            context.RequestedResourceUris,
+            true,
+            ct);
+
+        if (resources.HasInvalidTargets)
+        {
+            logger.LogError(
+                "Authorization code resource subset contains invalid resources: {Resources}",
+                resources.GetInvalidTargets());
+            context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested are invalid");
+            return null;
+        }
+
+        if (!resources.IsValid)
+        {
+            logger.LogError(
+                "Authorization code resources contain invalid scopes: {Scopes}",
+                resources.GetInvalidScopes());
+            context.Error(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
+            return null;
+        }
+
+        if (!HasScopeResourceCoherence(resources))
+        {
+            logger.LogError("Authorization code resource subset is not coherent with the authorized scopes");
+            context.Error(Oidc.Token.Errors.InvalidTarget, "scope requires a matching resource indicator");
+            return null;
+        }
+
+        return resources;
+    }
+
+    private static bool HasScopeResourceCoherence(RequestedResources resources)
+    {
+        if (resources.ProtectedResources.Count is 0)
+            return true;
+
+        return resources.Scopes.All(scope =>
+        {
+            var owner = resources.ResourceServers
+                .FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
+
+            return owner is null
+                || owner.ProtectedResources.Count is 0
+                || owner.ProtectedResources.Any(pr => resources.ProtectedResources.Any(rp => rp.ResourceUri == pr.ResourceUri));
+        });
     }
 }

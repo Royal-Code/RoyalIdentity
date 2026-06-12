@@ -37,6 +37,11 @@ public class RefreshToken: TokenBase
     public ICollection<string> RequestedScopes { get; }
 
     /// <summary>
+    /// RFC 8707 protected resource URIs authorized for refresh-token renewal.
+    /// </summary>
+    public ICollection<string> ResourceUris { get; } = [];
+
+    /// <summary>
     /// Gets or sets the consumed time.
     /// </summary>
     /// <value>

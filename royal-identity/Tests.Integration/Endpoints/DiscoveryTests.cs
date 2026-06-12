@@ -1,4 +1,5 @@
 using System.Text.Json;
+using RoyalIdentity.Extensions;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
@@ -47,5 +48,60 @@ public class DiscoveryTests : IClassFixture<AppFactory>
         Assert.Contains("token_endpoint_auth_methods_supported", document);
         Assert.Contains("claims_supported", document);
         Assert.Contains("code_challenge_methods_supported", document);
+        Assert.Contains("protected_resources", document);
+    }
+
+    [Fact]
+    public async Task Get_ShouldPublishProtectedResources()
+    {
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.GetAsync(url);
+        var content = await response.Content.ReadAsStringAsync();
+        var document = JsonDocument.Parse(content);
+
+        Assert.True(document.RootElement.TryGetProperty("protected_resources", out var protectedResources));
+        Assert.Contains(
+            "https://api.demo.local/apiserver",
+            protectedResources.EnumerateArray().Select(resource => resource.GetString()));
+    }
+
+    [Fact]
+    public async Task Get_ProtectedResourceMetadata_ShouldReturnRfc9728Document()
+    {
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildProtectedResourceMetadataUrl(MemoryStorage.DemoRealm.Path)
+            .AddQueryString("resource", "https://api.demo.local/apiserver");
+
+        var response = await client.GetAsync(url);
+        var content = await response.Content.ReadAsStringAsync();
+        var document = JsonDocument.Parse(content);
+        var root = document.RootElement;
+
+        Assert.True(response.IsSuccessStatusCode);
+        Assert.Equal("https://api.demo.local/apiserver", root.GetProperty("resource").GetString());
+        Assert.Equal("API Server", root.GetProperty("resource_name").GetString());
+        Assert.Contains(
+            "api:read",
+            root.GetProperty("scopes_supported").EnumerateArray().Select(scope => scope.GetString()));
+        Assert.Contains(
+            "header",
+            root.GetProperty("bearer_methods_supported").EnumerateArray().Select(method => method.GetString()));
+        Assert.NotEmpty(root.GetProperty("authorization_servers").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Get_ProtectedResourceMetadata_WithUnknownResource_ShouldReturnInvalidTarget()
+    {
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildProtectedResourceMetadataUrl(MemoryStorage.DemoRealm.Path)
+            .AddQueryString("resource", "https://unknown.example.test/resource");
+
+        var response = await client.GetAsync(url);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.Contains("invalid_target", body);
     }
 }

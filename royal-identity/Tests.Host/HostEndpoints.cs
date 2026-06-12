@@ -1,5 +1,6 @@
 ﻿// Ignore Spelling: app username
 
+using Microsoft.AspNetCore.Diagnostics;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Users;
@@ -15,6 +16,15 @@ public static class HostEndpoints
 {
     public static void MapTestHostEndpoints(this WebApplication app)
     {
+        app.MapGet("/Exception", (HttpContext context) =>
+        {
+            var exception = context.Features.Get<IExceptionHandlerPathFeature>()?.Error;
+            return Results.Problem(
+                statusCode: 500,
+                title: exception?.GetType().FullName,
+                detail: exception?.ToString());
+        });
+
         app.MapPost("{realm}/test/account/login", async (HttpContext context,
             ISignInManager signInManager, 
             string realm) =>

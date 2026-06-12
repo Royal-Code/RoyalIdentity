@@ -12,9 +12,8 @@ public class RequestedResources
     public RequestedResources() { }
 
     public RequestedResources(RequestedResources other)
-        : this(other.IdentityScopes, other.ResourceServers, other.Scopes)
     {
-        OfflineAccess = other.OfflineAccess;
+        other.CopyTo(this);
     }
 
     public RequestedResources(
@@ -175,7 +174,7 @@ public class RequestedResources
     /// <summary>
     /// Count of resolved resources, excluding resources not found or disabled.
     /// </summary>
-    public int Count => (OfflineAccess ? 1 : 0) + ResourceServers.Count + IdentityScopes.Count + Scopes.Count;
+    public int Count => (OfflineAccess ? 1 : 0) + ResourceServers.Count + IdentityScopes.Count + Scopes.Count + ProtectedResources.Count;
 
     public bool IsValid => MissingScopes.Count is 0;
 

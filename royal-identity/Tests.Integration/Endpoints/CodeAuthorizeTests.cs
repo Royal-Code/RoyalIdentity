@@ -3,6 +3,8 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
+using RoyalIdentity.Utils;
 using System.Net;
 using System.Web;
 using Tests.Integration.Prepare;
@@ -369,5 +371,49 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_WithImplicitResourceIndicatorAndNoApiScope_ShouldReturnAccessToken()
+    {
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var clientId = $"implicit-resource-client-{suffix}";
+        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Implicit Resource Client",
+            RequireClientSecret = false,
+            RequirePkce = false,
+            AllowedGrantTypes = ["implicit"],
+            AllowedIdentityScopes = { "openid" },
+            AllowedResourceServers = { "apiserver" },
+            AllowedResponseTypes = { "token" },
+            RedirectUris = { "http://localhost:5000/**" }
+        };
+
+        var options = new WebApplicationFactoryClientOptions()
+        {
+            AllowAutoRedirect = false
+        };
+        var client = factory.CreateClient(options);
+        await client.LoginAliceAsync();
+
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+            .AddQueryString("client_id", clientId)
+            .AddQueryString("response_type", "token")
+            .AddQueryString("response_mode", "form_post")
+            .AddQueryString("scope", "openid")
+            .AddQueryString("resource", "https://api.demo.local/apiserver")
+            .AddQueryString("nonce", "implicit-resource-nonce")
+            .AddQueryString("redirect_uri", "http://localhost:5000/callback");
+
+        var response = await client.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
+        Assert.Contains("access_token", body);
+        Assert.DoesNotContain("invalid_scope", body);
     }
 }

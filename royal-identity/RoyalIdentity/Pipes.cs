@@ -32,6 +32,14 @@ public static class Pipes
 
 
             //////////////////////////////
+            //// Protected Resource Metadata
+            //////////////////////////////
+            var protectedResourceMetadataPipe = builder.For<ProtectedResourceMetadataContext>();
+
+            protectedResourceMetadataPipe.UseHandler<ProtectedResourceMetadataHandler>();
+
+
+            //////////////////////////////
             //// Discovery Jwk
             //////////////////////////////
             var jwkPipe = builder.For<JwkContext>();

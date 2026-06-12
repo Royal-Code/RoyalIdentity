@@ -151,6 +151,14 @@ public class ResourceStore : IResourceStore
         {
             foreach (var resource in server.ProtectedResources)
             {
+                if (!IsValidResourceUri(resource.ResourceUri))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid protected resource URI '{resource.ResourceUri}' found in resource server " +
+                        $"'{server.Name}'. Resource URIs must be absolute HTTPS URIs without fragment " +
+                        "or localhost HTTP URIs for development.");
+                }
+
                 if (index.TryGetValue(resource.ResourceUri, out var existing))
                 {
                     throw new InvalidOperationException(
@@ -166,7 +174,13 @@ public class ResourceStore : IResourceStore
     }
 
     private static bool IsValidResourceUri(string uri)
-        => Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && string.IsNullOrEmpty(parsed.Fragment);
+    {
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed) || !string.IsNullOrEmpty(parsed.Fragment))
+            return false;
+
+        return parsed.Scheme == Uri.UriSchemeHttps
+            || (parsed.Scheme == Uri.UriSchemeHttp && parsed.IsLoopback);
+    }
 
     private static void AddResourceServer(RequestedResources resources, ResourceServer server)
     {

@@ -105,6 +105,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DiscoveryHandler>();
         services.AddTransient<EndSessionHandler>();
         services.AddTransient<JwkHandler>();
+        services.AddTransient<ProtectedResourceMetadataHandler>();
         services.AddTransient<RefreshTokenHandler>();
         services.AddTransient<RevocationHandler>();
         services.AddTransient<UserInfoHandler>();
@@ -116,6 +117,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DiscoveryEndpoint>();
         services.AddTransient<EndSessionEndpoint>();
         services.AddTransient<JwkEndpoint>();
+        services.AddTransient<ProtectedResourceMetadataEndpoint>();
         services.AddTransient<RevocationEndpoint>();
         services.AddTransient<TokenEndpoint>();
         services.AddTransient<UserInfoEndpoint>();

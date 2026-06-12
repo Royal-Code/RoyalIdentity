@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using RoyalIdentity.Contexts.Parameters;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Contexts;
 
@@ -28,6 +29,8 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithAuthoriza
 
     public CodeParameters CodeParameters { get; } = new();
 
+    public HashSet<string> RequestedResourceUris { get; } = [];
+
     public override ClaimsPrincipal? GetSubject() => CodeParameters.AuthorizationCode?.Subject;
 
     public override void Load(ILogger logger)
@@ -36,6 +39,8 @@ public class AuthorizationCodeContext : TokenEndpointContextBase, IWithAuthoriza
         RedirectUri = Raw.Get(Oidc.Token.Request.RedirectUri);
         Code = Raw.Get(Oidc.Token.Request.Code);
         CodeVerifier = Raw.Get(Oidc.Token.Request.CodeVerifier);
+        RequestedResourceUris.Clear();
+        RequestedResourceUris.AddRange(Raw.GetValues(Oidc.Token.Request.Resource) ?? []);
     }
 
     public void RedirectUriValidated() => redirectUriValidated = true;

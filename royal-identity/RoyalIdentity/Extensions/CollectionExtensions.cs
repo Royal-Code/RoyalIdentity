@@ -16,7 +16,8 @@ public static class CollectionExtensions
 
         foreach (var field in collection)
         {
-            nv.Add(field.Key, field.Value[0]);
+            foreach (var value in field.Value)
+                nv.Add(field.Key, value);
         }
 
         return nv;
@@ -29,7 +30,8 @@ public static class CollectionExtensions
 
         foreach (var field in collection)
         {
-            nv.Add(field.Key, field.Value[0]);
+            foreach (var value in field.Value)
+                nv.Add(field.Key, value);
         }
 
         return nv;

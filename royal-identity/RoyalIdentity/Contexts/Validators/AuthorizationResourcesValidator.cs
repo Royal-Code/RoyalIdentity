@@ -37,10 +37,12 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
             return default;
         }
 
-        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.Token) && !context.Scopes.Scopes.Any())
+        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.Token)
+            && !context.Scopes.Scopes.Any()
+            && !context.Scopes.ProtectedResources.Any())
         {
-            logger.LogError(context, "The parameter response_type requires resource scopes");
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "missing resource scopes");
+            logger.LogError(context, "The parameter response_type requires resource scopes or resource indicators");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "missing resource scopes or resource indicators");
             return default;
         }
 

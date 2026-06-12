@@ -407,25 +407,27 @@ Passos:
 
 Criterio de aceite: `resource` RFC 8707 funciona em authorize/token, inclusive audience-only em fluxos que emitem ou preparam access token; `aud` respeita o caminho scope-vs-resource; grants preservam resources autorizados; `invalid_target` cobre resources invalidos; discovery nao anuncia scopes que nao podem ser pedidos por `scope`; discovery publica `protected_resources` e metadata RFC 9728 geravel por protected resource; testes verdes.
 
-### Resultado da Fase 6 (em andamento)
+### Resultado da Fase 6 (concluida)
 
-**Status:** **parcial** — o nucleo do caminho de request esta feito e verde (**129 testes**: Pipelines 3, Identity 6, Integration 120). A fase **nao** esta concluida (faltam persistencia em grants no token endpoint/refresh e RFC 9728).
+**Status:** **concluida** - Resource Indicators (RFC 8707) e Protected Resource Metadata (RFC 9728) implementados e verificados. Testes verdes: `dotnet test RoyalIdentity.sln --no-restore` (**146 testes**: Integration 137, Identity 6, Pipelines 3).
 
 **Feito:**
-- **Modelo (passos 1-2):** `ProtectedResource` (ResourceUri + ShowInDiscoveryDocument + metadata RFC 9728; sem `Enabled` proprio — deriva do RS). `ResourceServer.ProtectedResources` + copy ctor. Store com **indice de `ResourceUri`** (unicidade por realm, fail-fast) e resolucao; validacao de URI **absoluta e sem fragmento** (a politica `https`-only ainda nao e imposta — refinamento pendente). Seeding: `apiserver` ganhou um `ProtectedResource` (`https://api.demo.local/apiserver`).
-- **`RequestedResources`:** `RequestedResourceUris` (cru), `ProtectedResources` (resolvidos), `InvalidTargets`; `GetAudiences()` agora aplica a dominancia resource-vs-scope; `CopyTo`/`Any` atualizados.
-- **Parsing (passo 3, parcial):** parametro `resource` (multi-valor) lido no authorize (`AuthorizeContext`) e no client_credentials (`ClientCredentialsContext`).
-- **Resolucao + validacao (passos 4-6):** `FindRequestedResourcesAsync` resolve scopes+resources; `ResourcesDecorator`/`ClientResourceDecorator` rejeitam `invalid_target` (desconhecido/malformed/RS desabilitado); `ResourcesValidator` faz **autorizacao** do resource (RS dono em `AllowedResourceServers`/`AllowAllResourceServers`) e a **coerencia scope+resource** (scope cujo RS tem ProtectedResources exige um resource daquele RS).
-- **`aud` (passo 5):** via `GetAudiences()` — resource emite `ResourceUri` e suprime o `Audience` legado do mesmo RS.
-- **Discovery (passos 7 e 9):** `scopes_supported` agora exclui scopes de RS com `AllowScopeRequests = false`; LINQ ja em method-chain (`code-style.rules.md`).
-- **Testes (passo 10, parcial):** client_credentials com `resource` -> `aud = ResourceUri` (legado suprimido); `invalid_target` para resource desconhecido e para resource nao-permitido (audience-only). O fluxo **authorization_code** ja persiste os resources via `code.Scopes` (emissao com `aud` de resource funciona), mas falta teste e2e.
+- **Modelo e store (passos 1-2):** `ProtectedResource` em `ResourceServer.ProtectedResources`; indice por `ResourceUri` com unicidade por realm; validacao fail-fast para URI absoluta HTTPS sem fragmento, com excecao HTTP loopback/localhost para dev/testes.
+- **Request/authorization (passos 3-6):** `resource` multi-valor preservado em `NameValueCollection`; authorize e client_credentials resolvem `ProtectedResources`; token endpoint parseia `resource` em `authorization_code` e `refresh_token`; grants aceitam omissao ou subset do conjunto autorizado e rejeitam subset fora dele com `invalid_target`.
+- **Persistencia em grants:** `AccessToken.ResourceUris` e `RefreshToken.ResourceUris` guardam os protected resources autorizados; refresh sem subset preserva audiences de resource; refresh com subset reemite access token com o audience reduzido.
+- **`aud` (passo 5):** `ProtectedResource.ResourceUri` entra como audience explicito e suprime o audience legado (`ResourceServer.Audience ?? Name`) do mesmo RS; scopes sem `resource` continuam pelo caminho legado.
+- **Implicit/hybrid resource-only:** `AuthorizationResourcesValidator` aceita `resource` sem API scope quando `response_type` contem `token`; `id_token`-only permanece restrito a identity scopes.
+- **Discovery (passos 7-9):** `scopes_supported` exclui scopes de RS com `AllowScopeRequests = false`; discovery do AS publica `protected_resources`; novo endpoint `/{realm}/.well-known/oauth-protected-resource?resource=...` gera metadata RFC 9728 (`resource`, `authorization_servers`, `scopes_supported`, `bearer_methods_supported`, `resource_name`, docs/policy/tos quando configurados).
+- **Correcoes associadas:** authorization_code emite access token com `IdentityProfileTypes.User`; refresh que reemite access token usa o principal do access token armazenado para preservar `auth_time`/`sid`; TestHost usa DataProtection dentro do diretorio de build e logging sem EventLog para evitar falhas de permissao no sandbox.
 
-**Falta:**
-- **Authorize implicit/hybrid audience-only:** ajustar `AuthorizationResourcesValidator` para aceitar `resource` sem API scope quando `response_type` contem `token`; a exigencia deve ser "access token precisa de scope de API ou ProtectedResource resolvido", nao apenas `Scopes.Any()`.
-- **Passo 3/E — token endpoint:** parsear `resource` no token endpoint para os grants `authorization_code`/`refresh_token` e impor **subset** do conjunto autorizado; **refresh** re-resolve recursos so de `accessToken.Scopes` (nomes) -> o `aud` de resource **se perde no refresh** (precisa persistir os ResourceUris no refresh/access token e re-resolver).
-- **Passo 8 — RFC 9728:** publicar `protected_resources` no discovery do AS e gerar o metadata por `ProtectedResource`.
-- **Refinamento:** politica `https`-only para `ResourceUri` (hoje so absoluta + sem fragmento).
-- **Passo 10 — testes restantes:** authorize-code com `resource` (e2e), multi-resource, coerencia (precisa de 2o RS com resources no fixture), subset no token/refresh.
+**Testes adicionados/refinados:**
+- `client_credentials`: audience-only, multi-resource, resource desconhecido, resource nao permitido, scope+resource incoerente.
+- `authorization_code`: emissao com resource, subset no token endpoint, subset nao autorizado.
+- `refresh_token`: preservacao de resource audience, subset autorizado, subset nao autorizado.
+- `authorize`: implicit com `resource` sem API scope.
+- `discovery/store`: `protected_resources`, metadata RFC 9728, URI invalida/fragmento/http nao-local, duplicate `ResourceUri`, localhost HTTP aceito.
+
+**Falta:** nada pendente na Fase 6. A limitacao conhecida de consentimento para `ProtectedResource`s fica documentada para a Fase 7.
 
 ---
 

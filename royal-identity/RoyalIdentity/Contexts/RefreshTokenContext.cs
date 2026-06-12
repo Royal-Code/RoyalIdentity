@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
 using System.Collections.Specialized;
 using System.Security.Claims;
@@ -23,6 +24,8 @@ public class RefreshTokenContext : TokenEndpointContextBase, IWithRefreshToken
 
     public RefreshParameters RefreshParameters { get; } = new();
 
+    public HashSet<string> RequestedResourceUris { get; } = [];
+
     public override ClaimsPrincipal? GetSubject()
     {
         if (subject is null && RefreshParameters.RefreshToken is not null)
@@ -38,5 +41,7 @@ public class RefreshTokenContext : TokenEndpointContextBase, IWithRefreshToken
         ClientId = Raw.Get(Oidc.Token.Request.ClientId);
         Scope = Raw.Get(Oidc.Token.Request.Scope);
         Token = Raw.Get(Oidc.Token.Request.RefreshToken);
+        RequestedResourceUris.Clear();
+        RequestedResourceUris.AddRange(Raw.GetValues(Oidc.Token.Request.Resource) ?? []);
     }
 }

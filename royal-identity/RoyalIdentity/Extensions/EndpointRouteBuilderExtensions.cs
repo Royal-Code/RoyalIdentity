@@ -12,6 +12,7 @@ public static class EndpointRouteBuilderExtensions
     public static void MapOpenIdConnectProviderEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPipeline<DiscoveryEndpoint>(Oidc.Routes.DiscoveryConfiguration);
+        endpoints.MapPipeline<ProtectedResourceMetadataEndpoint>(Oidc.Routes.ProtectedResourceMetadata);
         endpoints.MapPipeline<JwkEndpoint>(Oidc.Routes.DiscoveryWebKeys);
         endpoints.MapPipeline<AuthorizeEndpoint>(Oidc.Routes.Authorize);
         endpoints.MapPipeline<AuthorizeCallbackEndpoint>(Oidc.Routes.AuthorizeCallback);

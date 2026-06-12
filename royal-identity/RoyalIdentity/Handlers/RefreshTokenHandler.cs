@@ -6,6 +6,7 @@ using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
@@ -68,14 +69,33 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         {
             logger.LogDebug("Creating a new access token");
 
-            
-            var scopes = accessToken.Scopes;
-            var resources = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);
+            var resources = await ResolveEffectiveResourcesAsync(context, accessToken, refreshToken, true, ct);
+            if (resources is null)
+                return;
 
             var request = new AccessTokenRequest()
             {
                 HttpContext = context.HttpContext,
-                User = context.GetSubject()!,
+                User = accessToken.CreatePrincipal(),
+                Client = client,
+                Resources = resources,
+                IdentityType = IdentityProfileTypes.User,
+            };
+
+            newAccessToken = await tokenFactory.CreateAccessTokenAsync(request, ct);
+        }
+        else if (context.RequestedResourceUris.Count is not 0)
+        {
+            logger.LogDebug("Creating a new access token with requested resource subset");
+
+            var resources = await ResolveEffectiveResourcesAsync(context, accessToken, refreshToken, true, ct);
+            if (resources is null)
+                return;
+
+            var request = new AccessTokenRequest()
+            {
+                HttpContext = context.HttpContext,
+                User = accessToken.CreatePrincipal(),
                 Client = client,
                 Resources = resources,
                 IdentityType = IdentityProfileTypes.User,
@@ -122,7 +142,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 
             newRefreshToken = refreshToken;
             newRefreshToken.Claims.RemoveWhere(c => c.Type == JwtRegisteredClaimNames.Jti);
-            newRefreshToken.Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, accessToken.Id));
+            newRefreshToken.Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, newAccessToken.Id));
 
             await refreshTokenStore.UpdateAsync(refreshToken, ct);
         }
@@ -148,7 +168,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         if (newAccessToken.Scopes.Any(scope => scope.Contains(Server.StandardScopes.OpenId)))
         {
             var scopes = newAccessToken.Scopes;
-            var resources = await resourceStore.FindResourcesByScopeAsync(scopes, true, ct);
+            var resources = await resourceStore.FindRequestedResourcesAsync(scopes, newAccessToken.ResourceUris, true, ct);
 
             var idTokenRequest = new IdentityTokenRequest()
             {
@@ -167,5 +187,85 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             newRefreshToken,
             newIdentityToken,
             newAccessToken.Scopes.ToSpaceSeparatedString());
+    }
+
+    private async Task<RequestedResources?> ResolveEffectiveResourcesAsync(
+        RefreshTokenContext context,
+        AccessToken accessToken,
+        RefreshToken refreshToken,
+        bool onlyEnabled,
+        CancellationToken ct)
+    {
+        var authorizedResourceUris = accessToken.ResourceUris
+            .Concat(refreshToken.ResourceUris)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var effectiveResourceUris = authorizedResourceUris;
+        if (context.RequestedResourceUris.Count is not 0)
+        {
+            var unauthorizedResourceUris = context.RequestedResourceUris
+                .Where(uri => !authorizedResourceUris.Contains(uri))
+                .ToArray();
+
+            if (unauthorizedResourceUris.Length is not 0)
+            {
+                logger.LogError(
+                    "Refresh token resource subset contains unauthorized resources: {Resources}",
+                    string.Join(" ", unauthorizedResourceUris));
+                context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested were not authorized");
+                return null;
+            }
+
+            effectiveResourceUris = context.RequestedResourceUris;
+        }
+
+        var resources = await storage.GetResourceStore(context.Realm).FindRequestedResourcesAsync(
+            accessToken.Scopes,
+            effectiveResourceUris,
+            onlyEnabled,
+            ct);
+
+        if (resources.HasInvalidTargets)
+        {
+            logger.LogError(
+                "Refresh token resource subset contains invalid resources: {Resources}",
+                resources.GetInvalidTargets());
+            context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested are invalid");
+            return null;
+        }
+
+        if (!resources.IsValid)
+        {
+            logger.LogError(
+                "Refresh token resources contain invalid scopes: {Scopes}",
+                resources.GetInvalidScopes());
+            context.Error(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
+            return null;
+        }
+
+        if (!HasScopeResourceCoherence(resources))
+        {
+            logger.LogError("Refresh token resource subset is not coherent with the authorized scopes");
+            context.Error(Oidc.Token.Errors.InvalidTarget, "scope requires a matching resource indicator");
+            return null;
+        }
+
+        return resources;
+    }
+
+    private static bool HasScopeResourceCoherence(RequestedResources resources)
+    {
+        if (resources.ProtectedResources.Count is 0)
+            return true;
+
+        return resources.Scopes.All(scope =>
+        {
+            var owner = resources.ResourceServers
+                .FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
+
+            return owner is null
+                || owner.ProtectedResources.Count is 0
+                || owner.ProtectedResources.Any(pr => resources.ProtectedResources.Any(rp => rp.ResourceUri == pr.ResourceUri));
+        });
     }
 }

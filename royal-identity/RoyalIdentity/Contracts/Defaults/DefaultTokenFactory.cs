@@ -89,6 +89,8 @@ public class DefaultTokenFactory : ITokenFactory
             token.Audiences.Add(aud);
         }
 
+        token.ResourceUris.AddRange(request.Resources.ProtectedResources.Select(resource => resource.ResourceUri));
+
         // add client_id to audiences if is openid
         if (request.Resources.IsOpenId)
         {
@@ -259,6 +261,7 @@ public class DefaultTokenFactory : ITokenFactory
             lifetime, 
             tokenItSelf);
 
+        refreshToken.ResourceUris.AddRange(request.AccessToken.ResourceUris);
         refreshToken.RealmId = request.Client.Realm.Id;
 
         await storage.GetRefreshTokenStore(request.Client.Realm).StoreAsync(refreshToken, ct);

@@ -234,6 +234,7 @@ public static partial class Constants
                 public const string Authorize = "authorize";
                 public const string DiscoveryConfiguration = "openid-configuration";
                 public const string DiscoveryWebKeys = "jwks";
+                public const string ProtectedResourceMetadata = "oauth-protected-resource";
                 public const string Token = "token";
                 public const string Revocation = "revocation";
                 public const string UserInfo = "userinfo";
@@ -259,6 +260,7 @@ public static partial class Constants
             public const string AuthorizeCallback = $"{{realm}}/{Names.OidcConnect}/{Names.Authorize}/{Names.Callback}";
             public const string DiscoveryConfiguration = $"{{realm}}/{Names.WellKnown}/{Names.DiscoveryConfiguration}";
             public const string DiscoveryWebKeys = $"{{realm}}/{Names.WellKnown}/{Names.DiscoveryConfiguration}/{Names.DiscoveryWebKeys}";
+            public const string ProtectedResourceMetadata = $"{{realm}}/{Names.WellKnown}/{Names.ProtectedResourceMetadata}";
             public const string Token = $"{{realm}}/{Names.OidcConnect}/{Names.Token}";
             public const string Revocation = $"{{realm}}/{Names.OidcConnect}/{Names.Revocation}";
             public const string UserInfo = $"{{realm}}/{Names.OidcConnect}/{Names.UserInfo}";
@@ -277,6 +279,7 @@ public static partial class Constants
             [
                 DiscoveryConfiguration,
                 DiscoveryWebKeys,
+                ProtectedResourceMetadata,
                 Token,
                 UserInfo,
                 Revocation
@@ -293,6 +296,9 @@ public static partial class Constants
 
             public static string BuildDiscoveryWebKeysUrl(string realm)
                 => $"{realm}/{Names.WellKnown}/{Names.DiscoveryConfiguration}/{Names.DiscoveryWebKeys}";
+
+            public static string BuildProtectedResourceMetadataUrl(string realm)
+                => $"{realm}/{Names.WellKnown}/{Names.ProtectedResourceMetadata}";
 
             public static string BuildTokenUrl(string realm)
                 => $"{realm}/{Names.OidcConnect}/{Names.Token}";
@@ -586,6 +592,24 @@ public static partial class Constants
 
         public static class ProtectedResource
         {
+            public static class Metadata
+            {
+                public const string Resource = "resource";
+                public const string AuthorizationServers = "authorization_servers";
+                public const string ScopesSupported = "scopes_supported";
+                public const string BearerMethodsSupported = "bearer_methods_supported";
+                public const string ResourceName = "resource_name";
+                public const string ResourceDocumentation = "resource_documentation";
+                public const string ResourcePolicyUri = "resource_policy_uri";
+                public const string ResourceTosUri = "resource_tos_uri";
+            }
+
+            public static class BearerMethods
+            {
+                public const string Header = "header";
+                public const string Body = "body";
+            }
+
             public static class Errors
             {
                 public const string InvalidToken = "invalid_token";
@@ -835,6 +859,7 @@ public static partial class Constants
             public const string ResponseTypesSupported = "response_types_supported";
             public const string ClaimsSupported = "claims_supported";
             public const string TokenEndpointAuthenticationMethodsSupported = "token_endpoint_auth_methods_supported";
+            public const string ProtectedResources = "protected_resources";
 
             // more capabilities
             public const string ClaimsLocalesSupported = "claims_locales_supported";
