@@ -26,8 +26,9 @@ public class ResourceStoreTests
         => new(ScopeVisibility.Public, name, name, name) { Enabled = enabled };
 
     [Fact]
-    public async Task FindResourcesByScope_DisabledScope_IsReportedAsDisabled()
+    public async Task FindResourcesByScope_DisabledScope_IsReportedAsInvalid()
     {
+        // Collapsed bucket (apontamento 3.1): a disabled scope is reported as invalid (MissingScopes).
         var server = Api("api1", Op("api1.read"), Op("api1.write", enabled: false));
         var store = new ResourceStore(Servers(server), NoIdentityScopes());
 
@@ -35,16 +36,14 @@ public class ResourceStoreTests
 
         Assert.Contains(resources.Scopes, s => s.Name == "api1.read");
         Assert.DoesNotContain(resources.Scopes, s => s.Name == "api1.write");
-        Assert.Contains("api1.write", resources.DisabledScopes);
+        Assert.Contains("api1.write", resources.MissingScopes);
         Assert.False(resources.IsValid);
     }
 
     [Fact]
-    public async Task FindResourcesByScope_OnlyEnabled_DisabledScope_IsReportedAsMissing()
+    public async Task FindResourcesByScope_OnlyEnabled_DisabledScope_IsReportedAsInvalid()
     {
-        // Pins the real pipeline behaviour: every decorator (and the refresh handler) calls with
-        // onlyEnabled:true, where a disabled scope is reported as MissingScopes (not DisabledScopes),
-        // because the enabled filter short-circuits the if before IsEnabled can classify it.
+        // With onlyEnabled:true (the pipeline path) a disabled scope is also reported as invalid.
         var server = Api("api1", Op("api1.read"), Op("api1.write", enabled: false));
         var store = new ResourceStore(Servers(server), NoIdentityScopes());
 
@@ -52,7 +51,6 @@ public class ResourceStoreTests
 
         Assert.Contains(resources.Scopes, s => s.Name == "api1.read");
         Assert.Contains("api1.write", resources.MissingScopes);
-        Assert.DoesNotContain("api1.write", resources.DisabledScopes);
         Assert.False(resources.IsValid);
     }
 

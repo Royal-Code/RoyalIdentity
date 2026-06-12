@@ -54,6 +54,10 @@ public class ClientCredentialsContext : TokenEndpointContextBase, IWithResources
     {
         LoadBase(logger);
         Scopes.RequestedScopeNames.AddRange(Scope.FromSpaceSeparatedString());
+
+        var resourceIndicators = Raw.GetValues(Oidc.Token.Request.Resource);
+        if (resourceIndicators is not null)
+            Scopes.RequestedResourceUris.AddRange(resourceIndicators);
     }
 
     public void ResourcesValidated() => resourcesValidated = true;

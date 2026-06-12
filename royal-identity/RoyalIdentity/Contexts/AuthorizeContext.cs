@@ -213,6 +213,10 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
         Scope = raw.Get(Oidc.Authorize.Request.Scope);
         Scopes.RequestedScopeNames.AddRange(Scope.FromSpaceSeparatedString());
 
+        var resourceIndicators = raw.GetValues(Oidc.Authorize.Request.Resource);
+        if (resourceIndicators is not null)
+            Scopes.RequestedResourceUris.AddRange(resourceIndicators);
+
         var responseType = raw.Get(Oidc.Authorize.Request.ResponseType);
         ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());
         ClientId = raw.Get(Oidc.Authorize.Request.ClientId);

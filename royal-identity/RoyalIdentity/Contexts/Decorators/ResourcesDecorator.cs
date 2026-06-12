@@ -28,10 +28,19 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         //////////////////////////////////////////////////////////
 
         var resourceStore = storage.GetResourceStore(context.Realm);
-        var scopesFromStorage = await resourceStore.FindResourcesByScopeAsync(context.Scopes.RequestedScopeNames, true, ct);
+        var scopesFromStorage = await resourceStore.FindRequestedResourcesAsync(
+            context.Scopes.RequestedScopeNames, context.Scopes.RequestedResourceUris, true, ct);
+
+        if (scopesFromStorage.HasInvalidTargets)
+        {
+            logger.LogError(context, "Requested resource indicators are invalid: {Resources}", scopesFromStorage.GetInvalidTargets());
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "resource indicators requested are invalid");
+            return;
+        }
+
         if (!scopesFromStorage.IsValid)
         {
-            logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", context.Scopes.GetInvalidScopes());
+            logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", scopesFromStorage.GetInvalidScopes());
             context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "scopes requested are invalid or inactive");
             return;
         }

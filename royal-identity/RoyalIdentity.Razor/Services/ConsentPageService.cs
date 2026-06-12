@@ -54,15 +54,15 @@ public class ConsentPageService(
                 return new ConsentResult(ConsentResultType.ValidationError, ErrorMessage: "Required scope not granted.");
         }
 
-        foreach (var scope in viewModel.ApiScopes)
+        foreach (var scope in viewModel.Scopes)
         {
-            var inputScope = input.ApiScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
+            var inputScope = input.ScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
             if (scope.Required && inputScope?.Checked is not true)
                 return new ConsentResult(ConsentResultType.ValidationError, ErrorMessage: "Required scope not granted.");
         }
 
         var consentedScopes = input.IdentityScopesConsent
-            .Concat(input.ApiScopesConsent)
+            .Concat(input.ScopesConsent)
             .Where(s => s.Checked)
             .Select(s => new ConsentedScope
             {
@@ -88,7 +88,7 @@ public class ConsentPageService(
             ClientLogoUrl = context.Client.LogoUri,
             AllowRememberConsent = context.Client.AllowRememberConsent,
             IdentityScopes = context.Resources.IdentityScopes,
-            ApiScopes = context.Resources.Scopes
+            Scopes = context.Resources.Scopes
         };
     }
 }

@@ -156,7 +156,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
 
         // scopes and claims
         if (options.Discovery.ShowIdentityScopes ||
-            options.Discovery.ShowApiScopes ||
+            options.Discovery.ShowScopes ||
             options.Discovery.ShowClaims)
         {
             var resources = await storage.GetResourceStore(context.Realm).GetAllEnabledResourcesAsync(ct);
@@ -168,13 +168,17 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 scopes.AddRange(resources.IdentityScopes.Where(x => x.ShowInDiscoveryDocument).Select(x => x.Name));
             }
 
-            if (options.Discovery.ShowApiScopes)
+            if (options.Discovery.ShowScopes)
             {
-                var apiScopes = from scope in resources.Scopes
-                                where scope.ShowInDiscoveryDocument
-                                select scope.Name;
+                // Only scopes that can actually be requested via the scope parameter
+                // (resource servers with AllowScopeRequests = false are reachable only via resource indicators).
+                var scopesSupported = resources.ResourceServers
+                    .Where(rs => rs.AllowScopeRequests)
+                    .SelectMany(rs => rs.Scopes)
+                    .Where(scope => scope.ShowInDiscoveryDocument)
+                    .Select(scope => scope.Name);
 
-                scopes.AddRange(apiScopes);
+                scopes.AddRange(scopesSupported);
                 scopes.Add(Server.StandardScopes.OfflineAccess);
             }
 

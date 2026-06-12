@@ -11,6 +11,7 @@ Before significant code changes, read:
 - `.ai/foundation/product.md` for product goals, OAuth2/OIDC flows, realm rules, business invariants, and active design debt.
 - `.ai/foundation/tech.md` for runtime, pipeline semantics, storage abstraction, token handling, and implementation patterns.
 - `.ai/foundation/structure.md` for project layout, dependency rules, naming conventions, and high-risk files.
+- `.ai/rules/code-style.rules.md` for repository-specific code style rules and code smells.
 
 Before modifying an area touched by a plan, inspect `.ai/plans/` first. As of this
 repo snapshot, `plan-realm-hardening.md` is completed and
@@ -153,6 +154,7 @@ Known unstable areas include:
 - Use tabs with width 4 for C# indentation.
 - Prefer file-scoped namespace style unless the surrounding file uses otherwise.
 - Primary constructors are preferred for simple cases.
+- Follow `.ai/rules/code-style.rules.md` for repository-specific style rules, including the preference for method-chain LINQ over query expression syntax.
 - Keep changes scoped to the task and follow nearby patterns.
 
 ## Verification

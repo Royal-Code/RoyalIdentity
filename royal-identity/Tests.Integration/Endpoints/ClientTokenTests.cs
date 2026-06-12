@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
+using RoyalIdentity.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Storage.InMemory;
+using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
@@ -149,5 +151,202 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("invalid_scope", body);
+    }
+
+    [Fact]
+    public async Task Post_WhenClientCredentialsRequestsOfflineAccess_ShouldReturnInvalidScope()
+    {
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+
+        var clientId = $"offline-client-{CryptoRandom.CreateUniqueId(6)}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Offline Client Credentials Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowOfflineAccess = true,
+            AllowedScopes = { "api" },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
+                    ["scope"] = "api offline_access"
+                }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("invalid_scope", body);
+        Assert.DoesNotContain("access_token", body);
+    }
+
+    [Fact]
+    public async Task Post_WhenClientCredentialsOmitsScope_ShouldReturnDefaultAllowedScopes()
+    {
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+
+        var clientId = $"default-scope-client-{CryptoRandom.CreateUniqueId(6)}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Default Scope Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedScopes = { "api" },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret
+                }));
+
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(content);
+        Assert.True(content.ContainsKey("access_token"));
+        Assert.Equal("api", content["scope"].ToString());
+    }
+
+    [Fact]
+    public async Task Post_WithResourceIndicator_ShouldSetAudienceToResourceUri()
+    {
+        // RFC 8707: requesting a resource indicator emits its URI as the aud and suppresses the legacy RS audience.
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+
+        var clientId = $"resource-client-{CryptoRandom.CreateUniqueId(6)}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Resource Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedResourceServers = { "apiserver" },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
+                    ["scope"] = "api",
+                    ["resource"] = "https://api.demo.local/apiserver"
+                }));
+
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(content);
+        var accessToken = content!["access_token"].ToString()!;
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
+        Assert.Contains("https://api.demo.local/apiserver", jwt.Audiences);
+        Assert.DoesNotContain("apiserver", jwt.Audiences);
+    }
+
+    [Fact]
+    public async Task Post_WithUnknownResourceIndicator_ShouldReturnInvalidTarget()
+    {
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+
+        var clientId = $"unknown-resource-client-{CryptoRandom.CreateUniqueId(6)}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Unknown Resource Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedResourceServers = { "apiserver" },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
+                    ["scope"] = "api",
+                    ["resource"] = "https://unknown.example/api"
+                }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("invalid_target", body);
+    }
+
+    [Fact]
+    public async Task Post_WithResourceNotAllowed_ShouldReturnInvalidTarget()
+    {
+        // Audience-only request for a resource whose resource server is not in AllowedResourceServers.
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+
+        var clientId = $"no-resource-client-{CryptoRandom.CreateUniqueId(6)}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "No Resource Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
+                    ["resource"] = "https://api.demo.local/apiserver"
+                }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("invalid_target", body);
     }
 }

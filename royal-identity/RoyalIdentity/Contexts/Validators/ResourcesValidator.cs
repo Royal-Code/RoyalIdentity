@@ -59,12 +59,51 @@ public class ResourcesValidator : IValidator<IWithResources>
             }
         }
 
-        foreach(var apiScope in resources.Scopes)
+        foreach(var scope in resources.Scopes)
         {
-            if (!IsApiScopeAllowed(client, apiScope, resources))
+            // Scope names are globally unique within a realm (Fase 3), so the owner is the requested
+            // resource server that exposes this scope.
+            var owner = resources.ResourceServers.FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
+
+            // The resource server must allow its scopes to be requested via the scope parameter (ADR-012).
+            if (owner is not null && !owner.AllowScopeRequests)
             {
-                logger.LogError(context, "Api Scope not allowed for the client", $"{apiScope.Name}, {client.Id}, {client.Name}");
+                logger.LogError(context, "Scope requests are not allowed for the resource server", $"{owner.Name}, {scope.Name}, {client.Id}");
                 context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
+                return default;
+            }
+
+            if (!IsScopeAllowed(client, scope, owner))
+            {
+                logger.LogError(context, "Scope not allowed for the client", $"{scope.Name}, {client.Id}, {client.Name}");
+                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
+                return default;
+            }
+
+            // scope + resource coherence (ADR-012): if any resource indicator was requested and this scope's
+            // resource server exposes protected resources, at least one of them must be among the requested ones.
+            if (resources.ProtectedResources.Count is not 0
+                && owner is not null && owner.ProtectedResources.Count is not 0
+                && !owner.ProtectedResources.Any(pr => resources.ProtectedResources.Any(rp => rp.ResourceUri == pr.ResourceUri)))
+            {
+                logger.LogError(context, "Scope requires a matching resource indicator", $"{scope.Name}, {owner.Name}, {client.Id}");
+                context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "scope requires a matching resource indicator");
+                return default;
+            }
+        }
+
+        // Resource indicator authorization (ADR-012): the client may only request a resource whose owning
+        // resource server is in AllowedResourceServers (or with AllowAllResourceServers).
+        foreach (var resource in resources.ProtectedResources)
+        {
+            var owner = resources.ResourceServers.FirstOrDefault(rs => rs.ProtectedResources.Any(pr => pr.ResourceUri == resource.ResourceUri));
+            var allowed = client.AllowAllResourceServers
+                || (owner is not null && client.AllowedResourceServers.Contains(owner.Name));
+
+            if (!allowed)
+            {
+                logger.LogError(context, "Resource indicator not allowed for the client", $"{resource.ResourceUri}, {client.Id}, {client.Name}");
+                context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "resource indicator not allowed for this client");
                 return default;
             }
         }
@@ -83,11 +122,11 @@ public class ResourcesValidator : IValidator<IWithResources>
     }
 
     /// <summary>
-    /// An API scope is allowed when the client has Full Scope Allowed, when the scope is listed
+    /// A scope is allowed when the client has Full Scope Allowed, when the scope is listed
     /// individually in <see cref="Client.AllowedScopes"/>, or when its owning resource server is in
     /// <see cref="Client.AllowedResourceServers"/> (which authorizes all of its scopes).
     /// </summary>
-    private static bool IsApiScopeAllowed(Client client, Scope scope, RequestedResources resources)
+    private static bool IsScopeAllowed(Client client, Scope scope, ResourceServer? owner)
     {
         if (client.AllowAllResourceServers)
             return true;
@@ -95,9 +134,6 @@ public class ResourcesValidator : IValidator<IWithResources>
         if (client.AllowedScopes.Contains(scope.Name))
             return true;
 
-        // Scope names are globally unique within a realm (Fase 3), so the owner is the requested
-        // resource server that exposes this scope.
-        var owner = resources.ResourceServers.FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
         return owner is not null && client.AllowedResourceServers.Contains(owner.Name);
     }
 }

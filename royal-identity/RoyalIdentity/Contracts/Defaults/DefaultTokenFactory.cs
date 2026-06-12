@@ -77,7 +77,9 @@ public class DefaultTokenFactory : ITokenFactory
             jti,
             Oidc.Token.Response.BearerTokenType)
         {
-            AllowedSigningAlgorithms = request.Resources.ResourceServers.FindMatchingSigningAlgorithms()
+            // signing-algorithm chain (ADR-010 #a): realm orders/filters; resource servers then client
+            // act only as a restrictive filter, hierarchically (never combined).
+            AllowedSigningAlgorithms = request.Resources.ResolveAccessTokenSigningAlgorithms(request.Client)
         };
         token.Claims.AddRange(claims);
 
@@ -199,7 +201,9 @@ public class DefaultTokenFactory : ITokenFactory
             clock.GetUtcNow().UtcDateTime,
             client.IdentityTokenLifetime)
         {
-            AllowedSigningAlgorithms = request.Resources.ResourceServers.FindMatchingSigningAlgorithms(),
+            // id token is signed for the client, not the resource servers (apontamento 2.5):
+            // use the client's identity-token signing algorithms (realm default when empty).
+            AllowedSigningAlgorithms = [.. client.AllowedIdentityTokenSigningAlgorithms],
             RealmId = request.Client.Realm.Id,
         };
 

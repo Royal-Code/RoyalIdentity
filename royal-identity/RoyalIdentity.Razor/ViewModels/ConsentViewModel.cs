@@ -14,7 +14,7 @@ public class ConsentViewModel
 
     public IEnumerable<IdentityScope> IdentityScopes { get; set; }
 
-    public IEnumerable<Scope> ApiScopes { get; set; }
+    public IEnumerable<Scope> Scopes { get; set; }
 
     public ICollection<ScopeConsentInputModel> CreateIdentityScopes()
     {
@@ -29,9 +29,9 @@ public class ConsentViewModel
         }).ToArray();
     }
 
-    public ICollection<ScopeConsentInputModel> CreateApiScopes()
+    public ICollection<ScopeConsentInputModel> CreateScopes()
     {
-        return ApiScopes.Select(s => new ScopeConsentInputModel
+        return Scopes.Select(s => new ScopeConsentInputModel
         {
             Scope = s.Name,
             Description = s.Description,

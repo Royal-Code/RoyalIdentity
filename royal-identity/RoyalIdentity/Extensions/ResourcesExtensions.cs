@@ -1,10 +1,29 @@
-using RoyalIdentity.Models.Scopes;
+using RoyalIdentity.Models;
 using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Extensions;
 
 public static class ResourcesExtensions
 {
+    /// <summary>
+    /// Resolves the signing-algorithm filter for the access token (ADR-010, decisao #a).
+    /// The Realm always provides the order and availability; resource servers and the client act only
+    /// as a restrictive filter, hierarchically: requested resource servers restrict first (multi-RS:
+    /// intersection), else the client restricts, else no extra restriction (Realm only). Resource server
+    /// and client filters are never combined, so different restrictions never yield an empty set.
+    /// </summary>
+    internal static HashSet<string> ResolveAccessTokenSigningAlgorithms(this RequestedResources resources, Client client)
+    {
+        var fromResourceServers = resources.ResourceServers.FindMatchingSigningAlgorithms();
+        if (fromResourceServers.Count > 0)
+            return fromResourceServers;
+
+        if (client.AllowedAccessTokenSigningAlgorithms.Count > 0)
+            return [.. client.AllowedAccessTokenSigningAlgorithms];
+
+        return [];
+    }
+
     internal static HashSet<string> FindMatchingSigningAlgorithms(this IEnumerable<ResourceServer> apiResources)
     {
         var apis = apiResources.ToList();

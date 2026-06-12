@@ -149,6 +149,13 @@ public class RealmMemoryStore
                     ShowInDiscoveryDocument = true,
                 }
             ],
+            ProtectedResources =
+            [
+                new ProtectedResource("https://api.demo.local/apiserver")
+                {
+                    DisplayName = "API Server",
+                }
+            ],
         }
     };
 

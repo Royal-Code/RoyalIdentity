@@ -36,6 +36,7 @@ public class ResourceServer : ScopeBase
         Audience = other.Audience;
         AllowScopeRequests = other.AllowScopeRequests;
         Scopes = [.. other.Scopes];
+        ProtectedResources = [.. other.ProtectedResources];
         Secrets = [.. other.Secrets];
         AllowedAccessTokenSigningAlgorithms = [.. other.AllowedAccessTokenSigningAlgorithms];
     }
@@ -55,6 +56,13 @@ public class ResourceServer : ScopeBase
     /// The scopes exposed by this resource server.
     /// </summary>
     public ICollection<Scope> Scopes { get; set; } = [];
+
+    /// <summary>
+    /// The protected resources (RFC 8707 resource indicators / RFC 9728 metadata) exposed by this
+    /// resource server. The OAuth <c>resource</c> parameter is matched against each
+    /// <see cref="ProtectedResource.ResourceUri"/>. See ADR-012.
+    /// </summary>
+    public ICollection<ProtectedResource> ProtectedResources { get; set; } = [];
 
     /// <summary>
     /// Secrets used by the resource server (e.g. to authenticate at the introspection endpoint).

@@ -44,8 +44,8 @@
         IconClass="icon-user"
         Description="Personal Information" />
 
-        <Scopes @bind-Value="inputModel.ApiScopesConsent"
-        BindPrefix="inputModel.ApiScopesConsent"
+        <Scopes @bind-Value="inputModel.ScopesConsent"
+        BindPrefix="inputModel.ScopesConsent"
         IconClass="icon-tasks"
         Description="Application Access" />
 
@@ -113,7 +113,7 @@
             {
                 RememberConsent = true,
                 IdentityScopesConsent = viewModel!.CreateIdentityScopes(),
-                ApiScopesConsent = viewModel.CreateApiScopes(),
+                ScopesConsent = viewModel.CreateScopes(),
                 ReturnUrl = ReturnUrl!
             };
         }

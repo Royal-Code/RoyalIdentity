@@ -27,9 +27,9 @@ public class ConsentInputModel
     public ICollection<ScopeConsentInputModel> IdentityScopesConsent { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets the API scopes submitted by the user.
+    /// Gets or sets the scopes submitted by the user.
     /// </summary>
-    public ICollection<ScopeConsentInputModel> ApiScopesConsent { get; set; } = [];
+    public ICollection<ScopeConsentInputModel> ScopesConsent { get; set; } = [];
 
     /// <summary>
     /// Gets or sets a value indicating whether the consent should be remembered.
@@ -54,7 +54,7 @@ public class ConsentInputModel
     /// <inheritdoc />
     public override string ToString()
     {
-        return $"IdentityScopesConsent: {IdentityScopesConsent}, ApiScopesConsent: {ApiScopesConsent}, RememberConsent: {RememberConsent}, ReturnUrl: {ReturnUrl}, Description: {Description}, Button: {Button}";
+        return $"IdentityScopesConsent: {IdentityScopesConsent}, ScopesConsent: {ScopesConsent}, RememberConsent: {RememberConsent}, ReturnUrl: {ReturnUrl}, Description: {Description}, Button: {Button}";
     }
 }
 

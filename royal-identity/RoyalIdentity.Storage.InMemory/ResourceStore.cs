@@ -11,6 +11,7 @@ public class ResourceStore : IResourceStore
     private readonly ConcurrentDictionary<string, ResourceServer> resourceServers;
     private readonly ConcurrentDictionary<string, IdentityScope> identityScopes;
     private readonly Dictionary<string, (ResourceServer Server, Scope Scope)> scopeIndex;
+    private readonly Dictionary<string, (ResourceServer Server, ProtectedResource Resource)> resourceIndex;
 
     public ResourceStore(
         ConcurrentDictionary<string, ResourceServer> resourceServers,
@@ -19,6 +20,7 @@ public class ResourceStore : IResourceStore
         this.resourceServers = resourceServers;
         this.identityScopes = identityScopes;
         scopeIndex = BuildScopeIndex(resourceServers.Values);
+        resourceIndex = BuildResourceIndex(resourceServers.Values);
     }
 
     public Task<AllScopes> GetAllResourcesAsync(CancellationToken ct = default)
@@ -49,11 +51,16 @@ public class ResourceStore : IResourceStore
 
     public Task<RequestedResources> FindResourcesByScopeAsync(
         IEnumerable<string> scopeNames, bool onlyEnabled = false, CancellationToken ct = default)
+        => FindRequestedResourcesAsync(scopeNames, [], onlyEnabled, ct);
+
+    public Task<RequestedResources> FindRequestedResourcesAsync(
+        IEnumerable<string> scopeNames, IEnumerable<string> resourceUris, bool onlyEnabled = false, CancellationToken ct = default)
     {
         var resources = new RequestedResources();
         resources.RequestedScopeNames.AddRange(scopeNames);
+        resources.RequestedResourceUris.AddRange(resourceUris);
 
-        foreach (var name in scopeNames)
+        foreach (var name in resources.RequestedScopeNames)
         {
             if (name == Server.StandardScopes.OfflineAccess)
             {
@@ -86,6 +93,23 @@ public class ResourceStore : IResourceStore
             resources.MissingScopes.Add(name);
         }
 
+        // Resource indicators (RFC 8707): match each requested URI against a protected resource.
+        foreach (var uri in resources.RequestedResourceUris)
+        {
+            // Unknown, malformed (not an absolute URI / has a fragment), or owned by a disabled
+            // resource server (Enabled derives from the parent) -> invalid_target (ADR-012).
+            if (!IsValidResourceUri(uri)
+                || !resourceIndex.TryGetValue(uri, out var match)
+                || !match.Server.Enabled)
+            {
+                resources.InvalidTargets.Add(uri);
+                continue;
+            }
+
+            resources.ProtectedResources.Add(match.Resource);
+            AddResourceServer(resources, match.Server);
+        }
+
         return Task.FromResult(resources);
     }
 
@@ -115,6 +139,35 @@ public class ResourceStore : IResourceStore
         return index;
     }
 
+    /// <summary>
+    /// Builds the resource-indicator index and enforces global uniqueness of <see cref="ProtectedResource.ResourceUri"/>
+    /// within the realm. A resource URI belongs to exactly one resource server.
+    /// </summary>
+    private static Dictionary<string, (ResourceServer Server, ProtectedResource Resource)> BuildResourceIndex(
+        IEnumerable<ResourceServer> servers)
+    {
+        var index = new Dictionary<string, (ResourceServer Server, ProtectedResource Resource)>(StringComparer.Ordinal);
+        foreach (var server in servers)
+        {
+            foreach (var resource in server.ProtectedResources)
+            {
+                if (index.TryGetValue(resource.ResourceUri, out var existing))
+                {
+                    throw new InvalidOperationException(
+                        $"Duplicate protected resource URI '{resource.ResourceUri}' found in resource servers " +
+                        $"'{existing.Server.Name}' and '{server.Name}'. Resource URIs must be unique within a realm.");
+                }
+
+                index[resource.ResourceUri] = (server, resource);
+            }
+        }
+
+        return index;
+    }
+
+    private static bool IsValidResourceUri(string uri)
+        => Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && string.IsNullOrEmpty(parsed.Fragment);
+
     private static void AddResourceServer(RequestedResources resources, ResourceServer server)
     {
         if (!resources.ResourceServers.Contains(server))
@@ -126,7 +179,8 @@ public class ResourceStore : IResourceStore
         if (scope.Enabled)
             return true;
 
-        resources.DisabledScopes.Add(scope.Name);
+        // collapsed bucket (apontamento 3.1): a disabled scope is reported as invalid (MissingScopes).
+        resources.MissingScopes.Add(scope.Name);
         return false;
     }
 }

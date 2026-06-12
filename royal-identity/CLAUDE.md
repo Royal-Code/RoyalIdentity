@@ -9,6 +9,7 @@ Before any significant work, read these three files — they contain context abo
 - [.ai/foundation/product.md](.ai/foundation/product.md) — domain, OAuth2/OIDC flows, business rules, active design debt
 - [.ai/foundation/tech.md](.ai/foundation/tech.md) — stack, pipeline execution semantics, storage abstraction, patterns to follow
 - [.ai/foundation/structure.md](.ai/foundation/structure.md) — project dependency graph, directory map, naming conventions, where new code belongs
+- [.ai/rules/code-style.rules.md](.ai/rules/code-style.rules.md) — repository-specific code style rules and code smells
 
 Completed refactoring plans (useful as historical record and for understanding design decisions):
 
@@ -20,11 +21,11 @@ Completed refactoring plans (useful as historical record and for understanding d
 
 Active plans (check status before modifying affected areas):
 
-- [.ai/plans/plan-resources-redesign.md](.ai/plans/plan-resources-redesign.md) — PLANNED (Resources/Scopes model: IdentityScope, ResourceServer, Scope)
+- [.ai/plans/plan-resources-redesign.md](.ai/plans/plan-resources-redesign.md) — IN_PROGRESS (Resources/Scopes model: IdentityScope, ResourceServer, Scope; client AllowedResources; signing chain; + Resource Indicators / Protected Resource Metadata)
 
 Architectural Decision Records (accepted decisions; read before changing the affected area):
 
-- [adrs/](adrs/) — ADR-001..011 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed)
+- [adrs/](adrs/) — ADR-001..012 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata)
 
 Backlog (deferred items with design notes):
 
@@ -88,3 +89,4 @@ services.AddPipelines(builder =>
 - `Nullable enable`, `ImplicitUsings enable`, `LangVersion latest` — applied globally via `Directory.Build.props`
 - File-scoped namespaces preferred (`csharp_style_namespace_declarations = block_scoped:silent`)
 - Primary constructors preferred for simple cases (`csharp_style_prefer_primary_constructors = true:suggestion`)
+- See [.ai/rules/code-style.rules.md](.ai/rules/code-style.rules.md) for repository-specific code smells such as LINQ query expression syntax.

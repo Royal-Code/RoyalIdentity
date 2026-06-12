@@ -1,6 +1,4 @@
-﻿// Ignore Spelling: Api
-
-namespace RoyalIdentity.Options;
+﻿namespace RoyalIdentity.Options;
 
 /// <summary>
 /// Options class to configure discovery endpoint
@@ -16,7 +14,7 @@ public class DiscoveryOptions
         ShowEndpoints = other.ShowEndpoints;
         ShowKeySet = other.ShowKeySet;
         ShowIdentityScopes = other.ShowIdentityScopes;
-        ShowApiScopes = other.ShowApiScopes;
+        ShowScopes = other.ShowScopes;
         ShowClaims = other.ShowClaims;
         ShowResponseTypes = other.ShowResponseTypes;
         ShowResponseModes = other.ShowResponseModes;
@@ -86,9 +84,9 @@ public class DiscoveryOptions
     public bool ShowIdentityScopes { get; set; } = true;
 
     /// <summary>
-    /// Show API scopes
+    /// Show scopes
     /// </summary>
-    public bool ShowApiScopes { get; set; } = true;
+    public bool ShowScopes { get; set; } = true;
 
     /// <summary>
     /// Show identity claims
