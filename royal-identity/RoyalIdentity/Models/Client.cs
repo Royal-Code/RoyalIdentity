@@ -63,16 +63,41 @@ public class Client
     public bool AllowPlainTextPkce { get; set; } = false;
 
     /// <summary>
-    /// Gets or sets a value indicating whether [allow offline access]. Defaults to <c>false</c>.
+    /// The OAuth 2.0 client type (RFC 6749). Defaults to <see cref="ClientType.Public"/>.
+    /// <see cref="RequireClientSecret"/>/<see cref="ClientSecrets"/> remain the runtime behavior;
+    /// the consistency between them is validated by the client CRUD (future). See ADR-011.
     /// </summary>
-    [Redesign("Incluir no Allowed Resources, ver abaixo")]
+    public ClientType ClientType { get; set; } = ClientType.Public;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the client may request a refresh token (offline_access). Defaults to <c>false</c>.
+    /// </summary>
     public bool AllowOfflineAccess { get; set; } = false;
 
     /// <summary>
-    /// Specifies the api scopes that the client is allowed to request. If empty, the client can't access any scope
+    /// The identity scopes the client is allowed to request (e.g. openid, profile, email).
     /// </summary>
-    [Redesign("Substituir por Allowed Resources, com divisão dos recursos permitidos por tipo")]
+    public HashSet<string> AllowedIdentityScopes { get; } = [];
+
+    /// <summary>
+    /// The resource servers the client is allowed to request. Being allowed a resource server
+    /// authorizes the client to request any of that resource server's scopes.
+    /// </summary>
+    public HashSet<string> AllowedResourceServers { get; } = [];
+
+    /// <summary>
+    /// The individual API scopes the client is allowed to request. A scope is also allowed when its
+    /// owning resource server is in <see cref="AllowedResourceServers"/> or <see cref="AllowAllResourceServers"/> is set.
+    /// </summary>
     public HashSet<string> AllowedScopes { get; } = [];
+
+    /// <summary>
+    /// Full Scope Allowed (Keycloak-style): authorizes the client to request any scope of any resource
+    /// server of the realm, without listing each one. Authorization only — the token still carries only
+    /// the requested scopes (ADR-010/011). Valid only for <see cref="ClientType.Confidential"/> clients
+    /// (guard enforced by the client CRUD, future). Defaults to <c>false</c>.
+    /// </summary>
+    public bool AllowAllResourceServers { get; set; } = false;
 
     /// <summary>
     /// Specifies the response types that the client is allowed to request. If empty, the client can't access any scope
@@ -83,6 +108,13 @@ public class Client
     /// Signing algorithm for identity token. If empty, will use the server default signing algorithm.
     /// </summary>
     public HashSet<string> AllowedIdentityTokenSigningAlgorithms { get; } = [];
+
+    /// <summary>
+    /// Signing algorithms accepted by the client for the access token, in order of preference.
+    /// Participates in the signing-algorithm chain (ResourceServer -> Client -> Realm); see ADR-010.
+    /// If empty, the client imposes no restriction. Applied in Fase 5.
+    /// </summary>
+    public HashSet<string> AllowedAccessTokenSigningAlgorithms { get; } = [];
 
     /// <summary>
     /// Specifies which external IdPs can be used with this client (if list is empty all IdPs are allowed). Defaults to empty.

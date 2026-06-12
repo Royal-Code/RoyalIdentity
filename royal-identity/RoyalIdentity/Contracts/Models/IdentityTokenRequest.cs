@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Contracts.Models;
@@ -17,7 +17,7 @@ public class IdentityTokenRequest
 
     public required Client Client { get; init; }
 
-    public required RequestedScopes Resources { get; init; }
+    public required RequestedResources Resources { get; init; }
 
     public string? Nonce { get; init; }
 

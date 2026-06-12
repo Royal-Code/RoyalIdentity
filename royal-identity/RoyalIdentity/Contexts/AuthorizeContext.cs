@@ -4,7 +4,7 @@ using RoyalIdentity.Contexts.Parameters;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Options;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
@@ -185,7 +185,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     /// <summary>
     /// The requested scopes.
     /// </summary>
-    public RequestedScopes Scopes { get; } = new();
+    public RequestedResources Scopes { get; } = new();
 
     /// <summary>
     /// Gets the session id from the current user.
@@ -211,7 +211,7 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public virtual void Load(NameValueCollection raw, ILogger logger)
     {
         Scope = raw.Get(Oidc.Authorize.Request.Scope);
-        Scopes.Scopes.AddRange(Scope.FromSpaceSeparatedString());
+        Scopes.RequestedScopeNames.AddRange(Scope.FromSpaceSeparatedString());
 
         var responseType = raw.Get(Oidc.Authorize.Request.ResponseType);
         ResponseTypes.AddRange(responseType.FromSpaceSeparatedString());

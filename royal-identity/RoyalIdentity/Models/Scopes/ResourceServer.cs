@@ -1,38 +1,74 @@
-﻿using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Extensions;
+using System.Diagnostics;
 
 namespace RoyalIdentity.Models.Scopes;
 
 /// <summary>
-/// Model for Web API Resource Server.
+/// Models a resource server (a Web API) that exposes protected <see cref="Scope"/>s.
 /// </summary>
+[DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
 public class ResourceServer : ScopeBase
 {
-    /// <summary>
-    /// Creates a new instance of <see cref="ResourceServer"/>.
-    /// </summary>
-    /// <param name="visibility">Visibility of the resource server.</param>
-    /// <param name="name">The unique name of the resource server.</param>
-    /// <param name="displayName">The display name of the resource server.</param>
-    /// <param name="description">The description of the resource server.</param>
-    public ResourceServer(
-        ScopeVisibility visibility, 
-        string name,
-        string displayName, 
-        string description) : base(ScopeType.ResourceServer, visibility, name, displayName, description)
-    { }
+    private string DebuggerDisplay => Name ?? $"{{{typeof(ResourceServer)}}}";
 
     /// <summary>
-    /// Indicates whether this API resource allows incoming scope requests. Defaults to true.
+    /// Initializes a new instance of the <see cref="ResourceServer"/> class.
+    /// </summary>
+    public ResourceServer(
+        ScopeVisibility visibility,
+        string name,
+        string displayName,
+        string description)
+        : base(ScopeType.ResourceServer, visibility, name, displayName, description)
+    {
+        if (name.IsMissing()) throw new ArgumentNullException(nameof(name));
+    }
+
+    /// <summary>
+    /// Copy constructor. Produces an independent instance with copied collections
+    /// (new collections sharing the same scope/secret element references).
+    /// </summary>
+    public ResourceServer(ResourceServer other)
+        : this(other.Visibility, other.Name, other.DisplayName, other.Description)
+    {
+        Enabled = other.Enabled;
+        ShowInDiscoveryDocument = other.ShowInDiscoveryDocument;
+        Audience = other.Audience;
+        AllowScopeRequests = other.AllowScopeRequests;
+        Scopes = [.. other.Scopes];
+        Secrets = [.. other.Secrets];
+        AllowedAccessTokenSigningAlgorithms = [.. other.AllowedAccessTokenSigningAlgorithms];
+    }
+
+    /// <summary>
+    /// The audience added to access tokens for scopes of this resource server.
+    /// When empty, <see cref="ScopeBase.Name"/> is used.
+    /// </summary>
+    public string? Audience { get; set; }
+
+    /// <summary>
+    /// Indicates whether this resource server allows incoming scope requests. Defaults to true.
     /// </summary>
     public bool AllowScopeRequests { get; set; } = true;
 
     /// <summary>
-    /// Models the resources this API resource server allows.
+    /// The scopes exposed by this resource server.
     /// </summary>
-    public ICollection<ApiResource> Resources { get; set; } = [];
+    public ICollection<Scope> Scopes { get; set; } = [];
 
     /// <summary>
-    /// Models the identity scopes this API resource server allows.
+    /// Secrets used by the resource server (e.g. to authenticate at the introspection endpoint).
     /// </summary>
-    public ICollection<IdentityScope> IdentityScopes { get; set; } = [];
+    public ICollection<ClientSecret> Secrets { get; set; } = [];
+
+    /// <summary>
+    /// Signing algorithms accepted by this resource server for access tokens.
+    /// If empty, the resource server imposes no restriction.
+    /// </summary>
+    public HashSet<string> AllowedAccessTokenSigningAlgorithms { get; set; } = [];
+
+    /// <summary>
+    /// Gets the effective audience (<see cref="Audience"/> when set, otherwise <see cref="ScopeBase.Name"/>).
+    /// </summary>
+    public string GetAudience() => Audience.IsPresent() ? Audience : Name;
 }

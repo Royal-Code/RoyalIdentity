@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`-------` **0%** - 0 de 7 fases concluidas
+`████----` **50%** - 4 de 8 fases concluidas
 
 ---
 
@@ -29,7 +29,7 @@ Colapsar o modelo para **3 conceitos** claros e alinhados ao OAuth2, com semanti
 2. **ResourceServer** — um servico que expoe recursos protegidos (uma WebApi). Dono de `Scope`s, de `Audience` e dos secrets.
 3. **Scope** — uma operacao/funcionalidade exposta por um `ResourceServer` (read/write/grupo de endpoints).
 
-E ainda: refatorar `RequestedScopes` -> `RequestedResources`, consolidar o namespace, redesenhar a permissao do client (`AllowedResources`) e o consentimento agrupado por ResourceServer.
+E ainda: refatorar `RequestedScopes` -> `RequestedResources`, consolidar o namespace, redesenhar a permissao do client (`AllowedResources`), adicionar Resource Indicators/Protected Resource Metadata (ADR-012) e o consentimento agrupado por ResourceServer.
 
 ---
 
@@ -80,8 +80,10 @@ Consumidores nucleo a tocar (~15): `ResourcesDecorator`, `ClientResourceDecorato
 **Conceitos (3):**
 
 - **`IdentityScope`** (mantido): claims de identidade; avulso, pertence ao realm. `UserClaims`, `Required`, `Emphasize`.
-- **`ResourceServer`** (= renomeado do antigo `ApiResource`): dono de `Scope`s. Campos: `Scopes` (`Scope[]`), `Audience` (string; default = `Name`), `Secrets` (para introspection futuro), `AllowedAccessTokenSigningAlgorithms`, `AllowScopeRequests`, `Visibility`, `Enabled`.
+- **`ResourceServer`** (= renomeado do antigo `ApiResource`): dono de `Scope`s e de `ProtectedResource`s. Campos: `Scopes` (`Scope[]`), `Audience` (string; default = `Name`, usado no caminho por `scope`), `ProtectedResources` (`ProtectedResource[]`, ADR-012), `Secrets` (para introspection futuro), `AllowedAccessTokenSigningAlgorithms`, `AllowScopeRequests`, `Visibility`, `Enabled`.
 - **`Scope`** (= renomeado do antigo `ApiScope`): operacao de um `ResourceServer`. `Name` **unico/global no realm**, `Required`, `Emphasize`. **So existe dentro de um ResourceServer.**
+
+**`ProtectedResource`** (ADR-012): protected resource RFC 8707/9728 pertencente a um `ResourceServer`. Campos: `ResourceUri` (URI absoluta, sem fragmento, unica por realm), `ShowInDiscoveryDocument`, `DisplayName`, `DocumentationUri`, `PolicyUri`, `TosUri`. O parametro OAuth `resource` casa contra `ProtectedResource.ResourceUri`.
 
 **Removidos:** o `ResourceServer`-grupo atual (que agregava `ApiResource`s) e o nivel intermediario `ApiResource`. `ScopeType` passa a ter 3 valores: `Identity`, `ResourceServer`, `Scope`. `ResourceServer.IdentityScopes` **removido** (IdentityScope e do realm, nao do RS).
 
@@ -91,7 +93,9 @@ Consumidores nucleo a tocar (~15): `ResourcesDecorator`, `ClientResourceDecorato
 
 - **`scope` no token** = apenas os `Scope` (e `IdentityScope`) explicitamente pedidos + `offline_access`. Pedir o nome de um ResourceServer **nao** despeja todos os scopes no token.
 - **Autorizacao do client** = ter um `ResourceServer` em `AllowedResourceServers` ⇒ o client pode pedir **qualquer Scope** daquele RS.
-- **`aud`** = uniao dos `ResourceServer.Audience` dos ResourceServers cujos scopes foram pedidos.
+- **`aud` por `scope`** = uniao de `ResourceServer.Audience ?? ResourceServer.Name` dos ResourceServers donos dos Scopes pedidos, quando nao ha `resource` explicito para aquele RS.
+- **`aud` por `resource`** (ADR-012) = `ProtectedResource.ResourceUri` dos resources pedidos. Quando `resource` e informado para um RS, esse audience explicito domina e o `Audience` legado do RS nao e adicionado para o mesmo RS.
+- **`scope + resource`** e aceito quando coerente: scopes de API so podem acompanhar `resource` se o ResourceServer dono do scope estiver representado por pelo menos um `ProtectedResource` pedido; caso contrario, `invalid_target`.
 
 **Permissao do client (decisao #4 + tipo de client — ver ADR-011)** — substituir `AllowedScopes`(string-misto) e `AllowOfflineAccess`:
 
@@ -122,8 +126,9 @@ Pega o primeiro para o qual ha chave de assinatura disponivel. **Multi-RS:** qua
 2. **Fase 2 (modelo de dominio)** — base das demais.
 3. **Fase 3 (store)** e **Fase 4 (client AllowedResources)** — dependem da Fase 2; independentes entre si.
 4. **Fase 5 (pipeline/token/aud)** — depende de 2, 3, 4.
-5. **Fase 6 (consentimento)** — depende de 2 e 5.
-6. **Fase 7 (testes)** — depende de tudo.
+5. **Fase 6 (Resource Indicators e Protected Resource Metadata)** — depende de 2, 3, 4 e 5.
+6. **Fase 7 (consentimento)** — depende de 2, 5 e 6.
+7. **Fase 8 (testes)** — depende de tudo.
 
 ---
 
@@ -144,7 +149,7 @@ Criterio de aceite: call sites de `IdentityResource/ApiScope/ApiResource/Resourc
 
 ### Resultado da Fase 1
 
-**Status:** em andamento (passo 1 concluido).
+**Status:** concluida (passos 1-6).
 
 #### Passo 1 — Derivacao do `aud` (audience)
 
@@ -161,9 +166,99 @@ Criterio de aceite: call sites de `IdentityResource/ApiScope/ApiResource/Resourc
 
 **Implicacoes para o redesenho:**
 - Hoje o `aud` sai **somente** do `ApiResource` (nivel do meio). Nao usa o `ResourceServer`-grupo nem `ApiScope` avulso — pedir so um `ApiScope` **nao gera `aud`**.
-- Alvo: `aud` = `ResourceServer.Audience` (default = `Name`) dos ResourceServers donos dos Scopes pedidos (+ ResourceServers pedidos diretamente). A linha `request.Resources.ApiResources.Select(x => x.Name)` passa a `Select(rs => rs.Audience)` sobre os ResourceServers efetivos.
+- Alvo: no caminho por `scope`, `aud` = `ResourceServer.Audience ?? ResourceServer.Name` dos ResourceServers donos dos Scopes pedidos. ResourceServer nao e pedido diretamente por `scope`; o caminho explicito por audience/resource fica na ADR-012/Fase 6.
 - Manter o comportamento `IsOpenId -> client.Id` no `aud`.
 - **Nota cruzada (signing-alg, passo 5):** `AllowedSigningAlgorithms` tambem sai hoje **so** de `request.Resources.ApiResources.FindMatchingSigningAlgorithms()` (access **e** id token, l.80 e l.202). A cadeia RS->Client->Realm decidida e uma **mudanca de comportamento** aqui, tratada na Fase 5.
+
+#### Passo 2 — Consumo de `RequestedScopes` em consent e claims
+
+**Claims (`DefaultTokenClaimsService`):**
+- Access token: `resources.ToScopeClaims()` (claim `scope`, l.98) + `resources.GetRequestedIdentityClaimsTypes()` (tipos de claim de identidade p/ o profile, l.110).
+- Id token: `resources.RequestedIdentityClaimTypes()` (extension; **so** `IdentityResources.UserClaims`, filtrado, l.47).
+- **Inconsistencia:** dois metodos de "tipos de claim de identidade" — `GetRequestedIdentityClaimsTypes()` (RequestedScopes; inclui `ResourceServers.IdentityScopes`) no access token, e `RequestedIdentityClaimTypes()` (ResourcesExtensions; so IdentityResources) no id token. Com a decisao #5 (ResourceServer nao possui IdentityScopes) os dois convergem para **IdentityScopes apenas** -> unificar num metodo so.
+- `ToScopeClaims()` percorre **5 caminhos** hoje; no alvo colapsa para **nomes dos Scopes pedidos + IdentityScopes + offline_access** (decisao #2).
+
+**Consent (`DefaultConsentService` + `ConsentPageService`/`ConsentViewModel`):**
+- A tela e a comparacao operam **somente** sobre `IdentityResources` + `ApiScope` avulso. `ConsentPageService.BuildConsentViewModel` monta o ViewModel de `context.Resources.IdentityResources` + `context.Resources.ApiScopes` (l.90-91); `ProcessConsentAsync` valida/coleta so esses dois grupos (l.50-74).
+- A comparacao usa `resources.IntersectConsentScopes(...)` (l.144 do `DefaultConsentService`), que considera `IdentityResources.Name ∪ ApiScopes.Name`.
+- **Gap atual:** `ResourceServer` e `ApiResource` **nao aparecem no consentimento** — pedir scopes de um ApiResource hoje nao gera tela de consent para eles.
+
+**Implicacoes para o redesenho:**
+- A decisao #6 (consent agrupado por ResourceServer mostrando os Scopes pedidos) **nao e so cosmetica**: o consent precisa **passar a consentir** os Scopes de ResourceServer (hoje ignorados). Mudam `ConsentViewModel` (grupo por ResourceServer + IdentityScopes), `ConsentPageService` (build/process) e o matching `IntersectConsentScopes` (considerar os Scopes pedidos, nao so ApiScopes).
+- Unificar os dois caminhos de tipos de claim de identidade.
+
+**Arquivos:** `DefaultTokenClaimsService` (l.98, 110, 47), `RequestedScopes` (`ToScopeClaims`/`GetRequestedIdentityClaimsTypes`/`IntersectConsentScopes`), `ResourcesExtensions.RequestedIdentityClaimTypes` (l.51), `DefaultConsentService` (l.144), `ConsentPageService` (l.50-91), `ConsentViewModel`/`ConsentInputModel`.
+
+#### Passo 3 — Persistencia dos scopes pedidos e re-load no refresh
+
+**AuthorizationCode:** guarda o **objeto `RequestedScopes` completo** (`AuthorizationCode.Scopes`), criado em `DefaultCodeFactory` a partir de `context.Scopes`. Na troca do code (`AuthorizationCodeHandler`) o `code.Scopes` e **reusado direto** (`Resources = code.Scopes`, `IsOpenId`, `OfflineAccess`) — nao re-resolve do store.
+
+**RefreshToken:** guarda apenas **nomes de scope** em `RefreshToken.RequestedScopes` (`ICollection<string>`), populado de `request.AccessToken.Scopes.ToList()` (`DefaultTokenFactory`, l.251). `TokenBase.Scopes` = valores dos claims `scope` do token; `Audiences` e um `HashSet<string>` proprio (copiado em `AccessToken.Renew`).
+
+**Re-load no refresh (`RefreshTokenHandler`):** **nao** usa `refreshToken.RequestedScopes`; usa os **scope claims do access token armazenado** (`accessToken.Scopes`) e re-resolve via `resourceStore.FindResourcesByScopeAsync(scopes, onlyEnabled: true)` (l.72-73 no caminho `UpdateAccessTokenClaimsOnRefresh`; l.150-151 para o id token). No caminho padrao, `accessToken.Renew` copia claims (scopes) e `Audiences` do token antigo.
+
+**Observacoes para o redesenho:**
+- `RefreshToken.RequestedScopes` (collection de string) parece **armazenado mas nao lido** no refresh — candidato a remocao (o refresh re-resolve a partir dos scope claims do access token). Confirmar e limpar.
+- `FindResourcesByScopeAsync(..., onlyEnabled: true)` no refresh **descarta scopes desabilitados/removidos** entre emissao e refresh — comportamento a preservar no novo modelo.
+- A re-resolucao por nome e o ponto onde o novo modelo entra: nomes -> Scopes (com RS dono -> `aud`). `AuthorizationCode.Scopes` muda de tipo com o rename `RequestedScopes` -> `RequestedResources`.
+
+**Arquivos:** `AuthorizationCode.Scopes`, `DefaultCodeFactory` (l.45), `AuthorizationCodeHandler` (l.50, 61, 77, 99), `RefreshToken.RequestedScopes`, `DefaultTokenFactory.CreateRefreshTokenAsync` (l.251), `RefreshTokenHandler` (l.72-73, 92, 150-151), `TokenBase.Scopes/Audiences`.
+
+#### Passo 4 — Seeding e testes
+
+**Seeding (`RealmMemoryStore`):** 4 dicionarios — `IdentityResources` (IdentityScope), `ResourceServers`, `ApiResources`, `ApiScopes`. Seed:
+- IdentityScopes: `openid`, `profile`, `email`, `address`, `phone`.
+- 1 ResourceServer `apiserver` -> Resources [ ApiResource (ctor "api1", mas `Name` sobrescrito para "api") -> Scopes [ ApiScope "api" ] ].
+- ApiScopes avulsos: `api:read`, `api:write`.
+- `InitializeResources()` **achata** o aninhado: copia o 1o ApiResource do 1o ResourceServer para `ApiResources["api"]` e seus scopes para `ApiScopes["api"]` — o scope "api" existe nas duas formas.
+
+**Como resolvem hoje (`FindResourcesByScopeAsync`):** "apiserver" -> ResourceServer; "api" -> **ApiResource** (dict flat); "api:read"/"api:write" -> **ApiScope**; openid/profile/... -> IdentityScope. (Confirma o Passo 1: so "api" gera `aud`.)
+
+**Testes:** nenhum teste cria ResourceServer/ApiResource/IdentityScope — todos usam os scopes **seedados** por nome. Impacto:
+- `Client.AllowedScopes = { ... }` (string) em ~10 arquivos (RealmIsolation, Phase4/5, CodeToken, RefreshToken, ClientToken, EndSession, CodeAuthorize, EventIsolation) -> migrar para o novo modelo de client (Fase 4).
+- `FindResourcesByScopeAsync([...nomes...])` (CodeToken, RealmIsolation, HostEndpoints) -> continua valido.
+
+**Implicacoes:** store cai de 4 dicts para **2** (`ResourceServers` com `Scopes` + `IdentityScopes`); remover `InitializeResources()`. Re-modelar `api`/`api:read`/`api:write` como **Scopes de um ResourceServer** com `Audience` — hoje "api:read"/"api:write" sao ApiScope avulso (sem aud); no novo modelo **passam a contribuir `aud`** (mudanca na demo data).
+
+**Arquivos:** `RealmMemoryStore` (l.36-45, 61-181), `MemoryStorage.Storage.cs` `GetResourceStore` (l.75-85), `Tests.Integration/*`, `Tests.Host/HostEndpoints.cs`.
+
+#### Passo 5 — Algoritmo de assinatura (multi-ResourceServer)
+
+**Hoje:** `AllowedSigningAlgorithms` sai **so** de `request.Resources.ApiResources.FindMatchingSigningAlgorithms()` (access e id token). Ja intersecta entre multiplos ApiResources (lanca se incompativel); sem fallback para Client/Realm.
+
+**Decidido (precedencia, com ordem):**
+1. ResourceServers pedidos que declaram algoritmos -> intersecao das listas (todas as APIs participantes devem aceitar); ordem = a do **primeiro ResourceServer pedido**.
+2. senao `Client.AllowedAccessTokenSigningAlgorithms` -> ordem do Client.
+3. senao algoritmos disponiveis no Realm -> ordem do Realm.
+
+Pega o primeiro com chave disponivel. **Mudanca:** adiciona niveis Client e Realm (hoje so ApiResource) + ordem; `FindMatchingSigningAlgorithms` passa a operar sobre ResourceServers + a cadeia. Implementado na Fase 5.
+
+#### Passo 6 — Contrato consolidado
+
+**Classificacao dos tipos:**
+
+| Atual | Acao | Alvo |
+|---|---|---|
+| `IdentityScope` | manter | `IdentityScope` (avulso, do realm) |
+| `ApiScope` | renomear | `Scope` (pertence a um ResourceServer) |
+| `ApiResource` | renomear | `ResourceServer` (dono de Scopes, Audience, secrets, signing-alg) |
+| `ResourceServer` (grupo de ApiResources) | **remover** | — |
+| `ResourceServer.IdentityScopes` | **remover** | IdentityScope e do realm |
+| `RequestedScopes` | renomear | `RequestedResources` (IdentityScopes/ResourceServers/Scopes) |
+| `ApiResource.ApiSecrets` / `AllowedAccessTokenSigningAlgorithms` | manter no RS (des-obsoletar) | `ResourceServer.Secrets` / `AllowedAccessTokenSigningAlgorithms` |
+| `Client.AllowedScopes` (string) / `AllowOfflineAccess` | substituir | `AllowedIdentityScopes` + `AllowedResourceServers` + `AllowedScopes` + `AllowAllResourceServers` + flag `AllowOfflineAccess` + `ClientType` (ADR-011) |
+| namespace `Models.Resources` | remover | consolidar em `Models.Scopes` |
+
+**Contrato (sintese):**
+- `aud` sem `resource` explicito = `ResourceServer.Audience ?? ResourceServer.Name` dos RS donos dos Scopes pedidos + `client.Id` quando OpenID. O caminho explicito por `resource` e definido na ADR-012/Fase 6.
+- `scope` no token = apenas Scopes pedidos + IdentityScopes + offline_access.
+- Consent: passa a consentir Scopes de ResourceServer (hoje ignorados), agrupado por RS; ajustar `IntersectConsentScopes` e `ConsentViewModel`.
+- Unificar os dois metodos de "identity claim types".
+- Refresh re-resolve por nome (`FindResourcesByScopeAsync(onlyEnabled:true)`); `RefreshToken.RequestedScopes` (string) provavelmente removivel.
+- Signing-alg: cadeia RS -> Client -> Realm com ordem.
+- Store: 2 dicts; remover `InitializeResources()`.
+
+**Fase 1 concluida.**
 
 ---
 
@@ -181,6 +276,26 @@ Passos:
 
 Criterio de aceite: solucao compila; o modelo tem so 3 tipos; `RequestedResources` nao referencia mais ApiResource/grupo.
 
+### Resultado da Fase 2
+
+**Status:** concluida. `dotnet build RoyalIdentity.sln` limpo; `dotnet test` verde (116 — Pipelines 3, Identity 6, Integration 107).
+
+**Modelo:** `ScopeType` reduzido a 3 (`Identity`, `ResourceServer`, `Scope`), tudo consolidado em `RoyalIdentity.Models.Scopes`. Criados `Scope` (ex-`ApiScope`) e `ResourceServer` (ex-`ApiResource`; com `Scopes`, `Audience`, `Secrets` (`ClientSecret`), `AllowedAccessTokenSigningAlgorithms`, `AllowScopeRequests`, `GetAudience()`). Removidos `ApiResource`, o `ResourceServer`-grupo antigo e `ResourceServer.IdentityScopes`. `RequestedScopes` -> `RequestedResources` (membros `IdentityScopes`/`ResourceServers`/`Scopes` + `RequestedScopeNames` para os nomes crus). Os `[Obsolete]` de secrets/signing-alg foram revertidos.
+
+**Migracao mecanica (Opcao A):** ~25 consumidores atualizados para compilar preservando comportamento; `IResourceStore` enxuto (finders obsoletos removidos).
+
+**Trabalho de fases seguintes adiantado (forcado pelo colapso do modelo):**
+- **Store (Fase 3):** `MemoryStorage`/`RealmMemoryStore` reshapados de 4 para **2 dicionarios** (`ResourceServers` com `Scope`s aninhados + `IdentityScopes`); `InitializeResources()` removido; seeding migrado (`apiserver` com Scopes `api`/`api:read`/`api:write`). **Fase 3 NAO esta concluida** — so o reshape estrutural foi adiantado; faltam unicidade de `Scope.Name`, `AllowScopeRequests`, filtro de scopes-filhos desabilitados no discovery e testes de `DisabledScopes` (ver "Avaliacao do progresso" / Fase 2).
+- **Token (Fase 5):** `aud` agora vem de `ResourceServer.GetAudience()` (default = Name) via `RequestedResources.GetAudiences()`; `ToScopeClaims()` emite **apenas** Scopes pedidos + IdentityScopes + offline (decisao #2); os dois metodos de "identity claim types" unificados para `IdentityScopes`.
+
+**Mudanca de comportamento (intencional):** `api:read`/`api:write` (antes ApiScope avulso, sem `aud`) agora sao Scopes de `apiserver` e passam a contribuir `aud=apiserver`; "api" muda de `aud=api` para `aud=apiserver`. Nenhum teste quebrou.
+
+**Restante real para as proximas fases:**
+- **Fase 4** — `Client.AllowedResources` (`AllowedIdentityScopes`/`AllowedResourceServers`/`AllowedScopes`/`AllowAllResourceServers`) + `ClientType`; aposentar `Client.AllowedScopes`(string)/`AllowOfflineAccess`. (Os decorators ainda filtram por `client.AllowedScopes` string.)
+- **Fase 5** — cadeia de signing-alg **RS -> Client -> Realm** (hoje so RS-level); revisar decorators para usar `AllowedResources` (depende da Fase 4).
+- **Fase 6** — Resource Indicators (RFC 8707) + Protected Resource Metadata (RFC 9728), com `ProtectedResource`s por ResourceServer.
+- **Fase 7** — consentimento agrupado por ResourceServer/ProtectedResource (hoje so renomeado/flat).
+
 ---
 
 ## Fase 3: Store
@@ -192,8 +307,24 @@ Passos:
 1. Enxugar `IResourceStore` (remover os finders `[Obsolete]` por tipo; manter `FindResourcesByScopeAsync` -> `RequestedResources`, `GetAll`/`GetAllEnabled`).
 2. `MemoryStorage`/`RealmMemoryStore`: de 4 dicionarios para **2** (`ResourceServers` com `Scope`s aninhados + `IdentityScopes`). Lookup por nome de scope resolve via RS dono.
 3. Atualizar o seeding do DemoRealm.
+4. **Unicidade global de `Scope.Name`**: indice nome -> (RS, Scope) construido no ctor do `ResourceStore`, que lanca em duplicata (fail-fast) e elimina a ambiguidade de first-match.
+5. **Scopes desabilitados no discovery**: `GetAllEnabledResourcesAsync` passa a retornar ResourceServers com **apenas Scopes habilitados** (via copy ctor de `ResourceServer`), para um scope desabilitado de um RS habilitado nao vazar.
+6. Testes de store (`ResourceStoreTests`): unicidade, `DisabledScopes`, snapshot de habilitados.
 
-Criterio de aceite: lookup por nome (scope, identity, resource server) resolve no novo modelo; seeding migrado.
+> `AllowScopeRequests` **nao** e tratado aqui — e autorizacao de request (ver Fase 5), nao resolucao de armazenamento.
+
+Criterio de aceite: lookup por nome (scope, identity, resource server) resolve no novo modelo; seeding migrado; nome de scope unico por realm (enforced); discovery nao expoe scopes desabilitados; testes verdes.
+
+### Resultado da Fase 3
+
+**Status:** concluida.
+
+- **Unicidade de `Scope.Name`** (`ResourceStore.BuildScopeIndex`): indice `name -> (ResourceServer, Scope)` montado no ctor; lanca `InvalidOperationException` se o mesmo nome aparecer em dois RS. `FindScope` (first-match, ambiguo) **removido** — a resolucao agora e O(1) pelo indice.
+- **Discovery sem scopes desabilitados** (`ResourceStore.GetAllEnabledResourcesAsync`): retorna RS filtrados por `Enabled` **e** com `Scopes` filtrados por `Enabled`, usando o novo **copy ctor** `ResourceServer(ResourceServer)`. Antes, `AllScopes.Scopes` achatava todos os scopes (inclusive desabilitados) de RS habilitados.
+- **Copy ctor `ResourceServer(ResourceServer)`** adicionado (convencao copy-on-create; sera reusado no CRUD/Fase 4).
+- **RS-direto preservado** no `FindResourcesByScopeAsync` com nota de codigo apontando que a remocao (apontamento 2.1) foi **deferida para a Fase 4**.
+- **Testes** (`Tests.Integration/Storage/ResourceStoreTests.cs`, 4 casos): disabled scope -> `DisabledScopes`; `GetAllEnabledResourcesAsync` exclui scope-filho desabilitado; exclui RS desabilitado; ctor lanca em nome de scope duplicado. Suite: **120 testes verdes** (Pipelines 3, Identity 6, Integration 111).
+- **`AllowScopeRequests`** reclassificado para a **Fase 5** (autorizacao de request).
 
 ---
 
@@ -207,8 +338,20 @@ Passos:
 2. Adicionar `AllowedIdentityScopes`, `AllowedResourceServers`, `AllowedScopes` (individuais) e `AllowAllResourceServers` (Full Scope Allowed); manter `AllowOfflineAccess` (flag).
 3. Remover o `AllowedScopes` antigo (string-misto) e os `[Redesign]`.
 4. Implementar a regra de permissao (scope permitido por `AllowAllResourceServers`, por `AllowedScopes`, ou pelo RS em `AllowedResourceServers`).
+5. **(apontamento 2.1/2.2/2.3)** Tornar o ResourceServer **nao-requisitavel por nome**: remover o branch de RS-direto em `ResourceStore.FindResourcesByScopeAsync` (l.60-66) — nome de RS vira `MissingScopes`. So `Scope`/`IdentityScope` sao requisitaveis; o `aud` deriva dos RS donos dos Scopes pedidos. Documentar a semantica no bloco de decisoes e na ADR-010. Resolve o gap de aud-sem-autorizacao e o caso de refresh.
 
-Criterio de aceite: client autoriza scopes por tipo; pedir scope de um RS permitido funciona sem listar cada scope; `AllowAllResourceServers` libera todos os RS sem alterar o conteudo do token; `ClientType` presente no modelo.
+Criterio de aceite: client autoriza scopes por tipo; pedir scope de um RS permitido funciona sem listar cada scope; `AllowAllResourceServers` libera todos os RS sem alterar o conteudo do token; `ClientType` presente no modelo; pedir o **nome de um RS** como scope resulta em `invalid_scope` (RS nao e requisitavel).
+
+### Resultado da Fase 4
+
+**Status:** concluida.
+
+- **Modelo (`Client`):** novo enum `ClientType` (`Public`/`Confidential`, default `Public`). Adicionados `AllowedIdentityScopes`, `AllowedResourceServers`, `AllowAllResourceServers` e `AllowedAccessTokenSigningAlgorithms`. `AllowedScopes` **reaproveitado** para scopes individuais de API (nome mantido por ADR-010). `AllowOfflineAccess` mantido (flag). Os `[Redesign]` de `AllowedScopes`/`AllowOfflineAccess` **removidos**. Novo `RoyalIdentity/Models/ClientType.cs`.
+- **Regra de permissao (`ResourcesValidator`):** identity scope permitido por `AllowedIdentityScopes`; api scope permitido por `AllowAllResourceServers` **ou** `AllowedScopes` **ou** RS-dono em `AllowedResourceServers` (helper `IsApiScopeAllowed`); offline por `AllowOfflineAccess`. Vale para authorize **e** client_credentials (ambos passam pelo validator). Autorizacao no nivel do **scope** — `resources.ResourceServers` serve so para o `aud`, sem dupla checagem (resolve 2.1).
+- **Passo 5 (RS nao requisitavel):** branch RS-direto **removido** do `ResourceStore.FindResourcesByScopeAsync`; nome de RS vira `MissingScopes` (`invalid_scope`). ADR-010 atualizada com a semantica explicita.
+- **Migracao (comportamento-equivalente):** seeding (3 clients: `server_admin`/`demo_client` -> `AllowedIdentityScopes`; `demo_consent_client` -> `AllowedIdentityScopes` + `AllowedResourceServers = {apiserver}`) + ~7 arquivos de teste (split do `AllowedScopes` misto; `offline_access` -> flag). Clients de teste confidenciais ficaram no default `Public` — o `ClientType` explicito e a consistencia com segredo sao do CRUD futuro (ADR-011), sem enforcement agora.
+- **Testes:** `AllowAllResourceServers` + negativo (`invalid_scope`) via client_credentials; RS-nao-requisitavel (store). `AllowedResourceServers` e `AllowedScopes` individual ja cobertos por `LoginConsentUIFlowTests` e `RealmOptionsPhase4Tests`. Suite: **124 verdes** (Pipelines 3, Identity 6, Integration 115).
+- **Fica para a Fase 5:** o `ClientResourceDecorator` ainda usa `client.AllowedScopes` (individual) como default de client_credentials sem `scope` — a resolucao completa do default a partir de `AllowedResources`/`AllowAllResourceServers` entra na Fase 5 (passo 1).
 
 ---
 
@@ -219,35 +362,56 @@ Arquivos provaveis: `ResourcesDecorator`, `ClientResourceDecorator`, `Authorizat
 Passos:
 
 1. Decorators/validators: filtrar por `AllowedResources` do client; aplicar `RequestedResources`.
-2. Token: `scope` claim so com os pedidos; `aud` = `Audience` dos ResourceServers pedidos.
+2. Token: `scope` claim so com os pedidos; no caminho sem `resource`, `aud` = `ResourceServer.Audience ?? ResourceServer.Name` dos ResourceServers donos dos scopes pedidos.
 3. Signing-alg: aplicar a cadeia RS -> Client -> Realm (com ordem) em `ResourcesExtensions` + `IKeyManager`.
 4. Discovery (`scopes_supported`) e UserInfo coerentes com o novo modelo.
+5. **(apontamento 2.4 + 2.5)** `AllowScopeRequests`: quando um ResourceServer tem `AllowScopeRequests = false`, seus Scopes **nao** podem ser pedidos via parametro `scope` (rejeitar como `invalid_scope`) — gate de autorizacao de request, no validator. E rever a restricao de signing do **id token** por ResourceServer (`DefaultTokenFactory` l.202): id token deve usar `Client.AllowedIdentityTokenSigningAlgorithms` (fallback Realm), nao os algoritmos do RS.
+6. **(apontamento 3.1)** Decidir a semantica de `MissingScopes` x `DisabledScopes`. Hoje `FindResourcesByScopeAsync(onlyEnabled: true)` — caminho usado por **todos** os decorators e pelo refresh — classifica scope desabilitado como `MissingScopes`, e `ClientResourceDecorator` so checa `MissingScopes`. Escolher: (a) **colapsar** a distincao (tratar desabilitado como invalido uniformemente), ou (b) **tornar precisa** E alinhar o `ClientResourceDecorator` a rejeitar tambem `DisabledScopes`. Sem (b), tornar a classificacao precisa regride o client_credentials (passaria a dropar scope desabilitado em vez de rejeitar).
 
-Criterio de aceite: token de realms/clients diferentes reflete scopes/aud corretos; signing-alg respeita a precedencia.
+Criterio de aceite: token de realms/clients diferentes reflete scopes/aud corretos no caminho por `scope`; signing-alg respeita a precedencia; RS com `AllowScopeRequests = false` rejeita pedido de seus scopes; id token nao e restrito pelos algoritmos do RS; classificacao de scope invalido/desabilitado consistente entre todos os decorators.
 
 ---
 
-## Fase 6: Consentimento
+## Fase 6: Resource Indicators e Protected Resource Metadata
+
+Arquivos provaveis: `ResourceServer`, novo `ProtectedResource`, `RequestedResources`, `IWithResources`, contexts de authorize/token, `AuthorizationCode`, `RefreshToken`, `ResourceStore`, `DiscoveryHandler`, `DefaultTokenFactory`, validators.
+
+Passos:
+
+1. Criar `ProtectedResource` (ADR-012) e adicionar `ResourceServer.ProtectedResources`; manter `ResourceServer.Audience` como audience legado do caminho por `scope`.
+2. Indexar `ProtectedResource.ResourceUri` no store, com unicidade por realm; validar URI absoluta, sem fragmento, e politica de `https` com excecao controlada para dev/local.
+3. Parsear e persistir o parametro `resource` no authorize e token endpoint (valores repetidos permitidos); `AuthorizationCode`/refresh grants guardam os protected resources autorizados, e o token endpoint so aceita subset.
+4. Implementar validacao/autorizacao: `resource` desconhecido/malformed/desabilitado/nao permitido -> `invalid_target`; client so pode pedir resource cujo RS dono esteja em `AllowedResourceServers` ou `AllowAllResourceServers`.
+5. Implementar semantica de `aud`: sem `resource`, scopes de API geram `ResourceServer.Audience ?? ResourceServer.Name`; com `resource`, o `aud` e `ProtectedResource.ResourceUri` e domina o `Audience` legado para o mesmo RS.
+6. Aceitar `scope + resource` quando coerente: scopes de API so podem acompanhar `resource` se o RS dono estiver representado por pelo menos um dos `ProtectedResource`s pedidos; combinacao incoerente -> `invalid_target`.
+7. RFC 9728: publicar `protected_resources` no metadata do Authorization Server e gerar metadata por `ProtectedResource` (`resource`, `authorization_servers`, `scopes_supported`, `bearer_methods_supported`, `resource_name`, docs/policy/tos quando configurados).
+8. Testes de authorize/token/refresh/discovery: audience-only, scope-only, scope+resource, multi-resource, resource desconhecido, resource nao permitido, subset no token/refresh.
+
+Criterio de aceite: `resource` RFC 8707 funciona em authorize/token; `aud` respeita o caminho scope-vs-resource; grants preservam resources autorizados; `invalid_target` cobre resources invalidos; discovery publica `protected_resources` e metadata RFC 9728 geravel por protected resource; testes verdes.
+
+---
+
+## Fase 7: Consentimento
 
 Arquivos provaveis: `DefaultConsentService`, `ConsentPageService`, `ConsentViewModel`/`ConsentInputModel`, `ConsentPage.razor`.
 
 Passos:
 
-1. ViewModel agrupado por **ResourceServer** (dados do RS + seus Scopes pedidos) + IdentityScopes + offline_access.
-2. Razor: tela clara e agradavel, agrupando visualmente por ResourceServer.
-3. Consentir/negar continua operando sobre os scopes efetivamente pedidos.
+1. ViewModel agrupado por **ResourceServer** (dados do RS + seus Scopes pedidos + `ProtectedResource`s pedidos) + IdentityScopes + offline_access.
+2. Razor: tela clara e agradavel, agrupando visualmente por ResourceServer e mostrando protected resources audience-only quando existirem.
+3. Consentir/negar continua operando sobre os scopes efetivamente pedidos e os protected resources autorizados.
 
-Criterio de aceite: a tela mostra os scopes agrupados por ResourceServer de forma clara; consentimento grava/aplica corretamente.
+Criterio de aceite: a tela mostra os scopes e protected resources agrupados por ResourceServer de forma clara; consentimento grava/aplica corretamente.
 
 ---
 
-## Fase 7: Testes e Regressao
+## Fase 8: Testes e Regressao
 
 Passos:
 
-1. Testes de modelo/store: lookup, copy, validacao, missing/disabled.
-2. Testes de token: `scope` so com pedidos, `aud` a partir do RS, signing-alg pela precedencia.
-3. Testes de autorizacao do client (AllowedResources) e de consent agrupado.
+1. Testes de modelo/store: lookup, copy, validacao, missing/disabled, unicidade de `ProtectedResource.ResourceUri`.
+2. Testes de token: `scope` so com pedidos, `aud` a partir do RS/ProtectedResource, signing-alg pela precedencia.
+3. Testes de autorizacao do client (AllowedResources), Resource Indicators e consent agrupado.
 4. Isolamento por realm onde aplicavel.
 5. `dotnet test RoyalIdentity.sln` verde.
 
@@ -262,7 +426,7 @@ dotnet test RoyalIdentity.sln --no-restore
 ## Como Marcar Progresso
 
 - Uma fase so e concluida quando suas tarefas estiverem feitas e o criterio de aceite satisfeito.
-- Ao concluir uma fase, atualizar `Progresso` no topo (`0 de 7`) e substituir um `-` por `█` na barra (barra de 7 segmentos, um por fase; mesmo caractere usado nos outros planos).
+- Ao concluir uma fase, atualizar `Progresso` no topo (`0 de 8`) e substituir um `-` por `█` na barra (barra de 8 segmentos, um por fase; mesmo caractere usado nos outros planos).
 
 ---
 
@@ -271,3 +435,71 @@ dotnet test RoyalIdentity.sln --no-restore
 Apontamentos da revisao da execucao, por fase. Cada item: problema, solucao e `Status`.
 
 `Status` pode ser: `avaliar`, `questionado`, `rejeitado`, `valido`, `corrigido`. Ao criar, usar `avaliar`.
+
+### Fase 2
+
+Revisao de 5 pontos levantados sobre a execucao da Fase 2.
+
+#### 2.1 — ResourceServer direto gera `aud` sem autorizacao do client
+
+**Problema:** `ResourceStore.FindResourcesByScopeAsync` resolve o nome de um ResourceServer direto (branch `resourceServers.TryGetValue`, l.60-66) e o `DefaultTokenFactory` emite o `aud` dele; porem `ResourcesValidator` (l.50-68) so valida `IdentityScopes` e `Scopes` contra `client.AllowedScopes` — **nao** itera `ResourceServers`. Logo, pedir `scope=apiserver` passa a validacao e gera `aud=apiserver` sem o RS estar em `AllowedScopes`.
+
+**Avaliacao:** veridico e valido — confirmado no codigo. Foi **introduzido na Fase 2** (no modelo antigo, pedir o RS-grupo nao gerava `aud`; o `aud` vinha so do `ApiResource`). Contradiz a decisao #2: o RS e item da allowed-list e fonte do `aud` **dos scopes pedidos**, nao um scope requisitavel por nome.
+
+**Correcao recomendada:** remover a resolucao de **RS-como-scope** no store (RS direto vira `MissingScopes`). Fecha o gap e alinha ao contrato; o `aud` continua vindo dos RS donos dos Scopes pedidos.
+
+**Decisao:** **dobrar na Fase 4** (passo 5), junto com `AllowedResourceServers`, quando a autorizacao por RS for implementada de fato. Ate la o caminho fica aberto (RS pedido por nome -> `aud` sem checagem de `AllowedScopes`).
+
+**Resolucao (Fase 4):** branch RS-direto removido do `ResourceStore`; pedir nome de RS vira `invalid_scope`. O `aud` deriva so dos RS donos dos Scopes pedidos. Gap fechado.
+
+**Status:** `corrigido` (Fase 4)
+
+#### 2.2 — Contrato "ResourceServer como scope" precisa ficar explicito
+
+**Problema:** o plano/ADR-010 dizem que o `aud` vem dos RS "cujos scopes foram pedidos", mas nao definem se pedir o **nome do RS** e valido. Tambem falta definir `response_type=token` com RS-only — hoje `AuthorizationResourcesValidator` (l.40) exige `Scopes.Any()` e rejeita RS-only.
+
+**Avaliacao:** valido. Decisao registrada: **RS nao e um scope requisitavel** — so `Scope` e `IdentityScope` sao; o `aud` deriva dos RS donos dos Scopes pedidos. O acesso explicito por audience/resource foi especificado na ADR-012 e entra na Fase 6. Com isso, a rejeicao de RS-only em l.40 fica **correta** (nao ha como obter token so com RS pelo parametro `scope`).
+
+**Resolucao (Fase 4):** ADR-010 atualizada (bullet "ResourceServer nao e requisitavel"); implementado no `ResourceStore`. Decisao registrada.
+
+**Status:** `corrigido` (Fase 4)
+
+#### 2.3 — Refresh com `UpdateAccessTokenClaimsOnRefresh` perderia RS direto
+
+**Problema:** `RefreshTokenHandler` (l.72) re-resolve recursos a partir de `accessToken.Scopes` (claims). Como o RS direto nao vira claim `scope`, o `aud` desapareceria nesse caminho.
+
+**Avaliacao:** veridico. **Consequencia de 2.1/2.2** — se o RS deixar de ser requisitavel (correcao do 2.1), torna-se **moot**: o `aud` sempre deriva dos owners dos Scopes pedidos, que sao re-resolvidos a partir dos claims. Sem a correcao, exigiria persistir os nomes crus.
+
+**Resolucao (Fase 4):** com o RS nao-requisitavel, o `aud` sempre deriva dos owners dos Scopes pedidos (re-resolvidos no refresh). Moot, conforme previsto.
+
+**Status:** `corrigido` (Fase 4)
+
+#### 2.4 — Fase 3 NAO esta concluida (over-claim corrigido)
+
+**Problema:** o "Resultado da Fase 2" afirmava que a Fase 3 estava "essencialmente concluida". So o reshape estrutural do store foi adiantado. Faltam: unicidade global de `Scope.Name` (`FindScope` pega o **primeiro match** — nomes duplicados entre RS sao ambiguos), enforcement de `AllowScopeRequests` (ignorado hoje), filtro de **scopes-filhos desabilitados no discovery** (`GetAllEnabledResourcesAsync` filtra RS por `Enabled` mas nao os `Scopes` aninhados; `AllScopes.Scopes` expoe scopes desabilitados de RS habilitados), e testes de `DisabledScopes`.
+
+**Avaliacao:** valido — **exagerei** ao declarar a Fase 3 concluida. Texto do "Resultado da Fase 2" corrigido.
+
+**Resolucao (Fase 3 concluida):** unicidade de `Scope.Name` (indice com fail-fast), filtro de scopes-filhos desabilitados no discovery e testes de `DisabledScopes` **feitos** (ver "Resultado da Fase 3"). `AllowScopeRequests` foi **reclassificado** para a Fase 5 (autorizacao de request, nao armazenamento — passo 5 da Fase 5).
+
+**Status:** `corrigido`
+
+#### 2.5 — Signing-alg pendente (Fase 5) + id token restrito por ResourceServer
+
+**Problema:** falta a cadeia de selecao RS -> Client -> Realm (ja prevista para a Fase 5). Alem disso, o **id token** recebe `AllowedAccessTokenSigningAlgorithms` do ResourceServer (`DefaultTokenFactory` l.202) — o id token e do client, nao da API.
+
+**Avaliacao:** valido. A cadeia ja estava marcada para a Fase 5. A restricao de signing do id token por RS e **pre-existente** e deve ser revista na Fase 5 (id token deve usar `Client.AllowedIdentityTokenSigningAlgorithms`, com fallback Realm).
+
+**Status:** `valido`
+
+### Fase 3
+
+#### 3.1 — `onlyEnabled: true` classifica scope desabilitado como `MissingScopes`, nao `DisabledScopes`
+
+**Problema:** em `ResourceStore.FindResourcesByScopeAsync` (l.83-84), o filtro `(match.Server.Enabled && match.Scope.Enabled)` faz o `if` ser `false` quando o scope esta desabilitado e `onlyEnabled: true`, caindo em `MissingScopes` (l.94) **antes** do `IsEnabled` (l.86) classifica-lo como `DisabledScopes`. **Todos** os decorators e o refresh chamam com `onlyEnabled: true`; so o UserInfo usa `false`. Logo, `DisabledScopes` praticamente **nunca** e populado no pipeline, e o teste inicial (`ResourceStoreTests`, default `onlyEnabled:false`) cobria uma ramificacao que o pipeline nao usa.
+
+**Avaliacao:** veridico e valido. **Pre-existente** (estrutura da Fase 2), **nao** e regressao da Fase 3 — o que faltava era cobertura honesta. Funcionalmente o request continua invalidado nos dois decorators. **Reviravolta:** tornar a classificacao "precisa" (desabilitado -> `DisabledScopes`) **regrediria** o `ClientResourceDecorator`, que so checa `MissingScopes` (passaria a dropar em vez de rejeitar); no `ResourcesDecorator` a imprecisao e **invisivel** (`IsValid` e `GetInvalidScopes()` cobrem os dois buckets).
+
+**Resolucao:** teste do caminho `onlyEnabled: true` adicionado (`FindResourcesByScope_OnlyEnabled_DisabledScope_IsReportedAsMissing`), fixando o comportamento real. A decisao de **colapsar** vs **tornar precisa** a distincao `MissingScopes` x `DisabledScopes` (e alinhar o `ClientResourceDecorator`) foi movida para a **Fase 5, passo 6**.
+
+**Status:** `valido`

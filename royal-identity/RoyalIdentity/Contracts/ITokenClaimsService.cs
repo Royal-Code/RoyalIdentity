@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Contracts;
 
@@ -19,7 +19,7 @@ public interface ITokenClaimsService
     /// <returns>
     /// Claims for the identity token
     /// </returns>
-    Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(ClaimsPrincipal subject, RequestedScopes resources, Client client, bool includeAllIdentityClaims, CancellationToken ct);
+    Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(ClaimsPrincipal subject, RequestedResources resources, Client client, bool includeAllIdentityClaims, CancellationToken ct);
 
     /// <summary>
     /// Returns claims for an access token.
@@ -32,5 +32,5 @@ public interface ITokenClaimsService
     /// <returns>
     /// Claims for the access token
     /// </returns>
-    Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(ClaimsPrincipal subject, RequestedScopes resources, Client client, string identityType, CancellationToken ct);
+    Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(ClaimsPrincipal subject, RequestedResources resources, Client client, string identityType, CancellationToken ct);
 }

@@ -1,11 +1,11 @@
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Extensions;
 
 public static class ResourcesExtensions
 {
-    internal static HashSet<string> FindMatchingSigningAlgorithms(this IEnumerable<ApiResource> apiResources)
+    internal static HashSet<string> FindMatchingSigningAlgorithms(this IEnumerable<ResourceServer> apiResources)
     {
         var apis = apiResources.ToList();
 
@@ -48,9 +48,9 @@ public static class ResourcesExtensions
     /// </summary>
     /// <param name="resources">Requested resources.</param>
     /// <returns>A list of requested Identity claim types.</returns>
-    public static IReadOnlyList<string> RequestedIdentityClaimTypes(this RequestedScopes resources)
+    public static IReadOnlyList<string> RequestedIdentityClaimTypes(this RequestedResources resources)
     {
-        var types = resources.IdentityResources.SelectMany(r => r.UserClaims).ToList();
+        var types = resources.IdentityScopes.SelectMany(r => r.UserClaims).ToList();
 
         // filter so we don't ask for claim types that we will eventually filter out
         return FilterRequestedClaimTypes(types);

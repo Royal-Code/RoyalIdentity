@@ -22,7 +22,6 @@ public class RealmMemoryStore
     {
         this.realm = realm;
         Clients = isServer ? ServerClients(realm) : DemoClients(realm);
-        InitializeResources();
     }
 
     /// <summary>Constructor for programmatically created realms — starts with no clients.</summary>
@@ -30,18 +29,6 @@ public class RealmMemoryStore
     {
         this.realm = realm;
         Clients = new ConcurrentDictionary<string, Client>();
-        InitializeResources();
-    }
-
-    private void InitializeResources()
-    {
-        var apiResource = ResourceServers.First().Value.Resources.First();
-        ApiResources[apiResource.Name] = apiResource;
-        var apiscopes = apiResource.Scopes;
-        foreach (var item in apiscopes)
-        {
-            ApiScopes[item.Name] = item;
-        }
     }
 
     public ConcurrentDictionary<string, Client> Clients { get; }
@@ -58,7 +45,7 @@ public class RealmMemoryStore
 
     public ConcurrentDictionary<string, IdentitySession> UserSessions { get; } = new();
 
-    public ConcurrentDictionary<string, IdentityScope> IdentityResources { get; } = new()
+    public ConcurrentDictionary<string, IdentityScope> IdentityScopes { get; } = new()
     {
         [Server.StandardScopes.OpenId] = new IdentityScope(
             ScopeVisibility.Public,
@@ -142,41 +129,26 @@ public class RealmMemoryStore
     {
         ["apiserver"] = new ResourceServer(ScopeVisibility.Public, "apiserver", "API Server", "Access to the API Server")
         {
-            Resources =
+            Scopes =
             [
-                new ApiResource(ScopeVisibility.Public, "api1", "API 1", "Access to the API 1")
+                new Scope(ScopeVisibility.Public, "api", "API", "Access to the API")
                 {
-                    Name = "api",
-                    DisplayName = "API",
-                    Scopes = 
-                    [
-                        new ApiScope(ScopeVisibility.Public, "api", "API", "Access to the API")
-                        {
-                            Required = true,
-                            Emphasize = false,
-                        }
-                    ]
+                    Required = true,
+                    Emphasize = false,
+                },
+                new Scope(ScopeVisibility.Public, "api:read", "API read", "Read values from the API")
+                {
+                    Required = false,
+                    Emphasize = false,
+                    ShowInDiscoveryDocument = true,
+                },
+                new Scope(ScopeVisibility.Public, "api:write", "API write", "Write values from the API")
+                {
+                    Required = false,
+                    Emphasize = true,
+                    ShowInDiscoveryDocument = true,
                 }
             ],
-        }
-    };
-
-    public ConcurrentDictionary<string, ApiResource> ApiResources { get; } = [];
-
-    public ConcurrentDictionary<string, ApiScope> ApiScopes { get; } = new()
-    {
-        ["api:read"] = new ApiScope(ScopeVisibility.Public, "api:read", "API read", "Read values from the API")
-        {
-            Required = false,
-            Emphasize = false,
-            ShowInDiscoveryDocument = true
-        }
-        ,
-        ["api:write"] = new ApiScope(ScopeVisibility.Public, "api:write", "API write", "Write values from the API")
-        {
-            Required = false,
-            Emphasize = true,
-            ShowInDiscoveryDocument = true
         }
     };
 
@@ -221,7 +193,7 @@ public class RealmMemoryStore
                 Name = "Administrative server portal",
                 RequireClientSecret = false,
                 AllowOfflineAccess = true,
-                AllowedScopes = { "openid", "profile", },
+                AllowedIdentityScopes = { "openid", "profile" },
                 AllowedResponseTypes = { "code" },
                 RedirectUris = { "http://localhost:5200/**", "https://localhost:7200/**" }
             }
@@ -242,7 +214,7 @@ public class RealmMemoryStore
                 RequireClientSecret = false,
                 AllowOfflineAccess = true,
                 AllowedGrantTypes = ["authorization_code", "refresh_token"],
-                AllowedScopes = { "openid", "profile", "email" },
+                AllowedIdentityScopes = { "openid", "profile", "email" },
                 AllowedResponseTypes = { "code" },
                 RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" }
             },
@@ -254,7 +226,8 @@ public class RealmMemoryStore
                 RequireClientSecret = false,
                 AllowOfflineAccess = true,
                 AllowedGrantTypes = ["authorization_code", "refresh_token"],
-                AllowedScopes = { "openid", "profile", "email", "api", "api:read", "api:write" },
+                AllowedIdentityScopes = { "openid", "profile", "email" },
+                AllowedResourceServers = { "apiserver" },
                 AllowedResponseTypes = { "code" },
                 RequireConsent = true,
                 RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" }

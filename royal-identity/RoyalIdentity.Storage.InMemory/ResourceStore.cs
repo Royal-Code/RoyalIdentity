@@ -2,7 +2,6 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using static RoyalIdentity.Options.Constants;
 using System.Collections.Concurrent;
-using RoyalIdentity.Models.Resources;
 using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Storage.InMemory;
@@ -10,146 +9,124 @@ namespace RoyalIdentity.Storage.InMemory;
 public class ResourceStore : IResourceStore
 {
     private readonly ConcurrentDictionary<string, ResourceServer> resourceServers;
-    private readonly ConcurrentDictionary<string, IdentityScope> identityResources;
-    private readonly ConcurrentDictionary<string, ApiScope> apiScopes;
-    private readonly ConcurrentDictionary<string, ApiResource> apiResources;
+    private readonly ConcurrentDictionary<string, IdentityScope> identityScopes;
+    private readonly Dictionary<string, (ResourceServer Server, Scope Scope)> scopeIndex;
 
     public ResourceStore(
         ConcurrentDictionary<string, ResourceServer> resourceServers,
-        ConcurrentDictionary<string, IdentityScope> identityResources,
-        ConcurrentDictionary<string, ApiScope> apiScopes,
-        ConcurrentDictionary<string, ApiResource> apiResources)
+        ConcurrentDictionary<string, IdentityScope> identityScopes)
     {
         this.resourceServers = resourceServers;
-        this.identityResources = identityResources;
-        this.apiScopes = apiScopes;
-        this.apiResources = apiResources;
-    }
-
-    [Obsolete("Use FindResourcesByScopeAsync instead.")]
-    public Task<IEnumerable<IdentityScope>> FindIdentityResourcesByScopeNameAsync(IEnumerable<string> scopeNames, CancellationToken ct = default)
-    {
-        List<IdentityScope> scopes = new();
-        foreach (var scope in scopeNames)
-        {
-            if (identityResources.TryGetValue(scope, out var identityResource))
-                scopes.Add(identityResource);
-        }
-        return Task.FromResult<IEnumerable<IdentityScope>>(scopes);
-    }
-
-    [Obsolete("Use FindResourcesByScopeAsync instead.")]
-    public Task<IEnumerable<ApiScope>> FindApiScopesByScopeNameAsync(IEnumerable<string> scopeNames, CancellationToken ct = default)
-    {
-        List<ApiScope> scopes = new();
-        foreach (var scope in scopeNames)
-        {
-            if (apiScopes.TryGetValue(scope, out var apiScope))
-                scopes.Add(apiScope);
-        }
-        return Task.FromResult<IEnumerable<ApiScope>>(scopes);
-    }
-
-    [Obsolete("Use FindResourcesByScopeAsync instead.")]
-    public Task<IEnumerable<ApiResource>> FindApiResourcesByScopeNameAsync(IEnumerable<string> scopeNames, CancellationToken ct = default)
-    {
-        List<ApiResource> scopes = new();
-        foreach (var scope in scopeNames)
-        {
-            if (this.apiResources.TryGetValue(scope, out var apiResource))
-                scopes.Add(apiResource);
-        }
-        return Task.FromResult<IEnumerable<ApiResource>>(scopes);
+        this.identityScopes = identityScopes;
+        scopeIndex = BuildScopeIndex(resourceServers.Values);
     }
 
     public Task<AllScopes> GetAllResourcesAsync(CancellationToken ct = default)
     {
         var resources = new AllScopes(
             resourceServers.Values.ToList(),
-            apiResources.Values.ToList(),
-            apiScopes.Values.ToList(),
-            identityResources.Values.ToList()
-        );
+            identityScopes.Values.ToList());
         return Task.FromResult(resources);
     }
 
     public Task<AllScopes> GetAllEnabledResourcesAsync(CancellationToken ct = default)
     {
+        // Only enabled resource servers, and within each, only enabled scopes
+        // (a disabled scope under an enabled resource server must not leak into the snapshot).
+        var enabledServers = resourceServers.Values
+            .Where(rs => rs.Enabled)
+            .Select(rs => new ResourceServer(rs)
+            {
+                Scopes = [.. rs.Scopes.Where(s => s.Enabled)]
+            })
+            .ToList();
+
         var resources = new AllScopes(
-            resourceServers.Values.Where(x => x.Enabled).ToList(),
-            apiResources.Values.Where(x => x.Enabled).ToList(),
-            apiScopes.Values.Where(x => x.Enabled).ToList(),
-            identityResources.Values.Where(x => x.Enabled).ToList()
-        );
+            enabledServers,
+            identityScopes.Values.Where(x => x.Enabled).ToList());
         return Task.FromResult(resources);
     }
 
-    public Task<RequestedScopes> FindResourcesByScopeAsync(
+    public Task<RequestedResources> FindResourcesByScopeAsync(
         IEnumerable<string> scopeNames, bool onlyEnabled = false, CancellationToken ct = default)
     {
-        RequestedScopes resources = new();
-        resources.Scopes.AddRange(scopeNames);
+        var resources = new RequestedResources();
+        resources.RequestedScopeNames.AddRange(scopeNames);
 
-        foreach (var scope in scopeNames)
+        foreach (var name in scopeNames)
         {
-            if (scope is Server.StandardScopes.OfflineAccess)
+            if (name == Server.StandardScopes.OfflineAccess)
             {
                 resources.OfflineAccess = true;
                 continue;
             }
 
-            if (resourceServers.TryGetValue(scope, out var resourceServer)
-                && (!onlyEnabled || resourceServer.Enabled))
+            if (identityScopes.TryGetValue(name, out var identityScope)
+                && (!onlyEnabled || identityScope.Enabled))
             {
-                if (IsEnabled(resourceServer, resources))
-                    resources.ResourceServers.Add(resourceServer);
+                if (IsEnabled(identityScope, resources))
+                    resources.IdentityScopes.Add(identityScope);
                 continue;
             }
 
-            if (identityResources.TryGetValue(scope, out var identityResource)
-                && (!onlyEnabled || identityResource.Enabled))
+            // A resource server is NOT requestable by name (ADR-010): only Scope and IdentityScope are.
+            // The audience is derived from the resource servers that own the requested scopes. Requesting
+            // a resource server name therefore falls through to MissingScopes (invalid_scope).
+            if (scopeIndex.TryGetValue(name, out var match)
+                && (!onlyEnabled || (match.Server.Enabled && match.Scope.Enabled)))
             {
-                if (IsEnabled(identityResource, resources))
-                    resources.IdentityResources.Add(identityResource);
+                if (IsEnabled(match.Server, resources) && IsEnabled(match.Scope, resources))
+                {
+                    resources.Scopes.Add(match.Scope);
+                    AddResourceServer(resources, match.Server);
+                }
                 continue;
             }
 
-            if (apiResources.TryGetValue(scope, out var apiResource)
-                && (!onlyEnabled || apiResource.Enabled))
-            {
-                if (IsEnabled(apiResource, resources))
-                    resources.ApiResources.Add(apiResource);
-                continue;
-            }
-
-            if (apiScopes.TryGetValue(scope, out var apiScope)
-                && (!onlyEnabled || apiScope.Enabled))
-            {
-                if (IsEnabled(apiScope, resources))
-                    resources.ApiScopes.Add(apiScope);
-                continue;
-            }
-
-            resources.MissingScopes.Add(scope);
+            resources.MissingScopes.Add(name);
         }
 
         return Task.FromResult(resources);
     }
 
-    private bool IsEnabled(ScopeBase scope, RequestedScopes requestedScopes)
+    /// <summary>
+    /// Builds the scope-name index and enforces global uniqueness of scope names within the realm.
+    /// A scope name belongs to exactly one resource server; duplicates are a configuration error.
+    /// </summary>
+    private static Dictionary<string, (ResourceServer Server, Scope Scope)> BuildScopeIndex(
+        IEnumerable<ResourceServer> servers)
+    {
+        var index = new Dictionary<string, (ResourceServer Server, Scope Scope)>(StringComparer.Ordinal);
+        foreach (var server in servers)
+        {
+            foreach (var scope in server.Scopes)
+            {
+                if (index.TryGetValue(scope.Name, out var existing))
+                {
+                    throw new InvalidOperationException(
+                        $"Duplicate scope name '{scope.Name}' found in resource servers " +
+                        $"'{existing.Server.Name}' and '{server.Name}'. Scope names must be unique within a realm.");
+                }
+
+                index[scope.Name] = (server, scope);
+            }
+        }
+
+        return index;
+    }
+
+    private static void AddResourceServer(RequestedResources resources, ResourceServer server)
+    {
+        if (!resources.ResourceServers.Contains(server))
+            resources.ResourceServers.Add(server);
+    }
+
+    private static bool IsEnabled(ScopeBase scope, RequestedResources resources)
     {
         if (scope.Enabled)
             return true;
 
-        requestedScopes.DisabledScopes.Add(scope.Name);
+        resources.DisabledScopes.Add(scope.Name);
         return false;
-    }
-
-    private static void AddRange<T>(ICollection<T> collection, IEnumerable<T> items)
-    {
-        foreach (var item in items)
-        {
-            collection.Add(item);
-        }
     }
 }

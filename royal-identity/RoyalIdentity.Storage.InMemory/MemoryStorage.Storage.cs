@@ -77,9 +77,7 @@ public partial class MemoryStorage : IStorage
         if (realmMemoryStore.TryGetValue(realm.Id, out var store))
             return new ResourceStore(
                 store.ResourceServers,
-                store.IdentityResources, 
-                store.ApiScopes,
-                store.ApiResources);
+                store.IdentityScopes);
 
         throw RealmNotFound(realm);
     }

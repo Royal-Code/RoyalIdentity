@@ -87,8 +87,8 @@ public class ConsentPageService(
             ClientUrl = context.Client.ClientUri,
             ClientLogoUrl = context.Client.LogoUri,
             AllowRememberConsent = context.Client.AllowRememberConsent,
-            IdentityScopes = context.Resources.IdentityResources,
-            ApiScopes = context.Resources.ApiScopes
+            IdentityScopes = context.Resources.IdentityScopes,
+            ApiScopes = context.Resources.Scopes
         };
     }
 }

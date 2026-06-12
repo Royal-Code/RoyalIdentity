@@ -1,27 +1,24 @@
-﻿namespace RoyalIdentity.Models.Scopes;
+namespace RoyalIdentity.Models.Scopes;
 
 /// <summary>
-/// A class with all scopes.
+/// A snapshot of all resource servers and identity scopes of a realm.
 /// </summary>
 public class AllScopes
 {
     public AllScopes(
         IReadOnlyList<ResourceServer> resourceServers,
-        IReadOnlyList<ApiResource> resources,
-        IReadOnlyList<ApiScope> apiScopes,
         IReadOnlyList<IdentityScope> identityScopes)
     {
         ResourceServers = resourceServers;
-        Resources = resources;
-        ApiScopes = apiScopes;
         IdentityScopes = identityScopes;
     }
 
     public IReadOnlyList<ResourceServer> ResourceServers { get; }
 
-    public IReadOnlyList<ApiResource> Resources { get; }
-
-    public IReadOnlyList<ApiScope> ApiScopes { get; }
-
     public IReadOnlyList<IdentityScope> IdentityScopes { get; }
+
+    /// <summary>
+    /// All scopes across all resource servers.
+    /// </summary>
+    public IEnumerable<Scope> Scopes => ResourceServers.SelectMany(rs => rs.Scopes);
 }

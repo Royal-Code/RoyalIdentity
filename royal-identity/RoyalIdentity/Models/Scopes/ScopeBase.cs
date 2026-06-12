@@ -1,10 +1,9 @@
-﻿using RoyalIdentity.Models.Scopes;
 using System.Diagnostics;
 
-namespace RoyalIdentity.Models.Resources;
+namespace RoyalIdentity.Models.Scopes;
 
 /// <summary>
-/// Models the common data of API and identity resources.
+/// Models the common data of identity scopes, resource servers and scopes.
 /// </summary>
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
 public abstract class ScopeBase

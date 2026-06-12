@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -24,7 +24,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     /// <inheritdoc />
     public async Task<IEnumerable<Claim>> GetIdentityTokenClaimsAsync(
         ClaimsPrincipal subject,
-        RequestedScopes resources,
+        RequestedResources resources,
         Client client,
         bool includeAllIdentityClaims,
         CancellationToken ct)
@@ -66,7 +66,7 @@ public class DefaultTokenClaimsService : ITokenClaimsService
     /// <inheritdoc />
     public async Task<IEnumerable<Claim>> GetAccessTokenClaimsAsync(
         ClaimsPrincipal subject,
-        RequestedScopes resources,
+        RequestedResources resources,
         Client client,
         string identityType,
         CancellationToken ct)

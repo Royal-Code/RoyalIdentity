@@ -118,7 +118,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
             RequireClientSecret = true,
             RequirePkce = false,
             AllowOfflineAccess = true,
-            AllowedScopes = { "openid", "profile", "email" },
+            AllowedIdentityScopes = { "openid", "profile", "email" },
             AllowedResponseTypes = { "code" },
             RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
             PostLogoutRedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }

@@ -1,5 +1,5 @@
 ﻿using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Users.Contexts;
 using System.Security.Claims;
 
@@ -64,5 +64,5 @@ public interface ISignInManager
     /// <param name="resources">The requested resources.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if the user consent is required, otherwise false.</returns>
-    Task<bool> ConsentRequired(ClaimsPrincipal user, Client client, RequestedScopes resources, CancellationToken ct);
+    Task<bool> ConsentRequired(ClaimsPrincipal user, Client client, RequestedResources resources, CancellationToken ct);
 }

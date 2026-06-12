@@ -2,7 +2,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Options;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Contracts.Models;
 
@@ -18,7 +18,7 @@ public class AccessTokenRequest
 
     public required Client Client { get; init; }
 
-    public required RequestedScopes Resources { get; init; }
+    public required RequestedResources Resources { get; init; }
 
     /// <summary>
     /// Gets or sets the type of the identity.

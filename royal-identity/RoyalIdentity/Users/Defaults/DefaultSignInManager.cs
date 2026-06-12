@@ -7,7 +7,7 @@ using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contexts;
 using static RoyalIdentity.Users.CredentialsValidationResult.WellKnownReasons;
@@ -166,7 +166,7 @@ public class DefaultSignInManager : ISignInManager
         return principal;
     }
 
-    public async Task<bool> ConsentRequired(ClaimsPrincipal user, Client client, RequestedScopes resources, CancellationToken ct)
+    public async Task<bool> ConsentRequired(ClaimsPrincipal user, Client client, RequestedResources resources, CancellationToken ct)
     {
         return !await consentService.ValidateConsentAsync(user, client, resources, ct);
     }

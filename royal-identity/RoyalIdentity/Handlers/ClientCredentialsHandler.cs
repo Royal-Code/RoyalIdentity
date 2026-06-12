@@ -54,7 +54,7 @@ public class ClientCredentialsHandler : IHandler<ClientCredentialsContext>
             accessToken,
             null,
             null,
-            context.Scopes.Scopes.ToSpaceSeparatedString());
+            context.Scopes.RequestedScopeNames.ToSpaceSeparatedString());
 
         await eventDispatcher.DispatchAsync(atEvent, context.Realm);
 

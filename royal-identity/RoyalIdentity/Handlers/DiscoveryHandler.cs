@@ -170,7 +170,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
 
             if (options.Discovery.ShowApiScopes)
             {
-                var apiScopes = from scope in resources.ApiScopes
+                var apiScopes = from scope in resources.Scopes
                                 where scope.ShowInDiscoveryDocument
                                 select scope.Name;
 

@@ -77,12 +77,12 @@ public class DefaultTokenFactory : ITokenFactory
             jti,
             Oidc.Token.Response.BearerTokenType)
         {
-            AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms()
+            AllowedSigningAlgorithms = request.Resources.ResourceServers.FindMatchingSigningAlgorithms()
         };
         token.Claims.AddRange(claims);
 
-        // add aud based on ApiResources in the validated request
-        foreach (var aud in request.Resources.ApiResources.Select(x => x.Name).Distinct())
+        // add aud based on the resource servers of the requested scopes
+        foreach (var aud in request.Resources.GetAudiences())
         {
             token.Audiences.Add(aud);
         }
@@ -199,7 +199,7 @@ public class DefaultTokenFactory : ITokenFactory
             clock.GetUtcNow().UtcDateTime,
             client.IdentityTokenLifetime)
         {
-            AllowedSigningAlgorithms = request.Resources.ApiResources.FindMatchingSigningAlgorithms(),
+            AllowedSigningAlgorithms = request.Resources.ResourceServers.FindMatchingSigningAlgorithms(),
             RealmId = request.Client.Realm.Id,
         };
 

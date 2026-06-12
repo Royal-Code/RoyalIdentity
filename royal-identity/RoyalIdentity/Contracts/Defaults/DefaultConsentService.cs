@@ -2,7 +2,7 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 
@@ -24,7 +24,7 @@ public class DefaultConsentService : IConsentService
         this.clock = clock;
     }
 
-    public async ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, RequestedScopes resources, CancellationToken ct)
+    public async ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, RequestedResources resources, CancellationToken ct)
     {
         if (!client.RequireConsent)
         {
@@ -98,7 +98,7 @@ public class DefaultConsentService : IConsentService
         await consentStore.StoreUserConsentAsync(consent, ct);
     }
 
-    public async ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, RequestedScopes resources, CancellationToken ct)
+    public async ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, RequestedResources resources, CancellationToken ct)
     {
         if (!client.RequireConsent)
         {
@@ -123,7 +123,7 @@ public class DefaultConsentService : IConsentService
         return await Consented(consentStore, consent, resources, ct);
     }
 
-    private async Task<bool> Consented(IUserConsentStore consentStore, [NotNullWhen(true)]Consent? consent, RequestedScopes resources, CancellationToken ct)
+    private async Task<bool> Consented(IUserConsentStore consentStore, [NotNullWhen(true)]Consent? consent, RequestedResources resources, CancellationToken ct)
     {
         if (consent is null)
         {

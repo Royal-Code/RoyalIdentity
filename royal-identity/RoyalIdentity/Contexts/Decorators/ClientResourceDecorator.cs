@@ -44,7 +44,7 @@ public class ClientResourceDecorator : IDecorator<ClientCredentialsContext>
                 return;
             }
 
-            if (resourcesFromStore.IdentityResources.Count is not 0)
+            if (resourcesFromStore.IdentityScopes.Count is not 0)
             {
                 logger.LogError(context, "Client cannot request OpenID scopes in client credentials flow");
                 context.InvalidRequest(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");

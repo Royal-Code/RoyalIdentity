@@ -1,4 +1,4 @@
-﻿using RoyalIdentity.Models.Resources;
+﻿using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Contexts.Withs;
 
@@ -9,6 +9,6 @@ public interface IWithResources : IWithClient
     /// <summary>
     /// The resources of the result.
     /// </summary>
-    public RequestedScopes Scopes { get; }
+    public RequestedResources Scopes { get; }
 
 }

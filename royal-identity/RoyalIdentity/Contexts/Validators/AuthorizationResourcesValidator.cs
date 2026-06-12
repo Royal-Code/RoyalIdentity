@@ -30,21 +30,21 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
         }
 
         if (context.ResponseTypes.Only(Oidc.ResponseTypes.IdToken) &&
-            (context.Scopes.ApiScopes.Any() || context.Scopes.ApiResources.Any()))
+            (context.Scopes.Scopes.Any() || context.Scopes.ResourceServers.Any()))
         {
             logger.LogError(context, "Requests for id_token response type only must include identity scopes only");
             context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "resource scopes are not allowed for id_token response type only");
             return default;
         }
 
-        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.Token) && !context.Scopes.ApiScopes.Any())
+        if (context.ResponseTypes.Contains(Oidc.ResponseTypes.Token) && !context.Scopes.Scopes.Any())
         {
             logger.LogError(context, "The parameter response_type requires resource scopes");
             context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "missing resource scopes");
             return default;
         }
 
-        if (context.ResponseTypes.Only(Oidc.ResponseTypes.Token) && context.Scopes.IdentityResources.Any())
+        if (context.ResponseTypes.Only(Oidc.ResponseTypes.Token) && context.Scopes.IdentityScopes.Any())
         {
             logger.LogError(context, "Requests for token response type only must include resource scopes only");
         }

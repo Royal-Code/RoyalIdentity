@@ -14,7 +14,7 @@ public class ConsentViewModel
 
     public IEnumerable<IdentityScope> IdentityScopes { get; set; }
 
-    public IEnumerable<ApiScope> ApiScopes { get; set; }
+    public IEnumerable<Scope> ApiScopes { get; set; }
 
     public ICollection<ScopeConsentInputModel> CreateIdentityScopes()
     {

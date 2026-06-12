@@ -308,7 +308,8 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
             Name = "Demo Client (realm B)",
             RequireClientSecret = false,
             AllowedGrantTypes = ["authorization_code"],
-            AllowedScopes = { "openid", "offline_access" },
+            AllowedIdentityScopes = { "openid" },
+            AllowOfflineAccess = true,
             AllowedResponseTypes = { "code" },
             RedirectUris = { "http://localhost:5000/callback" }
         };
@@ -345,7 +346,7 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
             RequireClientSecret = false,
             RequirePkce = false,
             AllowedGrantTypes = ["authorization_code"],
-            AllowedScopes = { "openid", "profile" },
+            AllowedIdentityScopes = { "openid", "profile" },
             AllowedResponseTypes = { "code" },
             RedirectUris = { "http://localhost:5000/callback" }
         };

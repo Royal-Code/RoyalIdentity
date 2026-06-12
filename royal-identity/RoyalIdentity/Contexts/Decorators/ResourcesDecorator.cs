@@ -28,7 +28,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         //////////////////////////////////////////////////////////
 
         var resourceStore = storage.GetResourceStore(context.Realm);
-        var scopesFromStorage = await resourceStore.FindResourcesByScopeAsync(context.Scopes.Scopes, true, ct);
+        var scopesFromStorage = await resourceStore.FindResourcesByScopeAsync(context.Scopes.RequestedScopeNames, true, ct);
         if (!scopesFromStorage.IsValid)
         {
             logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", context.Scopes.GetInvalidScopes());
@@ -46,7 +46,7 @@ public class ResourcesDecorator : IDecorator<IWithResources>
         // check for openid scope
         //////////////////////////////////////////////////////////
         if (!context.Scopes.IsOpenId && 
-            context.Scopes.IdentityResources.Count is not 0)
+            context.Scopes.IdentityScopes.Count is not 0)
         {
             logger.LogError(context, "Identity related scope requests, but no openid scope");
             context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "Identity scopes requested, but openid scope is missing");

@@ -96,7 +96,7 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             accessToken, 
             refreshToken, 
             identityToken, 
-            code.Scopes.Scopes.ToSpaceSeparatedString());
+            code.Scopes.RequestedScopeNames.ToSpaceSeparatedString());
 
         await eventDispatcher.DispatchAsync(atEvent, context.Realm);
 

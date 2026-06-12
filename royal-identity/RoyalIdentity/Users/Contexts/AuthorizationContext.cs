@@ -1,6 +1,6 @@
 ﻿using RoyalIdentity.Contexts;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using System.Collections.Specialized;
 using System.Security.Claims;
 
@@ -85,7 +85,7 @@ public class AuthorizationContext
     /// <summary>
     /// The validated resources.
     /// </summary>
-    public RequestedScopes Resources { get; }
+    public RequestedResources Resources { get; }
 
     /// <summary>
     /// The acr values passed from the authorization request.

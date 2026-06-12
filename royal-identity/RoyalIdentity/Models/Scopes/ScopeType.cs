@@ -1,4 +1,4 @@
-﻿namespace RoyalIdentity.Models.Resources;
+namespace RoyalIdentity.Models.Scopes;
 
 /// <summary>
 /// Defines the type of scope.
@@ -6,27 +6,17 @@
 public enum ScopeType
 {
     /// <summary>
-    /// Scope is an identity resource.
-    /// This includes standard OpenID Connect scopes like "openid", "profile", and "email".
+    /// An identity scope: standard OpenID Connect scopes like "openid", "profile", "email".
     /// </summary>
     Identity,
 
     /// <summary>
-    /// Represents a group of API resources.
-    /// This type is used to define a collection of APIs that can be accessed together.
+    /// A resource server (a Web API) that exposes protected scopes.
     /// </summary>
     ResourceServer,
 
     /// <summary>
-    /// Represents an individual API resource.
-    /// This type is used to define specific APIs that clients can request access to.
+    /// A scope: an operation exposed by a resource server.
     /// </summary>
-    ApiResource,
-
-    /// <summary>
-    /// Represents an API scope.
-    /// This type is used to define the permissions that a client can request for a specific API resource.
-    /// For example, an API scope might represent read or write access to a particular API.
-    /// </summary>
-    ApiScope,
+    Scope,
 }

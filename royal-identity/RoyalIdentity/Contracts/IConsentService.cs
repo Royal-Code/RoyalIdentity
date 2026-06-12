@@ -1,5 +1,5 @@
 ﻿using RoyalIdentity.Models;
-using RoyalIdentity.Models.Resources;
+using RoyalIdentity.Models.Scopes;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Contracts;
@@ -19,7 +19,7 @@ public interface IConsentService
     /// <returns>
     /// Boolean if consent is required.
     /// </returns>
-    ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, RequestedScopes resources, CancellationToken ct);
+    ValueTask<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, RequestedResources resources, CancellationToken ct);
 
     /// <summary>
     /// Updates the consent.
@@ -41,5 +41,5 @@ public interface IConsentService
     /// <returns>
     /// Boolean if the resources are consented.
     /// </returns>
-    ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, RequestedScopes resources, CancellationToken ct);
+    ValueTask<bool> ValidateConsentAsync(ClaimsPrincipal subject, Client client, RequestedResources resources, CancellationToken ct);
 }

@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts.Withs;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
+using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Contexts;
 
@@ -47,9 +49,9 @@ public class ResourcesValidator : IValidator<IWithResources>
             }
         }
 
-        foreach(var identity in resources.IdentityResources)
+        foreach(var identity in resources.IdentityScopes)
         {
-            if (!client.AllowedScopes.Contains(identity.Name))
+            if (!client.AllowedIdentityScopes.Contains(identity.Name))
             {
                 logger.LogError(context, "Identity Scope not allowed for the client", $"{identity.Name}, {client.Id}, {client.Name}");
                 context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
@@ -57,9 +59,9 @@ public class ResourcesValidator : IValidator<IWithResources>
             }
         }
 
-        foreach(var apiScope in resources.ApiScopes)
+        foreach(var apiScope in resources.Scopes)
         {
-            if (!client.AllowedScopes.Contains(apiScope.Name))
+            if (!IsApiScopeAllowed(client, apiScope, resources))
             {
                 logger.LogError(context, "Api Scope not allowed for the client", $"{apiScope.Name}, {client.Id}, {client.Name}");
                 context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
@@ -78,5 +80,24 @@ public class ResourcesValidator : IValidator<IWithResources>
         }
 
         return default;
+    }
+
+    /// <summary>
+    /// An API scope is allowed when the client has Full Scope Allowed, when the scope is listed
+    /// individually in <see cref="Client.AllowedScopes"/>, or when its owning resource server is in
+    /// <see cref="Client.AllowedResourceServers"/> (which authorizes all of its scopes).
+    /// </summary>
+    private static bool IsApiScopeAllowed(Client client, Scope scope, RequestedResources resources)
+    {
+        if (client.AllowAllResourceServers)
+            return true;
+
+        if (client.AllowedScopes.Contains(scope.Name))
+            return true;
+
+        // Scope names are globally unique within a realm (Fase 3), so the owner is the requested
+        // resource server that exposes this scope.
+        var owner = resources.ResourceServers.FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
+        return owner is not null && client.AllowedResourceServers.Contains(owner.Name);
     }
 }
