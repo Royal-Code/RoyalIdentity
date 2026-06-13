@@ -38,9 +38,11 @@ public static class ResourceStoreExtensions
         bool onlyEnabled,
         CancellationToken ct)
     {
+        var authorizedScopeNames = scopeNames.ToArray();
         var authorized = authorizedResourceUris.ToHashSet(StringComparer.Ordinal);
 
         IEnumerable<string> effectiveResourceUris = authorized;
+        IEnumerable<string> effectiveScopeNames = authorizedScopeNames;
         if (requestedResourceUris.Count is not 0)
         {
             var unauthorized = requestedResourceUris.Where(uri => !authorized.Contains(uri)).ToArray();
@@ -53,9 +55,32 @@ public static class ResourceStoreExtensions
             }
 
             effectiveResourceUris = requestedResourceUris;
+
+            var requestedResources = await store.FindRequestedResourcesAsync([], effectiveResourceUris, onlyEnabled, ct);
+            if (requestedResources.HasInvalidTargets)
+            {
+                return ResourceResolution.Fail(
+                    Oidc.Token.Errors.InvalidTarget,
+                    "resource indicators requested are invalid",
+                    requestedResources.GetInvalidTargets());
+            }
+
+            var resolvedAuthorizedScopes = await store.FindRequestedResourcesAsync(authorizedScopeNames, [], onlyEnabled, ct);
+            if (!resolvedAuthorizedScopes.IsValid)
+            {
+                return ResourceResolution.Fail(
+                    Oidc.Token.Errors.InvalidScope,
+                    "scopes requested are invalid or inactive",
+                    resolvedAuthorizedScopes.GetInvalidScopes());
+            }
+
+            effectiveScopeNames = SelectScopeNamesForResourceSubset(
+                authorizedScopeNames,
+                resolvedAuthorizedScopes,
+                requestedResources.ResourceServers);
         }
 
-        var resources = await store.FindRequestedResourcesAsync(scopeNames, effectiveResourceUris, onlyEnabled, ct);
+        var resources = await store.FindRequestedResourcesAsync(effectiveScopeNames, effectiveResourceUris, onlyEnabled, ct);
 
         if (resources.HasInvalidTargets)
         {
@@ -81,5 +106,41 @@ public static class ResourceStoreExtensions
         }
 
         return ResourceResolution.Ok(resources);
+    }
+
+    private static string[] SelectScopeNamesForResourceSubset(
+        IEnumerable<string> scopeNames,
+        RequestedResources resolvedAuthorizedScopes,
+        ICollection<ResourceServer> selectedResourceServers)
+    {
+        var selectedResourceServerNames = selectedResourceServers
+            .Select(rs => rs.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var scopeOwners = resolvedAuthorizedScopes.ResourceServers
+            .SelectMany(rs => rs.Scopes.Select(scope => (ScopeName: scope.Name, Server: rs)))
+            .ToDictionary(x => x.ScopeName, x => x.Server, StringComparer.Ordinal);
+
+        var includedScopeNames = resolvedAuthorizedScopes.IdentityScopes
+            .Select(scope => scope.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        if (resolvedAuthorizedScopes.OfflineAccess)
+            includedScopeNames.Add(Server.StandardScopes.OfflineAccess);
+
+        foreach (var scope in resolvedAuthorizedScopes.Scopes)
+        {
+            var include = !scopeOwners.TryGetValue(scope.Name, out var owner)
+                || owner.ProtectedResources.Count is 0
+                || selectedResourceServerNames.Contains(owner.Name);
+
+            if (include)
+                includedScopeNames.Add(scope.Name);
+        }
+
+        return scopeNames
+            .Where(includedScopeNames.Contains)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 }

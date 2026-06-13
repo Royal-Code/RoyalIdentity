@@ -3,6 +3,20 @@ using RoyalIdentity.Models.Scopes;
 
 namespace RoyalIdentity.Extensions;
 
+/// <summary>
+/// The outcome of resolving the access-token signing-algorithm filter. On success carries the resolved
+/// set (empty = no extra restriction, Realm only); on failure carries the incompatibility error so the
+/// caller can signal it (e.g. <c>invalid_request</c>) instead of throwing.
+/// </summary>
+public readonly record struct SigningAlgorithmsResolution(HashSet<string> Algorithms, string? Error)
+{
+    public bool IsCompatible => Error is null;
+
+    public static SigningAlgorithmsResolution Ok(HashSet<string> algorithms) => new(algorithms, null);
+
+    public static SigningAlgorithmsResolution Incompatible(string error) => new([], error);
+}
+
 public static class ResourcesExtensions
 {
     /// <summary>
@@ -11,45 +25,49 @@ public static class ResourcesExtensions
     /// as a restrictive filter, hierarchically: requested resource servers restrict first (multi-RS:
     /// intersection), else the client restricts, else no extra restriction (Realm only). Resource server
     /// and client filters are never combined, so different restrictions never yield an empty set.
+    /// Returns a <see cref="SigningAlgorithmsResolution"/> carrying the resolved set, or an error when
+    /// multiple requested resource servers impose mutually incompatible signing algorithms.
     /// </summary>
-    internal static HashSet<string> ResolveAccessTokenSigningAlgorithms(this RequestedResources resources, Client client)
+    internal static SigningAlgorithmsResolution ResolveAccessTokenSigningAlgorithms(this RequestedResources resources, Client client)
     {
-        var fromResourceServers = resources.ResourceServers.FindMatchingSigningAlgorithms();
+        var (fromResourceServers, error) = resources.ResourceServers.FindMatchingSigningAlgorithms();
+        if (error is not null)
+            return SigningAlgorithmsResolution.Incompatible(error);
+
         if (fromResourceServers.Count > 0)
-            return fromResourceServers;
+            return SigningAlgorithmsResolution.Ok(fromResourceServers);
 
         if (client.AllowedAccessTokenSigningAlgorithms.Count > 0)
-            return [.. client.AllowedAccessTokenSigningAlgorithms];
+            return SigningAlgorithmsResolution.Ok([.. client.AllowedAccessTokenSigningAlgorithms]);
 
-        return [];
+        return SigningAlgorithmsResolution.Ok([]);
     }
 
-    internal static HashSet<string> FindMatchingSigningAlgorithms(this IEnumerable<ResourceServer> apiResources)
+    internal static (HashSet<string> Algorithms, string? Error) FindMatchingSigningAlgorithms(this IEnumerable<ResourceServer> apiResources)
     {
         var apis = apiResources.ToList();
 
         if (apis.IsNullOrEmpty())
-            return [];
+            return ([], null);
 
         // only one API resource request, forward the allowed signing algorithms (if any)
         if (apis.Count == 1)
         {
-            return apis[0].AllowedAccessTokenSigningAlgorithms;
+            return (apis[0].AllowedAccessTokenSigningAlgorithms, null);
         }
 
-        var allAlgorithms = apis.Where(r => r.AllowedAccessTokenSigningAlgorithms.Any())
+        var allAlgorithms = apis.Where(r => r.AllowedAccessTokenSigningAlgorithms.Count > 0)
             .Select(r => r.AllowedAccessTokenSigningAlgorithms).ToList();
 
         // resources need to agree on allowed signing algorithms
         if (allAlgorithms.Count is 0)
-            return [];
+            return ([], null);
 
         var allowedAlgorithms = allAlgorithms.IntersectMany().ToHashSet();
         if (allowedAlgorithms.Count is 0)
-            throw new InvalidOperationException(
-                "Signing algorithms requirements for requested resources are not compatible.");
+            return ([], "Signing algorithms requirements for requested resources are not compatible.");
 
-        return allowedAlgorithms.ToHashSet();
+        return (allowedAlgorithms, null);
     }
 
     /// <summary>

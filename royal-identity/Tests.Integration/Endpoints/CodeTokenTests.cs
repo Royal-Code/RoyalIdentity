@@ -474,6 +474,187 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task Post_WhenCodeTokenRequestUsesResourceSubsetWithApiScopes_ShouldDownscopeScopesAndAudience()
+    {
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
+        var store = memoryStorage.GetDemoRealmStore();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var ordersServer = $"orders-with-scope-{suffix}";
+        var ordersScope = $"orders:read:{suffix}";
+        var ordersResource = $"https://orders.demo.local/{suffix}";
+        store.ResourceServers[ordersServer] = new ResourceServer(
+            ScopeVisibility.Public,
+            ordersServer,
+            "Orders API",
+            "Orders API")
+        {
+            Scopes =
+            [
+                new Scope(ScopeVisibility.Public, ordersScope, "Orders read", "Read orders")
+            ],
+            ProtectedResources =
+            [
+                new ProtectedResource(ordersResource)
+            ]
+        };
+
+        var clientId = $"code-subset-scopes-client-{suffix}";
+        store.Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Code Subset Scopes Client",
+            RequireClientSecret = false,
+            RequirePkce = false,
+            AllowedGrantTypes = ["authorization_code"],
+            AllowedIdentityScopes = { "openid" },
+            AllowedResourceServers = { "apiserver", ordersServer },
+            AllowedResponseTypes = { "code" },
+            RedirectUris = { "http://localhost:5000/**" }
+        };
+
+        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
+            ["openid", "api:read", ordersScope],
+            ["https://api.demo.local/apiserver", ordersResource],
+            onlyEnabled: true);
+
+        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            clientId,
+            SubjectFactory.Create("alice", "Test Name", "admin"),
+            "session",
+            DateTime.UtcNow,
+            300,
+            resources,
+            "http://localhost:5000/callback");
+
+        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "authorization_code",
+                    ["code"] = code.Code,
+                    ["client_id"] = clientId,
+                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["resource"] = ordersResource
+                }));
+
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(content);
+        Assert.Contains(ordersScope, content!["scope"].ToString());
+        // identity scopes survive the downscope (they do not flow through the resource axis)
+        Assert.Contains("openid", content["scope"].ToString());
+        Assert.DoesNotContain("api:read", content["scope"].ToString());
+        var accessToken = content["access_token"].ToString()!;
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
+        Assert.Contains(ordersResource, jwt.Audiences);
+        Assert.DoesNotContain("https://api.demo.local/apiserver", jwt.Audiences);
+    }
+
+    [Fact]
+    public async Task Post_WhenCodeTokenResourceSubset_ShouldKeepScopesOfResourceServersWithoutProtectedResources()
+    {
+        // ADR-012 (subset): downscoping to a resource subset drops API scopes of resource-capable
+        // resource servers left out of the subset, but keeps identity scopes and scopes of resource
+        // servers that have no protected resources (they flow only through the scope axis).
+        var storage = factory.Services.GetRequiredService<IStorage>();
+        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
+        var store = memoryStorage.GetDemoRealmStore();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+
+        // resource-capable RS kept in the subset
+        var ordersServer = $"orders-{suffix}";
+        var ordersScope = $"orders:read:{suffix}";
+        var ordersResource = $"https://orders.demo.local/{suffix}";
+        store.ResourceServers[ordersServer] = new ResourceServer(
+            ScopeVisibility.Public, ordersServer, "Orders API", "Orders API")
+        {
+            Scopes = [new Scope(ScopeVisibility.Public, ordersScope, "Orders read", "Read orders")],
+            ProtectedResources = [new ProtectedResource(ordersResource)]
+        };
+
+        // RS without protected resources: its scope must survive the downscope (scope axis only)
+        var plainServer = $"plain-{suffix}";
+        var plainScope = $"plain:read:{suffix}";
+        store.ResourceServers[plainServer] = new ResourceServer(
+            ScopeVisibility.Public, plainServer, "Plain API", "Plain API")
+        {
+            Scopes = [new Scope(ScopeVisibility.Public, plainScope, "Plain read", "Read plain")]
+        };
+
+        var clientId = $"code-subset-mixed-client-{suffix}";
+        store.Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Code Subset Mixed Client",
+            RequireClientSecret = false,
+            RequirePkce = false,
+            AllowedGrantTypes = ["authorization_code"],
+            AllowedIdentityScopes = { "openid" },
+            AllowedResourceServers = { "apiserver", ordersServer, plainServer },
+            AllowedResponseTypes = { "code" },
+            RedirectUris = { "http://localhost:5000/**" }
+        };
+
+        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
+            ["openid", "api:read", ordersScope, plainScope],
+            ["https://api.demo.local/apiserver", ordersResource],
+            onlyEnabled: true);
+
+        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            clientId,
+            SubjectFactory.Create("alice", "Test Name", "admin"),
+            "session",
+            DateTime.UtcNow,
+            300,
+            resources,
+            "http://localhost:5000/callback");
+
+        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        // narrow to the orders resource only
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "authorization_code",
+                    ["code"] = code.Code,
+                    ["client_id"] = clientId,
+                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["resource"] = ordersResource
+                }));
+
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(content);
+        var scope = content!["scope"].ToString()!;
+        // kept: identity scope, the in-subset resource-capable scope, the non-resource-capable scope
+        Assert.Contains("openid", scope);
+        Assert.Contains(ordersScope, scope);
+        Assert.Contains(plainScope, scope);
+        // dropped: the resource-capable scope whose RS was left out of the subset
+        Assert.DoesNotContain("api:read", scope);
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(content["access_token"].ToString()!);
+        // aud: the requested resource + the plain RS audience (scope axis); not the dropped apiserver resource
+        Assert.Contains(ordersResource, jwt.Audiences);
+        Assert.Contains(plainServer, jwt.Audiences);
+        Assert.DoesNotContain("https://api.demo.local/apiserver", jwt.Audiences);
+    }
+
+    [Fact]
     public async Task Post_WhenCodeTokenRequestUsesUnauthorizedResourceSubset_ShouldReturnInvalidTarget()
     {
         var storage = factory.Services.GetRequiredService<IStorage>();

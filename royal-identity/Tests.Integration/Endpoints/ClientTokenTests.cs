@@ -469,4 +469,221 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("invalid_target", body);
     }
+
+    [Fact]
+    public async Task Post_WhenResourceServerDisallowsScopeRequests_RequestingItsScope_ShouldReturnInvalidScope()
+    {
+        // ADR-012: a resource server with AllowScopeRequests = false cannot have its scopes requested
+        // via the scope parameter, even when the client is otherwise allowed the resource server.
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var store = storage.GetDemoRealmStore();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var serverName = $"audience-only-{suffix}";
+        var scopeName = $"{serverName}:read";
+
+        store.ResourceServers[serverName] = new ResourceServer(
+            ScopeVisibility.Public, serverName, "Audience Only API", "Audience Only API")
+        {
+            AllowScopeRequests = false,
+            Scopes = [new Scope(ScopeVisibility.Public, scopeName, "read", "read")]
+        };
+
+        var clientId = $"audience-only-scope-client-{suffix}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        store.Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Audience Only Scope Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedResourceServers = { serverName },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
+                    ["scope"] = scopeName
+                }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("invalid_scope", body);
+    }
+
+    [Fact]
+    public async Task Post_WhenResourceServerDisallowsScopeRequests_StillReachableViaResourceIndicator()
+    {
+        // ADR-012: an audience-only resource server (AllowScopeRequests = false) remains reachable via
+        // the resource parameter — the resource axis is independent of the scope gate.
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var store = storage.GetDemoRealmStore();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var serverName = $"audience-only-reachable-{suffix}";
+        var scopeName = $"{serverName}:read";
+        var resourceUri = $"https://audience-only-{suffix}.demo.local/api";
+
+        store.ResourceServers[serverName] = new ResourceServer(
+            ScopeVisibility.Public, serverName, "Audience Only API", "Audience Only API")
+        {
+            AllowScopeRequests = false,
+            Scopes = [new Scope(ScopeVisibility.Public, scopeName, "read", "read")],
+            ProtectedResources = [new ProtectedResource(resourceUri)]
+        };
+
+        var clientId = $"audience-only-resource-client-{suffix}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        store.Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Audience Only Resource Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedResourceServers = { serverName },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
+                    ["resource"] = resourceUri
+                }));
+
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(content);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(content!["access_token"].ToString()!);
+        Assert.Contains(resourceUri, jwt.Audiences);
+    }
+
+    [Fact]
+    public async Task Post_WithResourceIndicatorOfDisabledResourceServer_ShouldReturnInvalidTarget()
+    {
+        // ADR-012: a ProtectedResource availability derives from the owning resource server's Enabled.
+        // A disabled resource server makes its resources unavailable -> invalid_target.
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var store = storage.GetDemoRealmStore();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var serverName = $"disabled-rs-{suffix}";
+        var resourceUri = $"https://disabled-{suffix}.demo.local/api";
+
+        store.ResourceServers[serverName] = new ResourceServer(
+            ScopeVisibility.Public, serverName, "Disabled API", "Disabled API")
+        {
+            Enabled = false,
+            ProtectedResources = [new ProtectedResource(resourceUri)]
+        };
+
+        var clientId = $"disabled-rs-client-{suffix}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        store.Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Disabled RS Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedResourceServers = { serverName },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
+                    ["resource"] = resourceUri
+                }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("invalid_target", body);
+    }
+
+    [Fact]
+    public async Task Post_WhenClientOmitsScope_DefaultScopesShouldExcludeResourceServersThatDisallowScopeRequests()
+    {
+        // ADR-012: when client_credentials omits scope, the default scopes are the requestable scopes of
+        // the client's allowed resource servers; audience-only servers (AllowScopeRequests = false) are excluded.
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var store = storage.GetDemoRealmStore();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+
+        var normalServer = $"normal-{suffix}";
+        var normalScope = $"{normalServer}:read";
+        store.ResourceServers[normalServer] = new ResourceServer(
+            ScopeVisibility.Public, normalServer, "Normal API", "Normal API")
+        {
+            Scopes = [new Scope(ScopeVisibility.Public, normalScope, "read", "read")]
+        };
+
+        var audienceOnlyServer = $"audience-only-default-{suffix}";
+        var audienceOnlyScope = $"{audienceOnlyServer}:read";
+        store.ResourceServers[audienceOnlyServer] = new ResourceServer(
+            ScopeVisibility.Public, audienceOnlyServer, "Audience Only API", "Audience Only API")
+        {
+            AllowScopeRequests = false,
+            Scopes = [new Scope(ScopeVisibility.Public, audienceOnlyScope, "read", "read")]
+        };
+
+        var clientId = $"default-scopes-client-{suffix}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        store.Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Default Scopes Client",
+            ClientType = ClientType.Confidential,
+            RequireClientSecret = true,
+            AllowedResourceServers = { normalServer, audienceOnlyServer },
+            AllowedGrantTypes = ["client_credentials"],
+            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        // no scope parameter -> default scopes
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "client_credentials",
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret
+                }));
+
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(content);
+        var scope = content!["scope"].ToString()!;
+        Assert.Contains(normalScope, scope);
+        Assert.DoesNotContain(audienceOnlyScope, scope);
+    }
 }

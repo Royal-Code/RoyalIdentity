@@ -277,6 +277,63 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task Post_WhenRefreshTokenRequestsResourceSubsetWithApiScopes_ShouldDownscopeScopesAndAudience()
+    {
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var ordersServer = $"orders-refresh-with-scope-{suffix}";
+        var ordersScope = $"orders:read:{suffix}";
+        var ordersResource = $"https://orders.demo.local/{suffix}";
+        storage.GetDemoRealmStore().ResourceServers[ordersServer] = new ResourceServer(
+            ScopeVisibility.Public,
+            ordersServer,
+            "Orders API",
+            "Orders API")
+        {
+            Scopes =
+            [
+                new Scope(ScopeVisibility.Public, ordersScope, "Orders read", "Read orders")
+            ],
+            ProtectedResources =
+            [
+                new ProtectedResource(ordersResource)
+            ]
+        };
+
+        var (clientId, refreshToken, _) = await CreateRefreshTokenWithResourcesAsync(
+            ["https://api.demo.local/apiserver", ordersResource],
+            ["openid", "offline_access", "api:read", ordersScope]);
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.PostAsync(url,
+            new FormUrlEncodedContent(
+                new Dictionary<string, string>
+                {
+                    ["grant_type"] = "refresh_token",
+                    ["refresh_token"] = refreshToken,
+                    ["client_id"] = clientId,
+                    ["resource"] = ordersResource
+                }));
+
+        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(content);
+        var scope = content!["scope"].ToString()!;
+        Assert.Contains(ordersScope, scope);
+        // identity scope and offline_access survive the downscope (scope axis, not the resource axis)
+        Assert.Contains("openid", scope);
+        Assert.Contains("offline_access", scope);
+        Assert.DoesNotContain("api:read", scope);
+        var accessToken = content["access_token"].ToString()!;
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
+        Assert.Contains(ordersResource, jwt.Audiences);
+        Assert.DoesNotContain("https://api.demo.local/apiserver", jwt.Audiences);
+    }
+
+    [Fact]
     public async Task Post_WhenRefreshTokenRequestsUnauthorizedResourceSubset_ShouldReturnInvalidTarget()
     {
         var ordersResource = AddOrdersResourceServer();
@@ -324,7 +381,8 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     }
 
     private async Task<(string ClientId, string RefreshToken, string AccessToken)> CreateRefreshTokenWithResourcesAsync(
-        string[] resourceUris)
+        string[] resourceUris,
+        string[]? scopeNames = null)
     {
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var storage = factory.Services.GetRequiredService<IStorage>();
@@ -354,7 +412,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         store.Clients[clientId] = resourceClient;
 
         var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
-            ["openid", "offline_access"],
+            scopeNames ?? ["openid", "offline_access"],
             resourceUris,
             onlyEnabled: true);
 

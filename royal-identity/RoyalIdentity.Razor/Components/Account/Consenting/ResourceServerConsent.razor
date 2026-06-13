@@ -1,0 +1,76 @@
+@using RoyalIdentity.Extensions
+
+@if (Group.Scopes.Count is not 0 || Group.ProtectedResources.Count is not 0)
+{
+    <div class="mb-3">
+        <div class="consent-box">
+            <div class="consent-title">
+                <span class="icon-tasks"></span>
+                @Group.DisplayName
+            </div>
+
+            @if (Group.Description.IsPresent())
+            {
+                <p class="rs-description">
+                    <small class="fw-light">@Group.Description</small>
+                </p>
+            }
+
+            <ul class="list-group list-group-flush">
+                @for (int i = 0; i < Group.Scopes.Count; i++)
+                {
+                    var globalIndex = StartIndex + i;
+                    var scope = Consents.ElementAt(globalIndex);
+                    var id = $"scopes_{scope.Scope}";
+                    <Scope @bind-Value="scope" Index="globalIndex" BindPrefix="@BindPrefix" @key="id" />
+                }
+            </ul>
+
+            @if (Group.ProtectedResources.Count is not 0)
+            {
+                <div class="protected-resources">
+                    <div class="protected-resources-title">
+                        <span class="icon-lock"></span>
+                        Protected resources this application will access
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var resource in Group.ProtectedResources)
+                        {
+                            <li class="list-group-item protected-resource">
+                                <strong>@(resource.DisplayName.IsPresent() ? resource.DisplayName : resource.ResourceUri)</strong>
+                                @if (resource.DisplayName.IsPresent())
+                                {
+                                    <div class="protected-resource-uri">
+                                        <small class="text-muted">@resource.ResourceUri</small>
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+
+    /// <summary>The resource server group to render (its requested scopes and protected resources).</summary>
+    [Parameter, EditorRequired]
+    public ResourceServerConsentModel Group { get; set; } = default!;
+
+    /// <summary>
+    /// The single flat consent input list. This group's scope rows occupy the contiguous slice
+    /// <c>[StartIndex, StartIndex + Group.Scopes.Count)</c>, so each row posts with its global index.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public ICollection<ScopeConsentInputModel> Consents { get; set; } = default!;
+
+    /// <summary>The index of this group's first scope within <see cref="Consents"/>.</summary>
+    [Parameter, EditorRequired]
+    public int StartIndex { get; set; }
+
+    /// <summary>The form binding prefix for the flat consent list (e.g. <c>inputModel.ScopesConsent</c>).</summary>
+    [Parameter, EditorRequired]
+    public string BindPrefix { get; set; } = default!;
+}

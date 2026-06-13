@@ -44,10 +44,33 @@
         IconClass="icon-user"
         Description="Personal Information" />
 
-        <Scopes @bind-Value="inputModel.ScopesConsent"
-        BindPrefix="inputModel.ScopesConsent"
-        IconClass="icon-tasks"
-        Description="Application Access" />
+        @{
+            var scopeOffset = 0;
+        }
+        @foreach (var group in viewModel?.ResourceServers ?? [])
+        {
+            <ResourceServerConsent Group="group"
+            Consents="inputModel.ScopesConsent"
+            StartIndex="scopeOffset"
+            BindPrefix="inputModel.ScopesConsent" />
+
+            scopeOffset += group.Scopes.Count;
+        }
+
+        @if (viewModel?.OfflineAccess is true)
+        {
+            <div class="mb-3">
+                <div class="offline-access-box">
+                    <span class="icon-time"></span>
+                    <strong>Offline access</strong>
+                    <div>
+                        <small class="text-muted">
+                            The application will be able to access your resources while you are away.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        }
 
         <div class="form-floating mb-3">
             <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="Description or name of device" auto-focus />

@@ -1,10 +1,10 @@
 # Plan: Resources / Scopes Redesign
 
-## Status: IN_PROGRESS
+## Status: COMPLETED
 
 ## Progresso
 
-`█████---` **63%** - 5 de 8 fases concluidas
+`████████` **100%** - 8 de 8 fases concluidas
 
 ---
 
@@ -297,7 +297,7 @@ Criterio de aceite: solucao compila; o modelo tem so 3 tipos; `RequestedResource
 - **Fase 4** — `Client.AllowedResources` (`AllowedIdentityScopes`/`AllowedResourceServers`/`AllowedScopes`/`AllowAllResourceServers`) + `ClientType`; aposentar `Client.AllowedScopes`(string)/`AllowOfflineAccess`. (Os decorators ainda filtram por `client.AllowedScopes` string.)
 - **Fase 5** — cadeia de signing-alg **RS -> Client -> Realm** (hoje so RS-level); revisar decorators para usar `AllowedResources` (depende da Fase 4).
 - **Fase 6** — Resource Indicators (RFC 8707) + Protected Resource Metadata (RFC 9728), com `ProtectedResource`s por ResourceServer.
-- **Fase 7** — consentimento agrupado por ResourceServer/ProtectedResource (hoje so renomeado/flat).
+- **Fase 7** — consentimento agrupado por ResourceServer/ProtectedResource (concluida: tela agrupada por RS com protected resources audience-only; persistencia segue baseada em scopes).
 
 ---
 
@@ -409,11 +409,11 @@ Criterio de aceite: `resource` RFC 8707 funciona em authorize/token, inclusive a
 
 ### Resultado da Fase 6 (concluida)
 
-**Status:** **concluida** - Resource Indicators (RFC 8707) e Protected Resource Metadata (RFC 9728) implementados e verificados. Testes verdes: `dotnet test RoyalIdentity.sln --no-restore` (**146 testes**: Integration 137, Identity 6, Pipelines 3).
+**Status:** **concluida** - Resource Indicators (RFC 8707) e Protected Resource Metadata (RFC 9728) implementados e verificados. Testes verdes: `dotnet test RoyalIdentity.sln --no-restore` (**158 testes**: Integration 149, Identity 6, Pipelines 3).
 
 **Feito:**
 - **Modelo e store (passos 1-2):** `ProtectedResource` em `ResourceServer.ProtectedResources`; indice por `ResourceUri` com unicidade por realm; validacao fail-fast para URI absoluta HTTPS sem fragmento, com excecao HTTP loopback/localhost para dev/testes.
-- **Request/authorization (passos 3-6):** `resource` multi-valor preservado em `NameValueCollection`; authorize e client_credentials resolvem `ProtectedResources`; token endpoint parseia `resource` em `authorization_code` e `refresh_token`; grants aceitam omissao ou subset do conjunto autorizado e rejeitam subset fora dele com `invalid_target`.
+- **Request/authorization (passos 3-6):** `resource` multi-valor preservado em `NameValueCollection`; authorize e client_credentials resolvem `ProtectedResources`; token endpoint parseia `resource` em `authorization_code` e `refresh_token`; grants aceitam omissao ou subset do conjunto autorizado e rejeitam subset fora dele com `invalid_target`. Quando ha subset, o conjunto efetivo de scopes de API tambem e reduzido aos ResourceServers resource-capable selecionados pelo subset (identity/offline e scopes de RS sem `ProtectedResource`s permanecem pelo eixo de `scope`).
 - **Persistencia em grants:** `AccessToken.ResourceUris` e `RefreshToken.ResourceUris` guardam os protected resources autorizados; refresh sem subset preserva audiences de resource; refresh com subset reemite access token com o audience reduzido.
 - **`aud` (passo 5):** `ProtectedResource.ResourceUri` entra como audience explicito e suprime o audience legado (`ResourceServer.Audience ?? Name`) do mesmo RS; scopes sem `resource` continuam pelo caminho legado.
 - **Implicit/hybrid resource-only:** `AuthorizationResourcesValidator` aceita `resource` sem API scope quando `response_type` contem `token`; `id_token`-only permanece restrito a identity scopes.
@@ -422,14 +422,14 @@ Criterio de aceite: `resource` RFC 8707 funciona em authorize/token, inclusive a
 
 **Testes adicionados/refinados:**
 - `client_credentials`: audience-only, multi-resource, resource desconhecido, resource nao permitido, scope+resource incoerente.
-- `authorization_code`: emissao com resource, subset no token endpoint, subset nao autorizado.
-- `refresh_token`: preservacao de resource audience, subset autorizado, subset nao autorizado.
+- `authorization_code`: emissao com resource, subset no token endpoint, subset com scopes de API multi-RS, subset nao autorizado.
+- `refresh_token`: preservacao de resource audience, subset autorizado, subset com scopes de API multi-RS, subset nao autorizado.
 - `authorize`: implicit com `resource` sem API scope.
 - `discovery/store`: `protected_resources`, metadata RFC 9728, URI invalida/fragmento/http nao-local, duplicate `ResourceUri`, localhost HTTP aceito.
 
 **Limitacoes / notas (avaliacao pos-Fase 6):**
-- **Consent ainda nao modela `ProtectedResource`** (apontamento 6.1): `ConsentPageService` e `RequestedResources.IntersectConsentScopes` operam apenas sobre `IdentityScopes` + `Scopes`. **Nao ha loop de consent**: o `AuthorizeMainValidator` exige `scope` (um request resource-only no authorize e rejeitado com `invalid_scope` antes do consent) e `client_credentials` nao consente; em `scope + resource`, o consent e dirigido pelos scopes e o resource flui para o `aud`. O display/consentimento agrupado por ResourceServer + `ProtectedResource` e trabalho da **Fase 7**.
-- **DRY (resolvido):** a coerencia `scope + resource` virou `RequestedResources.IsScopeResourceCoherent()` (usada pelo `ResourcesValidator` e pelo resolver); a validacao de subset/`invalid_target` do token endpoint virou `IResourceStore.ResolveAuthorizedSubsetAsync(...)` (extension) retornando um `ResourceResolution` puro (sem acoplar ao `context`). `AuthorizationCodeHandler` e `RefreshTokenHandler` reduziram o `ResolveEffectiveResourcesAsync` a uma chamada + map de erro; os `HasScopeResourceCoherence` duplicados foram removidos. 146 testes verdes.
+- **Consent: exibicao agrupada na Fase 7; persistencia segue baseada em scopes (resolvido).** Apontamento 6.1: o consent nao modela `ProtectedResource` na persistencia — `RequestedResources.IntersectConsentScopes` e o `Consent`/`ConsentedScope` operam sobre `IdentityScopes` + `Scopes`. Isso e intencional: **nao ha loop de consent** para authorize sem parametro `scope` (o `AuthorizeMainValidator` exige `scope`, entao `resource` sozinho e rejeitado com `invalid_scope` antes do consent; `client_credentials` nao consente). Quando o authorize tem `scope` presente e tambem `resource` — por exemplo `scope=openid` + `resource` em implicit/hybrid que emite ou prepara access token — a Fase 7 mostra os `ProtectedResource`s agrupados, mas a persistencia continua por scopes; por coerencia scope/resource (ADR-012), consentir o scope autoriza o resource, que flui para o `aud`. A **Fase 7** fechou o lado de display/UX: a tela agrupa por ResourceServer e mostra os `ProtectedResource`s audience-only; o resource permanece audience-only (sem checkbox proprio).
+- **DRY (resolvido):** a coerencia `scope + resource` virou `RequestedResources.IsScopeResourceCoherent()` (usada pelo `ResourcesValidator` e pelo resolver); a validacao de subset/`invalid_target` do token endpoint virou `IResourceStore.ResolveAuthorizedSubsetAsync(...)` (extension) retornando um `ResourceResolution` puro (sem acoplar ao `context`). `AuthorizationCodeHandler` e `RefreshTokenHandler` reduziram o `ResolveEffectiveResourcesAsync` a uma chamada + map de erro; os `HasScopeResourceCoherence` duplicados foram removidos. Corrigido tambem o downscope de scopes de API quando `authorization_code`/`refresh_token` pedem subset de `resource`. 158 testes verdes.
 
 **Falta:** nada pendente na Fase 6. A limitacao conhecida de consentimento para `ProtectedResource`s fica documentada para a Fase 7.
 
@@ -449,6 +449,16 @@ Passos:
 
 Criterio de aceite: a tela mostra os scopes e protected resources agrupados por ResourceServer de forma clara; consentimento grava/aplica corretamente.
 
+### Resultado da Fase 7 (concluida)
+
+- **ViewModel agrupado** (`ConsentViewModel`): `IdentityScopes` (informacoes pessoais, avulsas), `ResourceServers` (novo `ResourceServerConsentModel`: nome/displayName/descricao + `Scopes` pedidos + `ProtectedResources` pedidos do RS) e `OfflineAccess`. Acessor `Scopes` faz o flatten em ordem de grupo para o input flat.
+- **ConsentPageService**: `BuildConsentViewModel` agrupa `context.Resources` por ResourceServer (scopes e protected resources filtrados ao RS dono); um RS pode aparecer so com protected resources (request resource-only) ou so com scopes. `ProcessConsentAsync` valida required/grava sobre o acessor flat — sem mudanca no shape do POST.
+- **Razor**: novo componente `ResourceServerConsent.razor` (header do RS + protected resources audience-only + linhas de `Scope` com indice global por offset, num unico input flat `inputModel.ScopesConsent`); `ConsentPage.razor` itera os grupos e mostra `offline_access` como item informativo. `ConsentInputModel` permanece flat (blast radius minimo).
+- **Decisoes** (alinhadas ao apontamento 6.1 e ao plano): protected resources sao **audience-only** (exibicao, sem checkbox — a coerencia scope/resource da ADR-012 garante que consentir o scope autoriza o resource); `offline_access` e informativo (o grant continua dirigido pelo scope na validacao); a **persistencia de consentimento continua baseada em scopes** (resources fluem para o `aud` via scopes) — o `Consent`/`ConsentedScope` nao modela `ProtectedResource`.
+- **Testes:** +1 teste de aceite (`Consent_WhenResourceRequested_MustShowProtectedResourceGroupedByResourceServer`): com `resource`, a tela mostra o RS, seus scopes e o protected resource (audience-only) pela URI. A correcao pos-Fase 7 adicionou +2 testes de regressao para subset de `resource` com scopes de API multi-RS (`authorization_code` e `refresh_token`). A Fase 8 adicionou +9 testes de regressao. Suite completa verde: **158** (Pipelines 3, Identity 6, Integration 149).
+
+**Falta:** nada pendente na Fase 7. A matriz ampla de consentimento agrupado (varios RS, resource-only, negacao com resource) fica para a Fase 8.
+
 ---
 
 ## Fase 8: Testes e Regressao
@@ -467,6 +477,27 @@ Criterio de aceite final:
 ```powershell
 dotnet test RoyalIdentity.sln --no-restore
 ```
+
+### Resultado da Fase 8 (concluida)
+
+**Status:** concluida. Suite completa verde: `dotnet test RoyalIdentity.sln --no-restore` (**166 testes**: Integration 157, Identity 6, Pipelines 3).
+
+**Feito:**
+- **Modelo/store:** adicionados testes para lookup combinado `scope + resource`, coerencia `scope/resource` negativa e `RequestedResources.CopyTo` preservando `RequestedScopeNames`, `RequestedResourceUris`, `ResourceServers`, `Scopes`, `ProtectedResources` e `OfflineAccess`.
+- **Token / Resource Indicators:** mantidos e reforcados os testes de `aud` por scope, `aud` por `resource`, subset em `authorization_code` e `refresh_token`, inclusive downscope de scopes de API em subset multi-RS.
+- **Signing por precedencia:** adicionados testes end-to-end para realm default, filtro do client quando nao ha filtro de RS, filtro do RS sobrepondo client, multi-RS com intersecao, multi-RS incompativel e id token usando apenas `Client.AllowedIdentityTokenSigningAlgorithms`.
+- **Correcao descoberta na Fase 8:** incompatibilidade de algoritmos entre ResourceServers agora e rejeitada no `ResourcesValidator` com `invalid_request`, em vez de estourar excecao tardia no token factory e virar 500.
+- **Autorizacao/consent/discovery/realm:** cobertura revalidada pela suite completa; casos amplos de `AllowedScopes`, `AllowedResourceServers`, `AllowAllResourceServers`, `resource` permitido/nao permitido, discovery RFC 9728, consent agrupado e isolamento por realm permanecem verdes.
+
+**Revisao pos-Fase 8 (lacunas fechadas):**
+- **`AllowScopeRequests = false` estava sem teste** (a etapa 4 havia sido marcada como "revalidada pela cobertura existente", mas nao existia teste). Adicionados: scope de um RS audience-only via `scope` -> `invalid_scope`; o mesmo RS continua alcancavel via `resource` (eixo de resource independente do gate de scope); exclusao do scope de `scopes_supported` no discovery; e exclusao do RS audience-only das default scopes de `client_credentials` (quando o `scope` e omitido).
+- **Ramos do downscope de subset reforcados** (`ResourceStoreExtensions.SelectScopeNamesForResourceSubset`): novo teste de `authorization_code` com 3 RS provando que (a) identity scope sobrevive, (b) scope de RS resource-capable no subset e mantido, (c) scope de RS resource-capable fora do subset e dropado, (d) scope de RS sem `ProtectedResource` e mantido e flui pelo `aud` via eixo de scope; e asserts de `openid`/`offline_access` sobrevivendo ao downscope nos testes de code/refresh existentes.
+- **Outros casos de borda da ADR-012:** `response_type=id_token` only + `resource` -> `invalid_scope` (id_token-only restrito a identity scopes); `resource` de um ResourceServer **desabilitado** -> `invalid_target`; incompatibilidade de algoritmos de signing entre multiplos RS detectada tambem no **authorize** -> `invalid_request`.
+- **Refactor (sem exception no fluxo):** `ResolveAccessTokenSigningAlgorithms` agora retorna um `SigningAlgorithmsResolution` (`Algorithms` + `Error`) em vez de lancar `InvalidOperationException`; o `ResourcesValidator` checa `IsCompatible` (sem `try/catch`) e o `DefaultTokenFactory` usa `.Algorithms` (incompatibilidade ja barrada antes).
+- **Clareza:** variavel `authorizedScopes` -> `resolvedAuthorizedScopes` no resolver (era um `RequestedResources`, nao uma lista de nomes).
+- Suite apos as adicoes: **166** (Integration 157, Identity 6, Pipelines 3).
+
+**Falta:** nada pendente neste plano.
 
 ---
 

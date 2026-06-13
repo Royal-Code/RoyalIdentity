@@ -216,6 +216,59 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task Consent_WhenResourceRequested_MustShowProtectedResourceGroupedByResourceServer()
+    {
+        // Fase 7 acceptance: with a resource indicator (RFC 8707) requested, the consent screen must
+        // group scopes by resource server and show the protected resource (audience-only) for that server.
+        // Arrange
+
+        var client = factory.CreateClient();
+
+        var codeVerifier = CryptoRandom.CreateUniqueId();
+        var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
+        var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
+
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+            .AddQueryString("client_id", "demo_consent_client")
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile email api api:read api:write offline_access")
+            .AddQueryString("resource", "https://api.demo.local/apiserver")
+            .AddQueryString("redirect_uri", $"{client.BaseAddress}callback")
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", codeChallenge)
+            .AddQueryString("code_challenge_method", "S256");
+
+        // will redirect to login page
+        var loginPage = await client.GetAsync(path);
+        var content = await loginPage.Content.ReadAsStringAsync();
+        var doc = new HtmlDocument();
+        doc.LoadHtml(content);
+        var form = doc.DocumentNode.SelectSingleNode("//form");
+        // 'bob' has no persisted consent (the denial test never stores it), so this always reaches consent.
+        // This test does not submit the consent, so it persists nothing and stays isolated.
+        var formAction = new FormAction(client, form)
+            .SetValue("Input.Username", "bob")
+            .SetValue("Input.Password", "bob");
+
+        // Act
+        // after login, the response is the consent screen
+        var response = await formAction.SubmitAsync();
+        content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // the resource server group is shown with its scopes
+        Assert.Contains("API Server", content);
+        Assert.Contains("API read", content);
+        Assert.Contains("API write", content);
+        // the protected resource (audience-only) is shown by its URI
+        Assert.Contains("https://api.demo.local/apiserver", content);
+        // and the consent form is present (the user can still grant/deny)
+        Assert.Contains("Yes, Allow", content);
+    }
+
+    [Fact]
     public async Task Login_WhenUserDeniesConsent_MustRedirectToClient_WithAccessDenied()
     {
         // Arrange

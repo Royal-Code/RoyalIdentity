@@ -78,8 +78,9 @@ public class DefaultTokenFactory : ITokenFactory
             Oidc.Token.Response.BearerTokenType)
         {
             // signing-algorithm chain (ADR-010 #a): realm orders/filters; resource servers then client
-            // act only as a restrictive filter, hierarchically (never combined).
-            AllowedSigningAlgorithms = request.Resources.ResolveAccessTokenSigningAlgorithms(request.Client)
+            // act only as a restrictive filter, hierarchically (never combined). Incompatibility is rejected
+            // earlier by ResourcesValidator (invalid_request), so here the resolution is always compatible.
+            AllowedSigningAlgorithms = request.Resources.ResolveAccessTokenSigningAlgorithms(request.Client).Algorithms
         };
         token.Claims.AddRange(claims);
 

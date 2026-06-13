@@ -106,6 +106,14 @@ public class ResourcesValidator : IValidator<IWithResources>
             return default;
         }
 
+        var signingAlgorithms = resources.ResolveAccessTokenSigningAlgorithms(client);
+        if (!signingAlgorithms.IsCompatible)
+        {
+            logger.LogError(context, "Signing algorithms requirements are not compatible", $"{client.Id}, {client.Name}");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, signingAlgorithms.Error!);
+            return default;
+        }
+
         switch (context)
         {
             case AuthorizeContext ac:

@@ -1,0 +1,41 @@
+/* Consent group box (one per resource server) */
+.consent-box {
+  background-color: #ffffff;
+  padding: 2rem 1rem 0 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+/* Resource server title */
+.consent-title {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.rs-description {
+  color: #666;
+  margin-bottom: 12px;
+}
+
+/* Protected resources (audience-only) */
+.protected-resources {
+  margin-top: 12px;
+  border-top: 1px solid #eee;
+  padding-top: 12px;
+}
+
+.protected-resources-title {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.protected-resource {
+  text-align: left;
+}
+
+.protected-resource-uri {
+  word-break: break-all;
+}

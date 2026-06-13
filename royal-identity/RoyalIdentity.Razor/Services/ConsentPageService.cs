@@ -81,14 +81,32 @@ public class ConsentPageService(
 
     private static ConsentViewModel BuildConsentViewModel(Users.Contexts.AuthorizationContext context)
     {
+        var resources = context.Resources;
+
+        // Group the requested application access by resource server (Fase 7). Each group carries the
+        // resource server's requested scopes and requested protected resources (audience-only). A
+        // resource server may appear with only protected resources (resource-only request) and no scopes.
+        var groups = resources.ResourceServers
+            .Select(rs => new ResourceServerConsentModel
+            {
+                Name = rs.Name,
+                DisplayName = rs.DisplayName,
+                Description = rs.Description,
+                Scopes = [.. resources.Scopes.Where(s => rs.Scopes.Any(rss => rss.Name == s.Name))],
+                ProtectedResources = [.. resources.ProtectedResources
+                    .Where(pr => rs.ProtectedResources.Any(rsp => rsp.ResourceUri == pr.ResourceUri))],
+            })
+            .ToArray();
+
         return new ConsentViewModel
         {
             ClientName = context.Client.Name,
             ClientUrl = context.Client.ClientUri,
             ClientLogoUrl = context.Client.LogoUri,
             AllowRememberConsent = context.Client.AllowRememberConsent,
-            IdentityScopes = context.Resources.IdentityScopes,
-            Scopes = context.Resources.Scopes
+            OfflineAccess = resources.OfflineAccess,
+            IdentityScopes = [.. resources.IdentityScopes],
+            ResourceServers = groups,
         };
     }
 }

@@ -1,5 +1,8 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models.Scopes;
+using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
@@ -65,6 +68,39 @@ public class DiscoveryTests : IClassFixture<AppFactory>
         Assert.Contains(
             "https://api.demo.local/apiserver",
             protectedResources.EnumerateArray().Select(resource => resource.GetString()));
+    }
+
+    [Fact]
+    public async Task Get_ScopesSupported_ShouldExcludeScopesOfResourceServersThatDisallowScopeRequests()
+    {
+        // ADR-012: scopes of resource servers with AllowScopeRequests = false are not requestable via the
+        // scope parameter, so they must not be advertised in scopes_supported (reachable only via resource).
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var store = storage.GetDemoRealmStore();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var serverName = $"audience-only-discovery-{suffix}";
+        var hiddenScope = $"{serverName}:read";
+
+        store.ResourceServers[serverName] = new ResourceServer(
+            ScopeVisibility.Public, serverName, "Audience Only API", "Audience Only API")
+        {
+            AllowScopeRequests = false,
+            Scopes = [new Scope(ScopeVisibility.Public, hiddenScope, "read", "read")]
+        };
+
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(MemoryStorage.DemoRealm.Path);
+
+        var response = await client.GetAsync(url);
+        var content = await response.Content.ReadAsStringAsync();
+        var document = JsonDocument.Parse(content);
+
+        Assert.True(document.RootElement.TryGetProperty("scopes_supported", out var scopesSupported));
+        var scopes = scopesSupported.EnumerateArray().Select(scope => scope.GetString()).ToList();
+        // a normal (AllowScopeRequests = true) scope is still advertised as a control
+        Assert.Contains("api:read", scopes);
+        // the audience-only scope is excluded
+        Assert.DoesNotContain(hiddenScope, scopes);
     }
 
     [Fact]

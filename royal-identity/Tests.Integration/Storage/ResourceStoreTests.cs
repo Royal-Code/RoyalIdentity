@@ -176,4 +176,64 @@ public class ResourceStoreTests
         Assert.True(resources.HasInvalidTargets);
         Assert.Contains("https://api.example.test/unknown", resources.InvalidTargets);
     }
+
+    [Fact]
+    public async Task FindRequestedResources_ScopeAndResource_PopulatesOwnerScopeAndProtectedResource()
+    {
+        var server = Api("api1", Op("api1.read"));
+        server.ProtectedResources = [Resource("https://api.example.test/resource")];
+        var store = new ResourceStore(Servers(server), NoIdentityScopes());
+
+        var resources = await store.FindRequestedResourcesAsync(
+            ["api1.read"],
+            ["https://api.example.test/resource"],
+            onlyEnabled: true);
+
+        Assert.True(resources.IsValid);
+        Assert.False(resources.HasInvalidTargets);
+        Assert.True(resources.IsScopeResourceCoherent());
+        Assert.Contains(resources.Scopes, scope => scope.Name == "api1.read");
+        Assert.Contains(resources.ResourceServers, rs => rs.Name == "api1");
+        Assert.Contains(resources.ProtectedResources, resource => resource.ResourceUri == "https://api.example.test/resource");
+    }
+
+    [Fact]
+    public async Task RequestedResources_ScopeResourceCoherence_WhenScopeOwnerResourceIsMissing_ReturnsFalse()
+    {
+        var first = Api("api1", Op("api1.read"));
+        first.ProtectedResources = [Resource("https://api1.example.test/resource")];
+        var second = Api("api2", Op("api2.read"));
+        second.ProtectedResources = [Resource("https://api2.example.test/resource")];
+        var store = new ResourceStore(Servers(first, second), NoIdentityScopes());
+
+        var resources = await store.FindRequestedResourcesAsync(
+            ["api1.read"],
+            ["https://api2.example.test/resource"],
+            onlyEnabled: true);
+
+        Assert.False(resources.IsScopeResourceCoherent());
+    }
+
+    [Fact]
+    public async Task RequestedResources_CopyTo_CopiesScopesAndProtectedResources()
+    {
+        var server = Api("api1", Op("api1.read"));
+        server.ProtectedResources = [Resource("https://api.example.test/resource")];
+        var store = new ResourceStore(Servers(server), NoIdentityScopes());
+        var source = await store.FindRequestedResourcesAsync(
+            ["offline_access", "api1.read"],
+            ["https://api.example.test/resource"],
+            onlyEnabled: true);
+        var target = new RequestedResources();
+
+        source.CopyTo(target);
+
+        Assert.True(target.OfflineAccess);
+        Assert.Contains("offline_access", target.RequestedScopeNames);
+        Assert.Contains("api1.read", target.RequestedScopeNames);
+        Assert.Contains("https://api.example.test/resource", target.RequestedResourceUris);
+        Assert.Contains(target.Scopes, scope => scope.Name == "api1.read");
+        Assert.Contains(target.ResourceServers, rs => rs.Name == "api1");
+        Assert.Contains(target.ProtectedResources, resource => resource.ResourceUri == "https://api.example.test/resource");
+    }
 }
