@@ -122,74 +122,24 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
         RequestedResources authorizedResources,
         CancellationToken ct)
     {
+        // No requested subset: use the resources authorized at the authorize step as-is.
         if (context.RequestedResourceUris.Count is 0)
             return authorizedResources;
 
-        var authorizedResourceUris = authorizedResources.ProtectedResources
-            .Select(resource => resource.ResourceUri)
-            .ToHashSet(StringComparer.Ordinal);
-
-        var unauthorizedResourceUris = context.RequestedResourceUris
-            .Where(uri => !authorizedResourceUris.Contains(uri))
-            .ToArray();
-
-        if (unauthorizedResourceUris.Length is not 0)
-        {
-            logger.LogError(
-                "Authorization code resource subset contains unauthorized resources: {Resources}",
-                string.Join(" ", unauthorizedResourceUris));
-            context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested were not authorized");
-            return null;
-        }
-
-        var resourceStore = storage.GetResourceStore(context.Realm);
-        var resources = await resourceStore.FindRequestedResourcesAsync(
+        var resolution = await storage.GetResourceStore(context.Realm).ResolveAuthorizedSubsetAsync(
             authorizedResources.RequestedScopeNames,
+            authorizedResources.ProtectedResources.Select(resource => resource.ResourceUri),
             context.RequestedResourceUris,
             true,
             ct);
 
-        if (resources.HasInvalidTargets)
+        if (!resolution.IsSuccess)
         {
-            logger.LogError(
-                "Authorization code resource subset contains invalid resources: {Resources}",
-                resources.GetInvalidTargets());
-            context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested are invalid");
+            logger.LogError("Authorization code resource subset rejected: {Error} {Detail}", resolution.Error, resolution.Detail);
+            context.Error(resolution.Error!, resolution.ErrorDescription!);
             return null;
         }
 
-        if (!resources.IsValid)
-        {
-            logger.LogError(
-                "Authorization code resources contain invalid scopes: {Scopes}",
-                resources.GetInvalidScopes());
-            context.Error(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
-            return null;
-        }
-
-        if (!HasScopeResourceCoherence(resources))
-        {
-            logger.LogError("Authorization code resource subset is not coherent with the authorized scopes");
-            context.Error(Oidc.Token.Errors.InvalidTarget, "scope requires a matching resource indicator");
-            return null;
-        }
-
-        return resources;
-    }
-
-    private static bool HasScopeResourceCoherence(RequestedResources resources)
-    {
-        if (resources.ProtectedResources.Count is 0)
-            return true;
-
-        return resources.Scopes.All(scope =>
-        {
-            var owner = resources.ResourceServers
-                .FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
-
-            return owner is null
-                || owner.ProtectedResources.Count is 0
-                || owner.ProtectedResources.Any(pr => resources.ProtectedResources.Any(rp => rp.ResourceUri == pr.ResourceUri));
-        });
+        return resolution.Resources;
     }
 }

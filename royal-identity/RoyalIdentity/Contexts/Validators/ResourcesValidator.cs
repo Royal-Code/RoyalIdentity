@@ -79,17 +79,6 @@ public class ResourcesValidator : IValidator<IWithResources>
                 context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
                 return default;
             }
-
-            // scope + resource coherence (ADR-012): if any resource indicator was requested and this scope's
-            // resource server exposes protected resources, at least one of them must be among the requested ones.
-            if (resources.ProtectedResources.Count is not 0
-                && owner is not null && owner.ProtectedResources.Count is not 0
-                && !owner.ProtectedResources.Any(pr => resources.ProtectedResources.Any(rp => rp.ResourceUri == pr.ResourceUri)))
-            {
-                logger.LogError(context, "Scope requires a matching resource indicator", $"{scope.Name}, {owner.Name}, {client.Id}");
-                context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "scope requires a matching resource indicator");
-                return default;
-            }
         }
 
         // Resource indicator authorization (ADR-012): the client may only request a resource whose owning
@@ -106,6 +95,15 @@ public class ResourcesValidator : IValidator<IWithResources>
                 context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "resource indicator not allowed for this client");
                 return default;
             }
+        }
+
+        // scope + resource coherence (ADR-012): every requested scope of a resource-capable RS must
+        // be accompanied by at least one of that RS's protected resources when resources are requested.
+        if (!resources.IsScopeResourceCoherent())
+        {
+            logger.LogError(context, "Requested scopes require a matching resource indicator", $"{client.Id}, {client.Name}");
+            context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "scope requires a matching resource indicator");
+            return default;
         }
 
         switch (context)

@@ -142,6 +142,28 @@ public class RequestedResources
         return intersect.Count() == requestedScopes.Count();
     }
 
+    /// <summary>
+    /// Scope + resource coherence (ADR-012): when one or more resource indicators were requested, every
+    /// requested scope whose resource server exposes protected resources must have at least one of them
+    /// among the requested resources. Returns true when no resource indicator was requested.
+    /// </summary>
+    public bool IsScopeResourceCoherent()
+    {
+        if (ProtectedResources.Count is 0)
+            return true;
+
+        var requestedResourceUris = ProtectedResources.Select(r => r.ResourceUri).ToHashSet(StringComparer.Ordinal);
+
+        return Scopes.All(scope =>
+        {
+            var owner = ResourceServers.FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
+
+            return owner is null
+                || owner.ProtectedResources.Count is 0
+                || owner.ProtectedResources.Any(pr => requestedResourceUris.Contains(pr.ResourceUri));
+        });
+    }
+
     public void CopyTo(RequestedResources other)
     {
         other.OfflineAccess = OfflineAccess;

@@ -427,6 +427,10 @@ Criterio de aceite: `resource` RFC 8707 funciona em authorize/token, inclusive a
 - `authorize`: implicit com `resource` sem API scope.
 - `discovery/store`: `protected_resources`, metadata RFC 9728, URI invalida/fragmento/http nao-local, duplicate `ResourceUri`, localhost HTTP aceito.
 
+**Limitacoes / notas (avaliacao pos-Fase 6):**
+- **Consent ainda nao modela `ProtectedResource`** (apontamento 6.1): `ConsentPageService` e `RequestedResources.IntersectConsentScopes` operam apenas sobre `IdentityScopes` + `Scopes`. **Nao ha loop de consent**: o `AuthorizeMainValidator` exige `scope` (um request resource-only no authorize e rejeitado com `invalid_scope` antes do consent) e `client_credentials` nao consente; em `scope + resource`, o consent e dirigido pelos scopes e o resource flui para o `aud`. O display/consentimento agrupado por ResourceServer + `ProtectedResource` e trabalho da **Fase 7**.
+- **DRY (resolvido):** a coerencia `scope + resource` virou `RequestedResources.IsScopeResourceCoherent()` (usada pelo `ResourcesValidator` e pelo resolver); a validacao de subset/`invalid_target` do token endpoint virou `IResourceStore.ResolveAuthorizedSubsetAsync(...)` (extension) retornando um `ResourceResolution` puro (sem acoplar ao `context`). `AuthorizationCodeHandler` e `RefreshTokenHandler` reduziram o `ResolveEffectiveResourcesAsync` a uma chamada + map de erro; os `HasScopeResourceCoherence` duplicados foram removidos. 146 testes verdes.
+
 **Falta:** nada pendente na Fase 6. A limitacao conhecida de consentimento para `ProtectedResource`s fica documentada para a Fase 7.
 
 ---

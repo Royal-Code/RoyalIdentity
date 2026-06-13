@@ -196,76 +196,22 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         bool onlyEnabled,
         CancellationToken ct)
     {
-        var authorizedResourceUris = accessToken.ResourceUris
-            .Concat(refreshToken.ResourceUris)
-            .ToHashSet(StringComparer.Ordinal);
+        var authorizedResourceUris = accessToken.ResourceUris.Concat(refreshToken.ResourceUris);
 
-        var effectiveResourceUris = authorizedResourceUris;
-        if (context.RequestedResourceUris.Count is not 0)
-        {
-            var unauthorizedResourceUris = context.RequestedResourceUris
-                .Where(uri => !authorizedResourceUris.Contains(uri))
-                .ToArray();
-
-            if (unauthorizedResourceUris.Length is not 0)
-            {
-                logger.LogError(
-                    "Refresh token resource subset contains unauthorized resources: {Resources}",
-                    string.Join(" ", unauthorizedResourceUris));
-                context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested were not authorized");
-                return null;
-            }
-
-            effectiveResourceUris = context.RequestedResourceUris;
-        }
-
-        var resources = await storage.GetResourceStore(context.Realm).FindRequestedResourcesAsync(
+        var resolution = await storage.GetResourceStore(context.Realm).ResolveAuthorizedSubsetAsync(
             accessToken.Scopes,
-            effectiveResourceUris,
+            authorizedResourceUris,
+            context.RequestedResourceUris,
             onlyEnabled,
             ct);
 
-        if (resources.HasInvalidTargets)
+        if (!resolution.IsSuccess)
         {
-            logger.LogError(
-                "Refresh token resource subset contains invalid resources: {Resources}",
-                resources.GetInvalidTargets());
-            context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested are invalid");
+            logger.LogError("Refresh token resource resolution rejected: {Error} {Detail}", resolution.Error, resolution.Detail);
+            context.Error(resolution.Error!, resolution.ErrorDescription!);
             return null;
         }
 
-        if (!resources.IsValid)
-        {
-            logger.LogError(
-                "Refresh token resources contain invalid scopes: {Scopes}",
-                resources.GetInvalidScopes());
-            context.Error(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
-            return null;
-        }
-
-        if (!HasScopeResourceCoherence(resources))
-        {
-            logger.LogError("Refresh token resource subset is not coherent with the authorized scopes");
-            context.Error(Oidc.Token.Errors.InvalidTarget, "scope requires a matching resource indicator");
-            return null;
-        }
-
-        return resources;
-    }
-
-    private static bool HasScopeResourceCoherence(RequestedResources resources)
-    {
-        if (resources.ProtectedResources.Count is 0)
-            return true;
-
-        return resources.Scopes.All(scope =>
-        {
-            var owner = resources.ResourceServers
-                .FirstOrDefault(rs => rs.Scopes.Any(s => s.Name == scope.Name));
-
-            return owner is null
-                || owner.ProtectedResources.Count is 0
-                || owner.ProtectedResources.Any(pr => resources.ProtectedResources.Any(rp => rp.ResourceUri == pr.ResourceUri));
-        });
+        return resolution.Resources;
     }
 }
