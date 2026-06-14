@@ -69,9 +69,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICurrentRealmAccessor, CurrentRealmAccessor>();
 
         // Default Users Services
-        services.AddScoped<ISignInManager, DefaultSignInManager>();
         services.AddScoped<ISignOutManager, DefaultSignOutManager>();
         services.AddScoped<IUserSessionService, DefaultUserSessionService>();
+        services.AddScoped<ISubjectPrincipalFactory, DefaultSubjectPrincipalFactory>();
+        services.AddScoped<IAuthorizationContextResolver, DefaultAuthorizationContextResolver>();
+        services.AddScoped<LoginFlowService>();
         services.AddTransient<IPasswordProtector, DefaultPasswordProtector>();
 
         // Decorators

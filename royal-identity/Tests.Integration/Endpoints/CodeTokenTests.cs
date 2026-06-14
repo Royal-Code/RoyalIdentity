@@ -35,7 +35,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             "demo_client",
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -87,7 +87,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             "demo_client",
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -143,7 +143,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             "demo_client",
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -187,7 +187,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             "demo_client",
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -243,7 +243,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -310,7 +310,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -365,7 +365,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -440,7 +440,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -521,7 +521,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -611,7 +611,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -682,7 +682,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,

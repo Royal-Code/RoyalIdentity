@@ -1,20 +1,18 @@
 using Microsoft.AspNetCore.Authentication;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models.Messages;
-using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Events;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.ViewModels;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Defaults;
 using static RoyalIdentity.Options.Constants.UI;
 
 namespace RoyalIdentity.Razor.Services;
 
 public class LoginPageService(
     ISessionContextService sessionContext,
-    ISignInManager signInManager,
+    LoginFlowService loginFlowService,
     IAuthenticationSchemeProvider schemeProvider,
-    IEventDispatcher eventDispatcher,
     IMessageStore messageStore) : ILoginPageService
 {
     public async Task<LoginViewModel?> BuildViewModelAsync(string? returnUrl, CancellationToken ct)
@@ -60,48 +58,46 @@ public class LoginPageService(
 
     public async Task<LoginResult> LoginAsync(LoginInputModel input, CancellationToken ct)
     {
-        var context = await sessionContext.GetAuthorizationContextAsync(input.ReturnUrl);
-
-        Models.Realm? realm;
-        if (context is not null)
-            realm = context.Client.Realm;
-        else if (!sessionContext.TryGetCurrentRealm(out realm))
+        // The borda (LoginFlowService) authenticates, starts the session, writes the cookie and decides the
+        // routing outcome. This adapter only resolves the realm (for URL building) and maps the outcome to a
+        // redirect/render — it knows nothing of Subject/UserSession/ClaimsPrincipal/cookie.
+        if (!sessionContext.TryGetCurrentRealm(out var realm))
             return new LoginResult(LoginResultType.Error, Routes.SelectDomain);
 
-        var authResult = await signInManager.AuthenticateUserAsync(realm, input.Username!, input.Password!, ct);
+        var result = await loginFlowService.LoginAsync(
+            new LoginRequest(input.Username!, input.Password!, input.ReturnUrl, input.RememberLogin), ct);
 
-        if (!authResult.Success)
+        return result.Outcome switch
         {
-            await eventDispatcher.DispatchAsync(new UserLoginFailureEvent(input.Username!, authResult.ErrorMessage, context));
-            return new LoginResult(LoginResultType.Error, ErrorMessage: authResult.ErrorMessage);
-        }
+            LoginFlowOutcome.Error =>
+                new LoginResult(LoginResultType.Error, ErrorMessage: result.ErrorMessage),
 
-        await eventDispatcher.DispatchAsync(new UserLoginSuccessEvent(input.Username!, authResult.User, context));
-        var user = await signInManager.SignInAsync(authResult.User, authResult.Session, input.RememberLogin, ct);
+            LoginFlowOutcome.RequiresConsent =>
+                new LoginResult(LoginResultType.RequiresConsent, Routes.BuildConsentUrl(realm.Path, input.ReturnUrl)),
 
-        if (context is not null)
-        {
-            if (await signInManager.ConsentRequired(user, context.Client, context.Resources, ct))
-                return new LoginResult(LoginResultType.RequiresConsent, Routes.BuildConsentUrl(realm.Path, input.ReturnUrl));
+            LoginFlowOutcome.SignedInPage =>
+                new LoginResult(LoginResultType.SignedInPage, Routes.BuildSignedInUrl(realm.Path, input.ReturnUrl)),
 
-            if (!context.RedirectUri.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                return new LoginResult(LoginResultType.SignedInPage, Routes.BuildSignedInUrl(realm.Path, input.ReturnUrl));
+            LoginFlowOutcome.Callback =>
+                new LoginResult(LoginResultType.Success, result.ReturnUrl),
 
-            return new LoginResult(LoginResultType.Success, input.ReturnUrl);
-        }
+            LoginFlowOutcome.LocalRedirect =>
+                new LoginResult(LoginResultType.Success, result.ReturnUrl, ForceLoad: true),
 
-        if (input.ReturnUrl.IsMissing())
-            return new LoginResult(LoginResultType.Success, Routes.BuildProfileUrl(realm.Path), ForceLoad: true);
+            LoginFlowOutcome.Profile =>
+                new LoginResult(LoginResultType.Success, Routes.BuildProfileUrl(realm.Path), ForceLoad: true),
 
-        var uri = new Uri(input.ReturnUrl!, UriKind.RelativeOrAbsolute);
+            LoginFlowOutcome.InvalidReturnUrl =>
+                await BuildErrorPageAsync(result.ErrorMessage, ct),
 
-        if (uri is { IsAbsoluteUri: true, IsLoopback: false })
-        {
-            var error = new ErrorMessage { ErrorDescription = $"No consent request matching request: {uri}" };
-            var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
-            return new LoginResult(LoginResultType.Error, Routes.BuildErrorUrl(errorId), ForceLoad: true);
-        }
+            _ => new LoginResult(LoginResultType.Error, ErrorMessage: result.ErrorMessage)
+        };
+    }
 
-        return new LoginResult(LoginResultType.Success, uri.ToString(), ForceLoad: true);
+    private async Task<LoginResult> BuildErrorPageAsync(string? errorDescription, CancellationToken ct)
+    {
+        var error = new ErrorMessage { ErrorDescription = errorDescription };
+        var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
+        return new LoginResult(LoginResultType.Error, Routes.BuildErrorUrl(errorId), ForceLoad: true);
     }
 }

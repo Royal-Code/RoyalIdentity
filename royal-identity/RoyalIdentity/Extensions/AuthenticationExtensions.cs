@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contexts;
+using RoyalIdentity.Users.Contracts;
 using System.Diagnostics.CodeAnalysis;
 
 namespace RoyalIdentity.Extensions;
@@ -47,8 +48,8 @@ public static class AuthenticationExtensions
     private static async ValueTask<AuthorizationContext?> InternalGetAuthorizationContextAsync(
         HttpContext context, string returnUrl)
     {
-        var signInManager = context.RequestServices.GetRequiredService<ISignInManager>();
-        var authorizationContext = await signInManager.GetAuthorizationContextAsync(returnUrl, context.RequestAborted);
+        var resolver = context.RequestServices.GetRequiredService<IAuthorizationContextResolver>();
+        var authorizationContext = await resolver.ResolveAsync(returnUrl, context.RequestAborted);
         
         if (authorizationContext is not null)
         {

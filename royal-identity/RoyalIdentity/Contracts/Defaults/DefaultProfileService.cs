@@ -4,6 +4,7 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
+using RoyalIdentity.Users.Contracts;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -11,13 +12,19 @@ namespace RoyalIdentity.Contracts.Defaults;
 public class DefaultProfileService : IProfileService
 {
     private readonly IStorage storage;
+    private readonly IUserDirectory userDirectory;
+    private readonly IUserSessionService userSessionService;
     private readonly ILogger logger;
 
     public DefaultProfileService(
         IStorage storage,
+        IUserDirectory userDirectory,
+        IUserSessionService userSessionService,
         ILogger<DefaultProfileService> logger)
     {
         this.storage = storage;
+        this.userDirectory = userDirectory;
+        this.userSessionService = userSessionService;
         this.logger = logger;
     }
 
@@ -44,24 +51,32 @@ public class DefaultProfileService : IProfileService
         request.IssuedClaims.AddRange(userDetails.Roles.Select(r => new Claim(Jwt.ClaimTypes.Role, r)));
     }
 
+    /// <summary>
+    /// Unified "active" rule (ADR-014 §2.7): the account must be active AND, when the principal is
+    /// session-bound (has a <c>sid</c>), its session must be valid. A <b>missing</b> session for a principal
+    /// that carries a <c>sid</c> is treated as <b>invalid</b> (not "no session"), so the cookie, token and
+    /// authorize paths all agree. A principal without a <c>sid</c> is not session-bound, so only the account
+    /// activity is checked.
+    /// </summary>
     public async ValueTask<bool> IsActiveAsync(ClaimsPrincipal subject, Client client, string caller, CancellationToken ct)
     {
         var subjectId = subject.GetSubjectId();
-        var sessionId = subject.GetSessionId();
 
-        logger.LogDebug("Start User is active: {Subject} - {Session}, Caller: {Caller}, Client: {Client}",
-            subjectId, sessionId, caller, client.Id);
+        logger.LogDebug("Start User is active: {Subject}, Caller: {Caller}, Client: {Client}",
+            subjectId, caller, client.Id);
 
-        var userDetailsStore = storage.GetUserDetailsStore(client.Realm);
-        var userDetails = await userDetailsStore.GetUserDetailsAsync(subjectId, ct);
-        if (userDetails is null || !userDetails.IsActive)
+        // account active — via the borda facade (realm bound by the gateway).
+        var subjectStore = userDirectory.GetSubjectStore(client.Realm);
+        if (!await subjectStore.IsActiveAsync(subjectId, ct))
             return false;
 
-        var userSessionStore = storage.GetUserSessionStore(client.Realm);
-        var userSession = await userSessionStore.FindByIdAsync(sessionId, ct);
-        if (userSession is not null && !userSession.IsActive)
+        // session valid — only when the principal is session-bound; absent session ⇒ invalid.
+        if (HasSessionId(subject) && !await userSessionService.IsSessionValidAsync(subject, ct))
             return false;
 
         return true;
     }
+
+    private static bool HasSessionId(ClaimsPrincipal subject)
+        => (subject.Identity as ClaimsIdentity)?.FindFirst(JwtRegisteredClaimNames.Sid) is not null;
 }

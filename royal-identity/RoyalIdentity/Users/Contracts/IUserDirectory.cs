@@ -10,12 +10,18 @@ namespace RoyalIdentity.Users.Contracts;
 /// </summary>
 public interface IUserDirectory
 {
-    /// <summary>Gets the subject lookup store bound to the realm.</summary>
+    /// <summary>
+    /// Gets the subject lookup store bound to the realm.
+    /// </summary>
     ISubjectStore GetSubjectStore(Realm realm);
 
-    /// <summary>Gets the local authenticator bound to the realm.</summary>
+    /// <summary>
+    /// Gets the local authenticator bound to the realm.
+    /// </summary>
     ILocalUserAuthenticator GetLocalAuthenticator(Realm realm);
 
-    /// <summary>Gets the property→claims provider bound to the realm.</summary>
+    /// <summary>
+    /// Gets the property→claims provider bound to the realm.
+    /// </summary>
     IUserPropertyProvider GetPropertyProvider(Realm realm);
 }

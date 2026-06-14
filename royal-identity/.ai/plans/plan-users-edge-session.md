@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`█████░░░░` **56%** - 5 de 9 fases concluidas
+`██████░░░` **67%** - 6 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
@@ -13,7 +13,7 @@
 | Fase 3 - Contratos e tipos de borda | Concluida |
 | Fase 4 - Conta in-memory + SubjectId + autenticador | Concluida |
 | Fase 5 - Sessao (modelo + store puro + service) | Concluida |
-| Fase 6 - "Ativo" unificado | Pendente |
+| Fase 6 - "Ativo" unificado | Concluida |
 | Fase 7 - Principal + LoginFlowService + telas finas | Pendente |
 | Fase 8 - Claims por propriedade (seam) | Pendente |
 | Fase 9 - Limpeza, remocao e regressao final | Pendente |
@@ -468,20 +468,46 @@ classe). Remocao formal na Fase 9.
 quando o principal tem `sid`. Atualizar os consumidores hoje divergentes.
 
 **Tarefas:**
-- [ ] `IProfileService.IsActiveAsync` = `ISubjectStore.IsActiveAsync(sub)` **&&** (se ha `sid`) `IUserSessionService.IsSessionValidAsync(principal)` (portas realm-bound via `client.Realm`/ambiente).
-- [ ] Alinhar `ActiveUserValidator` (token endpoint) e `PromptLoginDecorator` (authorize) a regra unica.
-- [ ] Confirmar `ValidateUserSessionAsync` (cookie) usando `IsSessionValidAsync` (ausente ⇒ false).
-- [ ] Documentar a semantica de sessao nula (XML-doc/coment).
+- [x] `IProfileService.IsActiveAsync` = `ISubjectStore.IsActiveAsync(sub)` (via `IUserDirectory`, realm de `client.Realm`) **&&** (se ha `sid`) `IUserSessionService.IsSessionValidAsync(principal)`.
+- [x] Alinhar `ActiveUserValidator` (token endpoint) e `PromptLoginDecorator` (authorize) a regra unica — ambos ja chamam `IProfileService.IsActiveAsync`, agora unificado.
+- [x] Confirmar `ValidateUserSessionAsync` (cookie) usando `IsSessionValidAsync` (ausente ⇒ false) — migrado na Fase 5; agora os 3 caminhos compartilham a mesma definicao de "sessao valida".
+- [x] Documentar a semantica de sessao nula (XML-doc em `IsActiveAsync` + `IUserSessionService`).
 
 **Criterios de aceite:** os 3 caminhos de "ativo" usam a mesma regra; sessao ausente com `sid` ⇒ invalida;
 sem regressao nos fluxos de token/authorize/userinfo.
 
-**Testes:** integracao — token endpoint falha com sessao inativa/ausente; userinfo nao retorna claims p/ conta
-inativa; authorize re-pede login com sessao invalida.
+**Testes:** integracao — token endpoint falha com sessao ausente; userinfo nao retorna claims p/ conta
+inativa; authorize re-pede login com sessao encerrada/invalida.
 
 ### Resultado da Fase 6
 
-A preencher quando a fase for executada.
+Concluida. **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒ **199 testes, 0 falhas** (Pipelines 3,
+Identity 9, Integration 187 — **+3 novos** de aceite da regra unica).
+
+**Regra unica (`DefaultProfileService.IsActiveAsync`):** `conta ativa` (via `IUserDirectory.GetSubjectStore(client.Realm).IsActiveAsync(sub)`)
+**&&** (se o principal tem `sid`) `IUserSessionService.IsSessionValidAsync(principal)`. **Sessao ausente com `sid` ⇒ invalida**
+(antes: ausente ⇒ tratada como ativa — divergia do cookie). Principal **sem** `sid` ⇒ so checa conta. `DefaultProfileService`
+passou a depender de `IUserDirectory` + `IUserSessionService` (alem do `IStorage`, ainda usado por `GetProfileDataAsync` ate a Fase 8).
+
+**3 caminhos alinhados:** token endpoint (`ActiveUserValidator`) e authorize (`PromptLoginDecorator`) ja chamavam
+`IsActiveAsync`; cookie (`ValidateUserSessionAsync`) usa `IsSessionValidAsync` desde a Fase 5 — agora todos compartilham a
+mesma definicao de "sessao valida".
+
+**Mudanca de comportamento + ajuste de testes:** como a conta agora e resolvida por `ISubjectStore` (so por `SubjectId`) e a
+sessao ausente passou a invalidar, os testes que fabricavam principal via `SubjectFactory.Create("alice", ...)` (sub=username,
+`sid` aleatorio **sem** sessao) precisaram de conta real + sessao ativa. Solucao: novo `SubjectFactory.CreateWithSession(storage,
+realm, subjectId, name, role)` (semeia sessao ativa e usa `MemoryStorage.AliceSubjectId`). Migrados os exchanges de token:
+`CodeTokenTests` (11), `RefreshTokenTests` (1), `SigningAlgorithmTests` (1). Os usos **sem** exchange (consent, isolamento de
+store em `RealmIsolationTests`) seguem com `SubjectFactory.Create`. `DefaultTokenFactory` exige `sid` no principal (access/id/refresh),
+entao "principal sem sid" nao e opcao para esses testes — dai semear a sessao.
+
+**Decisao realm:** o check de conta usa `client.Realm` (explicito, via gateway); o check de sessao usa o `IUserSessionService`
+ambiente (`ICurrentRealmAccessor`). Nos caminhos que chamam `IsActiveAsync` (token/authorize, sempre HTTP) o realm ambiente ==
+`client.Realm`, entao sao coerentes.
+
+**Testes novos:** `Tests.Integration/Characterization/ActiveRuleCharacterizationTests.cs` — (1) token endpoint **rejeita** auth_code
+quando a sessao esta **ausente** (conta ativa, `sid` sem sessao); (2) authorize **re-pede login** quando a sessao foi encerrada;
+(3) userinfo **nao** retorna claims de perfil (so `sub`) para conta inativa.
 
 ---
 

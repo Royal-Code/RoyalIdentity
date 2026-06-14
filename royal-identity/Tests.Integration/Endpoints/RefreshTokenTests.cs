@@ -418,7 +418,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,

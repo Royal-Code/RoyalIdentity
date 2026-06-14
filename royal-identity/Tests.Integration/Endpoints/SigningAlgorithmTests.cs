@@ -125,7 +125,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
             onlyEnabled: true);
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.Create("alice", "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(storage, realm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
             DateTime.UtcNow,
             300,
