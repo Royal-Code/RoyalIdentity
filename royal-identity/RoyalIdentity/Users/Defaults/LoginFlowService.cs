@@ -47,7 +47,9 @@ public sealed class LoginFlowService(
         if (!authResult.Success)
         {
             var message = ErrorMessageFor(realm, authResult.Reason);
-            await eventDispatcher.DispatchAsync(new UserLoginFailureEvent(request.Login, message, context));
+            await eventDispatcher.DispatchAsync(
+                new UserLoginFailureEvent(request.Login, message, authResult.Reason, context),
+                realm);
             return new LoginFlowResult(LoginFlowOutcome.Error, ErrorMessage: message);
         }
 
@@ -60,7 +62,7 @@ public sealed class LoginFlowService(
         var principal = subjectPrincipalFactory.Create(subject, session);
         await WriteCookieAsync(realm, principal, request.RememberLogin);
 
-        await eventDispatcher.DispatchAsync(new UserLoginSuccessEvent(request.Login, subject.SubjectId, context));
+        await eventDispatcher.DispatchAsync(new UserLoginSuccessEvent(request.Login, subject.SubjectId, context), realm);
 
         logger.LogInformation("User logged in: {SubjectId}, Session id: {SessionId}", subject.SubjectId, session.Id);
 
