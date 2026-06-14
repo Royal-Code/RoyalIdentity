@@ -41,9 +41,14 @@ internal static class CharacterizationSeed
         => storage.GetRealmMemoryStore(realm).UsersDetails[username];
 
     /// <summary>Finds the (single) session created for the given user in the realm session store.</summary>
-    public static IdentitySession? FindSession(MemoryStorage storage, RoyalIdentity.Models.Realm realm, string username)
-        => storage.GetRealmMemoryStore(realm).UserSessions.Values
-            .FirstOrDefault(s => s.User.UserName == username);
+    public static UserSession? FindSession(MemoryStorage storage, RoyalIdentity.Models.Realm realm, string username)
+    {
+        var store = storage.GetRealmMemoryStore(realm);
+        var details = store.UsersDetails.Values.FirstOrDefault(u => u.Username == username);
+        return details is null
+            ? null
+            : store.UserSessions.Values.FirstOrDefault(s => s.SubjectId == details.SubjectId);
+    }
 
     /// <summary>Posts the test-host login form and returns the raw response (does not throw on failure).</summary>
     public static Task<HttpResponseMessage> PostLoginAsync(

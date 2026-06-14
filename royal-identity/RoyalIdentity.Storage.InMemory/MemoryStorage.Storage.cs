@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Contracts.Storage;
+﻿using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Users.Contracts;
@@ -14,9 +13,8 @@ public partial class MemoryStorage : IStorage
 
     private readonly IPasswordProtector passwordProtector;
     private readonly TimeProvider clock;
-    private readonly IHttpContextAccessor accessor;
 
-    public MemoryStorage(IPasswordProtector passwordProtector, TimeProvider clock, IHttpContextAccessor accessor)
+    public MemoryStorage(IPasswordProtector passwordProtector, TimeProvider clock)
     {
         realmMemoryStore.AddRange(
             Realms.Values.Select(
@@ -26,7 +24,6 @@ public partial class MemoryStorage : IStorage
 
         this.passwordProtector = passwordProtector;
         this.clock = clock;
-        this.accessor = accessor;
     }
 
     public RealmMemoryStore GetRealmMemoryStore(Realm realm)
@@ -94,7 +91,7 @@ public partial class MemoryStorage : IStorage
     public IUserSessionStore GetUserSessionStore(Realm realm)
     {
         if (realmMemoryStore.TryGetValue(realm.Id, out var store))
-            return new UserSessionStore(store.UserSessions, clock, accessor);
+            return new UserSessionStore(store.UserSessions, clock);
 
         throw RealmNotFound(realm);
     }

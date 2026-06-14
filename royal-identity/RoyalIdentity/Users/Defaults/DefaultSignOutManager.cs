@@ -72,7 +72,7 @@ public class DefaultSignOutManager : ISignOutManager
             ?? throw new InvalidOperationException("Invalid realm id");
 
         var userSessionStore = storage.GetUserSessionStore(realm);
-        var session = await userSessionStore.EndSessionAsync(sessionId, ct);
+        var session = await userSessionStore.EndAsync(sessionId, ct);
         
         if (session is null)
         {
@@ -105,8 +105,9 @@ public class DefaultSignOutManager : ISignOutManager
         {
             string? iss = null;
 
-            foreach(var clientId in session.Clients)
+            foreach(var sessionClient in session.Clients)
             {
+                var clientId = sessionClient.ClientId;
                 var clients = storage.GetClientStore(realm);
                 var client = await clients.FindClientByIdAsync(clientId, ct);
                 if (client is null || !client.Enabled)
@@ -132,7 +133,7 @@ public class DefaultSignOutManager : ISignOutManager
                         Realm = realm,
                         ClientId = clientId,
                         Issuer = iss,
-                        Subject = session.User.UserName,
+                        Subject = session.SubjectId,
                         SessionId = session.Id,
                         Audience = clientId,
                         Uri = uri,

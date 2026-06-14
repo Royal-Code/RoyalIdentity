@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
+using RoyalIdentity.Users.Contracts;
 
 #pragma warning disable S3358 // Ternary operators should not be nested
 
@@ -200,11 +201,8 @@ public static class HttpContextExtensions
 
     public static async Task<bool> ValidateUserSessionAsync(this HttpContext context, ClaimsPrincipal principal)
     {
-        var sessionId = principal.GetSessionId();
-        var storage = context.RequestServices.GetRequiredService<IStorage>();
-        var userSessionStore = storage.GetUserSessionStore(context.GetCurrentRealm());
-        var currentSession = await userSessionStore.GetUserSessionAsync(sessionId, context.RequestAborted);
-        return currentSession is { IsActive : true };
+        var sessionService = context.RequestServices.GetRequiredService<IUserSessionService>();
+        return await sessionService.IsSessionValidAsync(principal, context.RequestAborted);
     }
 
     //internal static async Task<string> GetIdentityServerSignoutFrameCallbackUrlAsync(this HttpContext context, LogoutMessage logoutMessage = null)

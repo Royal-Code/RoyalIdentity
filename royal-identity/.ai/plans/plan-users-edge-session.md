@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`████░░░░░` **44%** - 4 de 9 fases concluidas
+`█████░░░░` **56%** - 5 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Testes de caracterizacao | Concluida |
 | Fase 3 - Contratos e tipos de borda | Concluida |
 | Fase 4 - Conta in-memory + SubjectId + autenticador | Concluida |
-| Fase 5 - Sessao (modelo + store puro + service) | Pendente |
+| Fase 5 - Sessao (modelo + store puro + service) | Concluida |
 | Fase 6 - "Ativo" unificado | Pendente |
 | Fase 7 - Principal + LoginFlowService + telas finas | Pendente |
 | Fase 8 - Claims por propriedade (seam) | Pendente |
@@ -407,13 +407,13 @@ sucesso zera + devolve `SubjectId`/lockout apos N falhas e **expira**/`SubjectId
 `DefaultSignOutManager` (usar `SubjectId`), `EndSessionHandler`.
 
 **Tarefas:**
-- [ ] Implementar `UserSessionStore` in-memory puro (`Create/FindById/RecordClient(dedup)/End`), sem `IHttpContextAccessor`.
-- [ ] Implementar `IUserSessionService` sem realm em metodo (`GetCurrentAsync(principal)`, `IsSessionValidAsync(principal)`, `StartAsync(subject, method, idp)`, `EndAsync(sid)`, `RecordClientAsync(sid, clientId)`); realm resolvido por `ICurrentRealmAccessor`.
-- [ ] `StartAsync` recebe o **metodo de autenticacao** (amr) e o **idp**, para popular `UserSession.AuthenticationMethods`/`IdentityProvider` e o principal.
-- [ ] Atualizar `IStorage.GetUserSessionStore(realm)`/`MemoryStorage.Storage.cs` para usar o contrato puro, removendo `GetCurrentSessionAsync` do store.
-- [ ] Migrar `DefaultCodeFactory.AddClientIdAsync` → `IUserSessionService.RecordClientAsync`.
-- [ ] Migrar `HttpContextExtensions.ValidateUserSessionAsync` (cookie `OnValidatePrincipal`) → `IUserSessionService.IsSessionValidAsync`.
-- [ ] Migrar `DefaultSignOutManager`/`EndSessionHandler` para `SubjectId` (sem `session.User.UserName`) e `IUserSessionService.EndAsync`.
+- [x] Implementar `UserSessionStore` in-memory puro (`Create/FindById/RecordClient(dedup)/End`), sem `IHttpContextAccessor`. (`MemoryStorage` deixou de injetar `IHttpContextAccessor`.)
+- [x] Implementar `IUserSessionService` (`DefaultUserSessionService` no core) sem realm em metodo (`GetCurrentAsync(principal)`, `IsSessionValidAsync(principal)`, `StartAsync(subject, method, idp)`, `EndAsync(sid)`, `RecordClientAsync(sid, clientId)`); realm resolvido por `ICurrentRealmAccessor`; registrado no DI.
+- [x] `StartAsync` recebe **amr** e **idp**, populando `UserSession.AuthenticationMethod`/`IdentityProvider`.
+- [x] Atualizar `IStorage.GetUserSessionStore(realm)`/`MemoryStorage.Storage.cs` para o contrato puro; `GetCurrentSessionAsync` removido do store (a "sessao atual" vive no `IUserSessionService`). `RealmMemoryStore.UserSessions` agora e `ConcurrentDictionary<string, UserSession>`.
+- [x] Migrar `DefaultCodeFactory.AddClientIdAsync` → `RecordClientAsync` (via `GetUserSessionStore(context.Realm)` — realm-bound por fabrica; equivalente ao service).
+- [x] Migrar `HttpContextExtensions.ValidateUserSessionAsync` (cookie `OnValidatePrincipal`) → `IUserSessionService.IsSessionValidAsync`.
+- [x] Migrar `DefaultSignOutManager`/`EndSessionHandler` para `SubjectId` (sem `session.User.UserName`) e `IUserSessionService.EndAsync`/`FindByIdAsync`.
 
 **Criterios de aceite:** sessao nao referencia usuario rico; store nao toca `HttpContext`; servico usa accessor de realm, nao `HttpContext` direto; clients deduplicados;
 logout SSO (front/back-channel) intacto via `SubjectId`; code registra client; operacoes de sessao realm-scoped **sem realm em parametro** (fabrica/accessor).
@@ -423,7 +423,42 @@ encerrada e rejeitado; back-channel usa `SubjectId`.
 
 ### Resultado da Fase 5
 
-A preencher quando a fase for executada.
+Concluida (inclui a troca in-place do `IUserSessionStore` re-escopada da Fase 3). **Build + suite verdes:**
+`dotnet test RoyalIdentity.sln` ⇒ **196 testes, 0 falhas** (Pipelines 3, Identity 9, Integration 184 — **+5 novos**:
+1 de dedup de client no fluxo + 4 unit do `DefaultUserSessionService`/store puro).
+
+**Modelo + store + service:**
+- `RealmMemoryStore.UserSessions` re-tipado para `ConcurrentDictionary<string, UserSession>` (guarda `SubjectId`, nao o usuario).
+- `IUserSessionStore` (contrato) **reescrito puro**: `CreateAsync`/`FindByIdAsync`/`RecordClientAsync(dedup)`/`EndAsync`;
+  **sem** `HttpContext`, **sem** `GetCurrentSessionAsync`. Impl `UserSessionStore` agora so depende do dict + `TimeProvider`.
+- `MemoryStorage` deixou de receber `IHttpContextAccessor` (store puro nao precisa).
+- `DefaultUserSessionService` (core, `IUserSessionService`): `GetCurrentAsync`/`IsSessionValidAsync` (presente-e-ativa;
+  ausente ⇒ invalida) / `StartAsync(subject, amr, idp)` / `EndAsync` / `RecordClientAsync`; realm via `ICurrentRealmAccessor`
+  (nunca em metodo); registrado em DI (Scoped).
+
+**Consumidores migrados:** cookie `OnValidatePrincipal` (`HttpContextExtensions.ValidateUserSessionAsync` →
+`IUserSessionService.IsSessionValidAsync`); `DefaultCodeFactory` (→ `RecordClientAsync`); `DefaultProfileService`
+(`GetUserSessionAsync` → `FindByIdAsync`); `EndSessionHandler` (`FindByIdAsync` + `Clients.Single().ClientId`);
+`DefaultSignOutManager` (`EndAsync`; **back-channel `Subject = session.SubjectId`** em vez de `session.User.UserName`;
+itera `UserSessionClient`).
+
+**Login (ponte ate a Fase 7):** `DefaultIdentityUser` ainda cria a sessao na verificacao de senha, mas agora monta
+um `UserSession` e chama `sessionStore.CreateAsync` (em vez do antigo `StartSessionAsync(IdentityUser)`); o principal
+le `idp`/`amr` da sessao. `CredentialsValidationResult`/`ValidateCredentialsResult`/`ISignInManager.SignInAsync`/
+`IdentityUser.CreatePrincipalAsync` passaram de `IdentitySession` → `UserSession`. **A remocao do efeito colateral
+(sessao criada so no sign-in) fica para a Fase 7** (`LoginFlowService`); `IUserSessionService.StartAsync` ja existe e
+sera adotado la.
+
+**Caracterizacao atualizada (mudanca de comportamento visivel):** `BackChannelLogoutCharacterizationTests` agora
+asserta `notified.Subject == session.SubjectId` (era `== username`) — exatamente o que o teste da Fase 2 fixou para
+tornar a mudanca deliberada. `FindSession` (helper) passou a achar a sessao por `SubjectId` (resolvendo username→sub).
+
+**`IdentitySession` (legado):** ainda existe o tipo, mas **nao** e mais usado por nenhum store/fluxo (so resta a
+classe). Remocao formal na Fase 9.
+
+**Testes novos:** `Tests.Integration/Users/DefaultUserSessionServiceTests.cs` (Start cria ativa com `SubjectId`;
+`IsSessionValid` ativa/ausente/encerrada; `GetCurrent` por `sid`; `RecordClient` dedup) e
+`CodeIssuance_SameClientTwice_RecordedOnce` (dedup no fluxo HTTP).
 
 ---
 

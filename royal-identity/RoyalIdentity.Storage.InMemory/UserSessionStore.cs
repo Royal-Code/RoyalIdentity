@@ -1,74 +1,53 @@
-using Microsoft.AspNetCore.Http;
-using RoyalIdentity.Extensions;
+using System.Collections.Concurrent;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
-using RoyalIdentity.Utils;
-using System.Collections.Concurrent;
 
 namespace RoyalIdentity.Storage.InMemory;
 
-public class UserSessionStore : IUserSessionStore
+/// <summary>
+/// In-memory (fake/reference) pure <see cref="IUserSessionStore"/>: persists <see cref="UserSession"/> by
+/// <c>sid</c>. No <c>HttpContext</c>, no "current session" (ADR-014 §2.6). Realm is bound at construction
+/// (the sessions dictionary belongs to one realm).
+/// </summary>
+public class UserSessionStore(
+    ConcurrentDictionary<string, UserSession> userSessions,
+    TimeProvider clock) : IUserSessionStore
 {
-    private readonly ConcurrentDictionary<string, IdentitySession> userSessions;
-    private readonly TimeProvider clock;
-    private readonly IHttpContextAccessor accessor;
-
-    public UserSessionStore(
-        ConcurrentDictionary<string, IdentitySession> userSessions,
-        TimeProvider clock, 
-        IHttpContextAccessor accessor)
+    public Task<UserSession> CreateAsync(UserSession session, CancellationToken ct = default)
     {
-        this.userSessions = userSessions;
-        this.clock = clock;
-        this.accessor = accessor;
-    }
-
-    public Task AddClientIdAsync(string sessionId, string clientId, CancellationToken ct = default)
-    {
-        userSessions.TryGetValue(sessionId, out var session);
-        session?.Clients.Add(clientId);
-        return Task.CompletedTask;
-    }
-
-    public Task<IdentitySession> StartSessionAsync(IdentityUser user, string amr, CancellationToken ct = default)
-    {
-        var sid = CryptoRandom.CreateUniqueId(16);
-
-        var session = new IdentitySession
-        {
-            Id = sid,
-            User = user,
-            Amr = amr,
-            StartedAt = clock.GetUtcNow().UtcDateTime,
-        };
-
-        userSessions[sid] = session;
-
+        userSessions[session.Id] = session;
         return Task.FromResult(session);
     }
 
-    public async Task<IdentitySession?> EndSessionAsync(string sessionId, CancellationToken ct = default)
+    public Task<UserSession?> FindByIdAsync(string sessionId, CancellationToken ct = default)
     {
-        var session = await GetUserSessionAsync(sessionId, ct);
+        userSessions.TryGetValue(sessionId, out var session);
+        return Task.FromResult(session);
+    }
+
+    public Task RecordClientAsync(string sessionId, string clientId, CancellationToken ct = default)
+    {
+        if (userSessions.TryGetValue(sessionId, out var session))
+        {
+            var now = clock.GetUtcNow().UtcDateTime;
+            var existing = session.Clients.FirstOrDefault(c => c.ClientId == clientId);
+
+            // Deduplicate by client id (UserSessionClient equality is by ClientId); refresh LastSeenAt.
+            if (existing is not null)
+                session.Clients.Remove(existing);
+
+            session.Clients.Add(new UserSessionClient(clientId, existing?.FirstSeenAt ?? now, now));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<UserSession?> EndAsync(string sessionId, CancellationToken ct = default)
+    {
+        userSessions.TryGetValue(sessionId, out var session);
         if (session is not null)
             session.IsActive = false;
 
-        return session;
-    }
-
-    public ValueTask<IdentitySession?> GetCurrentSessionAsync(CancellationToken ct)
-    {
-        IdentitySession? session = null;
-        var httpContext = accessor.HttpContext;
-
-        return httpContext is not null && httpContext.User.IsAuthenticated()
-            ? GetUserSessionAsync(httpContext.User.GetSessionId(), ct)
-            : new ValueTask<IdentitySession?>(session);
-    }
-
-    public ValueTask<IdentitySession?> GetUserSessionAsync(string sessionId, CancellationToken ct)
-    {
-        userSessions.TryGetValue(sessionId, out var session);
-        return new ValueTask<IdentitySession?>(session);
+        return Task.FromResult(session);
     }
 }

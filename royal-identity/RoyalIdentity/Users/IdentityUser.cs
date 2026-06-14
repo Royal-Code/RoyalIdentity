@@ -49,5 +49,5 @@ public abstract class IdentityUser
     /// <param name="session">The session.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A new principal.</returns>
-    public abstract ValueTask<ClaimsPrincipal> CreatePrincipalAsync(IdentitySession? session, CancellationToken ct = default);
+    public abstract ValueTask<ClaimsPrincipal> CreatePrincipalAsync(UserSession? session, CancellationToken ct = default);
 }

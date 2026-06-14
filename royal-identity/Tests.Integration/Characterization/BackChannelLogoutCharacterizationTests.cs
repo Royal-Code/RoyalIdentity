@@ -75,7 +75,7 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
 
         var notified = factory.BackChannelCapture.SingleOrDefault(r => r.ClientId == clientId);
         Assert.NotNull(notified);
-        Assert.Equal(username, notified.Subject); // current behavior: subject = session user name
+        Assert.Equal(session.SubjectId, notified.Subject); // Fase 5: back-channel subject is the stable SubjectId (was username)
         Assert.Equal(session.Id, notified.SessionId);
     }
 

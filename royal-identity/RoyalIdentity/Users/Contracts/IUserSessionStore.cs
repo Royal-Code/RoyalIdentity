@@ -1,50 +1,22 @@
 namespace RoyalIdentity.Users.Contracts;
 
+/// <summary>
+/// Pure session store (camada C): persists <see cref="UserSession"/> by <c>sid</c>, without touching
+/// <c>HttpContext</c> and without a notion of "current" (ADR-014 §2.6). Realm is bound at construction
+/// (via <c>IStorage.GetUserSessionStore(realm)</c>); the methods take no realm parameter. The notion of
+/// the current session and "session valid" lives in <see cref="IUserSessionService"/>.
+/// </summary>
 public interface IUserSessionStore
 {
-    /// <summary>
-    /// Adds a client to the list of clients the user has sign in into during their session.
-    /// </summary>
-    /// <param name="sessionId">The session identifier.</param>
-    /// <param name="clientId">The client identifier.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    public Task AddClientIdAsync(string sessionId, string clientId, CancellationToken ct = default);
+    /// <summary>Persists a new session and returns it.</summary>
+    Task<UserSession> CreateAsync(UserSession session, CancellationToken ct = default);
 
-    /// <summary>
-    /// Initializes a new session for the user.
-    /// </summary>
-    /// <param name="user">The user.</param>
-    /// <param name="amr">The authentication method reference.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>The session identifier.</returns>
-    public Task<IdentitySession> StartSessionAsync(IdentityUser user, string amr, CancellationToken ct = default);
+    /// <summary>Gets the session by its <c>sid</c>, or <c>null</c> when not found.</summary>
+    Task<UserSession?> FindByIdAsync(string sessionId, CancellationToken ct = default);
 
-    /// <summary>
-    /// Ends a user session and returns the <see cref="IdentitySession"/> instance if exists.
-    /// </summary>
-    /// <param name="sessionId">The session id.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>
-    ///     The session if it exists, null otherwise.
-    /// </returns>
-    public Task<IdentitySession?> EndSessionAsync(string sessionId, CancellationToken ct = default);
+    /// <summary>Records that the subject signed into the given client during the session (deduplicated by client).</summary>
+    Task RecordClientAsync(string sessionId, string clientId, CancellationToken ct = default);
 
-    /// <summary>
-    /// Try to get the current session for the current user.
-    /// </summary>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>
-    ///     The current session if it exists, null otherwise.
-    /// </returns>
-    ValueTask<IdentitySession?> GetCurrentSessionAsync(CancellationToken ct);
-
-    /// <summary>
-    /// Try to get the session for the user with the given session identifier.
-    /// </summary>
-    /// <param name="sessionId">The session identifier (sid).</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>The session if it exists, null otherwise.</returns>
-    ValueTask<IdentitySession?> GetUserSessionAsync(string sessionId, CancellationToken ct);
-
+    /// <summary>Ends the session (marks it inactive) and returns it, or <c>null</c> when not found.</summary>
+    Task<UserSession?> EndAsync(string sessionId, CancellationToken ct = default);
 }

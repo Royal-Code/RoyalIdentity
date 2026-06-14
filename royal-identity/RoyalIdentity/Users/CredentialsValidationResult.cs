@@ -4,7 +4,7 @@ namespace RoyalIdentity.Users;
 
 public readonly struct CredentialsValidationResult
 {
-    public CredentialsValidationResult(IdentityUser user, IdentitySession session)
+    public CredentialsValidationResult(IdentityUser user, UserSession session)
     {
         User = user;
         Session = session;
@@ -29,7 +29,7 @@ public readonly struct CredentialsValidationResult
 
     public IdentityUser? User { get; }
 
-    public IdentitySession? Session { get; }
+    public UserSession? Session { get; }
 
     public static class WellKnownReasons
     {

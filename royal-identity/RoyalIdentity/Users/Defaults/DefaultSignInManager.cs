@@ -123,7 +123,7 @@ public class DefaultSignInManager : ISignInManager
 
     public async Task<ClaimsPrincipal> SignInAsync(
         IdentityUser user,
-        IdentitySession? session, 
+        UserSession? session,
         bool remember,
         CancellationToken ct)
     {

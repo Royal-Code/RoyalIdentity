@@ -10,10 +10,10 @@ public readonly struct ValidateCredentialsResult
     // implicit conversion from bool to ValidateCredentialsResult
     public static implicit operator ValidateCredentialsResult(bool isValid) => new(isValid, null);
 
-    // implicit conversion from IdentitySession to ValidateCredentialsResult
-    public static implicit operator ValidateCredentialsResult(IdentitySession session) => new(true, session);
+    // implicit conversion from UserSession to ValidateCredentialsResult
+    public static implicit operator ValidateCredentialsResult(UserSession session) => new(true, session);
 
-    public ValidateCredentialsResult(bool isValid, IdentitySession? session)
+    public ValidateCredentialsResult(bool isValid, UserSession? session)
     {
         IsValid = isValid;
         Session = session;
@@ -28,5 +28,5 @@ public readonly struct ValidateCredentialsResult
     [MemberNotNullWhen(true, nameof(Session))]
     public bool IsValid { get; }
 
-    public IdentitySession? Session { get; }
+    public UserSession? Session { get; }
 }

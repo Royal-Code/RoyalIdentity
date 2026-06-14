@@ -43,7 +43,7 @@ public class RealmMemoryStore
 
     public ConcurrentDictionary<string, Consent> UserConsents { get; } = new();
 
-    public ConcurrentDictionary<string, IdentitySession> UserSessions { get; } = new();
+    public ConcurrentDictionary<string, UserSession> UserSessions { get; } = new();
 
     public ConcurrentDictionary<string, IdentityScope> IdentityScopes { get; } = new()
     {

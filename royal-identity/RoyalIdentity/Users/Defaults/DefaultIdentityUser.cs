@@ -2,6 +2,7 @@
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
+using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Users.Defaults;
 
@@ -59,7 +60,17 @@ public sealed class DefaultIdentityUser : IdentityUser
         }
 
         // start a new session
-        var session = await sessionStore.StartSessionAsync(this, Oidc.AuthMethods.Password, ct);
+        // NOTE (plan Fase 5): the session is still created here as a side-effect of credential verification;
+        // Fase 7 moves session creation to LoginFlowService at sign-in time.
+        var session = new UserSession
+        {
+            Id = CryptoRandom.CreateUniqueId(16),
+            SubjectId = details.SubjectId,
+            AuthenticationMethod = Oidc.AuthMethods.Password,
+            IdentityProvider = Server.LocalIdentityProvider,
+            StartedAt = clock.GetUtcNow().UtcDateTime,
+        };
+        await sessionStore.CreateAsync(session, ct);
 
         return session;
     }
@@ -84,14 +95,12 @@ public sealed class DefaultIdentityUser : IdentityUser
         return new(isLockout);
     }
 
-    public override async ValueTask<ClaimsPrincipal> CreatePrincipalAsync(
-        IdentitySession? session, CancellationToken ct = default)
+    public override ValueTask<ClaimsPrincipal> CreatePrincipalAsync(
+        UserSession? session, CancellationToken ct = default)
     {
-        // check if session was created, if not, load it
-        var currentSession = session ?? await sessionStore.GetCurrentSessionAsync(ct);
-
-        if (currentSession is null)
-            throw new InvalidOperationException("There is no active session for the user.");
+        // the session is always supplied by the sign-in flow (the pure store has no notion of "current").
+        var currentSession = session
+            ?? throw new InvalidOperationException("There is no active session for the user.");
 
         var claims = new List<Claim>
         {
@@ -99,8 +108,8 @@ public sealed class DefaultIdentityUser : IdentityUser
             new(JwtRegisteredClaimNames.Name, details.DisplayName),
             new(JwtRegisteredClaimNames.AuthTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
             new(JwtRegisteredClaimNames.Sid, currentSession.Id),
-            new(Jwt.ClaimTypes.IdentityProvider, Server.LocalIdentityProvider),
-            new(JwtRegisteredClaimNames.Amr, currentSession.Amr)
+            new(Jwt.ClaimTypes.IdentityProvider, currentSession.IdentityProvider),
+            new(JwtRegisteredClaimNames.Amr, currentSession.AuthenticationMethod)
         };
 
         foreach (var role in details.Roles)
@@ -110,6 +119,6 @@ public sealed class DefaultIdentityUser : IdentityUser
 
         var identity = claims.CreateIdentity();
 
-        return new ClaimsPrincipal(identity);
+        return new ValueTask<ClaimsPrincipal>(new ClaimsPrincipal(identity));
     }
 }

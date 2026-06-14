@@ -58,7 +58,7 @@ public class DefaultProfileService : IProfileService
             return false;
 
         var userSessionStore = storage.GetUserSessionStore(client.Realm);
-        var userSession = await userSessionStore.GetUserSessionAsync(sessionId, ct);
+        var userSession = await userSessionStore.FindByIdAsync(sessionId, ct);
         if (userSession is not null && !userSession.IsActive)
             return false;
 

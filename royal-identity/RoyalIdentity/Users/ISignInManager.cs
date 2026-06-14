@@ -52,7 +52,7 @@ public interface ISignInManager
     /// <param name="remember">Indicates if the user wants to be remembered.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A task representing the operation.</returns>
-    Task<ClaimsPrincipal> SignInAsync(IdentityUser user, IdentitySession? session, bool remember, CancellationToken ct);
+    Task<ClaimsPrincipal> SignInAsync(IdentityUser user, UserSession? session, bool remember, CancellationToken ct);
 
     /// <summary>
     /// <para>

@@ -55,8 +55,10 @@ public class DefaultCodeFactory : ICodeFactory
 
         await storage.GetAuthorizationCodeStore(context.Realm).StoreAuthorizationCodeAsync(code, ct);
 
+        // Record the client on the session (dedup by client id). The store is realm-bound by the factory
+        // (GetUserSessionStore(realm)), so the call carries no realm parameter (ADR-014 §2.5).
         var userSessionStore = storage.GetUserSessionStore(context.Realm);
-        await userSessionStore.AddClientIdAsync(sid, context.ClientId!, ct);
+        await userSessionStore.RecordClientAsync(sid, context.ClientId!, ct);
 
         logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, code.Code);
 

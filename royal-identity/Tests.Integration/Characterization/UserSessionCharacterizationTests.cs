@@ -41,7 +41,7 @@ public class UserSessionCharacterizationTests : IClassFixture<AppFactory>
         var session = CharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
         Assert.NotNull(session);
         Assert.True(session.IsActive);
-        Assert.Equal(Oidc.AuthMethods.Password, session.Amr);
+        Assert.Equal(Oidc.AuthMethods.Password, session.AuthenticationMethod);
 
         // realm-scoped: the session exists only in the realm it was created in
         Assert.Null(CharacterizationSeed.FindSession(storage, MemoryStorage.ServerRealm, username));
@@ -139,7 +139,7 @@ public class UserSessionCharacterizationTests : IClassFixture<AppFactory>
         // end the session server-side; the cookie is now backed by an inactive session
         var session = CharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
         Assert.NotNull(session);
-        await sessionStorage.GetUserSessionStore(MemoryStorage.DemoRealm).EndSessionAsync(session.Id, default);
+        await sessionStorage.GetUserSessionStore(MemoryStorage.DemoRealm).EndAsync(session.Id, default);
 
         // OnValidatePrincipal rejects the principal and the protected endpoint challenges to login
         var rejected = await client.GetAsync("demo/test/account/profile");
@@ -162,7 +162,23 @@ public class UserSessionCharacterizationTests : IClassFixture<AppFactory>
         Assert.NotNull(code);
         var session = CharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
         Assert.NotNull(session);
-        Assert.Contains("demo_client", session.Clients);
+        Assert.Contains(session.Clients, c => c.ClientId == "demo_client");
+    }
+
+    [Fact]
+    public async Task CodeIssuance_SameClientTwice_RecordedOnce()
+    {
+        var storage = Storage;
+        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        await CharacterizationSeed.PostLoginAsync(client, username, password);
+        Assert.NotNull(await client.GetAuthorizeAsync());
+        Assert.NotNull(await client.GetAuthorizeAsync()); // same client again
+
+        var session = CharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
+        Assert.NotNull(session);
+        Assert.Single(session.Clients, c => c.ClientId == "demo_client"); // deduplicated
     }
 
     // ─── Logout ends the session ──────────────────────────────────────────────

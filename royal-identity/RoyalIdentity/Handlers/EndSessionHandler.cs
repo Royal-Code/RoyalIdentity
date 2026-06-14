@@ -63,10 +63,11 @@ public class EndSessionHandler : IHandler<EndSessionContext>
             return false;
 
         var userSessionStore = storage.GetUserSessionStore(context.Realm);
-        var userSession = await userSessionStore.GetUserSessionAsync(sid, ct);
+        var userSession = await userSessionStore.FindByIdAsync(sid, ct);
         if (userSession is null)
             return false;
 
-        return userSession.Clients.Count == 1 && userSession.Clients[0] == context.ClientParameters.Client.Id;
+        return userSession.Clients.Count == 1 &&
+            userSession.Clients.Single().ClientId == context.ClientParameters.Client.Id;
     }
 }

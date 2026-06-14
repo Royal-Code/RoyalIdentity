@@ -71,6 +71,7 @@ public static class ServiceCollectionExtensions
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();
         services.AddScoped<ISignOutManager, DefaultSignOutManager>();
+        services.AddScoped<IUserSessionService, DefaultUserSessionService>();
         services.AddTransient<IPasswordProtector, DefaultPasswordProtector>();
 
         // Decorators
