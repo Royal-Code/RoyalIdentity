@@ -28,24 +28,38 @@ public class UserStore : IUserStore, IUserDetailsStore
         this.clock = clock;
     }
 
-    public Task<IdentityUser?> GetUserAsync(string userName, CancellationToken ct = default)
+    public Task<IdentityUser?> GetUserAsync(string usernameOrSubjectId, CancellationToken ct = default)
     {
-        IdentityUser? user = null;
-        if (usersDetails.TryGetValue(userName, out var userDetails))
-            user = new DefaultIdentityUser(userDetails, accountOptions, userSessionStore, this, passwordProtector, clock);
+        var userDetails = Resolve(usernameOrSubjectId);
+        IdentityUser? user = userDetails is null
+            ? null
+            : new DefaultIdentityUser(userDetails, accountOptions, userSessionStore, this, passwordProtector, clock);
         return Task.FromResult(user);
     }
 
-    public Task<bool> IsUserActive(string userName, CancellationToken ct = default)
+    public Task<bool> IsUserActive(string usernameOrSubjectId, CancellationToken ct = default)
     {
-        usersDetails.TryGetValue(userName, out var userDetails);
+        var userDetails = Resolve(usernameOrSubjectId);
         return Task.FromResult(userDetails?.IsActive ?? false);
     }
 
-    public Task<UserDetails?> GetUserDetailsAsync(string userName, CancellationToken ct = default)
+    public Task<UserDetails?> GetUserDetailsAsync(string subjectIdOrUsername, CancellationToken ct = default)
     {
-        usersDetails.TryGetValue(userName, out var userDetails);
-        return Task.FromResult(userDetails);
+        return Task.FromResult(Resolve(subjectIdOrUsername));
+    }
+
+    /// <summary>
+    /// Resolves a user by username (the dictionary key) or by <see cref="UserDetails.SubjectId"/>. The two
+    /// key spaces never collide (subject ids are opaque GUIDs), so a single key works for both the login
+    /// path (passes username) and the profile/session path (passes the <c>sub</c>). The fake store scans
+    /// for the subject id; a real store (UsersAccounts module) would keep an index.
+    /// </summary>
+    private UserDetails? Resolve(string key)
+    {
+        if (usersDetails.TryGetValue(key, out var byUsername))
+            return byUsername;
+
+        return usersDetails.Values.FirstOrDefault(u => u.SubjectId == key);
     }
 
     public Task SaveUserDetailsAsync(UserDetails details, CancellationToken ct = default)

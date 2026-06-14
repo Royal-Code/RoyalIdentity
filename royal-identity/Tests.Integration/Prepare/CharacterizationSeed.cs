@@ -26,6 +26,7 @@ internal static class CharacterizationSeed
         var username = $"char-{CryptoRandom.CreateUniqueId(8)}";
         storage.GetRealmMemoryStore(realm).UsersDetails[username] = new UserDetails
         {
+            SubjectId = $"sub-{CryptoRandom.CreateUniqueId(16)}", // stable id, intentionally != username
             Username = username,
             PasswordHash = PasswordHash.Create(DefaultPassword),
             DisplayName = $"Char {username}",

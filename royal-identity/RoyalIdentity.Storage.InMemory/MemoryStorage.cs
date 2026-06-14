@@ -7,6 +7,16 @@ namespace RoyalIdentity.Storage.InMemory;
 
 public partial class MemoryStorage
 {
+    /// <summary>
+    /// Deterministic seed <c>sub</c> for the demo user "alice" — an opaque, stable identifier that is
+    /// intentionally NOT derived from the username (ADR-014 §2.2). Exposed so tests can assert
+    /// <c>sub</c> ≠ username.
+    /// </summary>
+    public const string AliceSubjectId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+
+    /// <summary>Deterministic seed <c>sub</c> for the demo user "bob" (see <see cref="AliceSubjectId"/>).</summary>
+    public const string BobSubjectId = "6f9619ff-8b86-d011-b42d-00cf4fc964ff";
+
     private static readonly ServerOptions serverOptions = new();
 
     public static Realm ServerRealm { get; } = new(

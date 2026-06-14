@@ -163,6 +163,7 @@ public class RealmMemoryStore
     {
         ["alice"] = new UserDetails
         {
+            SubjectId = MemoryStorage.AliceSubjectId,
             Username = "alice",
             PasswordHash = PasswordHash.Create("alice"),
             DisplayName = "Alice",
@@ -175,6 +176,7 @@ public class RealmMemoryStore
         },
         ["bob"] = new UserDetails
         {
+            SubjectId = MemoryStorage.BobSubjectId,
             Username = "bob",
             PasswordHash = PasswordHash.Create("bob"),
             DisplayName = "Bob",

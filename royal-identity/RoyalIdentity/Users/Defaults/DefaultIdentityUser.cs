@@ -95,7 +95,7 @@ public sealed class DefaultIdentityUser : IdentityUser
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, details.Username),
+            new(JwtRegisteredClaimNames.Sub, details.SubjectId),
             new(JwtRegisteredClaimNames.Name, details.DisplayName),
             new(JwtRegisteredClaimNames.AuthTime, new DateTimeOffset(currentSession.StartedAt).ToUnixTimeSeconds().ToString()),
             new(JwtRegisteredClaimNames.Sid, currentSession.Id),

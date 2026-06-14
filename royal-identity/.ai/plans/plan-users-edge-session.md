@@ -4,14 +4,14 @@
 
 ## Progresso
 
-`███░░░░░░` **33%** - 3 de 9 fases concluidas
+`████░░░░░` **44%** - 4 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - ADRs (governanca) | Concluida |
 | Fase 2 - Testes de caracterizacao | Concluida |
 | Fase 3 - Contratos e tipos de borda | Concluida |
-| Fase 4 - Conta in-memory + SubjectId + autenticador | Pendente |
+| Fase 4 - Conta in-memory + SubjectId + autenticador | Concluida |
 | Fase 5 - Sessao (modelo + store puro + service) | Pendente |
 | Fase 6 - "Ativo" unificado | Pendente |
 | Fase 7 - Principal + LoginFlowService + telas finas | Pendente |
@@ -339,14 +339,14 @@ duplicado**; a transicao do `IStorage` esta documentada aqui.
 modulo `UsersAccounts`.
 
 **Tarefas:**
-- [ ] Criar registro de conta in-memory (subjectId, username, displayName, isActive, passwordHash, contadores de lockout, roles, claims) — fake/referencia, **nao** o agregado rico.
-- [ ] Reindexar `RealmMemoryStore`/`MemoryStorage` por `SubjectId` (+ indice por username normalizado); seeds com `SubjectId` deterministico.
-- [ ] Implementar `ISubjectStore` (FindBySubjectId, IsActive) e `ILocalUserAuthenticator` (resolve login → verifica `IPasswordProtector` → `LockoutPolicy`).
-- [ ] Implementar `LockoutPolicy` unica (le `AccountOptions.PasswordOptions`; incrementa/zera/calcula `LockoutEndAt`).
-- [ ] Implementar o gateway `IUserDirectory` (Q1) in-memory, expondo as portas de conta realm-bound (lendo de `MemoryStorage`); registrar no DI. **Sem realm em metodo.**
-- [ ] Regra de imutabilidade: `SubjectId` e chave estavel; se houver operacao de update nesta fase, ela **rejeita** alterar `SubjectId`; se nao houver, registrar a rejeicao como criterio da futura fase admin/modulo.
-- [ ] Registrar os novos servicos no DI (`ServiceCollectionExtensions`/`Storage.InMemory`).
-- [ ] Auditar e **atualizar testes existentes que assumem `sub` == username** (asserts de `sub` em token/userinfo); usar os `SubjectId` determinísticos dos seeds (≠ username) nesses asserts.
+- [x] Criar registro de conta in-memory (subjectId, username, displayName, isActive, passwordHash, contadores de lockout, roles, claims) — fake/referencia, **nao** o agregado rico. (`UserDetails` ganhou `SubjectId`.)
+- [x] Resolver `RealmMemoryStore`/`MemoryStorage` por `SubjectId` via **dual-resolution** (username ou `SubjectId`); seeds com `SubjectId` deterministico. Indice real por `SubjectId` fica para o modulo `UsersAccounts`.
+- [x] Implementar `ISubjectStore` (FindBySubjectId, IsActive) e `ILocalUserAuthenticator` (resolve login → verifica `IPasswordProtector` → `LockoutPolicy`).
+- [x] Implementar `LockoutPolicy` unica (le `AccountOptions.PasswordOptions`; incrementa/zera; lockout deriva de `LastPasswordError` + duracao — sem campo `LockoutEndAt` no modelo atual).
+- [x] Implementar o gateway `IUserDirectory` (Q1) in-memory, expondo as portas de conta realm-bound (lendo de `MemoryStorage`); registrar no DI. **Sem realm em metodo.**
+- [x] Regra de imutabilidade: `SubjectId` e chave estavel e separado de `Username` (campos distintos); **nao ha API de update na borda nesta fase** ⇒ a rejeicao explicita de troca de `SubjectId` fica como criterio da futura fase admin/modulo `UsersAccounts` (registrado).
+- [x] Registrar os novos servicos no DI (`ServiceCollectionExtensions`/`Storage.InMemory`).
+- [x] Auditar testes que assumem `sub` == username: com a **dual-resolution** no `UserStore` (resolve por username **ou** `SubjectId`) **nenhum** teste existente quebrou; em vez de "ajustar", foi **adicionado** teste positivo provando `sub` = `SubjectId` (≠ username).
 
 **Criterios de aceite:** dado um login, o autenticador devolve `AuthenticationResult` com `Subject` correto;
 `sub` = `SubjectId` (≠ username); lockout funciona num lugar so; `SubjectId` e usado como chave estavel e nao deriva de username.
@@ -356,7 +356,45 @@ modulo `UsersAccounts`.
 
 ### Resultado da Fase 4
 
-A preencher quando a fase for executada.
+Concluida. **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒ **191 testes, 0 falhas** (Pipelines 3,
+Identity 9, Integration 179 — **+8 novos**: 1 de flip de `sub` + 7 de autenticador/lockout/imutabilidade).
+
+**Modelo / seeds:**
+- `UserDetails` ganhou `SubjectId` (imutavel, ≠ `Username`); `MemoryStorage.AliceSubjectId`/`BobSubjectId`
+  (GUIDs opacos, deterministicos, **nao** derivados do username), expostos para os testes.
+- `DefaultIdentityUser.CreatePrincipalAsync` agora emite `sub = details.SubjectId` (era `details.Username`).
+
+**Facades in-memory novas (`RoyalIdentity.Storage.InMemory`):** `MemorySubjectStore` (`ISubjectStore`),
+`MemoryLocalUserAuthenticator` (`ILocalUserAuthenticator` — resolve login username/email → `IPasswordProtector` →
+`LockoutPolicy`; **nao** inicia sessao), `MemoryUserPropertyProvider` (`IUserPropertyProvider` — stub funcional,
+so ligado ao `IProfileService` na Fase 8), `LockoutPolicy` (unica), `MemoryUserDirectory` (`IUserDirectory`,
+getters realm-bound; registrado no DI in-memory).
+
+**Decisao — keying / resolucao por `SubjectId`:** o fake store mantem `UsersDetails` keyed por **username**
+(ripple minimo: seed, `MemoryStorage.Storage.cs`, helper de teste inalterados) e resolve por `SubjectId` via
+**dual-resolution** no `UserStore.Resolve(key)` (username **ou** `SubjectId` — nunca colidem: `SubjectId` e GUID).
+Isso foi decisivo: como `CreateIdentity` usa `sub` como `nameType`, `Identity.Name` passou a ser o `SubjectId`;
+a dual-resolution faz os 3 caminhos (login por username; `IProfileService.GetUserDetailsAsync(sub)`; Razor
+`GetUserAsync(Identity.Name)`) funcionarem **sem** quebrar nada nem trocar assinaturas/consumidores. Index real
+fica para o modulo `UsersAccounts` (produção); no fake, scan e suficiente.
+
+**Lembrete para Fase 5:** revisar `DefaultSignOutManager`/back-channel logout para usar `SubjectId`; ate a migracao
+do store/servico de sessao, ainda ha trecho legado com `session.User.UserName`.
+
+**Lockout num lugar so:** `LockoutPolicy` (usada pelo novo autenticador). O lockout do `DefaultIdentityUser`
+legado coexiste ate a Fase 9 (remocao do caminho antigo); o novo caminho (Fase 7, `LoginFlowService`) ja usa so a `LockoutPolicy`.
+
+**Imutabilidade de `SubjectId`:** `SubjectId` e campo proprio, estavel a troca de `Username` (teste). **Nao existe
+API de update na borda** ⇒ a **rejeicao** ativa de alterar `SubjectId` e criterio da futura fase admin/modulo.
+
+**`sub` ≠ username — sem regressao:** nenhum teste existente assertava `sub == username` em token/userinfo de forma
+acoplada (mapa da Fase 2); os que usam `SubjectFactory.Create("alice", ...)` constroem o principal a mao (sub fixo),
+nao dependem do store. Novo teste `SubjectIdCharacterizationTests` prova o flip end-to-end (id_token `sub` =
+`AliceSubjectId`).
+
+**Testes novos:** `Tests.Integration/Characterization/SubjectIdCharacterizationTests.cs` (flip de `sub` no id_token) e
+`Tests.Integration/Users/LocalUserAuthenticatorTests.cs` (7: not found/inactive/sem hash/senha errada incrementa/
+sucesso zera + devolve `SubjectId`/lockout apos N falhas e **expira**/`SubjectId` estavel a troca de username).
 
 ---
 
