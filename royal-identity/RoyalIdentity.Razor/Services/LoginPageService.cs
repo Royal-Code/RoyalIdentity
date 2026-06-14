@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
-using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Models.Messages;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.ViewModels;
 using RoyalIdentity.Users;

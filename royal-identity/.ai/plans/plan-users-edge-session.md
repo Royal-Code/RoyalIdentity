@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`██████░░░` **67%** - 6 de 9 fases concluidas
+`███████░░` **78%** - 7 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - Conta in-memory + SubjectId + autenticador | Concluida |
 | Fase 5 - Sessao (modelo + store puro + service) | Concluida |
 | Fase 6 - "Ativo" unificado | Concluida |
-| Fase 7 - Principal + LoginFlowService + telas finas | Pendente |
+| Fase 7 - Principal + LoginFlowService + telas finas | Concluida |
 | Fase 8 - Claims por propriedade (seam) | Pendente |
 | Fase 9 - Limpeza, remocao e regressao final | Pendente |
 
@@ -523,14 +523,14 @@ vira **adaptador**: monta view model e traduz o flow-result em redirect/render. 
 `EndSessionPageService` confirmados finos.
 
 **Tarefas:**
-- [ ] Implementar `ISubjectPrincipalFactory` (sub/name/auth_time/sid/idp/amr); substituir `DefaultIdentityUser.CreatePrincipalAsync` sem mover roles/claims de perfil para o principal de sessao.
-- [ ] Verificar que **nenhum consumidor le roles/claims do principal de cookie** (hoje o `IdentityUser` injeta roles + `details.Claims` no cookie); cobrir com teste que o principal de sessao carrega apenas as claims minimas.
-- [ ] Implementar `LoginFlowService` (orquestracao + enum de desfecho); **sessao criada aqui**, nao na verificacao de senha.
-- [ ] Refatorar `DefaultSignInManager` para delegar ao `LoginFlowService` (ou absorver), expondo so o necessario.
-- [ ] Reduzir `LoginPageService` a adaptador de tela (view model + traduz flow-result).
-- [ ] Verificar `ConsentPageService`/`EndSessionPageService` (sem regra de conta/sessao vazando).
-- [ ] Ajustar eventos de login/logout para nao dependerem de `IdentityUser`; usar `SubjectId`/`Subject`/snapshot minimo, preservando motivo interno de falha para auditoria e mensagem generica para UI.
-- [ ] Mover `GetAuthorizationContextAsync` (de `ISignInManager`) para o `IAuthorizationContextResolver` (Q2); `SessionContextService` (Razor) delega; remover o metodo do `ISignInManager`.
+- [x] Implementar `ISubjectPrincipalFactory` (`DefaultSubjectPrincipalFactory`: sub/name/auth_time/sid/idp/amr); usado pelo `LoginFlowService` no lugar de `DefaultIdentityUser.CreatePrincipalAsync` (que ficou orfao → removido na Fase 9). Sem roles/claims de perfil no principal de sessao.
+- [x] Verificar que **nenhum consumidor le roles/claims do principal de cookie** — so `ProfilePage.razor` os **exibe** (cosmetico, sem teste). Coberto por teste unitario (`SubjectPrincipalFactoryTests`) + e2e (`SessionPrincipalCharacterizationTests`: cookie pos-login carrega so as 6 claims minimas, sem role/email).
+- [x] Implementar `LoginFlowService` (orquestracao + enum `LoginFlowOutcome`); **sessao criada aqui** (no sign-in, via `IUserSessionService.StartAsync`), nao na verificacao de senha.
+- [x] **Remover `ISignInManager`/`DefaultSignInManager`** (totalmente substituidos — sem codigo morto): login agora e `LoginFlowService`; contexto via `IAuthorizationContextResolver`; consent via `IConsentService`.
+- [x] Reduzir `LoginPageService` a adaptador de tela (resolve realm + traduz `LoginFlowOutcome` → URL/redirect; mantem a escrita de error-message no `IMessageStore` para o caso open-redirect).
+- [x] Verificar `ConsentPageService`/`EndSessionPageService` — confirmados finos (sem store/sessao/`IdentityUser`/`ClaimsPrincipal`).
+- [x] Ajustar eventos: `UserLoginSuccessEvent` deixou de carregar `IdentityUser` → agora `(username, subjectId, context)`; motivo interno preservado no `UserLoginFailureEvent`, mensagem generica para UI.
+- [x] Mover `GetAuthorizationContextAsync` → `IAuthorizationContextResolver` (`DefaultAuthorizationContextResolver`); `AuthenticationExtensions`/`SessionContextService` delegam a ele; metodo saiu junto com o `ISignInManager`.
 
 **Criterios de aceite:** a tela nao conhece `Subject`/`UserSession`/`ClaimsPrincipal`/stores/cookie; o roteamento
 de login vive no `LoginFlowService`; sessao so e criada no sign-in; eventos nao carregam objeto rico de usuario;
@@ -542,7 +542,40 @@ nao-loopback/invalida nao causa open redirect e cai no fluxo de erro esperado.
 
 ### Resultado da Fase 7
 
-A preencher quando a fase for executada.
+Concluida. **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒ **201 testes, 0 falhas** (Pipelines 3,
+Identity 9, Integration 189 — **+2 novos**: principal minimo unit + e2e).
+
+**Novos servicos de borda (core):**
+- `DefaultSubjectPrincipalFactory` (`ISubjectPrincipalFactory`) — principal minimo (sub/name/auth_time/sid/idp/amr),
+  **sem roles/claims de perfil**.
+- `LoginFlowService` (`RoyalIdentity/Users/Defaults/`) — orquestra `ILocalUserAuthenticator` →
+  `IUserSessionService.StartAsync` (**sessao criada no sign-in**) → `ISubjectPrincipalFactory` → cookie
+  (`HttpContext.SignInAsync`) → eventos → roteamento `LoginFlowOutcome`
+  (Error/RequiresConsent/Callback/SignedInPage/Profile/LocalRedirect/InvalidReturnUrl). Tipos `LoginRequest`/
+  `LoginFlowResult`/`LoginFlowOutcome` em `RoyalIdentity/Users/`.
+- `DefaultAuthorizationContextResolver` (`IAuthorizationContextResolver`) — recebe o `GetAuthorizationContextAsync`
+  que vivia no `ISignInManager`.
+
+**Removidos:** `ISignInManager` + `DefaultSignInManager` (substituidos por `LoginFlowService` + resolver — sem codigo
+morto). `DefaultIdentityUser.CreatePrincipalAsync`/`AuthenticateAndStartSessionAsync` ficaram **orfaos** (login nao
+passa mais por `IdentityUser`); `IdentityUser`/`CredentialsValidationResult` saem na Fase 9.
+
+**Consumidores migrados:** `AuthenticationExtensions.GetAuthorizationContextAsync` → resolver; `LoginPageService`
+virou **adaptador** (resolve realm + traduz outcome → URL; mantem `IMessageStore` so para o error-page do open-redirect);
+test host `{realm}/test/account/login` → `LoginFlowService`. `SessionContextService` inalterado (delega via extension).
+
+**Sessao no sign-in (fim do efeito colateral):** a sessao agora e criada **apenas** no `LoginFlowService` (sign-in);
+`DefaultIdentityUser.AuthenticateAndStartSessionAsync` nao e mais chamado. **Lockout num lugar so de fato:** o caminho
+vivo usa so a `LockoutPolicy` (via `MemoryLocalUserAuthenticator`); o lockout legado do `IdentityUser` virou codigo morto.
+
+**Principal minimo confirmado:** tokens/userinfo continuam com roles/email (vem do `IProfileService`, nao do cookie —
+ADR-014 §2.8). So `ProfilePage.razor` **exibe** as claims do cookie (cosmetico). Eventos sem objeto rico.
+
+**Testes novos:** `Tests.Integration/Users/SubjectPrincipalFactoryTests.cs` (factory emite exatamente as 6 claims) e
+`Tests.Integration/Characterization/SessionPrincipalCharacterizationTests.cs` (cookie pos-login = so claims minimas,
+`sub`=`AliceSubjectId`, sem role/email; novo endpoint de teste `{realm}/test/account/principal`). Roteamento de login
+(invalido→erro; sem authorize→profile; authorize sem consent→callback; com consent→tela; denial→`access_denied`) ja
+coberto por `LoginPageTests`/`LoginConsentUIFlowTests` (verdes contra o novo fluxo).
 
 ---
 

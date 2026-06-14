@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Models;
@@ -26,22 +27,16 @@ public static class HostEndpoints
         });
 
         app.MapPost("{realm}/test/account/login", async (HttpContext context,
-            ISignInManager signInManager, 
+            LoginFlowService loginFlow,
             string realm) =>
         {
             var username = context.Request.Form["username"].FirstOrDefault() ?? string.Empty;
             var password = context.Request.Form["password"].FirstOrDefault() ?? string.Empty;
 
-            var currentRealm = context.GetCurrentRealm();
+            var result = await loginFlow.LoginAsync(
+                new LoginRequest(username, password, null, false), context.RequestAborted);
 
-            var result = await signInManager.AuthenticateUserAsync(currentRealm, username, password, context.RequestAborted);
-
-            if (result.Success)
-            {
-                await signInManager.SignInAsync(result.User, result.Session, false, context.RequestAborted);
-                return Results.Ok();
-            }
-            else
+            if (result.Outcome is LoginFlowOutcome.Error or LoginFlowOutcome.InvalidReturnUrl)
             {
                 return Results.Problem(
                     statusCode: 400,
@@ -49,16 +44,27 @@ public static class HostEndpoints
                     title: "Invalid credentials",
                     detail: result.ErrorMessage);
             }
+
+            return Results.Ok();
         });
 
-        app.MapGet("{realm}/test/account/profile", async (HttpContext context, 
-            IStorage storage, 
+        app.MapGet("{realm}/test/account/profile", async (HttpContext context,
+            IStorage storage,
             string realm) =>
         {
             var currentRealm = context.GetCurrentRealm();
             var users = storage.GetUserStore(currentRealm);
             var user = await users.GetUserAsync(context.User.GetSubjectId(), context.RequestAborted);
             return Results.Ok(user);
+        }).RequireAuthorization();
+
+        // Echoes the cookie (session) principal's claim types — used to assert the minimal session principal.
+        app.MapGet("{realm}/test/account/principal", (HttpContext context, string realm) =>
+        {
+            var claims = context.User.Claims
+                .Select(c => new { type = c.Type, value = c.Value })
+                .ToArray();
+            return Results.Ok(claims);
         }).RequireAuthorization();
 
         app.MapGet("{realm}/test/account/logout", async (HttpContext context,
