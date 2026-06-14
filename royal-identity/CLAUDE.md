@@ -22,10 +22,11 @@ Completed refactoring plans (useful as historical record and for understanding d
 Active plans (check status before modifying affected areas):
 
 - [.ai/plans/plan-resources-redesign.md](.ai/plans/plan-resources-redesign.md) — IN_PROGRESS (Resources/Scopes model: IdentityScope, ResourceServer, Scope; client AllowedResources; signing chain; + Resource Indicators / Protected Resource Metadata)
+- [.ai/plans/plan-users-edge-session.md](.ai/plans/plan-users-edge-session.md) — IN_PROGRESS (users edge + session redesign; ADR-013/014; `SubjectId`, `IUserDirectory`, `ICurrentRealmAccessor`, pure session store, `LoginFlowService`)
 
 Architectural Decision Records (accepted decisions; read before changing the affected area):
 
-- [adrs/](adrs/) — ADR-001..012 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata)
+- [adrs/](adrs/) — ADR-001..014 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**)
 
 Backlog (deferred items with design notes):
 

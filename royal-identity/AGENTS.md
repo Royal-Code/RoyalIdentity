@@ -13,10 +13,19 @@ Before significant code changes, read:
 - `.ai/foundation/structure.md` for project layout, dependency rules, naming conventions, and high-risk files.
 - `.ai/rules/code-style.rules.md` for repository-specific code style rules and code smells.
 
-Before modifying an area touched by a plan, inspect `.ai/plans/` first. As of this
-repo snapshot, `plan-realm-hardening.md` is completed and
-`plan-realm-options-redesign.md` is planned. Deferred product/design notes live in
-`.ai/backlogs/backlog-001.md`.
+Before modifying an area touched by a plan, inspect `.ai/plans/` first. Deferred
+product/design notes live in `.ai/backlogs/backlog-001.md`.
+
+Active redesign plans include `.ai/plans/plan-users-edge-session.md` for the
+users/session area. Check its current phase and progress before changing
+`RoyalIdentity/Users/`, account UI services, profile claims, login/logout, or
+session behavior.
+
+Accepted architectural decisions live in `adrs/` (ADR-001..014). Read the relevant
+ADR before changing the affected area. Notably for the users/session area:
+`ADR-013` (modular architecture & boundaries — storages as facades) and `ADR-014`
+(users edge + session redesign, which **refines** `ADR-005`), implemented by
+`.ai/plans/plan-users-edge-session.md`.
 
 ## Commands
 
@@ -142,7 +151,9 @@ Known unstable areas include:
 
 - `Client.AllowedScopes` and `Client.AllowOfflineAccess`, pending an
   `AllowedResources`-style model.
-- The user/session model under `RoyalIdentity/Users/`.
+- The user/session model under `RoyalIdentity/Users/`, being redesigned per
+  `ADR-014` and `.ai/plans/plan-users-edge-session.md` (edge contracts/facades,
+  immutable `SubjectId`, pure session store, `LoginFlowService`).
 - Scope/resource hierarchy types such as `ResourceServer` and related models.
 - Realm-specific options and CORS, covered by
   `.ai/plans/plan-realm-options-redesign.md`.

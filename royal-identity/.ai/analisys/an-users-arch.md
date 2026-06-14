@@ -21,6 +21,11 @@
 > correspondentes.
 >
 > **Método:** leitura de pontos1/pontos2/final/código. Nenhum build/teste (documental).
+>
+> **Nota posterior:** o plano `plan-users-edge-session.md` refinou a regra de passagem de realm: as portas
+> podem ser **realm-bound por fábrica/gateway**, enquanto serviços de orquestração usam um **accessor de realm
+> corrente** em vez de espalhar `HttpContext.GetCurrentRealm()` ou receber `Realm` em todos os métodos. As
+> assinaturas com `realm` neste documento permanecem conceituais e a forma final deve ser registrada na ADR-014.
 
 ---
 

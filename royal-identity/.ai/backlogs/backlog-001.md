@@ -34,6 +34,7 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 **Área:** Criptografia / Chaves
 **Deferral:** A arquitetura já suporta chaves por realm (`GetKeyStore(realm)`). O plano é criar um módulo dedicado (projeto C# separado) tratando chaves, certificados, rotação, segredos — similar a um key vault.
 **Quando revisitar:** Quando a rotação de chaves por realm virar requisito operacional ou quando iniciar o módulo de segurança dedicado.
+**Nota de design:** Encaixa na arquitetura modular decidida em `an-users-arch.md` §3: módulo `RoyalIdentity.KMS` contém **domínio + persistência**; **API e UI em projetos separados** (não dentro do módulo). Plano futuro: `plan-kms` (domínio chaves/segredos/certificados → persistência → integração com `IKeyStore`).
 
 ---
 
@@ -114,3 +115,28 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 - Para `AccessTokenType.Reference`: gerar string opaca aleatória como `token.Token`, não assinar via `jwtFactory`. O token é armazenado no store e o `access_token` retornado ao cliente é a string opaca.
 - Introspection endpoint (`/{realm}/connect/introspect`) é o mecanismo de validação para resource servers que recebem reference tokens.
 - O teste `AccessTokenStoreIsolation_JtiFromRealmA_NotFoundInRealmB` testa isolamento do store por JTI; quando reference tokens forem implementados, adicionar teste específico com token opaco.
+
+---
+
+## Persistência de Dados (EFCore: Postgres/Sqlite) e Caching
+
+**Área:** Storage / Persistência
+**Deferral:** Hoje o único storage é `RoyalIdentity.Storage.InMemory` (fake/referência para dev/test/integração/demo). A produção precisa de módulos de dados com EFCore atrás das *facades* `IStorage.GetXStore(realm)`. Decidido em `an-users-arch.md` (arquitetura modular) — exige a própria ADR (ADR-013) e plano (`plan-data-persistence`). Era a seção "Planos futuros" do `plan-users-edge-session.md`.
+**Quando revisitar:** Quando a persistência real (Postgres) virar requisito, ou para substituir o in-memory por Sqlite nos testes.
+**Nota de design:**
+- Projetos: `RoyalIdentity.Data.Configuration` (realms/clients/resources/keys/options) e `RoyalIdentity.Data.Operational` (sessions/tokens/codes/consents) — **dados puros, NÃO dependem do core**; `RoyalIdentity.Storage.EntityFramework` (+ `.Postgre`/`.Sqlite`, mapeamentos/migrations por provedor); `RoyalIdentity.Storage.Caching`.
+- Só `Storage.EntityFramework` implementa as facades do IdP; `Data.*` contêm DbContext/entidades/queries. Divisão config × operacional por ciclo de vida/volume (TTL/cache no operacional).
+- Esboço de fases: entidades/DbContext → mapeamentos por provedor → impl. das facades → cache → migração in-memory→Sqlite nos testes.
+
+---
+
+## Módulo de Contas de Usuário (RoyalIdentity.UsersAccounts)
+
+**Área:** Usuários / Módulo de domínio
+**Deferral:** O `plan-users-edge-session.md` refatora só a **borda + sessão** do IdP atrás de *facades* (`IUserDirectory`/`ISubjectStore`/`ILocalUserAuthenticator`/`IUserPropertyProvider`), com backing in-memory. O **domínio rico de contas** vira um módulo próprio fora da biblioteca do IdP, implementando essas facades. Decidido em `an-users-arch.md` — exige análise/ADR próprios e plano (`plan-users-accounts-module`).
+**Quando revisitar:** Quando a borda+sessão (`plan-users-edge-session.md`) estiver concluída e houver demanda por gestão real de contas (CRUD, recuperação de senha, admin).
+**Nota de design:**
+- Requisitos (de `an-users-pontos2.md` §4): dados OIDC obrigatórios; usuários/config por realm; email opcional/múltiplo/fictício; ID externo; **propriedades dinâmicas por escopo** ancoradas nos Identity Scopes (projetadas em claims via `IUserPropertyProvider`); credenciais (senha + futuro MFA/externo/passwordless) e lockout por realm; casos de uso administrativos; eventos de domínio; Inbox/Outbox; replicação entre instâncias.
+- Persistência própria (EFCore). **API e UI em projetos separados** (não dentro do módulo).
+- Relaciona-se com "Federation / Identity Brokering" (identidades externas vinculadas à conta).
+- Esboço de fases: modelo (emails/ID externo/propriedades por escopo) → credenciais/MFA → casos de uso admin → eventos/inbox-outbox → replicação → integração com as facades de borda.
