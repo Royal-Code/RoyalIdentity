@@ -66,6 +66,7 @@ public static class ServiceCollectionExtensions
 
         // Realm management
         services.AddScoped<IRealmManager, RealmManager>();
+        services.AddScoped<ICurrentRealmAccessor, CurrentRealmAccessor>();
 
         // Default Users Services
         services.AddScoped<ISignInManager, DefaultSignInManager>();

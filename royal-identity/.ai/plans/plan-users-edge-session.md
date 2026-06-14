@@ -4,13 +4,13 @@
 
 ## Progresso
 
-`██░░░░░░░` **22%** - 2 de 9 fases concluidas
+`███░░░░░░` **33%** - 3 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - ADRs (governanca) | Concluida |
 | Fase 2 - Testes de caracterizacao | Concluida |
-| Fase 3 - Contratos e tipos de borda | Pendente |
+| Fase 3 - Contratos e tipos de borda | Concluida |
 | Fase 4 - Conta in-memory + SubjectId + autenticador | Pendente |
 | Fase 5 - Sessao (modelo + store puro + service) | Pendente |
 | Fase 6 - "Ativo" unificado | Pendente |
@@ -226,8 +226,8 @@ fim de cada fase seguinte. Onde ja houver cobertura, complementar; nao alterar c
 
 ### Resultado da Fase 2
 
-Concluida. **Baseline verde:** `dotnet test RoyalIdentity.sln` ⇒ **178 testes, 0 falhas** (Pipelines 3, Identity 6,
-Integration 169 — dos quais **12 novos** de caracterizacao). `Tests.Endpoints` nao esta na solution; `Tests.WebApp`
+Concluida. **Baseline verde:** `dotnet test RoyalIdentity.sln` ⇒ **180 testes, 0 falhas** (Pipelines 3, Identity 6,
+Integration 171 — dos quais **14 novos** de caracterizacao). `Tests.Endpoints` nao esta na solution; `Tests.WebApp`
 nao tem `[Fact]`.
 
 **Novos artefatos (em `Tests.Integration`):**
@@ -235,14 +235,21 @@ nao tem `[Fact]`.
   que sao estado mutavel compartilhado no singleton de storage), `GetDetails`, `FindSession` (por realm), `PostLoginAsync`.
 - `Prepare/BackChannelCapturingAppFactory.cs` — `AppFactory` que substitui `IBackChannelLogoutNotifier` por um fake
   capturador (ultima registro de DI vence), para assertar quem foi notificado no logout.
+- `Prepare/ControlledTimeAppFactory.cs` - `AppFactory` com `TimeProvider` controlado para caracterizar regras de
+  frescor de autenticacao sem `Task.Delay`.
 - `Characterization/UserSessionCharacterizationTests.cs` (8): login cria sessao ativa realm-scoped; senha invalida nao
   cria sessao e incrementa contador; sucesso zera; inativo ⇒ rejeitado + mensagem generica + sem sessao; **lockout** apos
   `MaxFailedAccessAttempts` (3) ⇒ ate a senha correta e rejeitada (prova lockout) + mensagem generica; cookie de sessao
   encerrada ⇒ rejeitado (302 p/ login); emissao de code registra o client na sessao; logout encerra a sessao.
-- `Characterization/PromptInteractionCharacterizationTests.cs` (3): baseline autenticado sem prompt emite code;
-  `prompt=login` e `max_age=0` forcam login (mesmo caminho do `PromptLoginDecorator` que serve `UserSsoLifetime`).
-- `Characterization/BackChannelLogoutCharacterizationTests.cs` (1): logout notifica back-channel dos clients registrados
-  na sessao, com `Subject` = nome do usuario (comportamento ATUAL) e `SessionId` corretos.
+- `Characterization/PromptInteractionCharacterizationTests.cs` (4): baseline autenticado sem prompt emite code;
+  `prompt=login`, `max_age=0` e `Client.UserSsoLifetime` expirado forcam login; `UserSsoLifetime` e coberto por
+  teste direto com relogio controlado.
+- `Characterization/BackChannelLogoutCharacterizationTests.cs` (2): logout notifica back-channel dos clients registrados
+  na sessao, com `Subject` = nome do usuario (comportamento ATUAL) e `SessionId` corretos; logout tambem grava
+  `LogoutCallbackMessage` com front-channel dos clients da sessao, incluindo `iss`, `sid` e `SignOutIframeUrl`.
+
+**Ajuste de test-host:** `{realm}/test/account/logout` agora retorna a URI calculada pelo `SignOutManager`, permitindo
+ler o `logoutId` do `LogoutCallbackMessage` sem depender da renderizacao Razor da pagina de processamento.
 
 > Cobertura ja existente reutilizada como rede: `LoginPageTests` (login valido/invalido), `LoginConsentUIFlowTests`
 > (consent + denial `access_denied`), `EndSessionTests` (logout message), `RealmIsolationTests`
@@ -269,14 +276,14 @@ isso todo teste que os altera usa `SeedUser` (usuario unico) — nunca alice/bob
 implementarem contra eles. Tipos persistiveis/serializaveis, sem dependencia de servico.
 
 **Tarefas:**
-- [ ] Criar `Subject`, `AuthenticationResult`, `UserClaimDto`, `UserSession`, `UserSessionClient` (records; `UserSessionClient` com igualdade por `ClientId` — pontos1 §1).
-- [ ] Criar `ISubjectStore`, `ILocalUserAuthenticator`, `IUserPropertyProvider`, `IUserSessionService`, `ISubjectPrincipalFactory`.
-- [ ] Criar o gateway de contas `IUserDirectory` (Q1) com getters realm-bound, e o `IAuthorizationContextResolver` (Q2).
-- [ ] Criar o accessor de realm corrente (`ICurrentRealmAccessor`), com implementacao HTTP e fake/test helper se necessario.
-- [ ] Substituir o contrato existente `IUserSessionStore` por assinaturas puras e realm-aware (`Create/FindById/RecordClient/End`), usando adapters temporarios se necessario para manter a compilacao entre fases.
-- [ ] Definir a estrategia de transicao do `IStorage`: `GetUserStore`/`GetUserDetailsStore` devem sair; `GetUserSessionStore` deve apontar para o contrato puro; adapters temporarios precisam ter fase de remocao marcada.
-- [ ] Marcar `UserSession.ExpiresAt`/credencial `ExpiresAt` como **reservados** (XML-doc "sem comportamento nesta fase" — pontos1 §6).
-- [ ] `dotnet build` verde (contratos compilando; nada referencia ainda).
+- [x] Criar `Subject`, `AuthenticationResult`, `UserClaimDto`, `UserSession`, `UserSessionClient` (records; `UserSessionClient` com igualdade por `ClientId` — pontos1 §1).
+- [x] Criar `ISubjectStore`, `ILocalUserAuthenticator`, `IUserPropertyProvider`, `IUserSessionService`, `ISubjectPrincipalFactory`.
+- [x] Criar o gateway de contas `IUserDirectory` (Q1) com getters realm-bound, e o `IAuthorizationContextResolver` (Q2).
+- [x] Criar o accessor de realm corrente (`ICurrentRealmAccessor`), com implementacao HTTP e fake/test helper se necessario.
+- [~] **Re-escopado para Fase 5** (decisao registrada abaixo): a troca do contrato `IUserSessionStore` para as assinaturas puras (`Create/FindById/RecordClient/End`) toca a impl in-memory + 4 consumidores (`DefaultIdentityUser`, `DefaultSignOutManager`, `HttpContextExtensions`, `MemoryStorage`) — i.e. trabalho da Fase 5 (que reimplementa o store puro). Fazer agora violaria "so interfaces/tipos, sem alterar comportamento" e arriscaria o baseline. A **forma-alvo** do store puro fica definida via `IUserSessionService` + `UserSession`/`UserSessionClient`; **nao** ha contrato duplicado de sessao com o mesmo nome.
+- [x] Definir a estrategia de transicao do `IStorage` (documentada no "Resultado da Fase 3").
+- [x] Marcar `UserSession.ExpiresAt` como **reservado** (XML-doc "sem comportamento nesta fase" — pontos1 §6). Credencial `ExpiresAt` **nao se aplica a borda** (credencial e dado do modulo de contas, fora deste plano).
+- [x] `dotnet build` verde (contratos compilando; nada referencia ainda alem do registro de DI do accessor).
 
 **Criterios de aceite:** contratos/tipos existem no core; solucao compila; nao ha contrato duplicado de sessao com o mesmo nome; a transicao de `IStorage` esta documentada no proprio plano/fase.
 
@@ -284,7 +291,41 @@ implementarem contra eles. Tipos persistiveis/serializaveis, sem dependencia de 
 
 ### Resultado da Fase 3
 
-A preencher quando a fase for executada.
+Concluida (aditiva, **sem alterar comportamento**). **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒
+**183 testes, 0 falhas** (Pipelines 3, Identity 9 — **+3 novos** de igualdade de `UserSessionClient`, Integration 171).
+
+**Tipos novos (`RoyalIdentity/Users/`):**
+- `Subject(SubjectId, DisplayName, IsActive)` — record enxuto da borda (substitui o `IdentityUser` rico).
+- `AuthenticationResult` + enum `AuthenticationFailureReason {NotFound, Inactive, InvalidCredentials, Blocked}` —
+  resultado unico (factories `Succeeded(subject)` / `Failed(reason)`).
+- `UserClaimDto(Type, Value, ValueType?)` — projecao primitiva do seam de claims.
+- `UserSession` (class serializavel: `Id/SubjectId/AuthenticationMethod/IdentityProvider/StartedAt/IsActive/Clients`,
+  `ExpiresAt` **reservado**) — guarda `SubjectId`, nao o usuario vivo. `Clients` e `HashSet<UserSessionClient>` (dedup).
+- `UserSessionClient(ClientId, FirstSeenAt, LastSeenAt)` — record com **igualdade por `ClientId`** (dedup; coberto por teste).
+
+**Contratos novos (`RoyalIdentity/Users/Contracts/`):** `ISubjectStore`, `ILocalUserAuthenticator`, `IUserPropertyProvider`,
+`IUserSessionService`, `ISubjectPrincipalFactory`, `IUserDirectory` (gateway Q1), `IAuthorizationContextResolver` (Q2).
+**Accessor:** `RoyalIdentity/Contracts/ICurrentRealmAccessor.cs` + impl HTTP `RoyalIdentity/Authentication/CurrentRealmAccessor.cs`
+(le `HttpContext.GetCurrentRealm()`; so resolve realm — sem I/O de cookie), registrado em DI (`AddScoped`). Testes podem usar fake.
+
+**Decisao — `IUserSessionStore` puro fica para a Fase 5 (re-escopo consciente):** a troca in-place do contrato existente
+exige reimplementar a impl in-memory e migrar os 4 consumidores (`DefaultIdentityUser`, `DefaultSignOutManager`,
+`HttpContextExtensions`, `MemoryStorage`) — exatamente o que a Fase 5 faz ("Implementar `UserSessionStore` in-memory puro").
+Antecipar isso na Fase 3 violaria o principio "apenas interfaces/tipos, sem alterar comportamento" e arriscaria o baseline
+verde. Por isso a Fase 3 **introduz** a forma-alvo (`UserSession`/`UserSessionClient` + `IUserSessionService`) e **mantem**
+o `IUserSessionStore` legado intacto; **nao** existe contrato de sessao duplicado com o mesmo nome (criterio atendido).
+
+**Estrategia de transicao do `IStorage` (a executar nas Fases 5 e 9):**
+- `GetUserStore`/`GetUserDetailsStore` → **removidos**; as portas de conta passam pelo gateway `IUserDirectory`
+  (impl in-memory na Fase 4). Adapters temporarios, se necessarios, marcados para remocao na Fase 9.
+- `GetUserSessionStore(realm)` → **mantido**, **re-tipado** para o `IUserSessionStore` puro na Fase 5 (reusa o nome;
+  `GetCurrentSessionAsync` sai do store e vai para o `IUserSessionService`).
+- Consumidores migram na Fase 5 (sessao) e Fase 7 (principal/fluxo); limpeza final e remocao de tipos legados na Fase 9.
+
+**Criterios de aceite:** atendidos — contratos/tipos existem no core; **solucao compila**; **nao ha contrato de sessao
+duplicado**; a transicao do `IStorage` esta documentada aqui.
+
+**Teste novo:** `Tests.Identity/Users/UserSessionClientTests.cs` (igualdade por `ClientId` + dedup em `HashSet`).
 
 ---
 
@@ -329,7 +370,7 @@ A preencher quando a fase for executada.
 
 **Tarefas:**
 - [ ] Implementar `UserSessionStore` in-memory puro (`Create/FindById/RecordClient(dedup)/End`), sem `IHttpContextAccessor`.
-- [ ] Implementar `IUserSessionService` sem realm em metodo (`GetCurrentAsync(principal)`, `IsSessionValidAsync(principal)`, `StartAsync(subject, method)`, `EndAsync(sid)`, `RecordClientAsync(sid, clientId)`); realm resolvido por `ICurrentRealmAccessor`.
+- [ ] Implementar `IUserSessionService` sem realm em metodo (`GetCurrentAsync(principal)`, `IsSessionValidAsync(principal)`, `StartAsync(subject, method, idp)`, `EndAsync(sid)`, `RecordClientAsync(sid, clientId)`); realm resolvido por `ICurrentRealmAccessor`.
 - [ ] `StartAsync` recebe o **metodo de autenticacao** (amr) e o **idp**, para popular `UserSession.AuthenticationMethods`/`IdentityProvider` e o principal.
 - [ ] Atualizar `IStorage.GetUserSessionStore(realm)`/`MemoryStorage.Storage.cs` para usar o contrato puro, removendo `GetCurrentSessionAsync` do store.
 - [ ] Migrar `DefaultCodeFactory.AddClientIdAsync` → `IUserSessionService.RecordClientAsync`.

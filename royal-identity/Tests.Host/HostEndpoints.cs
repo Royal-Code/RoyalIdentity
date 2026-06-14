@@ -91,9 +91,9 @@ public static class HostEndpoints
             }
 
             await messageStore.DeleteAsync(logoutId, default);
-            _ = await signOutManager.SignOutAsync(model, default);
+            var redirect = await signOutManager.SignOutAsync(model, default);
 
-            return Results.Ok();
+            return Results.Ok(new { redirect = redirect.ToString() });
         });
 
         app.MapGet("{realm}/test/account/token", async (HttpContext context,

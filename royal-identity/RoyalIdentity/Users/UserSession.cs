@@ -1,0 +1,39 @@
+namespace RoyalIdentity.Users;
+
+/// <summary>
+/// Serializable SSO session model (camada C). Unlike the legacy <see cref="IdentitySession"/>, it holds
+/// the <see cref="SubjectId"/> (a value), not the live user object, so it can be persisted by the future
+/// RoyalIdentity.Data.Operational module. Realm scoping is by the store it lives in — never a field/param.
+/// </summary>
+public sealed class UserSession
+{
+    /// <summary>Unique session identifier — the OIDC <c>sid</c> claim value.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>The subject (OIDC <c>sub</c>) that owns the session. A value, not the user object.</summary>
+    public required string SubjectId { get; init; }
+
+    /// <summary>Authentication method reference (OIDC <c>amr</c>) used to start the session.</summary>
+    public required string AuthenticationMethod { get; init; }
+
+    /// <summary>Identity provider (OIDC <c>idp</c>) that authenticated the subject.</summary>
+    public required string IdentityProvider { get; init; }
+
+    /// <summary>When the session started (drives the <c>auth_time</c> claim).</summary>
+    public required DateTime StartedAt { get; init; }
+
+    /// <summary>Whether the session is active. Logout/expiry set this to <c>false</c>.</summary>
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// Clients the subject signed into during the session. Deduplicated by client id (the default set
+    /// uses <see cref="UserSessionClient"/>'s by-client-id equality).
+    /// </summary>
+    public HashSet<UserSessionClient> Clients { get; init; } = [];
+
+    /// <summary>
+    /// Reserved — no behavior in this plan (pontos1 §6). A future phase may define its interaction with
+    /// cookie lifetime / <c>UserSsoLifetime</c> / session expiry. Do not branch on it yet.
+    /// </summary>
+    public DateTime? ExpiresAt { get; set; }
+}
