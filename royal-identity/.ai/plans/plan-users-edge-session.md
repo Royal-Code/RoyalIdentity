@@ -4,12 +4,12 @@
 
 ## Progresso
 
-`█░░░░░░░░` **11%** - 1 de 9 fases concluidas
+`██░░░░░░░` **22%** - 2 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - ADRs (governanca) | Concluida |
-| Fase 2 - Testes de caracterizacao | Pendente |
+| Fase 2 - Testes de caracterizacao | Concluida |
 | Fase 3 - Contratos e tipos de borda | Pendente |
 | Fase 4 - Conta in-memory + SubjectId + autenticador | Pendente |
 | Fase 5 - Sessao (modelo + store puro + service) | Pendente |
@@ -212,13 +212,13 @@ Concluida. Entregaveis:
 fim de cada fase seguinte. Onde ja houver cobertura, complementar; nao alterar comportamento aqui.
 
 **Tarefas:**
-- [ ] Cobrir: login valido cria sessao ativa realm-scoped; login invalido **nao** cria sessao e incrementa falha; sucesso zera falhas.
-- [ ] Cobrir: usuario inativo/bloqueado nao autentica (mensagem generica).
-- [ ] Cobrir: cookie com sessao encerrada e rejeitado; logout encerra sessao e notifica clients.
-- [ ] Cobrir: emissao de code registra o client na sessao; back/front-channel logout usam os clients da sessao.
-- [ ] Cobrir: isolamento de realm (sessao de A nao vale em B); `prompt=login`/`max_age`/`UserSsoLifetime` forcam interacao.
-- [ ] Mapear quais testes assertam `sub` == username (serao atualizados na Fase 4, quando `SubjectId` ≠ username).
-- [ ] Rodar a suite completa e registrar baseline verde.
+- [x] Cobrir: login valido cria sessao ativa realm-scoped; login invalido **nao** cria sessao e incrementa falha; sucesso zera falhas.
+- [x] Cobrir: usuario inativo/bloqueado nao autentica (mensagem generica).
+- [x] Cobrir: cookie com sessao encerrada e rejeitado; logout encerra sessao e notifica clients.
+- [x] Cobrir: emissao de code registra o client na sessao; back/front-channel logout usam os clients da sessao.
+- [x] Cobrir: isolamento de realm (sessao de A nao vale em B); `prompt=login`/`max_age`/`UserSsoLifetime` forcam interacao.
+- [x] Mapear quais testes assertam `sub` == username (serao atualizados na Fase 4, quando `SubjectId` ≠ username).
+- [x] Rodar a suite completa e registrar baseline verde.
 
 **Criterios de aceite:** suite verde; os comportamentos acima estao cobertos por testes HTTP.
 
@@ -226,7 +226,39 @@ fim de cada fase seguinte. Onde ja houver cobertura, complementar; nao alterar c
 
 ### Resultado da Fase 2
 
-A preencher quando a fase for executada.
+Concluida. **Baseline verde:** `dotnet test RoyalIdentity.sln` ⇒ **178 testes, 0 falhas** (Pipelines 3, Identity 6,
+Integration 169 — dos quais **12 novos** de caracterizacao). `Tests.Endpoints` nao esta na solution; `Tests.WebApp`
+nao tem `[Fact]`.
+
+**Novos artefatos (em `Tests.Integration`):**
+- `Prepare/CharacterizationSeed.cs` — helpers: `SeedUser` (usuario unico por chamada — **nao** mexe em alice/bob,
+  que sao estado mutavel compartilhado no singleton de storage), `GetDetails`, `FindSession` (por realm), `PostLoginAsync`.
+- `Prepare/BackChannelCapturingAppFactory.cs` — `AppFactory` que substitui `IBackChannelLogoutNotifier` por um fake
+  capturador (ultima registro de DI vence), para assertar quem foi notificado no logout.
+- `Characterization/UserSessionCharacterizationTests.cs` (8): login cria sessao ativa realm-scoped; senha invalida nao
+  cria sessao e incrementa contador; sucesso zera; inativo ⇒ rejeitado + mensagem generica + sem sessao; **lockout** apos
+  `MaxFailedAccessAttempts` (3) ⇒ ate a senha correta e rejeitada (prova lockout) + mensagem generica; cookie de sessao
+  encerrada ⇒ rejeitado (302 p/ login); emissao de code registra o client na sessao; logout encerra a sessao.
+- `Characterization/PromptInteractionCharacterizationTests.cs` (3): baseline autenticado sem prompt emite code;
+  `prompt=login` e `max_age=0` forcam login (mesmo caminho do `PromptLoginDecorator` que serve `UserSsoLifetime`).
+- `Characterization/BackChannelLogoutCharacterizationTests.cs` (1): logout notifica back-channel dos clients registrados
+  na sessao, com `Subject` = nome do usuario (comportamento ATUAL) e `SessionId` corretos.
+
+> Cobertura ja existente reutilizada como rede: `LoginPageTests` (login valido/invalido), `LoginConsentUIFlowTests`
+> (consent + denial `access_denied`), `EndSessionTests` (logout message), `RealmIsolationTests`
+> (`SessionIsolation_LoginInRealmA_DoesNotAuthenticateRealmB`, code com `RealmId`).
+
+**Mapa `sub == username` (a ajustar na Fase 4, quando `SubjectId` ≠ username):**
+- `Tests.Host/HostEndpoints.cs` — `{realm}/test/account/profile` faz `users.GetUserAsync(context.User.GetSubjectId())`,
+  i.e. **assume `sub` como chave de username** no store. Na Fase 4 o lookup precisa ser por `SubjectId`.
+- `Tests.Integration/Prepare/LoginTests.cs::Login_Profile` — depende do profile acima (assert `userName == "alice"`).
+- `Tests.Integration/Endpoints/CodeTokenTests.cs`, `RefreshTokenTests.cs`, `Realm/RealmIsolationTests.cs` e o helper
+  `Prepare/SubjectFactory.cs` — usam `SubjectFactory.Create("alice", ...)`, fixando `sub = "alice"` (principal construido
+  a mao; **nao quebram**, mas conflatam `sub` com username). Fase 4: usar `SubjectId` deterministico ≠ username nos seeds/asserts.
+- `Tests.Integration/Endpoints/UserInfoTests.cs` — so verifica **presenca** das claims `sub`/`name` (seguro).
+
+**Nota de isolamento:** os contadores de falha/lockout e o flag `IsActive` sao mutaveis e vivem no singleton de storage; por
+isso todo teste que os altera usa `SeedUser` (usuario unico) — nunca alice/bob — evitando contaminacao entre classes de teste.
 
 ---
 
