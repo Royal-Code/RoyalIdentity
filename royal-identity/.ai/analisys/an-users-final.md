@@ -1,8 +1,17 @@
 # Redesign de Usuários / Sessão / Identidade — Versão Final
 
-> **Status:** especificação de redesign aprovada para virar ADR + plano.
-> **Consolida e supersede** (como fonte de verdade do redesign de Users):
-> [an-users-m1.md](an-users-m1.md), [an-users-m2.md](an-users-m2.md),
+> **⚠️ Status (revisto):** **reescopada** por [an-users-arch.md](an-users-arch.md), que responde a
+> [an-users-pontos1.md](an-users-pontos1.md) e [an-users-pontos2.md](an-users-pontos2.md). Este documento
+> **deixa de ser a versão final autoritativa**: ele continua válido como **insumo da camada de borda + sessão**
+> do IdP, mas o **modelo rico** aqui descrito (`UserAccount` e submodelos) **migra para o módulo
+> `RoyalIdentity.UsersAccounts`** — não pertence à biblioteca do IdP. Ver o reescopo em três camadas
+> (borda / contas / sessão) e a arquitetura modular em [an-users-arch.md](an-users-arch.md).
+>
+> **Consenso escolhido:** [an-user-con2.md](an-user-con2.md) é o consenso adotado como base (o
+> `an-user-con1.md` existe no diretório, mas **não** foi usado como base — escolha registrada para evitar
+> confusão histórica; ponto 7 de [an-users-pontos1.md](an-users-pontos1.md)).
+>
+> **Consolida:** [an-users-m1.md](an-users-m1.md), [an-users-m2.md](an-users-m2.md),
 > [an-user-m1-av1.md](an-user-m1-av1.md), [an-user-m1-av2.md](an-user-m1-av2.md),
 > [an-user-con2.md](an-user-con2.md).
 >

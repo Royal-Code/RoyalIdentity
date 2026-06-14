@@ -1,7 +1,7 @@
 
 # Redesign to do list
 
-## Realm
+## Realm (CONCLUÍDO)
 
 Adicionar a funcionalidade de Realm, onde cada realm seja semelhante a um tenant.
 
@@ -20,7 +20,7 @@ Exemplo:
 
 No mapeamento da rota, o realm será identificado, e a pipeline receberá o RealmOptions correspondente.
 
-## Resources
+## Resources (CONCLUÍDO)
 
 O componente resources, o qual trata scopes, tem três tipos de recursos ou scopes:
 - IdentityResources
@@ -66,7 +66,7 @@ Há IdentitySession e IUserSessionStore.
 Há lógica confusa entre usuários e sessões.
 Precisa unificar o usuário e revisar a sessão e o login.
 
-## UI Services ✓ DONE
+## UI Services ✓ DONE (CONCLUÍDO)
 
 `ILoginPageService`, `IConsentPageService`, `IEndSessionPageService`, `ISessionContextService` criados em `RoyalIdentity.Razor/Services/`.
 ViewModels movidos para `RoyalIdentity.Razor/ViewModels/`.
@@ -79,3 +79,7 @@ Adicionar a funcionalidade de localização.
 Todos os textos e labels estão fixos no código em inglês.
 
 Deverá ser possível adicionar arquivos de localização para cada idioma.
+
+## RFC 9700
+
+Avaliar se a implementação atual está de acordo com **rfc9700**.
