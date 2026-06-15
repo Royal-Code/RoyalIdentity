@@ -1,9 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Models;
-using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
-using RoyalIdentity.Options;
 using RoyalIdentity.Users.Contracts;
 using System.Security.Claims;
 
@@ -11,44 +9,39 @@ namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultProfileService : IProfileService
 {
-    private readonly IStorage storage;
     private readonly IUserDirectory userDirectory;
     private readonly IUserSessionService userSessionService;
     private readonly ILogger logger;
 
     public DefaultProfileService(
-        IStorage storage,
         IUserDirectory userDirectory,
         IUserSessionService userSessionService,
         ILogger<DefaultProfileService> logger)
     {
-        this.storage = storage;
         this.userDirectory = userDirectory;
         this.userSessionService = userSessionService;
         this.logger = logger;
     }
 
+    /// <summary>
+    /// Sources the issued claims from the <see cref="IUserPropertyProvider"/> (claims seam, ADR-014 §2.9):
+    /// only primitives cross the boundary — the requested identity scope names and claim types go in, and
+    /// <see cref="UserClaimDto"/>[] comes back; the <see cref="Claim"/> objects are rebuilt here at the
+    /// borda. The provider also enforces account-active (inactive ⇒ no claims). Roles are emitted by the
+    /// provider as profile claims, never via the minimal session principal (ADR-014 §2.8).
+    /// </summary>
     public async ValueTask GetProfileDataAsync(ProfileDataRequest request, CancellationToken ct)
     {
-        var userDetailsStore = storage.GetUserDetailsStore(request.Client.Realm);
-        var userDetails = await userDetailsStore.GetUserDetailsAsync(request.Subject.GetSubjectId(), ct);
-        if (userDetails is null || !userDetails.IsActive)
-            return;
+        var subjectId = request.Subject.GetSubjectId();
 
-        // get all users claims
-        IEnumerable<Claim> userClaims = userDetails.Claims;
-        userClaims = userClaims.Concat(
-            [
-                new Claim(JwtRegisteredClaimNames.Name, userDetails.DisplayName),
-                new Claim(Jwt.ClaimTypes.PreferredUserName, userDetails.DisplayName)
-            ]);
+        var provider = userDirectory.GetPropertyProvider(request.Client.Realm);
+        var identityScopeNames = request.RequestedResources.IdentityScopes.Select(s => s.Name).ToList();
 
-        // filter the requested claims
-        var requestedClaim = request.RequestedClaimTypes;
-        request.IssuedClaims.AddRange(userClaims.Where(c => requestedClaim.Contains(c.Type)));
+        var userClaims = await provider.GetClaimsAsync(
+            subjectId, identityScopeNames, request.RequestedClaimTypes, ct);
 
-        // add the user's roles to the claims
-        request.IssuedClaims.AddRange(userDetails.Roles.Select(r => new Claim(Jwt.ClaimTypes.Role, r)));
+        foreach (var claim in userClaims)
+            request.IssuedClaims.Add(new Claim(claim.Type, claim.Value, claim.ValueType));
     }
 
     /// <summary>

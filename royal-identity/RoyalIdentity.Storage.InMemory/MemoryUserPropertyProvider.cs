@@ -32,9 +32,10 @@ public sealed class MemoryUserPropertyProvider(ConcurrentDictionary<string, User
         all.AddRange(details.Claims.Select(c => new UserClaimDto(c.Type, c.Value, c.ValueType)));
         all.AddRange(details.Roles.Select(r => new UserClaimDto(Jwt.ClaimTypes.Role, r)));
 
-        IReadOnlyList<UserClaimDto> projected = claimTypes.Count == 0
-            ? all
-            : all.Where(c => claimTypes.Contains(c.Type)).ToList();
+        // Strict projection by the requested claim types: a property is emitted only when its type was
+        // requested through an identity scope. No claim types requested ⇒ no profile claims (matches the
+        // previous DefaultProfileService behavior; an API-only access token must not leak profile claims).
+        IReadOnlyList<UserClaimDto> projected = [.. all.Where(c => claimTypes.Contains(c.Type))];
 
         return Task.FromResult(projected);
     }

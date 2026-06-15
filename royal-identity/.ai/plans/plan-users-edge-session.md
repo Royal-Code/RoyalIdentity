@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`███████░░` **78%** - 7 de 9 fases concluidas
+`████████░` **89%** - 8 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
@@ -15,7 +15,7 @@
 | Fase 5 - Sessao (modelo + store puro + service) | Concluida |
 | Fase 6 - "Ativo" unificado | Concluida |
 | Fase 7 - Principal + LoginFlowService + telas finas | Concluida |
-| Fase 8 - Claims por propriedade (seam) | Pendente |
+| Fase 8 - Claims por propriedade (seam) | Concluida |
 | Fase 9 - Limpeza, remocao e regressao final | Pendente |
 
 > **Manutencao deste plano (instrucao direta):** ao concluir as tarefas de uma fase, marque cada tarefa com
@@ -588,10 +588,10 @@ a montagem ad-hoc atual de claims do `DefaultProfileService`. O modulo nunca ve 
 **Roles e claims de perfil pertencem a este caminho**, nao ao `ISubjectPrincipalFactory`.
 
 **Tarefas:**
-- [ ] Implementar `IUserPropertyProvider` in-memory (projeta claims do registro por nomes de scope/claim types).
-- [ ] Refatorar `DefaultProfileService.GetProfileDataAsync` para extrair nomes/claim types e chamar o provider; converter `UserClaimDto` → `Claim` na borda.
-- [ ] Garantir que `DefaultTokenClaimsService`/`UserInfoHandler` continuam recebendo as mesmas claims efetivas.
-- [ ] **Roles:** emitir roles como claims de perfil pelo `IUserPropertyProvider`/`IProfileService`, preservando o comportamento efetivo atual, mas sem colocá-las no principal minimo de sessao.
+- [x] Implementar `IUserPropertyProvider` in-memory (projeta claims do registro por nomes de scope/claim types).
+- [x] Refatorar `DefaultProfileService.GetProfileDataAsync` para extrair nomes/claim types e chamar o provider; converter `UserClaimDto` → `Claim` na borda.
+- [x] Garantir que `DefaultTokenClaimsService`/`UserInfoHandler` continuam recebendo as mesmas claims efetivas.
+- [x] **Roles:** emitir roles como claims de perfil pelo `IUserPropertyProvider`/`IProfileService`, preservando o comportamento efetivo atual, mas sem colocá-las no principal minimo de sessao.
 
 **Criterios de aceite:** claims de id_token/userinfo identicas ao comportamento atual para os seeds; roles/profile
 claims saem pelo provider/profile service; o provider recebe so strings; sem `System.Security.Claims.Claim` cru cruzando a fronteira do provider.
@@ -601,7 +601,42 @@ projeta claims.
 
 ### Resultado da Fase 8
 
-A preencher quando a fase for executada.
+Concluida. **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒ **205 testes, 0 falhas** (Pipelines 3,
+Identity 9, Integration 193 — **+2 novos** da costura de claims).
+
+**Costura de claims fechada (`DefaultProfileService.GetProfileDataAsync`):** passou a obter as claims do
+`IUserPropertyProvider` (via `IUserDirectory.GetPropertyProvider(request.Client.Realm)`), enviando **apenas
+primitivos** — `request.RequestedResources.IdentityScopes.Select(s => s.Name)` (nomes dos identity scopes) +
+`request.RequestedClaimTypes` (claim types) — e recebendo `UserClaimDto[]`, reconstruido em `Claim` **na borda**
+(`new Claim(dto.Type, dto.Value, dto.ValueType)`). **Nenhum `System.Security.Claims.Claim` cru cruza a fronteira
+do provider** (ADR-014 §2.9). A montagem ad-hoc anterior (nome/preferred_username/roles montados no profile service)
+foi removida.
+
+**`DefaultProfileService` perdeu a dependencia de `IStorage`:** `GetUserDetailsStore`/`GetUserDetailsAsync` saiu
+deste caminho (adianta a limpeza da Fase 9 deste consumidor). A regra de "ativo" (`IsActiveAsync`) segue via
+`IUserDirectory` + `IUserSessionService`. O **enforcement de conta-ativa para claims** agora vive no provider
+(retorna `[]` para conta inexistente/inativa), preservando "conta inativa ⇒ sem claims de perfil".
+
+**Provider in-memory (`MemoryUserPropertyProvider`) — projecao estrita por claim type:** projeta `name`,
+`preferred_username`, as `Claims` do registro e as `Roles` (como `Claim(role, …)`), e **filtra estritamente pelos
+`claimTypes` solicitados** — uma propriedade so e emitida quando seu tipo foi pedido por um identity scope.
+**Correcao de bug do stub da Fase 4:** o ramo `claimTypes.Count == 0 ? all` vazaria *todas* as claims de perfil
+num access token **so-de-API** (sem identity scopes), onde o `DefaultProfileService` antigo nao adicionava nada;
+trocado por filtro estrito (sem claim type ⇒ sem claim de perfil), restaurando o comportamento anterior.
+
+**Roles preservadas sem vazar no cookie:** roles saem **so** por este caminho (provider/profile service), nunca
+pelo principal minimo de sessao (Fase 7 / ADR-014 §2.8). **Comportamento efetivo identico para os seeds:** alice/bob
+guardam `role=admin` em `Claims` e `Roles` vazio; como **nenhum** identity scope semeado declara o claim type `role`,
+a role e filtrada fora de id_token/userinfo — exatamente como antes (a colecao `Roles`, vazia, ja nao contribuia).
+
+**`DefaultTokenClaimsService`/`UserInfoHandler` inalterados:** continuam chamando `GetProfileDataAsync` e recebendo
+as mesmas claims efetivas; os filtros de protocolo (`FilterClaims`/`FilterProtocolClaims`) seguem aplicaveis.
+
+**Testes novos:** `Tests.Integration/Characterization/ClaimsSeamCharacterizationTests.cs` (2): userinfo e id_token
+(scope `openid profile email`) trazem `name`/`preferred_username`/`email` projetados pelos identity scopes e **nao**
+trazem `role` (claim do registro nao solicitada por nenhum scope ⇒ filtrada pela costura). "Conta inativa ⇒ sem
+claims" ja coberto por `ActiveRuleCharacterizationTests.UserInfo_WhenAccountInactive_ReturnsNoProfileClaims`
+(agora exercitando o provider).
 
 ---
 
