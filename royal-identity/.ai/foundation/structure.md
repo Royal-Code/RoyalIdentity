@@ -307,15 +307,37 @@ Responses/HttpResults/                  ← IResult implementations for OIDC res
   ResponseToFragmentResult.cs
   ResponseToFormPostResult.cs
 
-Users/                                  ← User management (under redesign)
+Users/                                  ← Edge (borda) facades + lean session model (ADR-013/014)
   Contracts/
-    IUserStore.cs
-    IUserDetailsStore.cs
+    ISubjectStore.cs                    ← Lookup a lean Subject by sub; IsActive (realm-bound)
+    ILocalUserAuthenticator.cs          ← Resolve login + verify password + lockout → AuthenticationResult
+    IUserPropertyProvider.cs            ← Project claims from primitives (scope names + claim types)
+    IUserDirectory.cs                   ← Gateway to the realm-bound account ports (Q1)
+    IUserSessionService.cs              ← Current/valid/start/end/record-client (realm via accessor)
+    IUserSessionStore.cs                ← Pure session store (Create/FindById/RecordClient/End)
+    ISubjectPrincipalFactory.cs         ← Minimal session principal (sub/name/auth_time/sid/idp/amr)
+    IAuthorizationContextResolver.cs    ← ResolveAsync(returnUrl) for login/consent/logout (Q2)
     IPasswordProtector.cs
-  Contexts/                             ← User flow contexts
+  Contexts/
+    AuthorizationContext.cs
   Defaults/
-  CredentialsValidationResult.cs
+    DefaultUserSessionService.cs
+    DefaultSignOutManager.cs
+    DefaultSubjectPrincipalFactory.cs
+    DefaultAuthorizationContextResolver.cs
+    DefaultPasswordProtector.cs
+    LoginFlowService.cs                 ← Orchestrates login → LoginFlowOutcome (session at sign-in)
+  Subject.cs                            ← Lean edge user (SubjectId/DisplayName/IsActive)
+  AuthenticationResult.cs               ← Unified auth result (Succeeded/Failed + reason)
+  UserSession.cs                        ← Serializable SSO session (holds SubjectId, not the user)
+  UserSessionClient.cs                  ← Client recorded on a session (equality by ClientId, dedup)
+  UserClaimDto.cs                       ← Primitive claim projection across the provider seam
+  LoginFlowResult.cs                    ← LoginRequest/LoginFlowOutcome/LoginFlowResult
   ISignOutManager.cs
+
+  > The rich account model (IdentityUser/UserDetails/IUserStore/IUserDetailsStore/IdentitySession and
+  > the credentials-result structs) was removed (ADR-014 §2.11). The in-memory fake keeps its own account
+  > record (MemoryUserAccount) in RoyalIdentity.Storage.InMemory; the UsersAccounts module replaces it later.
 
 Utils/
   Base64Url.cs
@@ -369,7 +391,6 @@ Services/                      ← UI page services (all registered Scoped)
   IEndSessionPageService.cs    ← End-session flow: load ViewModel, process POST
   EndSessionPageService.cs
   IdentityRedirectManager.cs   ← Utility: NavigationManager wrapper for SSR redirects
-  IdentityUserManager.cs       ← Thin wrapper: UserManager<T> usage
 
 ViewModels/                    ← Data transfer objects for page rendering
   LoginViewModel.cs            ← What LoginPage.razor needs to render
@@ -515,6 +536,7 @@ Constants: all protocol strings live in the single `Constants` static class (`Ro
 From `redesign-todo.md` and `[Redesign]` attributes in code:
 
 - `Client.AllowedScopes` and `Client.AllowOfflineAccess` — to be replaced by `AllowedResources` model
-- `RoyalIdentity/Users/` — user/session model needs unification (not stable)
+- `RoyalIdentity/Users/` — user/session edge redesign completed by `plan-users-edge-session`; follow ADR-014
+  and do not reintroduce the removed rich user/session types
 - `RoyalIdentity/Models/Scopes/ResourceServer.cs` and related — scope hierarchy redesign in progress
 Do not add heavy logic to these areas without consulting current context on whether redesign is still pending.

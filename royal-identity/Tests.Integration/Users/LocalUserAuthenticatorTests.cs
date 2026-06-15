@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users;
-using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
 using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
@@ -17,7 +16,7 @@ public class LocalUserAuthenticatorTests
 {
     private const string Password = "correct-horse";
 
-    private static UserDetails NewUser(
+    private static MemoryUserAccount NewUser(
         string username, string subjectId, string? password = Password, bool active = true)
         => new()
         {
@@ -29,9 +28,9 @@ public class LocalUserAuthenticatorTests
         };
 
     private static (MemoryLocalUserAuthenticator auth, ControlledTimeProvider clock, AccountOptions options)
-        Build(params UserDetails[] users)
+        Build(params MemoryUserAccount[] users)
     {
-        var dict = new ConcurrentDictionary<string, UserDetails>();
+        var dict = new ConcurrentDictionary<string, MemoryUserAccount>();
         foreach (var u in users)
             dict[u.Username] = u;
 
@@ -133,7 +132,7 @@ public class LocalUserAuthenticatorTests
     [Fact]
     public async Task SubjectId_IsSeparateFromUsername_AndStableAcrossUsernameChange()
     {
-        var users = new ConcurrentDictionary<string, UserDetails>();
+        var users = new ConcurrentDictionary<string, MemoryUserAccount>();
         var user = NewUser("alice", "sub-x");
         users[user.Username] = user;
         var subjects = new MemorySubjectStore(users);

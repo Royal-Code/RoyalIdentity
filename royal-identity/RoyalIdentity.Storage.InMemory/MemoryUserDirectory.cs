@@ -15,15 +15,15 @@ public sealed class MemoryUserDirectory(
     TimeProvider clock) : IUserDirectory
 {
     public ISubjectStore GetSubjectStore(Realm realm)
-        => new MemorySubjectStore(storage.GetRealmMemoryStore(realm).UsersDetails);
+        => new MemorySubjectStore(storage.GetRealmMemoryStore(realm).UserAccounts);
 
     public ILocalUserAuthenticator GetLocalAuthenticator(Realm realm)
         => new MemoryLocalUserAuthenticator(
-            storage.GetRealmMemoryStore(realm).UsersDetails,
+            storage.GetRealmMemoryStore(realm).UserAccounts,
             realm.Options.Account,
             passwordProtector,
             new LockoutPolicy(realm.Options.Account, clock));
 
     public IUserPropertyProvider GetPropertyProvider(Realm realm)
-        => new MemoryUserPropertyProvider(storage.GetRealmMemoryStore(realm).UsersDetails);
+        => new MemoryUserPropertyProvider(storage.GetRealmMemoryStore(realm).UserAccounts);
 }

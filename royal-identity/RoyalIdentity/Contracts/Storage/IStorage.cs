@@ -69,23 +69,9 @@ public interface IStorage
     IResourceStore GetResourceStore(Realm realm);
 
     /// <summary>
-    /// Gets the user store for the given realm.
-    /// </summary>
-    /// <param name="realm">The realm.</param>
-    /// <returns>The user store.</returns>
-    IUserStore GetUserStore(Realm realm);
-
-    /// <summary>
     /// Gets the user session store for the given realm.
     /// </summary>
     /// <param name="realm">The realm.</param>
     /// <returns>The user session store.</returns>
     IUserSessionStore GetUserSessionStore(Realm realm);
-
-    /// <summary>
-    /// Gets the user details store for the given realm.
-    /// </summary>
-    /// <param name="realm">The realm.</param>
-    /// <returns>The user details store.</returns>
-    IUserDetailsStore GetUserDetailsStore(Realm realm);
 }

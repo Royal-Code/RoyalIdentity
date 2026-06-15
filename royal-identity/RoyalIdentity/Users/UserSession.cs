@@ -1,7 +1,7 @@
 namespace RoyalIdentity.Users;
 
 /// <summary>
-/// Serializable SSO session model (camada C). Unlike the legacy <see cref="IdentitySession"/>, it holds
+/// Serializable SSO session model (camada C). Unlike the legacy <c>IdentitySession</c> (removed), it holds
 /// the <see cref="SubjectId"/> (a value), not the live user object, so it can be persisted by the future
 /// RoyalIdentity.Data.Operational module. Realm scoping is by the store it lives in — never a field/param.
 /// </summary>

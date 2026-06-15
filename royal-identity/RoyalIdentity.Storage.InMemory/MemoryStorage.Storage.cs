@@ -11,10 +11,9 @@ public partial class MemoryStorage : IStorage
 {
     private readonly ConcurrentDictionary<string, RealmMemoryStore> realmMemoryStore = new();
 
-    private readonly IPasswordProtector passwordProtector;
     private readonly TimeProvider clock;
 
-    public MemoryStorage(IPasswordProtector passwordProtector, TimeProvider clock)
+    public MemoryStorage(TimeProvider clock)
     {
         realmMemoryStore.AddRange(
             Realms.Values.Select(
@@ -22,7 +21,6 @@ public partial class MemoryStorage : IStorage
                     r.Id,
                     new RealmMemoryStore(r, r.Id == "server"))));
 
-        this.passwordProtector = passwordProtector;
         this.clock = clock;
     }
 
@@ -80,26 +78,10 @@ public partial class MemoryStorage : IStorage
     }
 
 
-    public IUserDetailsStore GetUserDetailsStore(Realm realm)
-    {
-        if (realmMemoryStore.TryGetValue(realm.Id, out var store))
-            return new UserStore(store.UsersDetails, realm.Options.Account, GetUserSessionStore(realm), passwordProtector, clock);
-
-        throw RealmNotFound(realm);
-    }
-
     public IUserSessionStore GetUserSessionStore(Realm realm)
     {
         if (realmMemoryStore.TryGetValue(realm.Id, out var store))
             return new UserSessionStore(store.UserSessions, clock);
-
-        throw RealmNotFound(realm);
-    }
-
-    public IUserStore GetUserStore(Realm realm)
-    {
-        if (realmMemoryStore.TryGetValue(realm.Id, out var store))
-            return new UserStore(store.UsersDetails, realm.Options.Account, GetUserSessionStore(realm), passwordProtector, clock);
 
         throw RealmNotFound(realm);
     }

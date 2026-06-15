@@ -58,13 +58,21 @@ Na hora de adicionar os scopes ao token, apenas os *scopes* requeridos serão ad
 
 Para exibir o consentimento, todos os *scopes* do recurso serão exibidos.
 
-## Users
+## Users ✓ DONE (CONCLUÍDO)
 
 Unificar a lógica de usuários.
 Existe IdentityUser, UserDetails, IUserStore e IUserDetailsStore.
 Há IdentitySession e IUserSessionStore.
 Há lógica confusa entre usuários e sessões.
 Precisa unificar o usuário e revisar a sessão e o login.
+
+**Concluído** pelo plano `.ai/plans/plan-users-edge-session.md` (ADR-013/014). A borda virou facades
+(`ISubjectStore`/`ILocalUserAuthenticator`/`IUserPropertyProvider` via `IUserDirectory`) + modelo enxuto
+(`Subject`, `UserSession` serializável); `sub` = `SubjectId` ≠ username; sessão criada no sign-in pelo
+`LoginFlowService`; "ativo" unificado; principal mínimo. Removidos `IdentityUser`/`DefaultIdentityUser`,
+`UserDetails`, `IUserStore`/`IUserDetailsStore`, `IdentitySession`, `(Validate|Credentials)…Result` e o
+`IdentityRevalidatingAuthenticationStateProvider` quebrado. In-memory = fake (`MemoryUserAccount`).
+**Trabalho futuro** (módulo `UsersAccounts`, persistência EFCore, KMS) está em `.ai/backlogs/backlog-001.md`.
 
 ## UI Services ✓ DONE (CONCLUÍDO)
 

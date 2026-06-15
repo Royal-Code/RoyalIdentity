@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Models.Messages;
@@ -49,13 +50,13 @@ public static class HostEndpoints
         });
 
         app.MapGet("{realm}/test/account/profile", async (HttpContext context,
-            IStorage storage,
+            IUserDirectory userDirectory,
             string realm) =>
         {
             var currentRealm = context.GetCurrentRealm();
-            var users = storage.GetUserStore(currentRealm);
-            var user = await users.GetUserAsync(context.User.GetSubjectId(), context.RequestAborted);
-            return Results.Ok(user);
+            var subjects = userDirectory.GetSubjectStore(currentRealm);
+            var subject = await subjects.FindBySubjectIdAsync(context.User.GetSubjectId(), context.RequestAborted);
+            return subject is null ? Results.NotFound() : Results.Ok(subject);
         }).RequireAuthorization();
 
         // Echoes the cookie (session) principal's claim types — used to assert the minimal session principal.

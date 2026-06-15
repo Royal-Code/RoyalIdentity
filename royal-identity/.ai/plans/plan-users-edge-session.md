@@ -1,10 +1,10 @@
 # Plan: Users — Redesign da Borda + Sessão (camadas A + C)
 
-## Status: IN_PROGRESS
+## Status: COMPLETED
 
 ## Progresso
 
-`████████░` **89%** - 8 de 9 fases concluidas
+`█████████` **100%** - 9 de 9 fases concluidas
 
 | Fase | Estado |
 |---|---|
@@ -16,7 +16,7 @@
 | Fase 6 - "Ativo" unificado | Concluida |
 | Fase 7 - Principal + LoginFlowService + telas finas | Concluida |
 | Fase 8 - Claims por propriedade (seam) | Concluida |
-| Fase 9 - Limpeza, remocao e regressao final | Pendente |
+| Fase 9 - Limpeza, remocao e regressao final | Concluida |
 
 > **Manutencao deste plano (instrucao direta):** ao concluir as tarefas de uma fase, marque cada tarefa com
 > `- [x]`, troque o **Estado** da fase para `Concluida` na tabela acima, e **atualize a barra de progresso**
@@ -601,8 +601,8 @@ projeta claims.
 
 ### Resultado da Fase 8
 
-Concluida. **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒ **205 testes, 0 falhas** (Pipelines 3,
-Identity 9, Integration 193 — **+2 novos** da costura de claims).
+Concluida. **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒ **206 testes, 0 falhas** (Pipelines 3,
+Identity 9, Integration 194 — **+3 novos** da costura de claims).
 
 **Costura de claims fechada (`DefaultProfileService.GetProfileDataAsync`):** passou a obter as claims do
 `IUserPropertyProvider` (via `IUserDirectory.GetPropertyProvider(request.Client.Realm)`), enviando **apenas
@@ -632,11 +632,11 @@ a role e filtrada fora de id_token/userinfo — exatamente como antes (a colecao
 **`DefaultTokenClaimsService`/`UserInfoHandler` inalterados:** continuam chamando `GetProfileDataAsync` e recebendo
 as mesmas claims efetivas; os filtros de protocolo (`FilterClaims`/`FilterProtocolClaims`) seguem aplicaveis.
 
-**Testes novos:** `Tests.Integration/Characterization/ClaimsSeamCharacterizationTests.cs` (2): userinfo e id_token
+**Testes novos:** `Tests.Integration/Characterization/ClaimsSeamCharacterizationTests.cs` (3): userinfo e id_token
 (scope `openid profile email`) trazem `name`/`preferred_username`/`email` projetados pelos identity scopes e **nao**
-trazem `role` (claim do registro nao solicitada por nenhum scope ⇒ filtrada pela costura). "Conta inativa ⇒ sem
-claims" ja coberto por `ActiveRuleCharacterizationTests.UserInfo_WhenAccountInactive_ReturnsNoProfileClaims`
-(agora exercitando o provider).
+trazem `role` (claim do registro nao solicitada por nenhum scope ⇒ filtrada pela costura); access token API-only
+(scope `api`) **nao** vaza `name`/`preferred_username`/`email`/`role`. "Conta inativa ⇒ sem claims" ja coberto por
+`ActiveRuleCharacterizationTests.UserInfo_WhenAccountInactive_ReturnsNoProfileClaims` (agora exercitando o provider).
 
 ---
 
@@ -646,12 +646,12 @@ claims" ja coberto por `ActiveRuleCharacterizationTests.UserInfo_WhenAccountInac
 completa e validar os criterios de aceite globais.
 
 **Tarefas:**
-- [ ] Remover `IdentityUser`/`DefaultIdentityUser`, `UserDetails`, `IUserStore`, `IUserDetailsStore`, `IdentitySession`, `ValidateCredentialsResult`, `CredentialsValidationResult`.
-- [ ] Remover `IdentityRevalidatingAuthenticationStateProvider` (e seu registro no `RoyalIdentityRazorServiceCollectionExtensions`).
-- [ ] Ajustar `IdentityUserManager` (Razor) para `ISubjectStore` (ou remover se redundante).
-- [ ] Remover/adaptar chamadas residuais de `IStorage.GetUserStore`, `GetUserDetailsStore` e contratos antigos de sessao (incluir `Tests.Host`/`HostEndpoints` e `Tests.Identity`, que referenciam os tipos removidos).
-- [ ] Remover registros de DI obsoletos; conferir que nenhum `[Redesign]` de Users remanesce sem destino.
-- [ ] Rodar build + suite completa; validar os "Criterios de aceite globais".
+- [x] Remover `IdentityUser`/`DefaultIdentityUser`, `UserDetails`, `IUserStore`, `IUserDetailsStore`, `IdentitySession`, `ValidateCredentialsResult`, `CredentialsValidationResult`.
+- [x] Remover `IdentityRevalidatingAuthenticationStateProvider` (e seu registro no `RoyalIdentityRazorServiceCollectionExtensions`).
+- [x] Ajustar `IdentityUserManager` (Razor) para `ISubjectStore` (ou remover se redundante). — **removido** (sem consumidores; era redundante).
+- [x] Remover/adaptar chamadas residuais de `IStorage.GetUserStore`, `GetUserDetailsStore` e contratos antigos de sessao (incluir `Tests.Host`/`HostEndpoints` e `Tests.Identity`, que referenciam os tipos removidos).
+- [x] Remover registros de DI obsoletos; conferir que nenhum `[Redesign]` de Users remanesce sem destino.
+- [x] Rodar build + suite completa; validar os "Criterios de aceite globais".
 
 **Criterios de aceite:** solucao sem os tipos antigos; suite verde; criterios globais satisfeitos.
 
@@ -659,7 +659,46 @@ completa e validar os criterios de aceite globais.
 
 ### Resultado da Fase 9
 
-A preencher quando a fase for executada.
+Concluida. **Build + suite verdes:** `dotnet test RoyalIdentity.sln` ⇒ **206 testes, 0 falhas** (Pipelines 3,
+Identity 9, Integration 194). **Sem novos avisos** (os 26 sao pre-existentes em `Client.cs`/`RedesignAttribute.cs`/
+`HttpContextExtensions.cs`).
+
+**Tipos legados removidos (core `RoyalIdentity`):** `IdentityUser`, `DefaultIdentityUser`, `IUserStore`,
+`IUserDetailsStore`, `UserDetails`, `IdentitySession`, `ValidateCredentialsResult`, `CredentialsValidationResult`.
+`IStorage` perdeu `GetUserStore`/`GetUserDetailsStore` (resta `GetUserSessionStore`, puro). XML-docs que citavam
+os tipos removidos viraram texto literal (`<c>...</c>`) — sem `<see cref>` quebrado (CS1574).
+
+**`UserDetails` → `MemoryUserAccount` (movido para o fake):** o registro de conta deixou o core (criterio global #1:
+borda 100% facade, so `Subject`) e passou a viver em `RoyalIdentity.Storage.InMemory` como `MemoryUserAccount` — a
+"persistencia" do fake. `RealmMemoryStore.UsersDetails` → `UserAccounts`. As facades (`MemorySubjectStore`,
+`MemoryLocalUserAuthenticator`, `LockoutPolicy`, `MemoryUserPropertyProvider`, `MemoryUserDirectory`) e os helpers
+de teste (`CharacterizationSeed`, `LocalUserAuthenticatorTests`) passaram a usar `MemoryUserAccount`. `UserStore`
+(impl. de `IUserStore`/`IUserDetailsStore`) **deletado**. `MemoryStorage` deixou de receber `IPasswordProtector`
+(so o usava para construir o `UserStore` removido) — ctor agora `(TimeProvider)`.
+
+**Razor:** `IdentityRevalidatingAuthenticationStateProvider` **removido** (resolvia um `IUserStore` nao registrado —
+quebrado — e ignorava realm); substituido pelo `ServerAuthenticationStateProvider` do framework (le o principal do
+cookie). A validacao de sessao ja ocorre por request no `OnValidatePrincipal` → `IUserSessionService.IsSessionValidAsync`;
+revalidacao por circuito (SecurityStamp) fica reservada (fora de escopo). `IdentityUserManager` **removido** (sem
+consumidores). `IdentityRedirectManager` e os page services finos permanecem.
+
+**Test host:** `{realm}/test/account/profile` reescrito para a borda (`IUserDirectory.GetSubjectStore(realm)
+.FindBySubjectIdAsync(sub)`), retornando o `Subject` enxuto; `LoginTests.Login_Profile` agora asserta
+`subjectId == AliceSubjectId` + `displayName == "Alice"` (o username deixou de existir na borda).
+
+**Validacao dos "Criterios de aceite globais" (todos atendidos):**
+1. ✅ Borda enxuta (`Subject`); nenhum agregado rico no core (`IdentityUser`/`UserDetails` removidos).
+2. ✅ `sub` = `SubjectId` estavel ≠ username/email (Fase 4; provado por `SubjectIdCharacterizationTests`).
+3. ✅ `UserSession` serializavel (guarda `SubjectId`); store puro sem `HttpContext`; sem realm em parametro (fabrica/accessor).
+4. ✅ "Ativo" unico (conta && sessao); sessao ausente ⇒ invalida (Fase 6; `ActiveRuleCharacterizationTests`).
+5. ✅ Telas nao conhecem stores/`ClaimsPrincipal`/cookie e nao fazem sign-in direto (Fase 7; `LoginPageService` adaptador).
+6. ✅ Lockout num lugar so (`LockoutPolicy`); mensagens genericas mantidas.
+7. ✅ Testes existentes (login/consent/endsession/userinfo/realm isolation) verdes.
+8. ✅ Novos testes cobrem lockout, sessao, `SubjectId`≠username, "ativo" e a costura de claims.
+9. ✅ Eventos de login/logout sem `IdentityUser` (carregam `SubjectId`).
+10. ✅ `ISubjectPrincipalFactory` so emite principal minimo; roles/claims de perfil via `IProfileService`/`IUserPropertyProvider` (Fase 8).
+11. ✅ Core nao espalha `HttpContext.GetCurrentRealm()`; usa `ICurrentRealmAccessor`.
+12. ✅ Facades prontas para os modulos futuros (`UsersAccounts`) encaixarem via troca de DI, sem reescrever a borda.
 
 ---
 

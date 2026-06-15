@@ -10,10 +10,10 @@ namespace RoyalIdentity.Storage.InMemory;
 /// verifies the password (<see cref="IPasswordProtector"/>) and applies the single <see cref="LockoutPolicy"/>,
 /// returning one <see cref="AuthenticationResult"/>. It does NOT start a session or write cookies — that is
 /// the IdP's job (ADR-014 §2.x). Realm is bound at construction. Failure/success counters are mutated
-/// in place on the shared <see cref="UserDetails"/> records (the fake store's "persistence").
+/// in place on the shared <see cref="MemoryUserAccount"/> records (the fake store's "persistence").
 /// </summary>
 public sealed class MemoryLocalUserAuthenticator(
-    ConcurrentDictionary<string, UserDetails> users,
+    ConcurrentDictionary<string, MemoryUserAccount> users,
     AccountOptions accountOptions,
     IPasswordProtector passwordProtector,
     LockoutPolicy lockoutPolicy) : ILocalUserAuthenticator
@@ -51,7 +51,7 @@ public sealed class MemoryLocalUserAuthenticator(
     /// realm allows it, by email claim. Identifier resolution is the authenticator's job, not the store's
     /// (pontos1 §2).
     /// </summary>
-    private UserDetails? ResolveLogin(string login)
+    private MemoryUserAccount? ResolveLogin(string login)
     {
         if (users.TryGetValue(login, out var byKey))
             return byKey;

@@ -28,7 +28,7 @@ public class DefaultUserSessionServiceTests
     private static (DefaultUserSessionService service, ControlledTimeProvider clock) Build()
     {
         var clock = new ControlledTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
-        var storage = new MemoryStorage(new DefaultPasswordProtector(), clock);
+        var storage = new MemoryStorage(clock);
         var accessor = new FakeRealmAccessor(MemoryStorage.DemoRealm);
         return (new DefaultUserSessionService(storage, accessor, clock), clock);
     }

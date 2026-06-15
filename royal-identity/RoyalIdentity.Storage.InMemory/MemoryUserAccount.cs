@@ -1,11 +1,18 @@
 using System.Security.Claims;
 
-namespace RoyalIdentity.Users.Contracts;
+namespace RoyalIdentity.Storage.InMemory;
 
 #nullable disable // POCO
 #pragma warning disable // POCO
 
-public class UserDetails
+/// <summary>
+/// In-memory (fake/reference) account record backing the edge facades (<c>ISubjectStore</c> /
+/// <c>ILocalUserAuthenticator</c> / <c>IUserPropertyProvider</c>). This is <b>not</b> a core contract: the
+/// borda is 100% facade and speaks only <c>Subject</c> + primitives; the rich account model lives in the
+/// future RoyalIdentity.UsersAccounts module (ADR-013/014). Kept here only as the fake store's persistence
+/// shape (failure counters and claims are mutated in place).
+/// </summary>
+public class MemoryUserAccount
 {
     /// <summary>
     /// Stable, immutable identifier — the OIDC <c>sub</c>. Separate from <see cref="Username"/> and never

@@ -21,7 +21,7 @@ public enum AuthenticationFailureReason
 
 /// <summary>
 /// Single result of a local authentication attempt — unifies the legacy
-/// <see cref="CredentialsValidationResult"/> + <see cref="ValidateCredentialsResult"/>. On success it
+/// <c>CredentialsValidationResult</c> + <c>ValidateCredentialsResult</c> (both removed). On success it
 /// carries the <see cref="Subject"/> the borda will use protocolarmente; on failure it carries the
 /// <see cref="AuthenticationFailureReason"/>.
 /// </summary>

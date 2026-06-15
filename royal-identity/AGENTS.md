@@ -16,8 +16,8 @@ Before significant code changes, read:
 Before modifying an area touched by a plan, inspect `.ai/plans/` first. Deferred
 product/design notes live in `.ai/backlogs/backlog-001.md`.
 
-Active redesign plans include `.ai/plans/plan-users-edge-session.md` for the
-users/session area. Check its current phase and progress before changing
+Completed redesign plans include `.ai/plans/plan-users-edge-session.md` for the
+users/session area. Treat it as the implemented target architecture before changing
 `RoyalIdentity/Users/`, account UI services, profile claims, login/logout, or
 session behavior.
 
@@ -101,8 +101,10 @@ valid `IResponseHandler`.
 
 ## Storage And Realm Isolation
 
-Use `IStorage` and the realm-aware store accessors. Do not add persistence logic
-directly to domain services or handlers. When adding storage operations:
+Use `IStorage` and the realm-aware store accessors for IdP data. Account/user
+edge data goes through `IUserDirectory` and its realm-bound ports, not through
+`IStorage`. Do not add persistence logic directly to domain services or handlers.
+When adding storage operations:
 
 1. Add the method to the relevant interface under `RoyalIdentity/Contracts/Storage/`.
 2. Implement it in `RoyalIdentity.Storage.InMemory`.
@@ -151,9 +153,13 @@ Known unstable areas include:
 
 - `Client.AllowedScopes` and `Client.AllowOfflineAccess`, pending an
   `AllowedResources`-style model.
-- The user/session model under `RoyalIdentity/Users/`, being redesigned per
-  `ADR-014` and `.ai/plans/plan-users-edge-session.md` (edge contracts/facades,
-  immutable `SubjectId`, pure session store, `LoginFlowService`).
+- The user/session edge under `RoyalIdentity/Users/`, redesigned per `ADR-014`
+  and `.ai/plans/plan-users-edge-session.md`: use `Subject`, `IUserDirectory`,
+  `ILocalUserAuthenticator`, `IUserPropertyProvider`, pure `IUserSessionStore`,
+  `IUserSessionService`, `ISubjectPrincipalFactory`, and `LoginFlowService`.
+  Do not reintroduce removed legacy types such as `IdentityUser`, `UserDetails`,
+  `IUserStore`, `IUserDetailsStore`, `IdentitySession`, `ISignInManager`, or
+  credentials-result structs.
 - Scope/resource hierarchy types such as `ResourceServer` and related models.
 - Realm-specific options and CORS, covered by
   `.ai/plans/plan-realm-options-redesign.md`.

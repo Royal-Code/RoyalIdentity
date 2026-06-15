@@ -141,13 +141,18 @@ Current model:
 
 ---
 
-## Users (Current State — Under Redesign)
+## Users (Edge + Session — redesigned, ADR-013/014)
 
-Current state (per redesign-todo.md): There is confusion between `IdentityUser`, `UserDetails`, `IUserStore`, `IUserDetailsStore`, `IdentitySession`, and `IUserSessionStore`. This is a known design debt.
+The edge (borda) was redesigned into **facades + a lean model** (plan `plan-users-edge-session`, COMPLETED). The old confusion (`IdentityUser`/`UserDetails` rich objects, `IUserStore`/`IUserDetailsStore` being the same class, `IdentitySession` holding the live user, `UserSessionStore` reading `HttpContext`) is gone — those types were removed (ADR-014 §2.11).
 
-**Decision (ADR-005)**: RoyalIdentity will have its own user management, not dependent on ASP.NET Identity. User data and rules are configurable per realm. ASP.NET Identity may be used as reference only.
+- **Edge contracts (core):** `ISubjectStore`, `ILocalUserAuthenticator`, `IUserPropertyProvider` (behind the `IUserDirectory` gateway), `IUserSessionStore` (pure) + `IUserSessionService`, `ISubjectPrincipalFactory`, `IAuthorizationContextResolver`. The borda speaks only `Subject` + primitives.
+- **`sub` = `SubjectId`** — stable, immutable, separate from username/email.
+- **Session** is serializable (holds `SubjectId`, not the user), created **at sign-in** by `LoginFlowService` (no longer a side-effect of password verification). "Active" is one rule (account active && session valid; absent session ⇒ invalid).
+- **Claims** flow through `IProfileService` → `IUserPropertyProvider` (primitives only); roles/profile claims never enter the minimal session principal.
 
-**Do not assume user/session model is stable**. The redesign-todo explicitly calls for unification.
+**Decision (ADR-005, refined by ADR-013/014)**: RoyalIdentity has its own user management, not dependent on ASP.NET Identity. User data and rules are configurable per realm.
+
+**In-memory is fake/reference only** (`MemoryUserAccount` + `MemoryUserDirectory` in `RoyalIdentity.Storage.InMemory`). The rich account model and persistence are deferred to the **RoyalIdentity.UsersAccounts** module (a DI swap; see backlog).
 
 ---
 
@@ -175,5 +180,6 @@ Current state (per redesign-todo.md): There is confusion between `IdentityUser`,
 From redesign-todo.md and `[Redesign]` attributes in code:
 
 1. **Scope/Resource model**: `Client.AllowedScopes` and `Client.AllowOfflineAccess` need replacement with an `AllowedResources` model following ResourceServer → Resource → Scope hierarchy
-2. **User/session unification**: Merge `IdentityUser`, `UserDetails`, `IUserStore`, `IUserDetailsStore`
-3. **Localization**: Add localization support for all UI text
+2. **Localization**: Add localization support for all UI text
+
+> **Done:** User/session unification (merge of `IdentityUser`/`UserDetails`/`IUserStore`/`IUserDetailsStore`) — completed by `plan-users-edge-session` (ADR-013/014). Follow-up modules (`UsersAccounts`, data persistence, KMS) are tracked in the backlog, not here.

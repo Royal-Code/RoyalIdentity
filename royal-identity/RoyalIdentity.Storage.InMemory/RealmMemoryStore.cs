@@ -5,7 +5,6 @@ using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users;
-using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Utils;
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
@@ -159,9 +158,9 @@ public class RealmMemoryStore
         }
     };
 
-    public ConcurrentDictionary<string, UserDetails> UsersDetails { get; } = new()
+    public ConcurrentDictionary<string, MemoryUserAccount> UserAccounts { get; } = new()
     {
-        ["alice"] = new UserDetails
+        ["alice"] = new MemoryUserAccount
         {
             SubjectId = MemoryStorage.AliceSubjectId,
             Username = "alice",
@@ -174,7 +173,7 @@ public class RealmMemoryStore
                 new Claim("role", "admin")
             ]
         },
-        ["bob"] = new UserDetails
+        ["bob"] = new MemoryUserAccount
         {
             SubjectId = MemoryStorage.BobSubjectId,
             Username = "bob",

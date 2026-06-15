@@ -1,18 +1,17 @@
 using RoyalIdentity.Options;
-using RoyalIdentity.Users.Contracts;
 
 namespace RoyalIdentity.Storage.InMemory;
 
 /// <summary>
 /// Single home for the account lockout policy used by the in-memory (fake/reference) authenticator
 /// (ADR-014 / plan Fase 4: "lockout num lugar so"). It reads <see cref="PasswordOptions"/> and mutates the
-/// failure counters on <see cref="UserDetails"/>. In production this logic belongs to the
+/// failure counters on <see cref="MemoryUserAccount"/>. In production this logic belongs to the
 /// RoyalIdentity.UsersAccounts module. Realm is bound at construction (via <see cref="AccountOptions"/>).
 /// </summary>
 public sealed class LockoutPolicy(AccountOptions accountOptions, TimeProvider clock)
 {
     /// <summary>Whether the account is currently locked out by failed-attempt count and duration.</summary>
-    public bool IsLockedOut(UserDetails details)
+    public bool IsLockedOut(MemoryUserAccount details)
     {
         var options = accountOptions.PasswordOptions;
         if (options.MaxFailedAccessAttempts is 0)
@@ -32,14 +31,14 @@ public sealed class LockoutPolicy(AccountOptions accountOptions, TimeProvider cl
     }
 
     /// <summary>Registers a failed password attempt (increments the counter and stamps the time).</summary>
-    public void RegisterFailure(UserDetails details)
+    public void RegisterFailure(MemoryUserAccount details)
     {
         details.LoginAttemptsWithPasswordErrors++;
         details.LastPasswordError = clock.GetUtcNow();
     }
 
     /// <summary>Resets the failure state after a successful authentication.</summary>
-    public void RegisterSuccess(UserDetails details)
+    public void RegisterSuccess(MemoryUserAccount details)
     {
         if (details.LoginAttemptsWithPasswordErrors is 0)
             return;

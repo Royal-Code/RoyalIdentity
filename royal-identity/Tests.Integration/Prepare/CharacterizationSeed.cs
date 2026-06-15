@@ -1,6 +1,5 @@
 using RoyalIdentity.Models;
 using RoyalIdentity.Users;
-using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 
@@ -24,7 +23,7 @@ internal static class CharacterizationSeed
         MemoryStorage storage, RoyalIdentity.Models.Realm realm, bool active = true)
     {
         var username = $"char-{CryptoRandom.CreateUniqueId(8)}";
-        storage.GetRealmMemoryStore(realm).UsersDetails[username] = new UserDetails
+        storage.GetRealmMemoryStore(realm).UserAccounts[username] = new MemoryUserAccount
         {
             SubjectId = $"sub-{CryptoRandom.CreateUniqueId(16)}", // stable id, intentionally != username
             Username = username,
@@ -36,15 +35,15 @@ internal static class CharacterizationSeed
         return (username, DefaultPassword);
     }
 
-    /// <summary>Reads back the mutable details record (failure counters, active flag, ...).</summary>
-    public static UserDetails GetDetails(MemoryStorage storage, RoyalIdentity.Models.Realm realm, string username)
-        => storage.GetRealmMemoryStore(realm).UsersDetails[username];
+    /// <summary>Reads back the mutable account record (failure counters, active flag, ...).</summary>
+    public static MemoryUserAccount GetDetails(MemoryStorage storage, RoyalIdentity.Models.Realm realm, string username)
+        => storage.GetRealmMemoryStore(realm).UserAccounts[username];
 
     /// <summary>Finds the (single) session created for the given user in the realm session store.</summary>
     public static UserSession? FindSession(MemoryStorage storage, RoyalIdentity.Models.Realm realm, string username)
     {
         var store = storage.GetRealmMemoryStore(realm);
-        var details = store.UsersDetails.Values.FirstOrDefault(u => u.Username == username);
+        var details = store.UserAccounts.Values.FirstOrDefault(u => u.Username == username);
         return details is null
             ? null
             : store.UserSessions.Values.FirstOrDefault(s => s.SubjectId == details.SubjectId);

@@ -28,13 +28,14 @@ public class LoginTests : IClassFixture<AppFactory>
         var content = await response.Content.ReadAsStringAsync();
         Assert.NotNull(content);
 
-        var user = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
-        
-        Assert.NotNull(user);
-        Assert.Contains("userName", user);
+        var subject = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
 
-        string userName = user["userName"].ToString()!;
-        Assert.Equal("alice", userName);
+        Assert.NotNull(subject);
+
+        // The profile endpoint now returns the lean edge Subject (subjectId/displayName/isActive); the
+        // username is no longer part of the borda. The sub is the stable SubjectId, not the username.
+        Assert.Equal(MemoryStorage.AliceSubjectId, subject["subjectId"].ToString());
+        Assert.Equal("Alice", subject["displayName"].ToString());
     }
 
     [Fact]

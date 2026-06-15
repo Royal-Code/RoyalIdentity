@@ -9,7 +9,7 @@ namespace RoyalIdentity.Storage.InMemory;
 /// stable <c>sub</c>. Realm is bound at construction (the users dictionary belongs to one realm). The fake
 /// store scans by subject id; a real store (UsersAccounts module) would keep an index.
 /// </summary>
-public sealed class MemorySubjectStore(ConcurrentDictionary<string, UserDetails> users) : ISubjectStore
+public sealed class MemorySubjectStore(ConcurrentDictionary<string, MemoryUserAccount> users) : ISubjectStore
 {
     public Task<Subject?> FindBySubjectIdAsync(string subjectId, CancellationToken ct = default)
     {
@@ -21,6 +21,6 @@ public sealed class MemorySubjectStore(ConcurrentDictionary<string, UserDetails>
     public Task<bool> IsActiveAsync(string subjectId, CancellationToken ct = default)
         => Task.FromResult(Find(subjectId) is { IsActive: true });
 
-    private UserDetails? Find(string subjectId)
+    private MemoryUserAccount? Find(string subjectId)
         => users.Values.FirstOrDefault(u => u.SubjectId == subjectId);
 }
