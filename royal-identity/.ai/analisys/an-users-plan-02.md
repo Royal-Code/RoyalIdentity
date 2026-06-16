@@ -10,7 +10,10 @@ Esta análise avalia o plano `.ai/plans/plan-users-accounts-module.md`.
 
 O plano está em coêrente nas seções iniciais, `Contexto`, `Objetivo`, `Fora de Escopo` e `Decisões já fechadas`.
 
-No entanto há uma afirmação/decisão/modeloagem que me encomoda, o uso do `UserClaimDto[]` como objeto de comunicação de borda. Já tem o `Claim` nativo das bibliotecas de autenticação, isso se trata de autenticação, colocar mais um tipo no meio entre a entidade que vem do banco e o `Claim` que é utilizado na autenticação me parece inútil, não consigo enxergar ganho nenhum, e ainda vejo um termo não desejado: `Dto`.
+No entanto há uma afirmação/decisão/modelagem que me encomoda, o uso do `UserClaimDto[]` como objeto de comunicação de borda. Já tem o `Claim` nativo das bibliotecas de autenticação, isso se trata de autenticação, colocar mais um tipo no meio entre a entidade que vem do banco e o `Claim` que é utilizado na autenticação me parece inútil, não consigo enxergar ganho nenhum, e ainda vejo um termo não desejado: `Dto`.
+
+Outro ponto problemático é que falta a definição do `PropertyScope` e `PropertyDefinition` como schema e como isso é "instanciado" por conta de usuário.
+O modelo de como salvar no banco não foi discutido, e também a modelagem me parece que não tem schema, ou que cada conta de usuário tem seu schema e valores juntos. Parece um erro de modelagem. Isso é grave ao meu ver.
 
 O problema mais grave de é de design, onde o UserAccounts depende de RoyalIdentity.
 O RoyalIdentity servirá para IdP, para autenticação com OIDC. UserAccounts vai gerenciar usuários, servirá como fonte para o IdP, mas também será usada de WebApi para administração.
