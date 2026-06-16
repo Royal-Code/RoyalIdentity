@@ -11,6 +11,7 @@ Before significant code changes, read:
 - `.ai/foundation/product.md` for product goals, OAuth2/OIDC flows, realm rules, business invariants, and active design debt.
 - `.ai/foundation/tech.md` for runtime, pipeline semantics, storage abstraction, token handling, and implementation patterns.
 - `.ai/foundation/structure.md` for project layout, dependency rules, naming conventions, and high-risk files.
+- `.ai/foundation/architecture.md` for the Feature-Slice architecture used by domain modules (`UsersAccounts`, `KMS`) — and which projects deliberately do not use it.
 - `.ai/rules/code-style.rules.md` for repository-specific code style rules and code smells.
 
 Before modifying an area touched by a plan, inspect `.ai/plans/` first. Deferred

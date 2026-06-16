@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Foundation Knowledge
 
-Before any significant work, read these three files — they contain context about the product, technology decisions, and structural rules that cannot be derived from the code alone:
+Before any significant work, read these files — they contain context about the product, technology decisions, and structural rules that cannot be derived from the code alone:
 
 - [.ai/foundation/product.md](.ai/foundation/product.md) — domain, OAuth2/OIDC flows, business rules, active design debt
 - [.ai/foundation/tech.md](.ai/foundation/tech.md) — stack, pipeline execution semantics, storage abstraction, patterns to follow
 - [.ai/foundation/structure.md](.ai/foundation/structure.md) — project dependency graph, directory map, naming conventions, where new code belongs
+- [.ai/foundation/architecture.md](.ai/foundation/architecture.md) — Feature-Slice architecture for domain modules (`UsersAccounts`, `KMS`); which projects use it and which deliberately don't
 - [.ai/rules/code-style.rules.md](.ai/rules/code-style.rules.md) — repository-specific code style rules and code smells
 
 Completed refactoring plans (useful as historical record and for understanding design decisions):
