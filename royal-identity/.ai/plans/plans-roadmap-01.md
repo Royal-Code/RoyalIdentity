@@ -43,10 +43,10 @@ Escopo principal:
 - `RoyalIdentity.Data.Operational` para sessions, tokens, codes e consents.
 - `RoyalIdentity.Storage.EntityFramework` adaptando `Data.*` para os contratos
   do core.
-- Provedores `Storage.EntityFramework.Postgre` e
-  `Storage.EntityFramework.Sqlite`.
+- Provedores `RoyalIdentity.Storage.EntityFramework.PostgreSql` e
+  `RoyalIdentity.Storage.EntityFramework.Sqlite`.
 - `RoyalIdentity.Storage.Caching` sobre as implementações de storage.
-- Migração gradual do uso in-memory para Sqlite/Postgre conforme ambiente.
+- Migração gradual do uso in-memory para Sqlite/PostgreSql conforme ambiente.
 
 Este plano é a base de produção para os dados do IdP. O módulo
 `UsersAccounts` tem persistência própria e não deve ser adaptado por este
