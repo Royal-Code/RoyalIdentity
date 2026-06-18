@@ -137,3 +137,20 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 - Persistência própria (EFCore). **API e UI em projetos separados** (não dentro do módulo).
 - Relaciona-se com "Federation / Identity Brokering" (identidades externas vinculadas à conta).
 - Esboço de fases: modelo (emails/ID externo/propriedades por escopo) → credenciais/MFA → casos de uso admin → eventos/inbox-outbox → replicação → integração com as facades de borda.
+
+---
+
+## Projeto compartilhado de segurança (RoyalIdentity.Security)
+
+**Área:** Segurança / Infra compartilhada
+**Deferral:** Hoje cada lugar tem seu próprio utilitário de aleatoriedade/identificador (o core usa
+`CryptoRandom.CreateUniqueId()`; o módulo `UserAccounts` tem `SubjectIdGenerator` próprio, pois o módulo puro não
+referencia o core). Há espaço para um projeto `RoyalIdentity.Security` com componentes de segurança reutilizáveis —
+geração de identificadores opacos, cripto, hashing de senha — compartilhável por core, módulos e providers sem
+acoplar ao IdP.
+**Quando revisitar:** Quando houver um segundo consumidor querendo a mesma primitiva (ex.: o módulo `UserAccounts`
+e o core convergindo no gerador de `SubjectId`/hash), ou ao implementar o hashing real de senha do módulo.
+**Nota de design:**
+- Não criar agora; evitar projeto-âncora prematuro (anti-YAGNI). Registrado a partir da review
+  `.ai/reviews/user-accounts/fase5-useraccount-domain.review-001.md` (§4/§D / `SubjectIdGenerator`).
+- Deve ser referenciável pelo módulo **puro** (sem arrastar o IdP) — pacote/projeto leve, só primitivas de segurança.

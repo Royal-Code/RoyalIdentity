@@ -1,10 +1,10 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1, 2, 3, 4 e 5 concluídas; próximo: Fase 6 (propriedades dinâmicas por escopo)
+## Status: EM EXECUÇÃO - Fases 1-4 concluídas; Fase 5 **REPROVADA** (redesign) — ver `.ai/reviews/user-accounts/fase5-useraccount-domain.review-001.md`
 
 ## Progresso
 
-`█████░░░░░` **50%** - 5 de 10 fases
+`████░░░░░░` **40%** - 4 de 10 fases (Fase 5 reaberta)
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Emenda da borda de claims no core | Concluida |
 | Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Concluida |
 | Fase 4 - Options do módulo + split de `AccountOptions` | Concluida |
-| Fase 5 - Domínio de contas (`UserAccount`) | Concluida |
+| Fase 5 - Domínio de contas (`UserAccount`) | **Reprovada — redesign (review-001)** |
 | Fase 6 - Propriedades dinâmicas por escopo | Não iniciada |
 | Fase 7 - Persistência própria EFCore + providers | Não iniciada |
 | Fase 8 - Casos de uso mínimos para integração com o IdP | Não iniciada |
@@ -844,6 +844,13 @@ lockout incrementa/zera/expira; senha ausente bloqueia login por senha.
 **Testes:** unidade de domínio.
 
 ### Resultado da Fase 5
+
+> ⛔ **REPROVADA (2026-06-18) — redesign necessário.** A entrega abaixo foi revisada e reprovada: o agregado foi
+> modelado como objeto de domínio em memória, **não para persistência EF** (filhos sem chave/`RealmId`, sem
+> unicidade/índices, sem token de concorrência) e carrega code smells rejeitados (utilitários `static`, fábricas de
+> `Problem`, `throw`, validação/normalização no agregado). Refazer modelando para EF e movendo validação para as
+> features. Detalhes e checklist: [`review-001`](../reviews/user-accounts/fase5-useraccount-domain.review-001.md).
+> O texto abaixo fica como registro histórico da primeira tentativa.
 
 **Concluida (2026-06-18).** O módulo puro agora possui o agregado rico `UserAccount`, realm-scoped,
 com `SubjectId` imutável, username/display name/status, `ExternalId`, emails, roles e credencial local mínima.
