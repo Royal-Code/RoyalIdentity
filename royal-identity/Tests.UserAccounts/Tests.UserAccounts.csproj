@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<Import Project="../tests.targets" />
+
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity.UserAccounts\RoyalIdentity.UserAccounts.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Xunit" />
+	</ItemGroup>
+
+</Project>

@@ -227,10 +227,12 @@ ServerOptions
     ├── MutualTlsOptions
     ├── UIOptions (paths: LoginPath, LogoutPath, ConsentPath, etc.)
     ├── LoggingOptions
-    └── AccountOptions (per-realm account settings)
+    └── AccountOptions (IdP account-flow/UI settings only)
 ```
 
 `RealmOptions` contains a `ServerOptions` reference for server-wide defaults. Realm-level settings override server defaults. `EndpointContextBase.Options` exposes `RealmOptions`; `EndpointContextBase.ServerOptions` exposes the root `ServerOptions`.
+Rich account policies such as registration, profile changes, email login, duplicate email, fixed-field claim projection,
+and password/lockout rules belong to `RoyalIdentity.UserAccounts.Options.UserAccountsRealmOptions`.
 
 ### EndpointsOptions
 

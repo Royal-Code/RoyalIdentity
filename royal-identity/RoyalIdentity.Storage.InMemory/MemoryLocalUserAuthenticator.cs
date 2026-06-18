@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using RoyalIdentity.Options;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 
@@ -14,7 +13,7 @@ namespace RoyalIdentity.Storage.InMemory;
 /// </summary>
 public sealed class MemoryLocalUserAuthenticator(
     ConcurrentDictionary<string, MemoryUserAccount> users,
-    AccountOptions accountOptions,
+    MemoryAccountOptions accountOptions,
     IPasswordProtector passwordProtector,
     LockoutPolicy lockoutPolicy) : ILocalUserAuthenticator
 {
@@ -61,7 +60,7 @@ public sealed class MemoryLocalUserAuthenticator(
         if (byUsername is not null)
             return byUsername;
 
-        if (accountOptions.LoginWithEmail || accountOptions.EmailAsUsername)
+        if ((accountOptions.LoginWithEmail || accountOptions.EmailAsUsername) && !accountOptions.AllowDuplicateEmail)
         {
             return users.Values.FirstOrDefault(
                 u => u.Claims.Any(c => c.Type == "email" && string.Equals(c.Value, login, StringComparison.OrdinalIgnoreCase)));

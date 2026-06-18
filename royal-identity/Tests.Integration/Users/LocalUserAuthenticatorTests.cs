@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using RoyalIdentity.Options;
+using System.Security.Claims;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Defaults;
 using RoyalIdentity.Utils;
@@ -27,14 +27,14 @@ public class LocalUserAuthenticatorTests
             PasswordHash = password is null ? null : PasswordHash.Create(password)
         };
 
-    private static (MemoryLocalUserAuthenticator auth, ControlledTimeProvider clock, AccountOptions options)
+    private static (MemoryLocalUserAuthenticator auth, ControlledTimeProvider clock, MemoryAccountOptions options)
         Build(params MemoryUserAccount[] users)
     {
         var dict = new ConcurrentDictionary<string, MemoryUserAccount>();
         foreach (var u in users)
             dict[u.Username] = u;
 
-        var options = new AccountOptions();
+        var options = new MemoryAccountOptions();
         var clock = new ControlledTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var auth = new MemoryLocalUserAuthenticator(
             dict, options, new DefaultPasswordProtector(), new LockoutPolicy(options, clock));
@@ -127,6 +127,38 @@ public class LocalUserAuthenticatorTests
         var allowed = await auth.AuthenticateLocalAsync("alice", Password);
         Assert.True(allowed.Success);
         Assert.Equal("sub-alice", allowed.Subject!.SubjectId);
+    }
+
+    [Fact]
+    public async Task Authenticate_EmailLogin_RequiresEmailPolicy()
+    {
+        var user = NewUser("alice", "sub-alice");
+        user.Claims.Add(new Claim("email", "alice@example.com"));
+        var (auth, _, options) = Build(user);
+
+        var disabled = await auth.AuthenticateLocalAsync("alice@example.com", Password);
+        Assert.False(disabled.Success);
+        Assert.Equal(AuthenticationFailureReason.NotFound, disabled.Reason);
+
+        options.LoginWithEmail = true;
+        var enabled = await auth.AuthenticateLocalAsync("alice@example.com", Password);
+        Assert.True(enabled.Success);
+        Assert.Equal("sub-alice", enabled.Subject!.SubjectId);
+    }
+
+    [Fact]
+    public async Task Authenticate_EmailLogin_DoesNotResolve_WhenDuplicateEmailAllowed()
+    {
+        var user = NewUser("alice", "sub-alice");
+        user.Claims.Add(new Claim("email", "alice@example.com"));
+        var (auth, _, options) = Build(user);
+        options.LoginWithEmail = true;
+        options.AllowDuplicateEmail = true;
+
+        var result = await auth.AuthenticateLocalAsync("alice@example.com", Password);
+
+        Assert.False(result.Success);
+        Assert.Equal(AuthenticationFailureReason.NotFound, result.Reason);
     }
 
     [Fact]

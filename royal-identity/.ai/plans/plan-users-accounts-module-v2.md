@@ -1,17 +1,17 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1, 2 e 3 concluídas; próximo: Fase 4 (options do módulo + split de `AccountOptions`)
+## Status: EM EXECUÇÃO - Fases 1, 2, 3 e 4 concluídas; próximo: Fase 5 (domínio de contas)
 
 ## Progresso
 
-`███░░░░░░░` **30%** - 3 de 10 fases
+`████░░░░░░` **40%** - 4 de 10 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Governança, ADRs e emendas de documentação | Concluida |
 | Fase 2 - Emenda da borda de claims no core | Concluida |
 | Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Concluida |
-| Fase 4 - Options do módulo + split de `AccountOptions` | Não iniciada |
+| Fase 4 - Options do módulo + split de `AccountOptions` | Concluida |
 | Fase 5 - Domínio de contas (`UserAccount`) | Não iniciada |
 | Fase 6 - Propriedades dinâmicas por escopo | Não iniciada |
 | Fase 7 - Persistência própria EFCore + providers | Não iniciada |
@@ -203,11 +203,11 @@ colisões para evitar claim duplicada.
 O módulo tem options próprias por realm: `UserAccountsRealmOptions` (nome a confirmar na ADR-015).
 Segue o padrão copy-on-create por realm já adotado no IdP.
 
-**Fonte de verdade e ciclo de vida (a fixar na ADR-015 / Fase 4):** as `UserAccountsRealmOptions` são **do módulo**,
+**Fonte de verdade e ciclo de vida (fixado na Fase 4):** as `UserAccountsRealmOptions` são **do módulo**,
 persistidas/configuradas pelo próprio módulo por realm (não vivem na `RealmOptions` do IdP). A `.Integration` **resolve**
 as options do realm a partir do `RealmId` (não da `Realm` rica) e as injeta nas portas realm-bound. Durante a **coexistência**
-com o fake — enquanto a política ainda vier da `AccountOptions` do IdP — a `.Integration` faz a **ponte** (lê do IdP e popula
-as options do módulo), **sem duplicar a regra**: assim que o módulo entra, a fonte de verdade passa a ser `UserAccountsRealmOptions`.
+com o fake, a implementação in-memory mantém política local mínima própria para testes do IdP e não referencia o
+módulo. `AccountOptions` fica restrito às opções de fluxo/cookie/UI do IdP.
 
 Migra para `UserAccounts`:
 
@@ -759,16 +759,16 @@ sem duplicar regra entre IdP e módulo.
 
 **Tarefas:**
 
-- [ ] Modelar `UserAccountsRealmOptions`.
-- [ ] Incluir políticas de login identifier: `EmailAsUsername`, `LoginWithEmail`.
-- [ ] Incluir políticas de email: múltiplos, `AllowDuplicateEmail`, `VerifyEmail`, fictício pattern,
+- [x] Modelar `UserAccountsRealmOptions`.
+- [x] Incluir políticas de login identifier: `EmailAsUsername`, `LoginWithEmail`.
+- [x] Incluir políticas de email: múltiplos, `AllowDuplicateEmail`, `VerifyEmail`, `AllowFictitiousEmail`, fictício pattern,
       fictício `IsVerified` default, `AllowChangeEmail`.
-- [ ] Incluir políticas de username, registro, perfil, phone, exclusão.
-- [ ] Incluir `PasswordOptions` do módulo e consolidar duplicatas.
-- [ ] Incluir política de `SubjectId` informado no cadastro.
-- [ ] Incluir projeção de campos fixos para claims.
-- [ ] Definir como a integração resolve options do realm para o módulo durante coexistência.
-- [ ] Manter no IdP apenas opções de fluxo/cookie/UI.
+- [x] Incluir políticas de username, registro, perfil, phone, exclusão.
+- [x] Incluir `PasswordOptions` do módulo e consolidar duplicatas.
+- [x] Incluir política de `SubjectId` informado no cadastro.
+- [x] Incluir projeção de campos fixos para claims.
+- [x] Definir como a integração resolve options do realm para o módulo durante coexistência.
+- [x] Manter no IdP apenas opções de fluxo/cookie/UI.
 
 **Critérios de aceite:** cada opção tem um único dono; login UI lê affordances de conta via integração/política do módulo
 quando necessário.
@@ -777,7 +777,42 @@ quando necessário.
 
 ### Resultado da Fase 4
 
-*a preencher*
+**Concluida (2026-06-18).** As políticas ricas de conta foram movidas para o módulo puro
+`RoyalIdentity.UserAccounts.Options`, e `RoyalIdentity.Options.AccountOptions` ficou limitado a fluxo/cookie/UI do IdP
+(`AllowLocalLogin`, remember-login, redirect pós-logout, mensagens genéricas e flags futuras fora deste plano).
+
+Arquivos principais:
+
+- `RoyalIdentity.UserAccounts/Options/UserAccountsRealmOptions.cs` — políticas por realm: login por email/username,
+  registro, profile/email/phone/delete, email múltiplo/duplicado/verificação, `AllowFictitiousEmail`, email fictício,
+  `AllowProvidedSubjectId`, `PasswordOptions` e projeções fixas para claims.
+- `RoyalIdentity.UserAccounts/Options/PasswordOptions.cs` — política de senha/lockout do módulo; duplicatas
+  `AllowForgotPassword`/`AllowChangePassword` ficaram apenas em `UserAccountsRealmOptions`.
+- `RoyalIdentity.UserAccounts/Options/FixedFieldClaimProjection.cs` — projeção `{ FixedField, ScopeName, ClaimType, Include }`.
+- `RoyalIdentity.UserAccounts.Integration/UserAccountsRealmBinding*` — fábrica/resolver que traduz `Realm` do IdP para
+  `RealmId` + options do módulo, sem passar a `Realm` rica para portas realm-bound.
+- `RoyalIdentity.Storage.InMemory` — fake mantém policy local mínima para login por email e lockout, sem referência ao módulo.
+- `Tests.UserAccounts` — testes de copy-on-create, defaults de projeção, validação de email-login/duplicidade,
+  colisão de claim type e binding da integração.
+
+Notas:
+
+- `UserAccountsRealmOptions.Validate(...)` rejeita `LoginWithEmail`/`EmailAsUsername` quando `AllowDuplicateEmail = true`
+  e detecta colisão entre projeções fixas e claim types dinâmicos.
+- O resolver atual da `.Integration` usa defaults copiáveis até a persistência própria de options do módulo entrar nas
+  fases seguintes.
+- Os foundations técnico/estrutural foram ajustados para registrar que `AccountOptions` é apenas fluxo/UI do IdP
+  e que o fake in-memory continua independente do módulo puro.
+
+Verificação:
+
+- `dotnet build RoyalIdentity.sln` — 0 erros; warnings existentes fora do escopo.
+- `dotnet test Tests.UserAccounts --no-build` — verde: 7/7.
+- `dotnet test Tests.Architecture --no-build` — verde: 10/10.
+- `dotnet test Tests.Integration --no-build --filter "FullyQualifiedName~LocalUserAuthenticatorTests"` — verde: 9/9.
+- `dotnet test Tests.Integration --no-build --filter "FullyQualifiedName~Users|FullyQualifiedName~RealmOptionsPhase6"` — verde: 25/25.
+- `dotnet test RoyalIdentity.sln --no-build` — verde: Tests.Architecture 9/9, Tests.UserAccounts 7/7,
+  Tests.Pipelines 3/3, Tests.Identity 9/9, Tests.Integration 194/194.
 
 ---
 
@@ -1021,4 +1056,4 @@ fake permanece disponível; diferidos registrados.
   [plans-roadmap-01.md](plans-roadmap-01.md)
 - Código de referência: `RoyalIdentity/Users/Contracts/`, `RoyalIdentity/Contracts/Defaults/DefaultProfileService.cs`,
   `RoyalIdentity.Storage.InMemory/Memory*`, `RoyalIdentity/Options/AccountOptions.cs`,
-  `RoyalIdentity/Options/PasswordOptions.cs`
+  `RoyalIdentity.UserAccounts/Options/PasswordOptions.cs`

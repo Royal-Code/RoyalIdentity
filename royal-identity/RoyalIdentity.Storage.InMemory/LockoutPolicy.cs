@@ -1,14 +1,12 @@
-using RoyalIdentity.Options;
-
 namespace RoyalIdentity.Storage.InMemory;
 
 /// <summary>
 /// Single home for the account lockout policy used by the in-memory (fake/reference) authenticator
-/// (ADR-014 / plan Fase 4: "lockout num lugar so"). It reads <see cref="PasswordOptions"/> and mutates the
-/// failure counters on <see cref="MemoryUserAccount"/>. In production this logic belongs to the
-/// RoyalIdentity.UsersAccounts module. Realm is bound at construction (via <see cref="AccountOptions"/>).
+/// (ADR-014 / plan Fase 4: "lockout num lugar so"). It reads <see cref="MemoryPasswordOptions"/> and mutates the
+/// failure counters on <see cref="MemoryUserAccount"/>. This fake keeps its own minimal policy and does not depend
+/// on the UserAccounts module.
 /// </summary>
-public sealed class LockoutPolicy(AccountOptions accountOptions, TimeProvider clock)
+public sealed class LockoutPolicy(MemoryAccountOptions accountOptions, TimeProvider clock)
 {
     /// <summary>Whether the account is currently locked out by failed-attempt count and duration.</summary>
     public bool IsLockedOut(MemoryUserAccount details)

@@ -12,7 +12,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IStorage>(sp => sp.GetRequiredService<MemoryStorage>());
         services.AddSingleton<IStorageProvider, StorageProvider>();
 
-        // Account ports gateway (Q1) backed by the in-memory store; swapped for the UsersAccounts module later.
+        // Account ports gateway (Q1) backed by the in-memory store; swapped for the UserAccounts module later.
         services.AddTransient<IUserDirectory, MemoryUserDirectory>();
 
         return services;

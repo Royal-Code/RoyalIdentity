@@ -18,11 +18,15 @@ public sealed class MemoryUserDirectory(
         => new MemorySubjectStore(storage.GetRealmMemoryStore(realm).UserAccounts);
 
     public ILocalUserAuthenticator GetLocalAuthenticator(Realm realm)
-        => new MemoryLocalUserAuthenticator(
+    {
+        var options = new MemoryAccountOptions();
+
+        return new MemoryLocalUserAuthenticator(
             storage.GetRealmMemoryStore(realm).UserAccounts,
-            realm.Options.Account,
+            options,
             passwordProtector,
-            new LockoutPolicy(realm.Options.Account, clock));
+            new LockoutPolicy(options, clock));
+    }
 
     public IUserClaimsProvider GetClaimsProvider(Realm realm)
         => new MemoryUserClaimsProvider(storage.GetRealmMemoryStore(realm).UserAccounts);

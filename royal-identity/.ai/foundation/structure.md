@@ -39,7 +39,7 @@ RoyalIdentity.Server
 
 `RoyalIdentity` depends only on `RoyalIdentity.Pipelines` and Microsoft.IdentityModel + ASP.NET Core packages. It must not take dependencies on storage implementations.
 
-`RoyalIdentity.Storage.InMemory` depends on `RoyalIdentity` — the only layer allowed to reference `IStorage` implementations.
+`RoyalIdentity.Storage.InMemory` depends on `RoyalIdentity`.
 
 ---
 

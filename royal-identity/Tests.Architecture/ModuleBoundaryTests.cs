@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Xml.Linq;
 using RoyalIdentity.UserAccounts;
 using RoyalIdentity.UserAccounts.Integration;
 using RoyalIdentity.UserAccounts.PostgreSql;
@@ -95,5 +96,42 @@ public class ModuleBoundaryTests
 
         var integrationRefs = Integration.GetReferencedAssemblies().Select(a => a.Name!);
         Assert.Contains(CoreName, integrationRefs);
+    }
+
+    [Fact]
+    public void InMemoryStorage_ProjectReference_Graph_DoesNotReference_UserAccounts()
+    {
+        var projectReferences = ReadProjectReferences("RoyalIdentity.Storage.InMemory/RoyalIdentity.Storage.InMemory.csproj");
+
+        Assert.Contains(projectReferences, r => r.EndsWith("RoyalIdentity/RoyalIdentity.csproj", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.UserAccounts", StringComparison.Ordinal));
+    }
+
+    private static IReadOnlyList<string> ReadProjectReferences(string relativeProjectPath)
+    {
+        var projectPath = Path.Combine(FindRepositoryRoot(), relativeProjectPath);
+        var document = XDocument.Load(projectPath);
+
+        return document
+            .Descendants("ProjectReference")
+            .Select(e => e.Attribute("Include")?.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!.Replace('\\', '/'))
+            .ToArray();
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "RoyalIdentity.sln")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root from test output directory.");
     }
 }

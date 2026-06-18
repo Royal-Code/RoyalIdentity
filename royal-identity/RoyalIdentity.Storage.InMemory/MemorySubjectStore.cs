@@ -7,7 +7,7 @@ namespace RoyalIdentity.Storage.InMemory;
 /// <summary>
 /// In-memory (fake/reference) <see cref="ISubjectStore"/>: looks up a lean <see cref="Subject"/> by its
 /// stable <c>sub</c>. Realm is bound at construction (the users dictionary belongs to one realm). The fake
-/// store scans by subject id; a real store (UsersAccounts module) would keep an index.
+/// store scans by subject id; a real store (UserAccounts module) would keep an index.
 /// </summary>
 public sealed class MemorySubjectStore(ConcurrentDictionary<string, MemoryUserAccount> users) : ISubjectStore
 {

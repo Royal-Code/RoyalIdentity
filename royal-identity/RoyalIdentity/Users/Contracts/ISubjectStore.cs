@@ -3,7 +3,7 @@ namespace RoyalIdentity.Users.Contracts;
 /// <summary>
 /// Edge lookup of a subject by its stable <c>sub</c>. Realm is bound at construction
 /// (factory / <see cref="IUserDirectory"/>), never passed per call. Backed in-memory now; by the
-/// RoyalIdentity.UsersAccounts module later (ADR-014 §2.3).
+/// RoyalIdentity.UserAccounts module later (ADR-014 §2.3).
 /// </summary>
 public interface ISubjectStore
 {
