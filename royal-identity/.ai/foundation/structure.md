@@ -311,7 +311,7 @@ Users/                                  ← Edge (borda) facades + lean session 
   Contracts/
     ISubjectStore.cs                    ← Lookup a lean Subject by sub; IsActive (realm-bound)
     ILocalUserAuthenticator.cs          ← Resolve login + verify password + lockout → AuthenticationResult
-    IUserPropertyProvider.cs            ← Project claims from primitives (scope names + claim types)
+    IUserPropertyProvider.cs            ← Project claims from primitives (scope names + claim types). Renamed to IUserClaimsProvider in plan-users-accounts-module-v2 Fase 2 (ADR-014 §4/ADR-015)
     IUserDirectory.cs                   ← Gateway to the realm-bound account ports (Q1)
     IUserSessionService.cs              ← Current/valid/start/end/record-client (realm via accessor)
     IUserSessionStore.cs                ← Pure session store (Create/FindById/RecordClient/End)
@@ -331,13 +331,13 @@ Users/                                  ← Edge (borda) facades + lean session 
   AuthenticationResult.cs               ← Unified auth result (Succeeded/Failed + reason)
   UserSession.cs                        ← Serializable SSO session (holds SubjectId, not the user)
   UserSessionClient.cs                  ← Client recorded on a session (equality by ClientId, dedup)
-  UserClaimDto.cs                       ← Primitive claim projection across the provider seam
+  UserClaimDto.cs                       ← Primitive claim projection across the provider seam. Removed in plan-users-accounts-module-v2 Fase 2 (seam returns IReadOnlyList<Claim>)
   LoginFlowResult.cs                    ← LoginRequest/LoginFlowOutcome/LoginFlowResult
   ISignOutManager.cs
 
   > The rich account model (IdentityUser/UserDetails/IUserStore/IUserDetailsStore/IdentitySession and
   > the credentials-result structs) was removed (ADR-014 §2.11). The in-memory fake keeps its own account
-  > record (MemoryUserAccount) in RoyalIdentity.Storage.InMemory; the UsersAccounts module replaces it later.
+  > record (MemoryUserAccount) in RoyalIdentity.Storage.InMemory; the UserAccounts module replaces it later.
 
 Utils/
   Base64Url.cs

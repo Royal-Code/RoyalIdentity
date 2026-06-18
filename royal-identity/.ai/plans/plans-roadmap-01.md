@@ -7,9 +7,9 @@ necessários para implementar a visão definida em `../analisys/`.
 
 ## 1. Módulo de Contas de Usuário + Propriedades Dinâmicas por Escopo
 
-**Plano sugerido:** `plan-users-accounts-module.md`
+**Plano sugerido:** `plan-users-accounts-module-v2.md` (ver também `adrs/ADR-015.md`)
 
-Criação do módulo `RoyalIdentity.UsersAccounts`, fora da biblioteca principal do
+Criação do módulo `RoyalIdentity.UserAccounts`, fora da biblioteca principal do
 IdP, contendo domínio rico de contas e persistência própria.
 
 Escopo principal:
@@ -19,9 +19,9 @@ Escopo principal:
 - Emails opcionais, múltiplos e fictícios/configuráveis por realm.
 - ID externo/legado.
 - Propriedades dinâmicas por escopo, vinculadas a `IdentityScope.Name`.
-- Projeção das propriedades para claims via `IUserPropertyProvider`.
-- Integração com as facades da borda: `IUserDirectory`, `ISubjectStore`,
-  `ILocalUserAuthenticator` e `IUserPropertyProvider`.
+- Projeção das propriedades para claims via `IUserClaimsProvider`.
+- Integração com as facades da borda (no projeto `.Integration`): `IUserDirectory`,
+  `ISubjectStore`, `ILocalUserAuthenticator` e `IUserClaimsProvider`.
 - Persistência própria do módulo.
 - Casos administrativos básicos.
 - Eventos de domínio, Inbox/Outbox e replicação como fases finais ou diferidas.
@@ -49,7 +49,7 @@ Escopo principal:
 - Migração gradual do uso in-memory para Sqlite/PostgreSql conforme ambiente.
 
 Este plano é a base de produção para os dados do IdP. O módulo
-`UsersAccounts` tem persistência própria e não deve ser adaptado por este
+`UserAccounts` tem persistência própria e não deve ser adaptado por este
 storage do IdP.
 
 ## 3. Credenciais e Ciclo de Segurança da Conta
@@ -68,7 +68,7 @@ Escopo principal:
   sensível mudarem.
 - Relação com `UserSsoLifetime`, cookie lifetime e sessões ativas.
 
-Este plano pode ser uma grande fase do `UsersAccounts`, mas merece separação se
+Este plano pode ser uma grande fase do `UserAccounts`, mas merece separação se
 o tamanho ou o risco ficarem altos.
 
 ## 4. Administração de Sessões por Dispositivo
@@ -117,7 +117,7 @@ Escopo principal:
 - Modelo `ExternalIdentityProvider` por realm.
 - Providers OIDC, social/corporativo e possivelmente SAML.
 - Callback handlers realm-aware.
-- Vinculação de identidades externas a contas do `UsersAccounts`.
+- Vinculação de identidades externas a contas do `UserAccounts`.
 - Respeito às restrições de IdP por client.
 - Emissão correta de `idp` e `amr`.
 
@@ -163,7 +163,7 @@ virar requisito.
 ## Ordem recomendada
 
 1. Concluir `plan-users-edge-session.md`.
-2. Planejar e implementar `plan-users-accounts-module.md`.
+2. Planejar e implementar `plan-users-accounts-module-v2.md`.
 3. Planejar e implementar `plan-data-persistence.md`.
 4. Evoluir segurança de contas e administração de sessões.
 5. Criar API/UI administrativa.

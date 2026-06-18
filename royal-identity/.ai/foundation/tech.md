@@ -2,16 +2,16 @@
 
 ## Runtime & Framework
 
-- **Target Framework**: .NET 9.0 (`net9.0`), `LangVersion: latest`
+- **Target Framework**: .NET 10.0 (`net10.0`), `LangVersion: latest`
 - **Global settings** (Directory.Build.props): `ImplicitUsings = enable`, `Nullable = enable`
-- **Package version pins**: `AspVer=9.0.10`, `IdVer=8.14.0` — all package refs use these properties
-- The project has compiled artifacts for net7.0, net8.0, and net9.0 in `obj/` dirs, indicating a recent upgrade path
+- **Package version pins**: `AspVer=10.0.0`, `ExtVer=10.0.0`, `IdVer=8.14.0` — all package refs use these properties
+- The repo carries an upgrade path through net7.0/net8.0/net9.0 to the current **net10.0**
 
 ---
 
 ## Key Dependencies
 
-### ASP.NET Core (9.0.10)
+### ASP.NET Core (10.0.0)
 
 - `Microsoft.AspNetCore.Authentication.OpenIdConnect` — OIDC client authentication
 - `Microsoft.Extensions.Http.Polly` — HTTP client with retry/circuit breaker for back-channel calls

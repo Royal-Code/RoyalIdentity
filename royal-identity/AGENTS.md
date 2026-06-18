@@ -11,7 +11,7 @@ Before significant code changes, read:
 - `.ai/foundation/product.md` for product goals, OAuth2/OIDC flows, realm rules, business invariants, and active design debt.
 - `.ai/foundation/tech.md` for runtime, pipeline semantics, storage abstraction, token handling, and implementation patterns.
 - `.ai/foundation/structure.md` for project layout, dependency rules, naming conventions, and high-risk files.
-- `.ai/foundation/architecture.md` for the Feature-Slice architecture used by domain modules (`UsersAccounts`, `KMS`) — and which projects deliberately do not use it.
+- `.ai/foundation/architecture.md` for the Feature-Slice architecture used by domain modules (`UserAccounts`, `KMS`) — the family layout (pure module + `.Integration` adapter + `.PostgreSql`/`.Sqlite`) and which projects deliberately do not use it.
 - `.ai/rules/code-style.rules.md` for repository-specific code style rules and code smells.
 
 Before modifying an area touched by a plan, inspect `.ai/plans/` first. Deferred
@@ -22,11 +22,13 @@ users/session area. Treat it as the implemented target architecture before chang
 `RoyalIdentity/Users/`, account UI services, profile claims, login/logout, or
 session behavior.
 
-Accepted architectural decisions live in `adrs/` (ADR-001..014). Read the relevant
+Accepted architectural decisions live in `adrs/` (ADR-001..015). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:
 `ADR-013` (modular architecture & boundaries — storages as facades) and `ADR-014`
 (users edge + session redesign, which **refines** `ADR-005`), implemented by
-`.ai/plans/plan-users-edge-session.md`.
+`.ai/plans/plan-users-edge-session.md`; and `ADR-015` (`RoyalIdentity.UserAccounts`
+module — rich accounts, own persistence, `.Integration` adapter, claims seam
+`IUserClaimsProvider`), which **amends** `ADR-013`/`ADR-014`.
 
 ## Commands
 
@@ -47,7 +49,7 @@ or UI flow changes.
 ## Product And Architecture
 
 RoyalIdentity is a multi-tenant OpenID Connect / OAuth2 authorization server in
-.NET 9. Realms are the top-level isolation boundary. Every data access involving
+.NET 10 (`net10.0`). Realms are the top-level isolation boundary. Every data access involving
 clients, keys, users, sessions, scopes, tokens, consents, or configuration must be
 realm-scoped unless a foundation document explicitly says otherwise.
 
@@ -156,8 +158,10 @@ Known unstable areas include:
   `AllowedResources`-style model.
 - The user/session edge under `RoyalIdentity/Users/`, redesigned per `ADR-014`
   and `.ai/plans/plan-users-edge-session.md`: use `Subject`, `IUserDirectory`,
-  `ILocalUserAuthenticator`, `IUserPropertyProvider`, pure `IUserSessionStore`,
+  `ILocalUserAuthenticator`, `IUserClaimsProvider`, pure `IUserSessionStore`,
   `IUserSessionService`, `ISubjectPrincipalFactory`, and `LoginFlowService`.
+  (`IUserClaimsProvider` is the ADR-014-amended name for `IUserPropertyProvider`;
+  the code rename lands in `plan-users-accounts-module-v2.md` Fase 2.)
   Do not reintroduce removed legacy types such as `IdentityUser`, `UserDetails`,
   `IUserStore`, `IUserDetailsStore`, `IdentitySession`, `ISignInManager`, or
   credentials-result structs.
@@ -167,7 +171,7 @@ Known unstable areas include:
 
 ## Code Style
 
-- Target framework is `net9.0`.
+- Target framework is `net10.0` (via `Directory.Build.props`).
 - Nullable and implicit usings are enabled globally.
 - Use tabs with width 4 for C# indentation.
 - Prefer file-scoped namespace style unless the surrounding file uses otherwise.

@@ -1,14 +1,14 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: PLANEJAMENTO FECHADO - pronto para iniciar governança e pré-flight
+## Status: EM EXECUÇÃO - Fase 1 (governança/docs) concluída; próximo: Fase 2 (emenda da borda) e Fase 3 (pré-flight)
 
 ## Progresso
 
-`░░░░░░░░░░` **0%** - 0 de 10 fases (plano v2 consolidado; nenhuma fase iniciada)
+`█░░░░░░░░░` **10%** - 1 de 10 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Governança, ADRs e emendas de documentação | Não iniciada |
+| Fase 1 - Governança, ADRs e emendas de documentação | Concluida |
 | Fase 2 - Emenda da borda de claims no core | Não iniciada |
 | Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Não iniciada |
 | Fase 4 - Options do módulo + split de `AccountOptions` | Não iniciada |
@@ -49,6 +49,9 @@ Correções consolidadas:
 - `plan-resources-redesign.md` está **COMPLETED**; `IdentityScope.Name` é base estável para a integração por string.
 - O módulo puro **não referencia `RoyalIdentity`**. A adaptação para o IdP fica em projeto separado.
 - O seam de claims da borda passa a ser `IUserClaimsProvider` retornando `IReadOnlyList<Claim>`.
+- Refinamentos de revisão incorporados: identidade de eventos por `SubjectId`; regra de login por email × `AllowDuplicateEmail`;
+  semântica de `AccountStatus` vs lockout; `ClaimType` denormalizado/imutável; fonte/ciclo das `UserAccountsRealmOptions`;
+  `SearchAccounts` como read-model groundwork; independência da Fase 2 vs pré-flight.
 
 ---
 
@@ -200,6 +203,12 @@ colisões para evitar claim duplicada.
 O módulo tem options próprias por realm: `UserAccountsRealmOptions` (nome a confirmar na ADR-015).
 Segue o padrão copy-on-create por realm já adotado no IdP.
 
+**Fonte de verdade e ciclo de vida (a fixar na ADR-015 / Fase 4):** as `UserAccountsRealmOptions` são **do módulo**,
+persistidas/configuradas pelo próprio módulo por realm (não vivem na `RealmOptions` do IdP). A `.Integration` **resolve**
+as options do realm a partir do `RealmId` (não da `Realm` rica) e as injeta nas portas realm-bound. Durante a **coexistência**
+com o fake — enquanto a política ainda vier da `AccountOptions` do IdP — a `.Integration` faz a **ponte** (lê do IdP e popula
+as options do módulo), **sem duplicar a regra**: assim que o módulo entra, a fonte de verdade passa a ser `UserAccountsRealmOptions`.
+
 Migra para `UserAccounts`:
 
 - `AllowRegistration`
@@ -256,8 +265,14 @@ Usar duas identidades distintas:
 
 - `RealmId` é estrutural em todas as raízes/tabelas realm-scoped.
 - `Username` é campo fixo de primeira classe, normalizado para busca e único por realm.
+- `AccountStatus` é o estado **administrativo** da conta: `Active`, `Inactive` (desabilitada por admin) e `Blocked`
+  (bloqueio administrativo indefinido). É **distinto do lockout**, que é temporário e mora na credencial (`LockoutEndAt`).
+  O autenticador mapeia: status `Inactive` -> reason `Inactive`; status `Blocked` **ou** lockout ativo -> reason `Blocked`.
 - `Email` é coleção dedicada: `Address`, `IsPrimary`, `IsVerified`, `IsFictitious`.
 - Email pode ser múltiplo; duplicidade entre contas respeita `AllowDuplicateEmail`.
+- **Login por email** só é determinístico quando o endereço é único no realm. Regra (a ratificar na ADR-015):
+  `LoginWithEmail`/`EmailAsUsername` exigem `AllowDuplicateEmail = false`; quando habilitados, o login por email
+  resolve **apenas pelo email primário e verificado**. Endereço duplicado/ambíguo **nunca autentica** (evita login não-determinístico).
 - Email fictício é gerado por policy por realm, com pattern configurável e `IsVerified` default configurável.
 - `ExternalId?` é um campo opcional, índice não único por realm, não usado como credencial de login.
 - `Roles` são primeira classe no agregado e projetadas como claim `role` quando configuradas/autorizadas.
@@ -266,6 +281,9 @@ Usar duas identidades distintas:
 
 Eventos de domínio entram no agregado, mas não são persistidos, despachados ou gravados em outbox neste plano.
 Documentar isso na ADR-015 e no roadmap/backlog para evitar leitura como código inútil.
+
+Os eventos **chaveiam por `(RealmId, SubjectId)`**, nunca pelo `UserAccount.Id` físico (interno, pode ser `0` antes do
+insert). O `Id` físico não cruza a fronteira do agregado nem entra em eventos/outbox/replicação futura.
 
 Eventos esperados:
 
@@ -306,6 +324,10 @@ UserAccount
   index  (RealmId, ExternalId) where ExternalId is not null
   index  (RealmId, AccountStatus, CreatedAt, Id)
 ```
+
+> O índice `(RealmId, AccountStatus, CreatedAt, Id)` e o caso de uso `SearchAccounts` são **groundwork de read model**
+> (oportunidade), **não requeridos** pela integração com a borda; o enforcement administrativo e a API/UI ficam no
+> `plan-admin-api-ui` (#5). Mantidos por baixo custo; podem ser adiados sem impacto na integração.
 
 ### `UserAccountEmail`
 
@@ -418,6 +440,10 @@ UserAccountPropertyValue
 
 Para `Multiplicity = Single`, o domínio aceita apenas `Ordinal = 0`. Para `Multi`, aceita N linhas com ordinal distinto.
 
+`PropertyDefinition.ClaimType` é **imutável** (é a identidade do claim no realm). As colunas `ClaimType`/`ValueType` em
+`UserAccountPropertyValue` são **cópias denormalizadas** da definição, mantidas em sincronia na escrita apenas para acelerar
+leituras; a **fonte de verdade** é a `PropertyDefinition` (a projeção canônica faz join e lê `d.claim_type`/`d.value_type`).
+
 ### Queries de referência
 
 Login por username:
@@ -501,7 +527,7 @@ RoyalIdentity.UserAccounts/
         SeedAccount
         GetAccountForSubject
         GetAccountForLogin
-        SearchAccounts
+        SearchAccounts            (read-model groundwork; admin -> #5)
       ChangePassword/
       Activate/
       Deactivate/
@@ -572,16 +598,16 @@ parar de falar em `UsersAccounts`, `.Postgre` e `Integration/` interno.
 
 **Tarefas:**
 
-- [ ] Criar `adrs/ADR-015.md` para `RoyalIdentity.UserAccounts`.
-- [ ] Registrar na ADR-015: família de projetos, projeto `.Integration` separado, `RealmId` estrutural,
+- [x] Criar `adrs/ADR-015.md` para `RoyalIdentity.UserAccounts`.
+- [x] Registrar na ADR-015: família de projetos, projeto `.Integration` separado, `RealmId` estrutural,
       `UserAccount.Id` PK física, `SubjectId` protocolar, schema de properties, options do módulo,
       split de `AccountOptions`, eventos não persistidos.
-- [ ] Emendar `adrs/ADR-014.md`: `IUserPropertyProvider` -> `IUserClaimsProvider`, retorno `Claim`,
+- [x] Emendar `adrs/ADR-014.md`: `IUserPropertyProvider` -> `IUserClaimsProvider`, retorno `Claim`,
       remoção de `UserClaimDto`, `GetPropertyProvider` -> `GetClaimsProvider`.
-- [ ] Emendar `adrs/ADR-013.md`: `UserAccounts`, projeto `.Integration`, `.PostgreSql`/`.Sqlite`.
-- [ ] Atualizar `.ai/foundation/architecture.md` para refletir o projeto `.Integration` separado.
-- [ ] Atualizar `plans-roadmap-01.md` para `UserAccounts`, `IUserClaimsProvider`, `.PostgreSql`.
-- [ ] Atualizar `AGENTS.md`/`CLAUDE.md` onde ainda citarem `net9.0`, `UsersAccounts`, resources `IN_PROGRESS`
+- [x] Emendar `adrs/ADR-013.md`: `UserAccounts`, projeto `.Integration`, `.PostgreSql`/`.Sqlite`.
+- [x] Atualizar `.ai/foundation/architecture.md` para refletir o projeto `.Integration` separado.
+- [x] Atualizar `plans-roadmap-01.md` para `UserAccounts`, `IUserClaimsProvider`, `.PostgreSql`.
+- [x] Atualizar `AGENTS.md`/`CLAUDE.md` onde ainda citarem `net9.0`, `UsersAccounts`, resources `IN_PROGRESS`
       ou `IUserPropertyProvider`.
 
 **Critérios de aceite:** documentação não contradiz o v2; ADR-015 existe; ADR-014 registra a mudança de contrato.
@@ -590,14 +616,34 @@ parar de falar em `UsersAccounts`, `.Postgre` e `Integration/` interno.
 
 ### Resultado da Fase 1
 
-*a preencher*
+Concluida (documentação). Entregáveis:
+
+- **`adrs/ADR-015.md`** criado — módulo `RoyalIdentity.UserAccounts`: família de projetos (puro + `.Integration` +
+  `.PostgreSql`/`.Sqlite`), `UserAccount.Id` (PK física `long`) × `SubjectId` (protocolar, imutável, único por realm),
+  `RealmId` estrutural, schema de properties por escopo, `UserAccountsRealmOptions` + split de `AccountOptions`,
+  seam `IUserClaimsProvider`/`Claim` (interseção), eventos não persistidos, coexistência opt-in.
+- **`adrs/ADR-014.md` emendada** (§4 + banner) — `IUserPropertyProvider`→`IUserClaimsProvider`,
+  `GetPropertyProvider`→`GetClaimsProvider`, retorno `IReadOnlyList<Claim>`, remoção de `UserClaimDto`. (Código: Fase 2.)
+- **`adrs/ADR-013.md` emendada** (§5 + banner) — nome `UserAccounts`, `.Integration` como padrão de adapter, grafia `.PostgreSql`.
+- **`.ai/foundation/architecture.md` reescrita** — `.Integration` como projeto separado; módulo puro sem ref ao core;
+  família `.PostgreSql`/`.Sqlite`; seam `IUserClaimsProvider`/`Claim`; §1/§2/§3/§7/§9/§10 atualizados.
+- **`plans-roadmap-01.md`** — `UserAccounts`, `IUserClaimsProvider`, `.PostgreSql`, plano sugerido apontando para o v2.
+- **`CLAUDE.md`** — `resources`/`users-edge-session` movidos para COMPLETED; novo plano ativo; ADRs `..015`; bullet `UserAccounts`.
+- **`AGENTS.md`** — `net9.0`→`net10.0`; `UsersAccounts`→`UserAccounts`; `IUserPropertyProvider`→`IUserClaimsProvider` (com nota); ADRs `..015`.
+
+**Nota de ordenação:** os docs forward-looking (ADR-015, architecture, roadmap) já usam os nomes-alvo
+(`IUserClaimsProvider`, `.Integration`, `UserAccounts`); o **código** ainda tem `IUserPropertyProvider`/`UserClaimDto` —
+a renomeação no core acontece na **Fase 2**. As notas em ADR-014/AGENTS sinalizam essa janela.
+
+**Critérios de aceite:** atendidos — ADR-015 existe; ADR-014 registra a mudança de contrato; documentação alinhada ao v2.
 
 ---
 
 ## Fase 2 - Emenda da borda de claims no core
 
 **O que/como:** aplicar no código do core a mudança já decidida para o seam de claims. Esta fase é pequena e
-deve ser concluída antes do projeto `.Integration`.
+deve ser concluída antes do projeto `.Integration`. É **independente das libs RoyalCode** (mexe só em core/borda),
+então vale por si mesma mesmo que o pré-flight da Fase 3 reprove alguma versão — não há acoplamento entre as duas.
 
 **Tarefas:**
 
@@ -859,7 +905,7 @@ fake permanece disponível; diferidos registrados.
 
 1. Conta é realm-scoped; nada cruza realm.
 2. `sub` = `SubjectId`, estável, imutável, separado de username/email.
-3. `UserAccount.Id` é interno e nunca aparece como `sub`.
+3. `UserAccount.Id` é interno: nunca aparece como `sub`, não cruza a fronteira do agregado e não entra em eventos/outbox (que chaveiam por `(RealmId, SubjectId)`).
 4. Erro de login é genérico por default; reason interno preservado para evento/auditoria.
 5. Falha de senha incrementa contador; sucesso zera.
 6. Lockout respeita `MaxFailedAccessAttempts` e `AccountLockoutDurationMinutes`.

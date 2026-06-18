@@ -1,6 +1,13 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UsersAccounts`)
 
-## Status: PLANEJAMENTO (rascunho) — aguardando respostas das **Questões em aberto** (§ "Questões")
+> **⛔ SUPERADO (2026-06-17) — não use este plano.** Foi substituído por
+> [plan-users-accounts-module-v2.md](plan-users-accounts-module-v2.md) (com [ADR-015](../../adrs/ADR-015.md)),
+> que fechou as Questões em aberto e revisou nomes/decisões: módulo **`UserAccounts`** (singular), projeto
+> **`.Integration`** separado, provedores **`.PostgreSql`**, seam **`IUserClaimsProvider`**/`Claim`. Este rascunho
+> v1 é mantido apenas como **registro histórico** do planejamento inicial; nomes antigos (`UsersAccounts`, `.Postgre`,
+> `IUserPropertyProvider`, `UserClaimDto`) abaixo refletem aquele momento.
+
+## Status: SUPERADO por `plan-users-accounts-module-v2.md` (era: PLANEJAMENTO/rascunho — Questões em aberto)
 
 ## Progresso
 

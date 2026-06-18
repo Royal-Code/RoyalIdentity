@@ -2,7 +2,7 @@
 
 ## What This System Is
 
-RoyalIdentity is a **multi-tenant OpenID Connect / OAuth 2.0 authorization server** built from scratch in .NET 9. It is a deliberate rearchitecture and spiritual successor to IdentityServer4 (IS4), created to address IS4's limitations: no multi-tenancy, no built-in UI, no independent user management, and a procedural/sequential internal design that resists modification and testing.
+RoyalIdentity is a **multi-tenant OpenID Connect / OAuth 2.0 authorization server** built from scratch in .NET 10 (`net10.0`). It is a deliberate rearchitecture and spiritual successor to IdentityServer4 (IS4), created to address IS4's limitations: no multi-tenancy, no built-in UI, no independent user management, and a procedural/sequential internal design that resists modification and testing.
 
 The goal is a **complete, turnkey, production-ready product** deployable as a Docker image — comparable in completeness to Keycloak, but built natively on ASP.NET Core with full per-realm customization capability.
 
@@ -145,14 +145,14 @@ Current model:
 
 The edge (borda) was redesigned into **facades + a lean model** (plan `plan-users-edge-session`, COMPLETED). The old confusion (`IdentityUser`/`UserDetails` rich objects, `IUserStore`/`IUserDetailsStore` being the same class, `IdentitySession` holding the live user, `UserSessionStore` reading `HttpContext`) is gone — those types were removed (ADR-014 §2.11).
 
-- **Edge contracts (core):** `ISubjectStore`, `ILocalUserAuthenticator`, `IUserPropertyProvider` (behind the `IUserDirectory` gateway), `IUserSessionStore` (pure) + `IUserSessionService`, `ISubjectPrincipalFactory`, `IAuthorizationContextResolver`. The borda speaks only `Subject` + primitives.
+- **Edge contracts (core):** `ISubjectStore`, `ILocalUserAuthenticator`, `IUserClaimsProvider` (behind the `IUserDirectory` gateway), `IUserSessionStore` (pure) + `IUserSessionService`, `ISubjectPrincipalFactory`, `IAuthorizationContextResolver`. The borda speaks only `Subject` + primitives. (`IUserClaimsProvider` is the ADR-014-amended/ADR-015 name; the code still has `IUserPropertyProvider` until `plan-users-accounts-module-v2` Fase 2.)
 - **`sub` = `SubjectId`** — stable, immutable, separate from username/email.
 - **Session** is serializable (holds `SubjectId`, not the user), created **at sign-in** by `LoginFlowService` (no longer a side-effect of password verification). "Active" is one rule (account active && session valid; absent session ⇒ invalid).
-- **Claims** flow through `IProfileService` → `IUserPropertyProvider` (primitives only); roles/profile claims never enter the minimal session principal.
+- **Claims** flow through `IProfileService` → `IUserClaimsProvider` (primitives only); roles/profile claims never enter the minimal session principal.
 
 **Decision (ADR-005, refined by ADR-013/014)**: RoyalIdentity has its own user management, not dependent on ASP.NET Identity. User data and rules are configurable per realm.
 
-**In-memory is fake/reference only** (`MemoryUserAccount` + `MemoryUserDirectory` in `RoyalIdentity.Storage.InMemory`). The rich account model and persistence are deferred to the **RoyalIdentity.UsersAccounts** module (a DI swap; see backlog).
+**In-memory is fake/reference only** (`MemoryUserAccount` + `MemoryUserDirectory` in `RoyalIdentity.Storage.InMemory`). The rich account model and persistence are deferred to the **RoyalIdentity.UserAccounts** module (a DI swap; see ADR-015 + `plan-users-accounts-module-v2`).
 
 ---
 
@@ -182,4 +182,4 @@ From redesign-todo.md and `[Redesign]` attributes in code:
 1. **Scope/Resource model**: `Client.AllowedScopes` and `Client.AllowOfflineAccess` need replacement with an `AllowedResources` model following ResourceServer → Resource → Scope hierarchy
 2. **Localization**: Add localization support for all UI text
 
-> **Done:** User/session unification (merge of `IdentityUser`/`UserDetails`/`IUserStore`/`IUserDetailsStore`) — completed by `plan-users-edge-session` (ADR-013/014). Follow-up modules (`UsersAccounts`, data persistence, KMS) are tracked in the backlog, not here.
+> **Done:** User/session unification (merge of `IdentityUser`/`UserDetails`/`IUserStore`/`IUserDetailsStore`) — completed by `plan-users-edge-session` (ADR-013/014). Follow-up modules (`UserAccounts`, data persistence, KMS) are tracked in the backlog, not here.

@@ -72,7 +72,7 @@ Precisa unificar o usuário e revisar a sessão e o login.
 `LoginFlowService`; "ativo" unificado; principal mínimo. Removidos `IdentityUser`/`DefaultIdentityUser`,
 `UserDetails`, `IUserStore`/`IUserDetailsStore`, `IdentitySession`, `(Validate|Credentials)…Result` e o
 `IdentityRevalidatingAuthenticationStateProvider` quebrado. In-memory = fake (`MemoryUserAccount`).
-**Trabalho futuro** (módulo `UsersAccounts`, persistência EFCore, KMS) está em `.ai/backlogs/backlog-001.md`.
+**Trabalho futuro** (módulo `UserAccounts` — ver [ADR-015](adrs/ADR-015.md) + `plan-users-accounts-module-v2`; persistência EFCore; KMS) está em `.ai/backlogs/backlog-001.md`.
 
 ## UI Services ✓ DONE (CONCLUÍDO)
 
