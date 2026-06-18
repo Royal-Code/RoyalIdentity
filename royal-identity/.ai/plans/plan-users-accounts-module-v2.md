@@ -1,10 +1,10 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1, 2, 3 e 4 concluídas; próximo: Fase 5 (domínio de contas)
+## Status: EM EXECUÇÃO - Fases 1, 2, 3, 4 e 5 concluídas; próximo: Fase 6 (propriedades dinâmicas por escopo)
 
 ## Progresso
 
-`████░░░░░░` **40%** - 4 de 10 fases
+`█████░░░░░` **50%** - 5 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Emenda da borda de claims no core | Concluida |
 | Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Concluida |
 | Fase 4 - Options do módulo + split de `AccountOptions` | Concluida |
-| Fase 5 - Domínio de contas (`UserAccount`) | Não iniciada |
+| Fase 5 - Domínio de contas (`UserAccount`) | Concluida |
 | Fase 6 - Propriedades dinâmicas por escopo | Não iniciada |
 | Fase 7 - Persistência própria EFCore + providers | Não iniciada |
 | Fase 8 - Casos de uso mínimos para integração com o IdP | Não iniciada |
@@ -822,18 +822,18 @@ Verificação:
 
 **Tarefas:**
 
-- [ ] `UserAccount : AggregateRoot<long>` com `Id` físico interno.
-- [ ] `RealmId` obrigatório no agregado.
-- [ ] `SubjectId` string, imutável, gerado por default e externo-opcional por policy.
-- [ ] `Username`/`NormalizedUsername`, `DisplayName`, `AccountStatus`.
-- [ ] `ExternalId?` opcional, não credencial.
-- [ ] Emails com primário/verificado/fictício.
-- [ ] Roles primeira classe.
-- [ ] Credencial local mínima: hash, lockout counters, timestamps.
-- [ ] `SetPassword`/`ChangePassword` com complexidade básica.
-- [ ] `AuthenticateLocal` ou serviço de domínio equivalente: verificar senha + lockout.
-- [ ] Eventos de domínio via `AddEvent`, sem persistir/despachar.
-- [ ] Resultados com `Result`/`Problems`, sem throw para fluxo esperado.
+- [x] `UserAccount : AggregateRoot<long>` com `Id` físico interno.
+- [x] `RealmId` obrigatório no agregado.
+- [x] `SubjectId` string, imutável, gerado por default e externo-opcional por policy.
+- [x] `Username`/`NormalizedUsername`, `DisplayName`, `AccountStatus`.
+- [x] `ExternalId?` opcional, não credencial.
+- [x] Emails com primário/verificado/fictício.
+- [x] Roles primeira classe.
+- [x] Credencial local mínima: hash, lockout counters, timestamps.
+- [x] `SetPassword`/`ChangePassword` com complexidade básica.
+- [x] `AuthenticateLocal` ou serviço de domínio equivalente: verificar senha + lockout.
+- [x] Eventos de domínio via `AddEvent`, sem persistir/despachar.
+- [x] Resultados com `Result`/`Problems`, sem throw para fluxo esperado.
 - [ ] Remover `RoyalIdentity.UserAccounts/Features/PreFlight/RoyalCodePreFlightSmoke.cs` à medida que o domínio e os
       usos reais cobrirem as APIs RoyalCode (commands/search/selector — última cobertura na Fase 7); são tipos
       **públicos temporários** do pré-flight (Fase 3) que não devem permanecer na superfície do módulo.
@@ -845,7 +845,36 @@ lockout incrementa/zera/expira; senha ausente bloqueia login por senha.
 
 ### Resultado da Fase 5
 
-*a preencher*
+**Concluida (2026-06-18).** O módulo puro agora possui o agregado rico `UserAccount`, realm-scoped,
+com `SubjectId` imutável, username/display name/status, `ExternalId`, emails, roles e credencial local mínima.
+
+Arquivos principais:
+
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccount.cs` — agregado `AggregateRoot<long>` com factory,
+  validações por `Result`/`Problems`, mutações de username/display/external id, emails, roles, senha e autenticação local.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountCredential.cs` — hash local, failed attempts,
+  timestamps e lockout temporário ou administrativo.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/IUserAccountPasswordHasher.cs` — porta do módulo para hash/verificação,
+  mantendo o domínio sem dependência do core/storage.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountEmail.cs` e `UserAccountRole.cs` — valores primeira classe
+  normalizados dentro da conta.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountEvents.cs` — eventos de domínio via `AddEvent`,
+  ainda sem persistência/despacho.
+- `Tests.UserAccounts/UserAccountDomainTests.cs` — cobertura dos invariantes da fase.
+
+Notas:
+
+- `SubjectId` é gerado por default por `SubjectIdGenerator` com valor aleatório URL-safe; fornecimento externo só passa
+  quando `UserAccountsRealmOptions.AllowProvidedSubjectId = true`.
+- `AuthenticateLocal` bloqueia senha ausente, aplica `AccountStatus`, incrementa/zera failed attempts e respeita expiração
+  de lockout.
+- `SetPassword`/`ChangePassword` validam complexidade básica a partir de `PasswordOptions`; histórico/expiração com enforcement
+  completo seguem fora de escopo desta fase.
+
+Verificação:
+
+- `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-restore` — verde: 17/17.
+- `dotnet test Tests.Architecture/Tests.Architecture.csproj --no-restore` — verde: 10/10.
 
 ---
 
