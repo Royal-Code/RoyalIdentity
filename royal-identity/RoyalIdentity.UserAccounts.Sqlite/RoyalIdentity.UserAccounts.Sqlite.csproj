@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- EF provider for the module (also covers tests via in-memory Sqlite connection). No ASP.NET, no IdP core. -->
+	<ItemGroup>
+		<FrameworkReference Remove="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity.UserAccounts\RoyalIdentity.UserAccounts.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="RoyalCode.WorkContext.Sqlite" Version="$(RcWorkContextVer)" />
+	</ItemGroup>
+
+</Project>

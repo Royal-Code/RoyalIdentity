@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Pure module (ADR-015 §2.1): domain + features + own persistence base.
+		MUST NOT reference the IdP core (RoyalIdentity) nor ASP.NET. The global
+		Directory.Build.props adds the Microsoft.AspNetCore.App framework reference to
+		every project, so it is explicitly removed here to keep the module ASP.NET-free.
+	-->
+	<ItemGroup>
+		<FrameworkReference Remove="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="RoyalCode.Aggregates" Version="$(RcDomainVer)" />
+		<PackageReference Include="RoyalCode.SmartCommands" Version="$(RcSmartCommandsVer)" />
+		<PackageReference Include="RoyalCode.SmartCommands.Generators" Version="$(RcSmartCommandsVer)" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<PackageReference Include="RoyalCode.SmartSearch.EntityFramework" Version="$(RcSmartSearchVer)" />
+		<PackageReference Include="RoyalCode.SmartSelector" Version="$(RcSmartSelectorVer)" />
+		<PackageReference Include="RoyalCode.SmartSelector.Generators" Version="$(RcSmartSelectorVer)" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<PackageReference Include="RoyalCode.WorkContext.EntityFramework" Version="$(RcWorkContextVer)" />
+	</ItemGroup>
+
+</Project>

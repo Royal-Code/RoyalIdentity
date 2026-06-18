@@ -1,16 +1,16 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1 (governança/docs) e 2 (emenda da borda no core) concluídas; próximo: Fase 3 (pré-flight)
+## Status: EM EXECUÇÃO - Fases 1, 2 e 3 concluídas; próximo: Fase 4 (options do módulo + split de `AccountOptions`)
 
 ## Progresso
 
-`██░░░░░░░░` **20%** - 2 de 10 fases
+`███░░░░░░░` **30%** - 3 de 10 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Governança, ADRs e emendas de documentação | Concluida |
 | Fase 2 - Emenda da borda de claims no core | Concluida |
-| Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Não iniciada |
+| Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Concluida |
 | Fase 4 - Options do módulo + split de `AccountOptions` | Não iniciada |
 | Fase 5 - Domínio de contas (`UserAccount`) | Não iniciada |
 | Fase 6 - Propriedades dinâmicas por escopo | Não iniciada |
@@ -697,20 +697,20 @@ com dependências corretas.
 
 **Tarefas:**
 
-- [ ] Validar pacotes RoyalCode em `nuget.org`: SmartCommands, SmartSearch, SmartSelector, SmartValidations,
+- [x] Validar pacotes RoyalCode em `nuget.org`: SmartCommands, SmartSearch, SmartSelector, SmartValidations,
       SmartProblems, WorkContext/domain.
-- [ ] Fixar versões compatíveis com `net10.0`.
-- [ ] Criar um smoke test mínimo compilando `[Command]`, `ICriteria<T>` e `IWorkContextBuilder`.
-- [ ] Criar `RoyalIdentity.UserAccounts`.
-- [ ] Criar `RoyalIdentity.UserAccounts.PostgreSql`.
-- [ ] Criar `RoyalIdentity.UserAccounts.Sqlite`.
-- [ ] Criar `RoyalIdentity.UserAccounts.Integration`.
-- [ ] Adicionar projetos à solution.
-- [ ] Referências:
+- [x] Fixar versões compatíveis com `net10.0`.
+- [x] Criar um smoke test mínimo compilando `[Command]`, `ICriteria<T>` e `IWorkContextBuilder`.
+- [x] Criar `RoyalIdentity.UserAccounts`.
+- [x] Criar `RoyalIdentity.UserAccounts.PostgreSql`.
+- [x] Criar `RoyalIdentity.UserAccounts.Sqlite`.
+- [x] Criar `RoyalIdentity.UserAccounts.Integration`.
+- [x] Adicionar projetos à solution.
+- [x] Referências:
       - módulo puro: RoyalCode/EFCore, sem `RoyalIdentity`;
       - providers: módulo puro + provider EF;
       - integration: `RoyalIdentity` + módulo puro.
-- [ ] Testes de arquitetura: core não referencia módulo; módulo puro não referencia core; `Domain` não depende de ASP.NET;
+- [x] Testes de arquitetura: core não referencia módulo; módulo puro não referencia core; `Domain` não depende de ASP.NET;
       `Features` não depende de ASP.NET; `.Integration` é o único projeto que conhece as portas do IdP.
 
 **Critérios de aceite:** solução compila; smoke RoyalCode passa; fronteiras de projeto protegidas por testes.
@@ -719,7 +719,35 @@ com dependências corretas.
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluida (2026-06-18).** O pré-flight validou os pacotes RoyalCode no `nuget.org`, fixou versões compatíveis
+com `net10.0`, criou a família de projetos e colocou todos na solution.
+
+Versões fixadas em `Directory.Build.props`:
+
+- `RoyalCode.Aggregates`/domínio: `0.8.1` (com `DomainEvents`/`Entities` transitivos).
+- `RoyalCode.SmartCommands` + `RoyalCode.SmartCommands.Generators`: `0.0.9`.
+- `RoyalCode.SmartSearch.EntityFramework`: `0.10.1`.
+- `RoyalCode.SmartSelector` + `RoyalCode.SmartSelector.Generators`: `0.4.0`.
+- `RoyalCode.WorkContext.EntityFramework`: `0.8.9`.
+
+Entregáveis:
+
+- Projetos criados e adicionados ao `RoyalIdentity.sln`:
+  `RoyalIdentity.UserAccounts`, `.Integration`, `.PostgreSql`, `.Sqlite` e `Tests.Architecture`.
+- `RoyalIdentity.UserAccounts/Features/PreFlight/RoyalCodePreFlightSmoke.cs` compila APIs reais de domínio,
+  commands, validations/problems, SmartSearch, SmartSelector e WorkContext, com generators ativos.
+- Providers ancoram o módulo puro e continuam sem referência ao core/ASP.NET.
+- `Tests.Architecture` cobre core -> módulo, módulo -> core, ASP.NET no módulo/providers e `.Integration`
+  como única ponte com o IdP.
+
+Observação do pré-flight: os generators de SmartCommands/SmartSelector geram handlers/extensions públicos; tipos
+anotados por `[Command]`/`[AutoSelect]` precisam ser públicos para não gerar erros de acessibilidade.
+
+Verificação:
+
+- `dotnet build RoyalIdentity.sln` — 0 erros; warnings existentes fora dos novos projetos.
+- `dotnet test RoyalIdentity.sln --no-build` — verde: `Tests.Architecture` 9/9, `Tests.Pipelines` 3/3,
+  `Tests.Identity` 9/9, `Tests.Integration` 194/194.
 
 ---
 

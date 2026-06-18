@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Integration adapter (ADR-015 §2.1): the ONLY project that knows both the IdP core and the module.
+		Implements the IdP edge ports (ISubjectStore / ILocalUserAuthenticator / IUserClaimsProvider /
+		IUserDirectory) by delegating to the module's use cases. Keeps ASP.NET (inherited) since it faces
+		the core. The administrative API/UI live in separate projects, free of the IdP.
+	-->
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.UserAccounts\RoyalIdentity.UserAccounts.csproj" />
+	</ItemGroup>
+
+</Project>
