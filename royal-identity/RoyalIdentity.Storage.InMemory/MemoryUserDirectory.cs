@@ -19,6 +19,11 @@ public sealed class MemoryUserDirectory(
 
     public ILocalUserAuthenticator GetLocalAuthenticator(Realm realm)
     {
+        // TODO (plan-users-accounts-module-v2 Fase 9): the fake uses default MemoryAccountOptions, so per-realm
+        // login-by-email and lockout policy are NOT honored through this path (tests exercise non-default policy
+        // by constructing MemoryLocalUserAuthenticator directly). When the UserAccounts module integration lands,
+        // per-realm UserAccountsRealmOptions (resolved via UserAccountsRealmBinding) must drive the authenticator
+        // instead of these static defaults. No active regression: no seeded realm configures these today.
         var options = new MemoryAccountOptions();
 
         return new MemoryLocalUserAuthenticator(

@@ -834,6 +834,9 @@ Verificação:
 - [ ] `AuthenticateLocal` ou serviço de domínio equivalente: verificar senha + lockout.
 - [ ] Eventos de domínio via `AddEvent`, sem persistir/despachar.
 - [ ] Resultados com `Result`/`Problems`, sem throw para fluxo esperado.
+- [ ] Remover `RoyalIdentity.UserAccounts/Features/PreFlight/RoyalCodePreFlightSmoke.cs` à medida que o domínio e os
+      usos reais cobrirem as APIs RoyalCode (commands/search/selector — última cobertura na Fase 7); são tipos
+      **públicos temporários** do pré-flight (Fase 3) que não devem permanecer na superfície do módulo.
 
 **Critérios de aceite:** invariantes de conta cobertas; `SubjectId` imutável; troca de username não troca `sub`;
 lockout incrementa/zera/expira; senha ausente bloqueia login por senha.
@@ -943,6 +946,9 @@ sem endpoints HTTP; sem casos administrativos completos.
 - [ ] Adaptar `Realm` do core para `RealmId` + `UserAccountsRealmOptions`.
 - [ ] Garantir que portas retornadas são realm-bound e não recebem realm em método.
 - [ ] Garantir que integration não acessa internals do módulo.
+- [ ] Ligar `UserAccountsRealmOptions` (via `UserAccountsRealmBinding`) ao `LocalUserAuthenticator` para dirigir
+      login-por-email/lockout por realm. **Dívida da Fase 4:** o fake `MemoryUserDirectory.GetLocalAuthenticator`
+      usa `MemoryAccountOptions` defaults estáticos (ver `// TODO` no código) — o caminho real precisa honrar a opção do realm.
 
 **Critérios de aceite:** `.Integration` é a única ponte com o IdP; módulo puro permanece independente; comportamento
 equivalente ao fake para os contratos de borda.
