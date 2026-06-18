@@ -1,15 +1,15 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fase 1 (governança/docs) concluída; próximo: Fase 2 (emenda da borda) e Fase 3 (pré-flight)
+## Status: EM EXECUÇÃO - Fases 1 (governança/docs) e 2 (emenda da borda no core) concluídas; próximo: Fase 3 (pré-flight)
 
 ## Progresso
 
-`█░░░░░░░░░` **10%** - 1 de 10 fases
+`██░░░░░░░░` **20%** - 2 de 10 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Governança, ADRs e emendas de documentação | Concluida |
-| Fase 2 - Emenda da borda de claims no core | Não iniciada |
+| Fase 2 - Emenda da borda de claims no core | Concluida |
 | Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Não iniciada |
 | Fase 4 - Options do módulo + split de `AccountOptions` | Não iniciada |
 | Fase 5 - Domínio de contas (`UserAccount`) | Não iniciada |
@@ -647,13 +647,13 @@ então vale por si mesma mesmo que o pré-flight da Fase 3 reprove alguma versã
 
 **Tarefas:**
 
-- [ ] Renomear `IUserPropertyProvider` para `IUserClaimsProvider`.
-- [ ] Renomear `IUserDirectory.GetPropertyProvider` para `GetClaimsProvider`.
-- [ ] Alterar retorno do provider para `Task<IReadOnlyList<Claim>>`.
-- [ ] Remover/aposentar `UserClaimDto`.
-- [ ] Atualizar `DefaultProfileService` para receber `Claim` diretamente.
-- [ ] Renomear `MemoryUserPropertyProvider` para `MemoryUserClaimsProvider`.
-- [ ] Atualizar testes da borda e contract tests existentes.
+- [x] Renomear `IUserPropertyProvider` para `IUserClaimsProvider`.
+- [x] Renomear `IUserDirectory.GetPropertyProvider` para `GetClaimsProvider`.
+- [x] Alterar retorno do provider para `Task<IReadOnlyList<Claim>>`.
+- [x] Remover/aposentar `UserClaimDto`.
+- [x] Atualizar `DefaultProfileService` para receber `Claim` diretamente.
+- [x] Renomear `MemoryUserPropertyProvider` para `MemoryUserClaimsProvider`.
+- [x] Atualizar testes da borda e contract tests existentes.
 
 **Critérios de aceite:** comportamento efetivo de claims não muda; suite atual continua verde.
 
@@ -661,7 +661,32 @@ então vale por si mesma mesmo que o pré-flight da Fase 3 reprove alguma versã
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída (2026-06-17).** O seam de claims foi renomeado no core/borda, com o retorno passando a `Claim` da BCL
+(sem DTO intermediário). Sem mudança de comportamento efetivo de claims.
+
+**Arquivos novos:**
+- `RoyalIdentity/Users/Contracts/IUserClaimsProvider.cs` — contrato renomeado; `GetClaimsAsync(...) → Task<IReadOnlyList<Claim>>`.
+- `RoyalIdentity.Storage.InMemory/MemoryUserClaimsProvider.cs` — fake renomeado; projeta `Claim` direto (mesma regra de filtro por claim type).
+
+**Arquivos removidos** (`git rm`):
+- `RoyalIdentity/Users/Contracts/IUserPropertyProvider.cs`
+- `RoyalIdentity/Users/UserClaimDto.cs`
+- `RoyalIdentity.Storage.InMemory/MemoryUserPropertyProvider.cs`
+
+**Arquivos alterados:**
+- `RoyalIdentity/Users/Contracts/IUserDirectory.cs` — `GetPropertyProvider` → `GetClaimsProvider`, retorno `IUserClaimsProvider`.
+- `RoyalIdentity/Contracts/Defaults/DefaultProfileService.cs` — chama `GetClaimsProvider`; adiciona os `Claim` recebidos
+  direto em `IssuedClaims` (removida a reconstrução `UserClaimDto`→`Claim`).
+- `RoyalIdentity.Storage.InMemory/MemoryUserDirectory.cs` — instancia `MemoryUserClaimsProvider` no getter renomeado.
+- Comentários XML alinhados (`MemoryUserAccount`, `DefaultSubjectPrincipalFactory`, `ISubjectPrincipalFactory`,
+  `ClaimsSeamCharacterizationTests`).
+
+**Verificação:** `dotnet build RoyalIdentity.sln` — 0 erros. Suíte completa **verde**: Tests.Pipelines 3/3,
+Tests.Identity 9/9, Tests.Integration 194/194 (inclui `ClaimsSeamCharacterizationTests` — id_token/userinfo/access
+token mantêm a projeção por identity scope e o filtro de claim type). Sem grep residual de `IUserPropertyProvider`/
+`UserClaimDto`/`GetPropertyProvider` em `*.cs`.
+
+**Nota:** com isto, **código e documentação ficam alinhados** — encerra a janela "docs à frente do código" aberta na Fase 1.
 
 ---
 

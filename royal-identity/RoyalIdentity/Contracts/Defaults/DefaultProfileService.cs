@@ -24,24 +24,24 @@ public class DefaultProfileService : IProfileService
     }
 
     /// <summary>
-    /// Sources the issued claims from the <see cref="IUserPropertyProvider"/> (claims seam, ADR-014 §2.9):
+    /// Sources the issued claims from the <see cref="IUserClaimsProvider"/> (claims seam, ADR-014 §2.9/§4):
     /// only primitives cross the boundary — the requested identity scope names and claim types go in, and
-    /// <see cref="UserClaimDto"/>[] comes back; the <see cref="Claim"/> objects are rebuilt here at the
-    /// borda. The provider also enforces account-active (inactive ⇒ no claims). Roles are emitted by the
-    /// provider as profile claims, never via the minimal session principal (ADR-014 §2.8).
+    /// <see cref="Claim"/>s come back ready to issue (no intermediate DTO; ADR-015 §2.4). The provider also
+    /// enforces account-active (inactive ⇒ no claims). Roles are emitted by the provider as profile claims,
+    /// never via the minimal session principal (ADR-014 §2.8).
     /// </summary>
     public async ValueTask GetProfileDataAsync(ProfileDataRequest request, CancellationToken ct)
     {
         var subjectId = request.Subject.GetSubjectId();
 
-        var provider = userDirectory.GetPropertyProvider(request.Client.Realm);
+        var provider = userDirectory.GetClaimsProvider(request.Client.Realm);
         var identityScopeNames = request.RequestedResources.IdentityScopes.Select(s => s.Name).ToList();
 
         var userClaims = await provider.GetClaimsAsync(
             subjectId, identityScopeNames, request.RequestedClaimTypes, ct);
 
         foreach (var claim in userClaims)
-            request.IssuedClaims.Add(new Claim(claim.Type, claim.Value, claim.ValueType));
+            request.IssuedClaims.Add(claim);
     }
 
     /// <summary>

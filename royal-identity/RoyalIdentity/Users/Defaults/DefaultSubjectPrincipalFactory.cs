@@ -9,7 +9,7 @@ namespace RoyalIdentity.Users.Defaults;
 /// Builds the minimal session principal from a <see cref="Subject"/> + <see cref="UserSession"/>
 /// (ADR-014 §2.8): only the protocol claims <c>sub</c>, <c>name</c>, <c>auth_time</c>, <c>sid</c>,
 /// <c>idp</c>, <c>amr</c>. Roles and profile claims are NOT placed in the cookie/session principal — they
-/// flow through <see cref="IProfileService"/> / <see cref="IUserPropertyProvider"/> for token/userinfo.
+/// flow through <see cref="IProfileService"/> / <see cref="IUserClaimsProvider"/> for token/userinfo.
 /// </summary>
 public sealed class DefaultSubjectPrincipalFactory : ISubjectPrincipalFactory
 {

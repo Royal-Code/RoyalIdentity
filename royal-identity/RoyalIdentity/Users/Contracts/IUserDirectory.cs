@@ -5,7 +5,7 @@ namespace RoyalIdentity.Users.Contracts;
 /// <summary>
 /// Dedicated gateway to the realm-bound account ports (Q1, ADR-014 §2.4). Keeps account data out of
 /// <c>IStorage</c> (which holds only IdP data, incl. session). Backed in-memory now; by the
-/// RoyalIdentity.UsersAccounts module later — swapping is a DI registration. Each getter binds the realm
+/// RoyalIdentity.UserAccounts module later — swapping is a DI registration. Each getter binds the realm
 /// at construction, so the returned ports take no realm parameter.
 /// </summary>
 public interface IUserDirectory
@@ -23,5 +23,5 @@ public interface IUserDirectory
     /// <summary>
     /// Gets the property→claims provider bound to the realm.
     /// </summary>
-    IUserPropertyProvider GetPropertyProvider(Realm realm);
+    IUserClaimsProvider GetClaimsProvider(Realm realm);
 }

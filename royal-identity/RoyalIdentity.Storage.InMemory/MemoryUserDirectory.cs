@@ -6,7 +6,7 @@ namespace RoyalIdentity.Storage.InMemory;
 /// <summary>
 /// In-memory (fake/reference) <see cref="IUserDirectory"/> — the dedicated gateway to the realm-bound
 /// account ports (Q1, ADR-014 §2.4). Each getter binds the realm at construction of the returned port, so
-/// the ports take no realm parameter. Backed by <see cref="MemoryStorage"/>; the UsersAccounts module
+/// the ports take no realm parameter. Backed by <see cref="MemoryStorage"/>; the UserAccounts module
 /// replaces it later (a DI swap), keeping <c>IStorage</c> free of account data.
 /// </summary>
 public sealed class MemoryUserDirectory(
@@ -24,6 +24,6 @@ public sealed class MemoryUserDirectory(
             passwordProtector,
             new LockoutPolicy(realm.Options.Account, clock));
 
-    public IUserPropertyProvider GetPropertyProvider(Realm realm)
-        => new MemoryUserPropertyProvider(storage.GetRealmMemoryStore(realm).UserAccounts);
+    public IUserClaimsProvider GetClaimsProvider(Realm realm)
+        => new MemoryUserClaimsProvider(storage.GetRealmMemoryStore(realm).UserAccounts);
 }

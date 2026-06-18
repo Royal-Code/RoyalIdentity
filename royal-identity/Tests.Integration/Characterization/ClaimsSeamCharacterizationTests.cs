@@ -5,8 +5,8 @@ namespace Tests.Integration.Characterization;
 
 /// <summary>
 /// Fase 8 (plan-users-edge-session.md) — the claims seam: <c>IProfileService.GetProfileDataAsync</c> sources
-/// the issued claims from <c>IUserPropertyProvider</c> passing only primitives (identity scope names + claim
-/// types) and rebuilding <c>Claim</c> at the borda. These tests lock in that id_token and userinfo carry the
+/// the issued claims from <c>IUserClaimsProvider</c> passing only primitives (identity scope names + claim
+/// types), returning <c>Claim</c> directly. These tests lock in that id_token and userinfo carry the
 /// claims projected by the requested identity scopes, and that a property whose type is NOT requested by any
 /// identity scope (alice's <c>role</c>) is filtered out by the seam — it never leaks into tokens.
 /// (Inactive accounts projecting no claims is covered by
