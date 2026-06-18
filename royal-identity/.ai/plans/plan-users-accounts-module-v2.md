@@ -742,6 +742,7 @@ Entregáveis:
 
 Observação do pré-flight: os generators de SmartCommands/SmartSelector geram handlers/extensions públicos; tipos
 anotados por `[Command]`/`[AutoSelect]` precisam ser públicos para não gerar erros de acessibilidade.
+O smoke é temporário e deve ser removido quando os usos reais de RoyalCode cobrirem essas APIs em fases futuras.
 
 Verificação:
 

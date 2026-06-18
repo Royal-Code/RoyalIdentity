@@ -4,14 +4,6 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 
 ---
 
-## DotNet 10
-
-**Área:** Projetos
-**Deferral:** Migrar projetos para `.net 10.0`.
-**Quando revisitar:** Não tem amarração.
-
----
-
 ## Gestão de Realms via API Administrativa
 
 **Área:** Realm / Admin API
