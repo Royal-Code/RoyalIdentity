@@ -141,6 +141,11 @@ not by HTTP. The **pure module does not reference the core**; only `.Integration
 - **Claims are an intersection (ADR-015 §2.4).** A claim is emitted only when it exists in the module for a requested scope
   **and** its claim type was requested/authorized by the IdP. Adding a property is a two-sided config (module
   `PropertyDefinition` + IdP `IdentityScope.UserClaims`).
+- **Dynamic properties are versioned (ADR-015 §2.5).** `PropertyScope` and `PropertyDefinition` are stable identities;
+  editable settings live in `PropertyScopeVersion`/`PropertyDefinitionVersion`. Projection and writes use only the
+  active version. Draft/pending versions do not affect active emission until approved; inactivation preserves stored
+  `UserAccountPropertyValue` rows. Validation is declarative and typed (`PropertyValidationRules`) plus registered
+  custom validators by key; no executable validation script is stored.
 
 ```csharp
 // {Module}.Integration — realm-bound port; primitives + BCL Claim only; no HttpContext, no realm param.
@@ -208,6 +213,7 @@ RoyalIdentity.Server
 - Writes → SmartCommands (no `Map*` in the module). Reads → SmartSearch/`ICriteria` (no `[Query]`). Domain returns `Result`/`Problems`.
 - Seam = **primitives + BCL `Claim`** via `IUserClaimsProvider`; **realm bound at construction**, `Realm` only inside `.Integration`,
   never a method param, never `HttpContext` in a realm-bound port.
+- Dynamic properties = stable scope/definition + versions; only the active version is used for writes/projection.
 - Do not split domain by object type. Use semantic names. Default lens = Gritante.
 
 **References:** [feature-slice-architecture.md](../references/architecture/feature-slice-architecture.md)

@@ -1,5 +1,6 @@
 using RoyalCode.Aggregates;
 using RoyalCode.SmartProblems;
+using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 using RoyalIdentity.UserAccounts.Options;
 
 namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
@@ -10,6 +11,7 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 public class UserAccount : AggregateRoot<long>
 {
 	private ICollection<UserAccountEmail> emails = [];
+	private ICollection<UserAccountPropertyValue> propertyValues = [];
 	private ICollection<UserAccountRole> roles = [];
 
 #nullable disable
@@ -142,6 +144,11 @@ public class UserAccount : AggregateRoot<long>
 	public IReadOnlyCollection<UserAccountRole> Roles => RoleItems.ToList().AsReadOnly();
 
 	/// <summary>
+	/// Gets dynamic property values assigned to this account.
+	/// </summary>
+	public IReadOnlyCollection<UserAccountPropertyValue> PropertyValues => PropertyValueItems.ToList().AsReadOnly();
+
+	/// <summary>
 	/// Gets the current primary email, when one exists.
 	/// </summary>
 	public UserAccountEmail? PrimaryEmail => EmailItems.FirstOrDefault(e => e.IsPrimary);
@@ -162,6 +169,15 @@ public class UserAccount : AggregateRoot<long>
 	{
 		get => roles;
 		set => roles = value;
+	}
+
+	/// <summary>
+	/// Collection navigation used by EF Core mapping while public access remains read-only.
+	/// </summary>
+	protected virtual ICollection<UserAccountPropertyValue> PropertyValueItems
+	{
+		get => propertyValues;
+		set => propertyValues = value;
 	}
 
 	/// <summary>
@@ -481,6 +497,43 @@ public class UserAccount : AggregateRoot<long>
 	{
 		LocalCredential.ResetFailures();
 		Touch(changedAt);
+	}
+
+	internal Result ReplacePropertyValues(
+		PropertyDefinition definition,
+		PropertyValueType valueType,
+		IReadOnlyList<string> values,
+		DateTimeOffset changedAt)
+	{
+		if (definition.RealmId != RealmId)
+		{
+			return Problems.InvalidState(
+				"Property definition realm does not match account realm.",
+				nameof(RealmId),
+				"user_account.property_realm_mismatch");
+		}
+
+		if (string.IsNullOrWhiteSpace(definition.ClaimType))
+		{
+			return Problems.InvalidState(
+				"Property definition claim type is missing.",
+				nameof(definition),
+				"user_account.property_claim_type_missing");
+		}
+
+		foreach (var existingValue in PropertyValueItems.Where(v => v.ClaimType == definition.ClaimType).ToArray())
+		{
+			PropertyValueItems.Remove(existingValue);
+		}
+
+		for (var index = 0; index < values.Count; index++)
+		{
+			PropertyValueItems.Add(new UserAccountPropertyValue(this, definition, valueType, values[index], index));
+		}
+
+		Touch(changedAt);
+		AddEvent(new UserAccountPropertyValueChanged(RealmId, SubjectId, definition.ClaimType));
+		return Result.Ok();
 	}
 
 	private void ClearPrimaryEmail()

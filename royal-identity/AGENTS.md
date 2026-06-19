@@ -180,6 +180,19 @@ Known unstable areas include:
 - Keep changes scoped to the task and follow nearby patterns.
 - Follow the instructions in `.ai\references\external-libraries\instructions.md` and the internal references for the design of specific components/classes/patterns documented in this file.
 
+## ADR
+
+ADRs are project architecture decisions. 
+
+Rules for ADRs:
+- They should not include the solution design, only the decisions;
+- They are stored in the `adrs\` directory;
+- They follow the naming convention: `ADR-{NNN}.md`.
+
+ADRs with good structure are ADR-001 through ADR-009.
+ADRs with acceptable structure: ADR-010 and ADR-011.
+ADRs with poor structure are ADR-012 through ADR-015; these contain a design rather than a decision.
+
 ## Verification
 
 For documentation-only changes, no build is normally required. For code changes,
