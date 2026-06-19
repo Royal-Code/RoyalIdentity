@@ -238,3 +238,24 @@ public class UserAccountUnblocked(string realmId, string subjectId) : DomainEven
 	/// </summary>
 	public string SubjectId { get; } = subjectId;
 }
+
+/// <summary>
+/// Event raised when a dynamic account property value changes.
+/// </summary>
+public class UserAccountPropertyValueChanged(string realmId, string subjectId, string claimType) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
+
+	/// <summary>
+	/// Gets the changed claim type.
+	/// </summary>
+	public string ClaimType { get; } = claimType;
+}

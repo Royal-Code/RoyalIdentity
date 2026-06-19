@@ -1,10 +1,10 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1-4 concluídas; Fase 5 **REPROVADA** (redesign) — ver `.ai/reviews/user-accounts/fase5-useraccount-domain.review-001.md`
+## Status: EM EXECUÇÃO - Fases 1-6 concluídas; próxima fase: persistência própria EFCore + providers
 
 ## Progresso
 
-`████░░░░░░` **40%** - 4 de 10 fases (Fase 5 reaberta)
+`██████░░░░` **60%** - 6 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,8 +12,8 @@
 | Fase 2 - Emenda da borda de claims no core | Concluida |
 | Fase 3 - Pré-flight RoyalCode + esqueleto da família de projetos | Concluida |
 | Fase 4 - Options do módulo + split de `AccountOptions` | Concluida |
-| Fase 5 - Domínio de contas (`UserAccount`) | **Reprovada — redesign (review-001)** |
-| Fase 6 - Propriedades dinâmicas por escopo | Não iniciada |
+| Fase 5 - Domínio de contas (`UserAccount`) | Concluida |
+| Fase 6 - Propriedades dinâmicas por escopo | Concluida |
 | Fase 7 - Persistência própria EFCore + providers | Não iniciada |
 | Fase 8 - Casos de uso mínimos para integração com o IdP | Não iniciada |
 | Fase 9 - Integração com a borda do IdP | Não iniciada |
@@ -41,6 +41,11 @@ O plano de borda/sessão [plan-users-edge-session.md](plan-users-edge-session.md
 já fala por facades (`IUserDirectory`, `ISubjectStore`, `ILocalUserAuthenticator`, provider de claims e sessão).
 Este plano cria a camada B: o módulo real de contas, com domínio rico, persistência própria, properties por escopo,
 credencial local mínima e integração opt-in com a borda.
+
+Os casos de teste detalhados do módulo são mantidos em
+[plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md). A Fase 10 concentra contract tests,
+DI opt-in, seeds e regressão, mas cada fase deve entregar os testes de unidade/integração compatíveis com o risco
+que introduz.
 
 Correções consolidadas:
 
@@ -397,10 +402,27 @@ PropertyScope
   Id                    bigint identity primary key
   RealmId               string not null
   Name                  string not null   -- casa com IdentityScope.Name
-  Status                string/int not null  -- Draft/Active
-  DisplayName           string null
+  IsActive              bool not null
+  ActiveVersionId      bigint null foreign key -> PropertyScopeVersion.Id
 
   unique (RealmId, Name)
+```
+
+### `PropertyScopeVersion`
+
+```text
+PropertyScopeVersion
+  Id                    bigint identity primary key
+  RealmId               string not null
+  PropertyScopeId       bigint not null foreign key -> PropertyScope.Id
+  Version               int not null
+  Status                string/int not null  -- Draft/PendingApproval/Active/Archived/Rejected
+  DisplayName           string null
+  CreatedAt             timestamp not null
+  ApprovedAt            timestamp null
+
+  unique (RealmId, PropertyScopeId, Version)
+  index  (RealmId, PropertyScopeId, Status)
 ```
 
 ### `PropertyDefinition`
@@ -411,17 +433,34 @@ PropertyDefinition
   RealmId               string not null
   PropertyScopeId       bigint not null foreign key -> PropertyScope.Id
   ClaimType             string not null
+
+  unique (RealmId, ClaimType)
+  index  (RealmId, PropertyScopeId)
+```
+
+`PropertyDefinition.ClaimType` é **imutável** (é a identidade do claim no realm). Alterar display/help/required/
+validação/ativação é alteração de version, não rename de definition.
+
+### `PropertyDefinitionVersion`
+
+```text
+PropertyDefinitionVersion
+  Id                    bigint identity primary key
+  RealmId               string not null
+  PropertyScopeVersionId bigint not null foreign key -> PropertyScopeVersion.Id
+  PropertyDefinitionId  bigint not null foreign key -> PropertyDefinition.Id
+  ClaimType             string not null
   ValueType             string null
   DisplayName           string null
   Help                  string null
   IsSensitive           bool not null
   IsRequired            bool not null
-  Multiplicity          string/int not null  -- Single/Multi
-  Validation            json/string null
+  IsCollection          bool not null
+  ValidationRules       json/string null
   IsActive              bool not null
 
-  unique (RealmId, ClaimType)
-  index  (RealmId, PropertyScopeId)
+  unique (PropertyScopeVersionId, PropertyDefinitionId)
+  index  (RealmId, PropertyDefinitionId)
 ```
 
 ### `UserAccountPropertyValue`
@@ -434,7 +473,7 @@ UserAccountPropertyValue
   PropertyDefinitionId  bigint not null foreign key -> PropertyDefinition.Id
   ClaimType             string not null
   Value                 string not null
-  ValueType             string null
+  ValueType             string not null
   Ordinal               int not null default 0
 
   unique (UserAccountId, PropertyDefinitionId, Ordinal)
@@ -442,11 +481,31 @@ UserAccountPropertyValue
   index  (RealmId, ClaimType)
 ```
 
-Para `Multiplicity = Single`, o domínio aceita apenas `Ordinal = 0`. Para `Multi`, aceita N linhas com ordinal distinto.
+Para `IsCollection = false`, o domínio aceita apenas `Ordinal = 0`. Para `IsCollection = true`, aceita N linhas com
+ordinal distinto e valida `MinItems`/`MaxItems` quando configurados.
 
-`PropertyDefinition.ClaimType` é **imutável** (é a identidade do claim no realm). As colunas `ClaimType`/`ValueType` em
-`UserAccountPropertyValue` são **cópias denormalizadas** da definição, mantidas em sincronia na escrita apenas para acelerar
-leituras; a **fonte de verdade** é a `PropertyDefinition` (a projeção canônica faz join e lê `d.claim_type`/`d.value_type`).
+As colunas `ClaimType`/`ValueType` em `UserAccountPropertyValue` são **cópias denormalizadas** da definition/version ativa,
+mantidas em sincronia na escrita apenas para acelerar leituras; a **fonte de verdade** é o schema
+(`PropertyDefinition` + `PropertyDefinitionVersion` da version ativa). Versions antigas continuam úteis para auditoria,
+mas a projeção canônica lê apenas a version ativa do scope.
+
+### Validação dinâmica
+
+```text
+PropertyValidationRules
+  MinLength             int null
+  MaxLength             int null
+  Range                 object null -- Min/Max canônicos em string, interpretados por ValueType
+  AllowedValues         string[] null
+  RegexPattern          string null
+  MinItems              int null
+  MaxItems              int null
+  CustomValidators      object[] null -- ValidatorKey + ParametersJson
+```
+
+`ValueType` é enum do módulo (`Text`, `Integer`, `Decimal`, `Boolean`, `Date`, `DateTime`, `Time`). O valor persistido
+continua string canônica; o validador parseia conforme `ValueType` antes de aplicar range, enumeração, regex e rotinas
+customizadas registradas por `ValidatorKey`. Não há script dinâmico no banco.
 
 ### Queries de referência
 
@@ -539,7 +598,10 @@ RoyalIdentity.UserAccounts/
     ScopeProperties/
       Domain/
         PropertyScope
+        PropertyScopeVersion
         PropertyDefinition
+        PropertyDefinitionVersion
+        PropertyValidationRules
         UserAccountPropertyValue
       Commons/
         SeedDefaultPropertyScopes
@@ -895,27 +957,74 @@ Verificação:
 
 **Tarefas:**
 
-- [ ] Modelar `PropertyScope` por realm, `Name` casando com `IdentityScope.Name` por string.
-- [ ] Modelar `PropertyDefinition` com `ClaimType`, `ValueType`, `DisplayName`, `Help`, `IsSensitive`,
-      `IsRequired`, `Multiplicity`, validação e `IsActive`.
-- [ ] Modelar `UserAccountPropertyValue` como valor por conta.
-- [ ] Garantir `ClaimType` único por realm entre definitions dinâmicas.
-- [ ] Validar colisão entre projections fixas e properties dinâmicas.
-- [ ] Implementar projeção interna que combine:
+- [x] Modelar `PropertyScope` por realm, `Name` casando com `IdentityScope.Name` por string, `IsActive` e
+      `ActiveVersionId`.
+- [x] Modelar `PropertyScopeVersion` com `Version`, `Status` (`Draft`, `PendingApproval`, `Active`,
+      `Archived`, `Rejected`), `DisplayName`, timestamps e aprovação sem impactar a version ativa.
+- [x] Modelar `PropertyDefinition` como identidade estável de `ClaimType` dentro do realm.
+- [x] Modelar `PropertyDefinitionVersion` com `ClaimType` denormalizado, `ValueType`, `DisplayName`,
+      `Help`, `IsSensitive`, `IsRequired`, `IsCollection`, validação tipada e `IsActive`.
+- [x] Modelar `PropertyValidationRules` com length, range por `ValueType`, enumeração, regex, cardinalidade de
+      coleção e validadores customizados por chave.
+- [x] Modelar `UserAccountPropertyValue` como valor por conta, com `ClaimType`/`ValueType` denormalizados na escrita.
+- [x] Garantir `ClaimType` único por realm entre definitions dinâmicas.
+- [x] Validar colisão entre projections fixas e properties dinâmicas.
+- [x] Garantir que `IsRequired` seja prospectivo: novas escritas validam, contas existentes sem valor não quebram login/projeção.
+- [x] Implementar projeção interna que combine:
       - campos fixos;
       - roles;
       - values dinâmicos.
-- [ ] Aplicar interseção com `identityScopeNames` + `claimTypes`.
-- [ ] Seed de scopes padrão (`profile`, `email`) e projeções padrão por realm.
+- [x] Aplicar interseção com `identityScopeNames` + `claimTypes`.
+- [x] Seed de scopes padrão (`profile`, `email`) e projeções padrão por realm.
 
-**Critérios de aceite:** conta não carrega schema próprio; definição e valor são separados; escopo não solicitado
-não emite; claim type não solicitado não emite; conta inativa não emite claims.
+**Critérios de aceite:** conta não carrega schema próprio; definição e valor são separados; edição usa draft/version e
+não impacta a version ativa até aprovação; inativação preserva dados e remove emissão; escopo não solicitado não emite;
+claim type não solicitado não emite; conta inativa não emite claims.
 
-**Testes:** unidade de projeção e validação de schema.
+**Testes:** unidade de versionamento, validação de schema, validação de valores e projeção.
 
 ### Resultado da Fase 6
 
-*a preencher*
+**Concluida (2026-06-19).** O módulo puro agora modela propriedades dinâmicas por escopo com versionamento explícito,
+aprovação sem impacto na version ativa, inativação preservando dados e validação tipada/declarativa com extensibilidade
+por validadores customizados registrados.
+
+Arquivos principais:
+
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Domain/PropertyScope.cs` — identidade estável do scope por realm,
+  `IsActive`, `ActiveVersionId`, criação de draft, aprovação e arquivo da version anterior.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Domain/PropertyScopeVersion.cs` — version editável/aprovável com
+  status `Draft`/`PendingApproval`/`Active`/`Archived`/`Rejected` e definitions versionadas.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Domain/PropertyDefinition.cs` — identidade estável e imutável do
+  `ClaimType` por realm.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Domain/PropertyDefinitionVersion.cs` — `ClaimType` denormalizado,
+  `ValueType`, `DisplayName`, `Help`, `IsSensitive`, `IsRequired`, `IsCollection`, `ValidationRules` e `IsActive`.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Domain/PropertyValidationRules.cs` — length, range por tipo,
+  enumeração, regex, cardinalidade e referências de validadores customizados por chave.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Domain/UserAccountPropertyValue.cs` — valor por conta com
+  `ClaimType`/`ValueType` denormalizados na escrita.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Domain/UserAccountPropertyValueService.cs` — valida valor antes de
+  atribuir, aplica range/enum/regex/custom validators e grava valores canônicos.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Commons/UserAccountClaimProjector.cs` — projeção interna sem
+  `System.Security.Claims.Claim`, combinando campos fixos, roles e valores dinâmicos por interseção scope/claim type.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Commons/ValidateClaimProjectionConfiguration.cs` —
+  valida colisões entre projections fixas e definitions dinâmicas.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Commons/SeedDefaultPropertyScopes.cs` — cria scopes padrão
+  `profile` e `email` ativos.
+- `Tests.UserAccounts/PropertyScopeDomainTests.cs` — cobre versionamento, inativação, validações, colisões e projeção.
+
+Notas:
+
+- `RealmId` permanece estrutural nos filhos realm-scoped para permitir constraints/índices compostos e evitar bugs
+  cross-realm sem depender de joins.
+- `IsRequired` é aplicado em novas escritas; contas existentes sem valor não quebram login nem projeção.
+- `ValidationRules` é domínio tipado; a Fase 7 pode persistir como JSON, mas não há script executável no banco.
+
+Verificação:
+
+- `dotnet test Tests.UserAccounts` — verde: 25/25.
+- `dotnet test Tests.Architecture` — verde: 10/10.
+- `dotnet build RoyalIdentity.sln` — verde, com avisos preexistentes da solution.
 
 ---
 
@@ -932,6 +1041,12 @@ não emite; claim type não solicitado não emite; conta inativa não emite clai
 - [ ] Implementar provider Sqlite com conexão in-memory para testes.
 - [ ] Configurar `ConfigureUserAccounts(IWorkContextBuilder)`.
 - [ ] Criar searches/selectors para consultas por subject, login, email e claims.
+- [ ] Mapear `PropertyDefinitionVersion.ClaimType` como coluna denormalizada da version, sem depender de navegação carregada.
+- [ ] Resolver `PropertyScope.ActiveVersionId` quando uma version recém-aprovada ainda não tem `Id` antes do `SaveChanges`.
+- [ ] Definir/enforçar regra de troca de `PropertyDefinitionVersion.ValueType` quando já existem valores persistidos
+      para a `PropertyDefinition` (bloquear sem migração explícita, ou executar migração).
+- [ ] Implementar os casos da Fase 7 da matriz de testes
+      ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
 - [ ] Testar round-trip do agregado e properties.
 
 **Critérios de aceite:** persistência realm-scoped; queries principais usam índices; providers não dependem do IdP;
@@ -960,6 +1075,8 @@ API/UI administrativa.
 - [ ] Projetar claims por scopes e claim types.
 - [ ] Definir properties de escopo para seeds/testes.
 - [ ] Alterar senha para suportar testes de credencial mínima.
+- [ ] Implementar os casos da Fase 8 da matriz de testes
+      ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
 
 **Critérios de aceite:** casos de uso suficientes para `ISubjectStore`, `ILocalUserAuthenticator` e `IUserClaimsProvider`;
 sem endpoints HTTP; sem casos administrativos completos.
@@ -986,6 +1103,8 @@ sem endpoints HTTP; sem casos administrativos completos.
 - [ ] Adaptar `Realm` do core para `RealmId` + `UserAccountsRealmOptions`.
 - [ ] Garantir que portas retornadas são realm-bound e não recebem realm em método.
 - [ ] Garantir que integration não acessa internals do módulo.
+- [ ] Implementar os casos da Fase 9 da matriz de testes
+      ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
 - [ ] Ligar `UserAccountsRealmOptions` (via `UserAccountsRealmBinding`) ao `LocalUserAuthenticator` para dirigir
       login-por-email/lockout por realm. **Dívida da Fase 4:** o fake `MemoryUserDirectory.GetLocalAuthenticator`
       usa `MemoryAccountOptions` defaults estáticos (ver `// TODO` no código) — o caminho real precisa honrar a opção do realm.
@@ -1009,6 +1128,8 @@ equivalente ao fake para os contratos de borda.
 
 - [ ] Criar contract tests compartilhados para `IUserDirectory`:
       `ISubjectStore`, `ILocalUserAuthenticator`, `IUserClaimsProvider`.
+- [ ] Implementar os casos da Fase 10 da matriz de testes
+      ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
 - [ ] Rodar contract tests contra fake in-memory.
 - [ ] Rodar contract tests contra `UserAccounts` + Sqlite in-memory.
 - [ ] Seeds de paridade Alice/Bob:
@@ -1100,6 +1221,7 @@ fake permanece disponível; diferidos registrados.
 - Planos relacionados: [plan-users-edge-session.md](plan-users-edge-session.md),
   [plan-resources-redesign.md](plan-resources-redesign.md),
   [plans-roadmap-01.md](plans-roadmap-01.md)
+- Matriz de testes: [plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)
 - Código de referência: `RoyalIdentity/Users/Contracts/`, `RoyalIdentity/Contracts/Defaults/DefaultProfileService.cs`,
   `RoyalIdentity.Storage.InMemory/Memory*`, `RoyalIdentity/Options/AccountOptions.cs`,
   `RoyalIdentity.UserAccounts/Options/PasswordOptions.cs`
