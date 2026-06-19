@@ -47,7 +47,7 @@ public class UserAccount : AggregateRoot<long>
 		DisplayName = displayName;
 		ExternalId = externalId;
 		IsActive = true;
-		IsBlocked = false;
+		BlockState = UserAccountBlockState.Unblocked();
 		CreatedAt = createdAt;
 		UpdatedAt = createdAt;
 		LocalCredential = new UserAccountCredential(RealmId);
@@ -89,17 +89,22 @@ public class UserAccount : AggregateRoot<long>
 	/// <summary>
 	/// Gets whether the account is administratively blocked.
 	/// </summary>
-	public bool IsBlocked { get; private set; }
+	public bool IsBlocked => BlockState.IsBlocked;
 
 	/// <summary>
 	/// Gets why the account was administratively blocked.
 	/// </summary>
-	public string? BlockedReason { get; private set; }
+	public string? BlockedReason => BlockState.BlockedReason;
 
 	/// <summary>
 	/// Gets when the account was administratively blocked.
 	/// </summary>
-	public DateTimeOffset? BlockedAt { get; private set; }
+	public DateTimeOffset? BlockedAt => BlockState.BlockedAt;
+
+	/// <summary>
+	/// Gets the administrative block state.
+	/// </summary>
+	public UserAccountBlockState BlockState { get; private set; } = UserAccountBlockState.Unblocked();
 
 	/// <summary>
 	/// Gets an optional external directory identifier. This is not a credential.
@@ -214,12 +219,12 @@ public class UserAccount : AggregateRoot<long>
 	{
 		if (email.RealmId != RealmId)
 		{
-			return Problems.InvalidState("Email realm does not match account realm.", nameof(email), "user_account.email_realm_mismatch");
+			return Problems.InvalidState("Email realm does not match account realm.", nameof(RealmId), "user_account.email_realm_mismatch");
 		}
 
 		if (EmailItems.Any(e => e.NormalizedAddress == email.NormalizedAddress))
 		{
-			return Problems.InvalidState("Email already exists in this account.", nameof(email), "user_account.email_duplicate");
+			return Problems.InvalidState("Email already exists in this account.", nameof(Emails), "user_account.email_duplicate");
 		}
 
 		var shouldBePrimary = email.IsPrimary || EmailItems.Count is 0;
@@ -253,7 +258,7 @@ public class UserAccount : AggregateRoot<long>
 		var email = EmailItems.FirstOrDefault(e => e.NormalizedAddress == normalizedAddress);
 		if (email is null)
 		{
-			return Problems.InvalidState("Email does not exist in this account.", nameof(normalizedAddress), "user_account.email_missing");
+			return Problems.InvalidState("Email does not exist in this account.", nameof(Emails), "user_account.email_missing");
 		}
 
 		ClearPrimaryEmail();
@@ -273,12 +278,12 @@ public class UserAccount : AggregateRoot<long>
 	{
 		if (role.RealmId != RealmId)
 		{
-			return Problems.InvalidState("Role realm does not match account realm.", nameof(role), "user_account.role_realm_mismatch");
+			return Problems.InvalidState("Role realm does not match account realm.", nameof(RealmId), "user_account.role_realm_mismatch");
 		}
 
 		if (RoleItems.Any(r => r.NormalizedName == role.NormalizedName))
 		{
-			return Problems.InvalidState("Role already exists in this account.", nameof(role), "user_account.role_duplicate");
+			return Problems.InvalidState("Role already exists in this account.", nameof(Roles), "user_account.role_duplicate");
 		}
 
 		role.AttachTo(this);
@@ -342,12 +347,12 @@ public class UserAccount : AggregateRoot<long>
 	{
 		if (!LocalCredential.HasPassword)
 		{
-			return Problems.InvalidState("Account does not have a local password.", nameof(currentPassword), "user_account.password_not_set");
+			return Problems.InvalidState("Account does not have a local password.", nameof(LocalCredential), "user_account.password_not_set");
 		}
 
 		if (!passwordHasher.Verify(currentPassword, LocalCredential.PasswordHash!))
 		{
-			return Problems.InvalidParameter("Current password is invalid.", nameof(currentPassword), "user_account.current_password_invalid");
+			return Problems.InvalidParameter("Current password is invalid.", nameof(LocalCredential), "user_account.current_password_invalid");
 		}
 
 		return SetPassword(newPasswordHash, changedAt);
@@ -447,9 +452,7 @@ public class UserAccount : AggregateRoot<long>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	public void Block(string? reason, DateTimeOffset changedAt)
 	{
-		IsBlocked = true;
-		BlockedReason = reason;
-		BlockedAt = changedAt;
+		BlockState = UserAccountBlockState.Blocked(reason, changedAt);
 		Touch(changedAt);
 		AddEvent(new UserAccountBlocked(RealmId, SubjectId, reason));
 	}
@@ -465,9 +468,7 @@ public class UserAccount : AggregateRoot<long>
 			return;
 		}
 
-		IsBlocked = false;
-		BlockedReason = null;
-		BlockedAt = null;
+		BlockState = UserAccountBlockState.Unblocked();
 		Touch(changedAt);
 		AddEvent(new UserAccountUnblocked(RealmId, SubjectId));
 	}

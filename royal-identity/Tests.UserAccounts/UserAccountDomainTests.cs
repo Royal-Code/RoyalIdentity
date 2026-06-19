@@ -21,6 +21,7 @@ public class UserAccountDomainTests
 		Assert.Equal("Alice", account.DisplayName);
 		Assert.True(account.IsActive);
 		Assert.False(account.IsBlocked);
+		Assert.False(account.BlockState.IsBlocked);
 		Assert.Equal("realm-a", account.LocalCredential.RealmId);
 		Assert.Same(account, account.LocalCredential.UserAccount);
 	}
@@ -164,6 +165,11 @@ public class UserAccountDomainTests
 		inactive.Deactivate(Now.AddMinutes(1));
 		blocked.Block("administrative", Now.AddMinutes(1));
 
+		Assert.True(blocked.IsBlocked);
+		Assert.True(blocked.BlockState.IsBlocked);
+		Assert.Equal("administrative", blocked.BlockedReason);
+		Assert.Equal(Now.AddMinutes(1), blocked.BlockedAt);
+
 		var inactiveResult = inactive.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(2));
 		var blockedResult = blocked.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(2));
 
@@ -174,9 +180,34 @@ public class UserAccountDomainTests
 	}
 
 	[Fact]
+	public void BlockAndUnblock_KeepAdministrativeBlockStateTogether()
+	{
+		var account = CreateAccount();
+
+		account.Block("administrative", Now.AddMinutes(1));
+
+		Assert.True(account.IsBlocked);
+		Assert.True(account.BlockState.IsBlocked);
+		Assert.Equal("administrative", account.BlockState.BlockedReason);
+		Assert.Equal(Now.AddMinutes(1), account.BlockState.BlockedAt);
+		Assert.Equal("administrative", account.BlockedReason);
+		Assert.Equal(Now.AddMinutes(1), account.BlockedAt);
+
+		account.Unblock(Now.AddMinutes(2));
+
+		Assert.False(account.IsBlocked);
+		Assert.False(account.BlockState.IsBlocked);
+		Assert.Null(account.BlockState.BlockedReason);
+		Assert.Null(account.BlockState.BlockedAt);
+		Assert.Null(account.BlockedReason);
+		Assert.Null(account.BlockedAt);
+	}
+
+	[Fact]
 	public void EntitySurface_IsEfFriendly_AndKeepsCollectionsProtected()
 	{
 		AssertProtectedParameterlessConstructor(typeof(UserAccount));
+		AssertProtectedParameterlessConstructor(typeof(UserAccountBlockState));
 		AssertProtectedParameterlessConstructor(typeof(UserAccountEmail));
 		AssertProtectedParameterlessConstructor(typeof(UserAccountRole));
 		AssertProtectedParameterlessConstructor(typeof(UserAccountCredential));
