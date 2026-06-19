@@ -1,10 +1,10 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1-6 concluídas; próxima fase: persistência própria EFCore + providers
+## Status: EM EXECUÇÃO - Fases 1-7 concluídas; próxima fase: casos de uso mínimos para integração com o IdP
 
 ## Progresso
 
-`██████░░░░` **60%** - 6 de 10 fases
+`███████░░░` **70%** - 7 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - Options do módulo + split de `AccountOptions` | Concluida |
 | Fase 5 - Domínio de contas (`UserAccount`) | Concluida |
 | Fase 6 - Propriedades dinâmicas por escopo | Concluida |
-| Fase 7 - Persistência própria EFCore + providers | Não iniciada |
+| Fase 7 - Persistência própria EFCore + providers | Concluida |
 | Fase 8 - Casos de uso mínimos para integração com o IdP | Não iniciada |
 | Fase 9 - Integração com a borda do IdP | Não iniciada |
 | Fase 10 - Contract tests, DI opt-in, seeds e regressão | Não iniciada |
@@ -1034,20 +1034,24 @@ Verificação:
 
 **Tarefas:**
 
-- [ ] Criar `UserAccountsDbContext`.
-- [ ] Mapear `UserAccount`, emails, roles, credencial, property scopes, definitions e values.
-- [ ] Implementar índices/chaves do "Modelo relacional mínimo".
-- [ ] Implementar provider PostgreSql com indexes específicos.
-- [ ] Implementar provider Sqlite com conexão in-memory para testes.
-- [ ] Configurar `ConfigureUserAccounts(IWorkContextBuilder)`.
-- [ ] Criar searches/selectors para consultas por subject, login, email e claims.
-- [ ] Mapear `PropertyDefinitionVersion.ClaimType` como coluna denormalizada da version, sem depender de navegação carregada.
-- [ ] Resolver `PropertyScope.ActiveVersionId` quando uma version recém-aprovada ainda não tem `Id` antes do `SaveChanges`.
+- [x] Criar `UserAccountsDbContext`.
+- [x] Mapear `UserAccount`, emails, roles, credencial, property scopes, definitions e values.
+- [x] Implementar índices/chaves do "Modelo relacional mínimo".
+- [x] Implementar provider PostgreSql com indexes específicos.
+- [x] Implementar provider Sqlite com conexão in-memory para testes.
+- [x] Configurar `ConfigureUserAccounts(IWorkContextBuilder)`.
+- [ ] Criar searches/selectors para consultas por subject, login, email e claims. → **adiado para a Fase 8**:
+      o WorkContext já registra searches/repositories por assembly (`ConfigureUserAccounts`), mas os
+      `ICriteria`/selectors concretos pertencem aos casos de uso de consulta (subject/login/email/claims).
+- [x] Mapear `PropertyDefinitionVersion.ClaimType` como coluna denormalizada da version, sem depender de navegação carregada.
+- [x] Resolver `PropertyScope.ActiveVersionId` quando uma version recém-aprovada ainda não tem `Id` antes do `SaveChanges`.
 - [ ] Definir/enforçar regra de troca de `PropertyDefinitionVersion.ValueType` quando já existem valores persistidos
-      para a `PropertyDefinition` (bloquear sem migração explícita, ou executar migração).
-- [ ] Implementar os casos da Fase 7 da matriz de testes
-      ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
-- [ ] Testar round-trip do agregado e properties.
+      para a `PropertyDefinition` → **adiado para a Fase 8**: é guarda de caso de uso (consulta valores existentes
+      antes de permitir a troca), não mapeamento; o schema já suporta ambos os caminhos.
+- [x] Implementar os casos da Fase 7 da matriz de testes
+      ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)) — exceto a guarda de troca de
+      `ValueType` (acima, Fase 8).
+- [x] Testar round-trip do agregado e properties.
 
 **Critérios de aceite:** persistência realm-scoped; queries principais usam índices; providers não dependem do IdP;
 Sqlite in-memory cobre testes sem DB externo.
@@ -1056,7 +1060,52 @@ Sqlite in-memory cobre testes sem DB externo.
 
 ### Resultado da Fase 7
 
-*a preencher*
+> ✅ **CONCLUÍDA (2026-06-19).** Persistência própria do módulo implementada com round-trip provado em SQLite
+> in-memory. Build da solução verde; `Tests.UserAccounts` 32/32 (7 novos de persistência); suíte completa verde
+> (Architecture 10/10, Pipelines 3/3, Identity 9/9, Integration 196/196).
+
+**Entregue (módulo puro `Infrastructure/Data/`):**
+
+- `UserAccountsDbContext` (provider-agnóstico) com `DbSet<UserAccount>`/`DbSet<PropertyScope>` e
+  `OnModelCreating` via `ApplyConfigurationsFromAssembly`.
+- Mapeamentos `IEntityTypeConfiguration<T>` para os 9 tipos persistidos (conta, credencial 1:1, emails, roles,
+  property values, scope, scope version, definition, definition version), com as chaves/índices únicos do
+  "Modelo relacional mínimo". `BlockState` mapeado como owned (colunas `IsBlocked`/`BlockedReason`/`BlockedAt`);
+  projeções computadas e `DomainEvents` ignorados.
+- `PropertyValidationRulesConverter` — persiste `PropertyValidationRules` como JSON canônico (via DTO interno,
+  sem poluir o domínio) + `ValueComparer` para change tracking. Round-trip preserva range, allowed values, regex,
+  cardinalidade e custom validators.
+- `ConfigureUserAccounts(IWorkContextBuilder<TDbContext>)` registra repositories e searches por assembly.
+
+**Providers:**
+
+- `RoyalIdentity.UserAccounts.Sqlite`: `AddUserAccountsSqlite(name)` (arquivo/config) e
+  `AddUserAccountsSqliteInMemory()` (conexão in-memory + `EnsureDatabaseCreated`, base dos testes).
+- `RoyalIdentity.UserAccounts.PostgreSql`: `UserAccountsPostgreSqlDbContext` (subclasse) com `xmin` como token de
+  concorrência e índices parciais (ExternalId não nulo; um único email primário por conta); `AddUserAccountsPostgreSql(name)`.
+
+**Decisões de design (desvios registrados):**
+
+- **`Microsoft.EntityFrameworkCore.Relational` 10.0.0** adicionado ao módulo puro (APIs `ToTable`/`HasColumnName`/
+  `HasFilter`). Continua "RoyalCode libs + EFCore only" (ADR-013/015); não introduz ASP.NET nem o core.
+- **`PropertyScope.ActiveVersionId` é coluna simples (sem FK), não FK como no "Modelo relacional mínimo".** A FK
+  criava dependência circular `PropertyScope ↔ PropertyScopeVersion` que o SQLite não quebra. Em vez de navegação,
+  o `UserAccountsDbContext` reconcilia o ponteiro **depois** do primeiro `SaveChanges` (quando a version já tem `Id`)
+  via `PropertyScope.SyncActiveVersionId()` + segundo save quando muda. Resolve o caso "version aprovada antes do
+  insert" e mantém o domínio sem navegação só-de-persistência. Integridade referencial do ponteiro denormalizado
+  fica como dívida menor (o valor é sempre derivável de `VersionItems`).
+- `RoyalCodePreFlightSmoke` removido (era tipo público temporário da Fase 3; APIs RoyalCode agora cobertas por
+  código real de persistência).
+
+**Adiado para a Fase 8 (com razão):** searches/selectors concretos por subject/login/email/claims (são consulta de
+caso de uso); guarda de troca de `ValueType` com valores persistidos (precisa consultar valores existentes — lógica
+de caso de uso, não de mapeamento).
+
+**Cobertura de testes (`UserAccountsPersistenceTests`):** round-trip completo de conta (credencial/emails/roles/
+block state) e de property values; round-trip de `PropertyScope` (versions/definitions/definition versions/status/
+`ActiveVersionId` reconciliado); `ClaimType` consultável sem include de navegação; unicidade `(RealmId, SubjectId)`
+e isolamento entre realms; persistência integral de `PropertyValidationRules`; wiring do `IWorkContext`
+(`Add`/`SaveAsync`/`FindAsync`).
 
 ---
 

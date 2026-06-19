@@ -53,7 +53,9 @@ public class PropertyScope : AggregateRoot<long>
 	public bool IsActive { get; private set; }
 
 	/// <summary>
-	/// Gets the active version foreign key when persisted.
+	/// Gets the active version foreign key when persisted. The denormalized pointer is reconciled by the
+	/// persistence layer from <see cref="ActiveVersion"/>, so it is correct even for a version approved
+	/// before its insert (its key only exists after <c>SaveChanges</c>).
 	/// </summary>
 	public long? ActiveVersionId { get; private set; }
 
@@ -62,6 +64,22 @@ public class PropertyScope : AggregateRoot<long>
 	/// </summary>
 	public PropertyScopeVersion? ActiveVersion =>
 		VersionItems.FirstOrDefault(r => r.Status is PropertyScopeVersionStatus.Active);
+
+	/// <summary>
+	/// Reconciles <see cref="ActiveVersionId"/> with the current <see cref="ActiveVersion"/>. Used by the
+	/// persistence layer after keys are generated; returns whether the stored value changed.
+	/// </summary>
+	internal bool SyncActiveVersionId()
+	{
+		var expected = ActiveVersion?.Id;
+		if (ActiveVersionId == expected)
+		{
+			return false;
+		}
+
+		ActiveVersionId = expected;
+		return true;
+	}
 
 	/// <summary>
 	/// Gets all versions.

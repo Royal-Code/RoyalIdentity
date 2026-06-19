@@ -5,6 +5,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\RoyalIdentity.UserAccounts\RoyalIdentity.UserAccounts.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.UserAccounts.Sqlite\RoyalIdentity.UserAccounts.Sqlite.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

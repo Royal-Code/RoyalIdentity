@@ -1,0 +1,268 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using RoyalCode.WorkContext;
+using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
+using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
+using RoyalIdentity.UserAccounts.Infrastructure.Data;
+
+namespace Tests.UserAccounts;
+
+public class UserAccountsPersistenceTests
+{
+	private static readonly DateTimeOffset Now = new(2026, 6, 19, 10, 0, 0, TimeSpan.Zero);
+
+	[Fact]
+	public async Task UserAccount_RoundTrips_WithCredentialEmailsRolesAndBlockState()
+	{
+		await using var provider = BuildProvider();
+		long accountId;
+
+		await using (var write = NewContext(provider))
+		{
+			var account = NewAccount();
+			Assert.True(account.AddEmail(
+				new UserAccountEmail("realm-a", "alice@example.com", "ALICE@EXAMPLE.COM", true, true, false), Now).IsSuccess);
+			Assert.True(account.AddEmail(
+				new UserAccountEmail("realm-a", "alice.alt@example.com", "ALICE.ALT@EXAMPLE.COM", false, false, false), Now).IsSuccess);
+			Assert.True(account.AddRole(new UserAccountRole("realm-a", "admin", "ADMIN"), Now).IsSuccess);
+			account.SetPassword("hashed-secret", Now);
+			account.Block("fraud", Now.AddMinutes(1));
+
+			write.UserAccounts.Add(account);
+			await write.SaveChangesAsync();
+			accountId = account.Id;
+		}
+
+		Assert.True(accountId > 0);
+
+		await using var read = NewContext(provider);
+		var loaded = await read.UserAccounts
+			.Include(a => a.LocalCredential)
+			.Include("EmailItems")
+			.Include("RoleItems")
+			.SingleAsync(a => a.Id == accountId);
+
+		Assert.Equal("realm-a", loaded.RealmId);
+		Assert.Equal("subject-1", loaded.SubjectId);
+		Assert.Equal("ALICE", loaded.NormalizedUsername);
+		Assert.True(loaded.IsActive);
+		Assert.True(loaded.IsBlocked);
+		Assert.Equal("fraud", loaded.BlockedReason);
+		Assert.Equal(Now.AddMinutes(1), loaded.BlockedAt);
+		Assert.Equal("hashed-secret", loaded.LocalCredential.PasswordHash);
+		Assert.Equal(2, loaded.Emails.Count);
+		Assert.Equal("alice@example.com", loaded.PrimaryEmail?.Address);
+		Assert.Single(loaded.Roles, r => r.NormalizedName == "ADMIN");
+	}
+
+	[Fact]
+	public async Task PropertyScope_RoundTrips_WithVersionsDefinitionsAndActiveVersion()
+	{
+		await using var provider = BuildProvider();
+		long scopeId;
+
+		await using (var write = NewContext(provider))
+		{
+			var scope = NewActiveProfileScope("nickname", new PropertyDefinitionSettings
+			{
+				ValueType = PropertyValueType.Text,
+				DisplayName = "Nickname",
+				IsRequired = true,
+				IsCollection = true,
+				ValidationRules = new PropertyValidationRules(
+					minLength: 2,
+					maxLength: 16,
+					range: new PropertyRangeRule("a", "z", includeMin: true, includeMax: false),
+					allowedValues: ["ally", "sam"],
+					regexPattern: "^[a-z]+$",
+					minItems: 1,
+					maxItems: 3,
+					customValidators: [new PropertyCustomValidationRef("reject-value", "BLOCK")])
+			});
+
+			write.PropertyScopes.Add(scope);
+			await write.SaveChangesAsync();
+			scopeId = scope.Id;
+		}
+
+		await using var read = NewContext(provider);
+		var loaded = await read.PropertyScopes
+			.Include("VersionItems.DefinitionVersionItems")
+			.Include("DefinitionItems")
+			.SingleAsync(s => s.Id == scopeId);
+
+		Assert.NotNull(loaded.ActiveVersion);
+		Assert.Equal(loaded.ActiveVersion!.Id, loaded.ActiveVersionId);
+		Assert.Equal(PropertyScopeVersionStatus.Active, loaded.ActiveVersion.Status);
+
+		var definitionVersion = loaded.ActiveVersion.DefinitionVersions.Single();
+		Assert.Equal("nickname", definitionVersion.ClaimType);
+		Assert.Equal(PropertyValueType.Text, definitionVersion.ValueType);
+		Assert.True(definitionVersion.IsRequired);
+		Assert.True(definitionVersion.IsCollection);
+		Assert.True(definitionVersion.IsActive);
+
+		var rules = definitionVersion.ValidationRules;
+		Assert.Equal(2, rules.MinLength);
+		Assert.Equal(16, rules.MaxLength);
+		Assert.NotNull(rules.Range);
+		Assert.Equal("a", rules.Range!.Min);
+		Assert.Equal("z", rules.Range.Max);
+		Assert.True(rules.Range.IncludeMin);
+		Assert.False(rules.Range.IncludeMax);
+		Assert.Equal(["ally", "sam"], rules.AllowedValues);
+		Assert.Equal("^[a-z]+$", rules.RegexPattern);
+		Assert.Equal(1, rules.MinItems);
+		Assert.Equal(3, rules.MaxItems);
+		Assert.Single(rules.CustomValidators, c => c.ValidatorKey == "reject-value" && c.ParametersJson == "BLOCK");
+
+		Assert.Single(loaded.Definitions, d => d.ClaimType == "nickname");
+	}
+
+	[Fact]
+	public async Task PropertyDefinitionVersion_ClaimType_IsQueryable_WithoutNavigationInclude()
+	{
+		await using var provider = BuildProvider();
+
+		await using (var write = NewContext(provider))
+		{
+			write.PropertyScopes.Add(NewActiveProfileScope("birthdate", new PropertyDefinitionSettings
+			{
+				ValueType = PropertyValueType.Date
+			}));
+			await write.SaveChangesAsync();
+		}
+
+		await using var read = NewContext(provider);
+		var version = await read.Set<PropertyDefinitionVersion>()
+			.AsNoTracking()
+			.SingleAsync(dv => dv.ClaimType == "birthdate");
+
+		Assert.Equal("birthdate", version.ClaimType);
+		Assert.Null(version.PropertyDefinition);
+	}
+
+	[Fact]
+	public async Task UserAccountPropertyValues_RoundTrip_ByDefinition()
+	{
+		await using var provider = BuildProvider();
+		long accountId;
+
+		await using (var write = NewContext(provider))
+		{
+			var scope = NewActiveProfileScope("level", new PropertyDefinitionSettings
+			{
+				ValueType = PropertyValueType.Integer,
+				IsCollection = true
+			});
+			write.PropertyScopes.Add(scope);
+			await write.SaveChangesAsync();
+
+			var definitionVersion = scope.ActiveVersion!.DefinitionVersions.Single();
+			var account = NewAccount();
+			var service = new UserAccountPropertyValueService();
+			Assert.True((await service.SetValuesAsync(account, definitionVersion, ["1", "3"], Now)).IsSuccess);
+
+			write.UserAccounts.Add(account);
+			await write.SaveChangesAsync();
+			accountId = account.Id;
+		}
+
+		await using var read = NewContext(provider);
+		var values = await read.Set<UserAccountPropertyValue>()
+			.AsNoTracking()
+			.Where(v => v.UserAccountId == accountId)
+			.OrderBy(v => v.Ordinal)
+			.ToListAsync();
+
+		Assert.Equal(2, values.Count);
+		Assert.All(values, v => Assert.Equal("level", v.ClaimType));
+		Assert.All(values, v => Assert.Equal(PropertyValueType.Integer, v.ValueType));
+		Assert.Equal("1", values[0].Value);
+		Assert.Equal(0, values[0].Ordinal);
+		Assert.Equal("3", values[1].Value);
+		Assert.Equal(1, values[1].Ordinal);
+	}
+
+	[Fact]
+	public async Task DuplicateSubjectId_InSameRealm_ViolatesUniqueIndex()
+	{
+		await using var provider = BuildProvider();
+
+		await using var ctx = NewContext(provider);
+		ctx.UserAccounts.Add(new UserAccount("realm-a", "dup-subject", "alice", "ALICE", "Alice", Now));
+		ctx.UserAccounts.Add(new UserAccount("realm-a", "dup-subject", "bob", "BOB", "Bob", Now));
+
+		await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync());
+	}
+
+	[Fact]
+	public async Task SameSubjectId_InDifferentRealms_IsAllowed()
+	{
+		await using var provider = BuildProvider();
+
+		await using var ctx = NewContext(provider);
+		ctx.UserAccounts.Add(new UserAccount("realm-a", "shared-subject", "alice", "ALICE", "Alice", Now));
+		ctx.UserAccounts.Add(new UserAccount("realm-b", "shared-subject", "alice", "ALICE", "Alice", Now));
+
+		var affected = await ctx.SaveChangesAsync();
+
+		Assert.True(affected > 0);
+	}
+
+	[Fact]
+	public async Task WorkContext_PersistsAndFinds_Account()
+	{
+		await using var provider = BuildProvider();
+		long accountId;
+
+		using (var scope = provider.CreateScope())
+		{
+			var work = scope.ServiceProvider.GetRequiredService<IWorkContext>();
+			var account = NewAccount();
+			work.Add(account);
+			await work.SaveAsync();
+			accountId = account.Id;
+		}
+
+		using (var scope = provider.CreateScope())
+		{
+			var work = scope.ServiceProvider.GetRequiredService<IWorkContext>();
+			var found = await work.FindAsync<UserAccount>(accountId);
+
+			Assert.NotNull(found);
+			Assert.Equal("subject-1", found!.SubjectId);
+		}
+	}
+
+	private static ServiceProvider BuildProvider()
+	{
+		var services = new ServiceCollection();
+		services.AddUserAccountsSqliteInMemory();
+		var provider = services.BuildServiceProvider();
+
+		using var scope = provider.CreateScope();
+		scope.ServiceProvider.GetRequiredService<UserAccountsDbContext>().Database.EnsureCreated();
+
+		return provider;
+	}
+
+	private static UserAccountsDbContext NewContext(ServiceProvider provider)
+	{
+		return provider.CreateScope().ServiceProvider.GetRequiredService<UserAccountsDbContext>();
+	}
+
+	private static UserAccount NewAccount()
+	{
+		return new UserAccount("realm-a", "subject-1", "alice", "ALICE", "Alice", Now);
+	}
+
+	private static PropertyScope NewActiveProfileScope(string claimType, PropertyDefinitionSettings settings)
+	{
+		var scope = new PropertyScope("realm-a", "profile", "Profile", Now);
+		var version = scope.Versions.Single();
+		Assert.True(scope.AddDefinition(version, claimType, settings).IsSuccess);
+		Assert.True(scope.ApproveVersion(version, Now.AddMinutes(1)).IsSuccess);
+		return scope;
+	}
+}
