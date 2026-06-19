@@ -8,8 +8,8 @@ namespace RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 /// </summary>
 public class PropertyScope : AggregateRoot<long>
 {
-	private ICollection<PropertyDefinition> definitions = [];
-	private ICollection<PropertyScopeVersion> versions = [];
+	private List<PropertyDefinition> definitions = [];
+	private List<PropertyScopeVersion> versions = [];
 
 #nullable disable
 	/// <summary>
@@ -66,17 +66,17 @@ public class PropertyScope : AggregateRoot<long>
 	/// <summary>
 	/// Gets all versions.
 	/// </summary>
-	public IReadOnlyCollection<PropertyScopeVersion> Versions => VersionItems.ToList().AsReadOnly();
+	public IReadOnlyCollection<PropertyScopeVersion> Versions => versions;
 
 	/// <summary>
 	/// Gets all stable property definitions.
 	/// </summary>
-	public IReadOnlyCollection<PropertyDefinition> Definitions => DefinitionItems.ToList().AsReadOnly();
+	public IReadOnlyCollection<PropertyDefinition> Definitions => definitions;
 
 	/// <summary>
 	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
-	protected virtual ICollection<PropertyScopeVersion> VersionItems
+	protected virtual List<PropertyScopeVersion> VersionItems
 	{
 		get => versions;
 		set => versions = value;
@@ -85,7 +85,7 @@ public class PropertyScope : AggregateRoot<long>
 	/// <summary>
 	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
-	protected virtual ICollection<PropertyDefinition> DefinitionItems
+	protected virtual List<PropertyDefinition> DefinitionItems
 	{
 		get => definitions;
 		set => definitions = value;

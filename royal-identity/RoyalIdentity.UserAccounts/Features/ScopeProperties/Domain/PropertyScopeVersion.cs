@@ -7,7 +7,7 @@ namespace RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 /// </summary>
 public class PropertyScopeVersion : Entity<long>
 {
-	private ICollection<PropertyDefinitionVersion> definitionVersions = [];
+	private List<PropertyDefinitionVersion> definitionVersions = [];
 
 #nullable disable
 	/// <summary>
@@ -77,13 +77,12 @@ public class PropertyScopeVersion : Entity<long>
 	/// <summary>
 	/// Gets definition versions for this scope version.
 	/// </summary>
-	public IReadOnlyCollection<PropertyDefinitionVersion> DefinitionVersions =>
-		DefinitionVersionItems.ToList().AsReadOnly();
+	public IReadOnlyCollection<PropertyDefinitionVersion> DefinitionVersions => definitionVersions;
 
 	/// <summary>
 	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
-	protected virtual ICollection<PropertyDefinitionVersion> DefinitionVersionItems
+	protected virtual List<PropertyDefinitionVersion> DefinitionVersionItems
 	{
 		get => definitionVersions;
 		set => definitionVersions = value;

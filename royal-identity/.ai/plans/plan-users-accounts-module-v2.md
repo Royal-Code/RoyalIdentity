@@ -1078,8 +1078,27 @@ API/UI administrativa.
 - [ ] Implementar os casos da Fase 8 da matriz de testes
       ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
 
+**Garantias obrigatórias (dívidas das reviews das Fases 5 e 6 — fechar nesta fase):**
+
+- [ ] **Lar único da normalização.** Hoje os ctors/entidades recebem `NormalizedUsername`/`NormalizedAddress`/
+      `NormalizedName` **prontos** e **nada no módulo os produz** (só os testes). A Fase 8 deve introduzir **um** ponto
+      de normalização (serviço injetável `IUserAccountNormalizer` **ou** factories de VO que normalizam) usado por
+      **todas** as features de conta. Proibido cada feature normalizar do seu jeito (risco de divergência).
+- [ ] **Validação de entrada nos commands** via SmartValidations (`Rules.Set<>()`) + SmartProblems; o agregado e os
+      serviços recebem valores **já válidos e não-nulos** (não reintroduzir validação de entrada no agregado).
+- [ ] **Factories de VO/entidade** que produzem instâncias **válidas e normalizadas** (ex.: criar `UserAccountEmail`/
+      `UserAccountRole` pela feature com normalização), em vez de ctor recebendo normalizado cru de qualquer caller.
+- [ ] **Email fictício no `Create`** da conta conforme `UserAccountsRealmOptions` (`AllowFictitiousEmail`/pattern/
+      `IsVerified` default) — **não** por flag solta em `AddEmail`.
+- [ ] **`SubjectId`:** política `AllowProvidedSubjectId` + geração no **caso de uso de criação** (não no ctor do agregado);
+      `(RealmId, SubjectId)` único.
+- [ ] **Unicidade de email por realm** quando `AllowDuplicateEmail = false`: garantida no **caso de uso/repositório em
+      transação** (o agregado só faz dedup intra-conta).
+- [ ] **Manter o estilo das Fases 5-6:** sem utilitário `static`, sem `throw` em fluxo esperado, validação fora do agregado,
+      entidades modeladas para EF (chave/`RealmId`/FK).
+
 **Critérios de aceite:** casos de uso suficientes para `ISubjectStore`, `ILocalUserAuthenticator` e `IUserClaimsProvider`;
-sem endpoints HTTP; sem casos administrativos completos.
+sem endpoints HTTP; sem casos administrativos completos; **e as Garantias obrigatórias acima atendidas**.
 
 **Testes:** unidade/integração dos casos mínimos.
 

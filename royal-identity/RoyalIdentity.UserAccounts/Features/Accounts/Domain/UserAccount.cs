@@ -10,9 +10,9 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 /// </summary>
 public class UserAccount : AggregateRoot<long>
 {
-	private ICollection<UserAccountEmail> emails = [];
-	private ICollection<UserAccountPropertyValue> propertyValues = [];
-	private ICollection<UserAccountRole> roles = [];
+	private List<UserAccountEmail> emails = [];
+	private List<UserAccountPropertyValue> propertyValues = [];
+	private List<UserAccountRole> roles = [];
 
 #nullable disable
 	/// <summary>
@@ -136,17 +136,17 @@ public class UserAccount : AggregateRoot<long>
 	/// <summary>
 	/// Gets account emails.
 	/// </summary>
-	public IReadOnlyCollection<UserAccountEmail> Emails => EmailItems.ToList().AsReadOnly();
+	public IReadOnlyCollection<UserAccountEmail> Emails => emails;
 
 	/// <summary>
 	/// Gets account roles.
 	/// </summary>
-	public IReadOnlyCollection<UserAccountRole> Roles => RoleItems.ToList().AsReadOnly();
+	public IReadOnlyCollection<UserAccountRole> Roles => roles;
 
 	/// <summary>
 	/// Gets dynamic property values assigned to this account.
 	/// </summary>
-	public IReadOnlyCollection<UserAccountPropertyValue> PropertyValues => PropertyValueItems.ToList().AsReadOnly();
+	public IReadOnlyCollection<UserAccountPropertyValue> PropertyValues => propertyValues;
 
 	/// <summary>
 	/// Gets the current primary email, when one exists.
@@ -156,7 +156,7 @@ public class UserAccount : AggregateRoot<long>
 	/// <summary>
 	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
-	protected virtual ICollection<UserAccountEmail> EmailItems
+	protected virtual List<UserAccountEmail> EmailItems
 	{
 		get => emails;
 		set => emails = value;
@@ -165,7 +165,7 @@ public class UserAccount : AggregateRoot<long>
 	/// <summary>
 	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
-	protected virtual ICollection<UserAccountRole> RoleItems
+	protected virtual List<UserAccountRole> RoleItems
 	{
 		get => roles;
 		set => roles = value;
@@ -174,7 +174,7 @@ public class UserAccount : AggregateRoot<long>
 	/// <summary>
 	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
-	protected virtual ICollection<UserAccountPropertyValue> PropertyValueItems
+	protected virtual List<UserAccountPropertyValue> PropertyValueItems
 	{
 		get => propertyValues;
 		set => propertyValues = value;
