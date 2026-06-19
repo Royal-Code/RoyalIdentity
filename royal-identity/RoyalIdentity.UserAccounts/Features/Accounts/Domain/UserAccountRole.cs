@@ -1,23 +1,48 @@
+using RoyalCode.Entities;
+
 namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 
 /// <summary>
 /// Role assigned directly to a user account.
 /// </summary>
-public class UserAccountRole
+public class UserAccountRole : Entity<long>
 {
-	private UserAccountRole()
+#nullable disable
+	/// <summary>
+	/// Constructor for EF Core.
+	/// </summary>
+	protected UserAccountRole()
 	{
 	}
+#nullable restore
 
 	/// <summary>
 	/// Creates an account role.
 	/// </summary>
+	/// <param name="realmId">The realm that owns the role row.</param>
 	/// <param name="name">The role name.</param>
-	public UserAccountRole(string name)
+	/// <param name="normalizedName">The normalized role name.</param>
+	public UserAccountRole(string realmId, string name, string normalizedName)
 	{
-		Name = name.Trim();
-		NormalizedName = Normalize(Name);
+		RealmId = realmId;
+		Name = name;
+		NormalizedName = normalizedName;
 	}
+
+	/// <summary>
+	/// Gets the realm that owns this role row.
+	/// </summary>
+	public string RealmId { get; private set; } = string.Empty;
+
+	/// <summary>
+	/// Gets the owner account foreign key.
+	/// </summary>
+	public long UserAccountId { get; private set; }
+
+	/// <summary>
+	/// Gets the owner account navigation.
+	/// </summary>
+	public virtual UserAccount? UserAccount { get; private set; }
 
 	/// <summary>
 	/// Gets the role name.
@@ -29,8 +54,14 @@ public class UserAccountRole
 	/// </summary>
 	public string NormalizedName { get; private set; } = string.Empty;
 
-	internal static string Normalize(string name)
+	/// <summary>
+	/// Attaches this role to its owning aggregate.
+	/// </summary>
+	/// <param name="account">The owner account.</param>
+	internal void AttachTo(UserAccount account)
 	{
-		return name.Trim().ToUpperInvariant();
+		RealmId = account.RealmId;
+		UserAccountId = account.Id;
+		UserAccount = account;
 	}
 }

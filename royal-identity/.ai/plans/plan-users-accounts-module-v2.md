@@ -265,9 +265,9 @@ Usar duas identidades distintas:
 
 - `RealmId` é estrutural em todas as raízes/tabelas realm-scoped.
 - `Username` é campo fixo de primeira classe, normalizado para busca e único por realm.
-- `AccountStatus` é o estado **administrativo** da conta: `Active`, `Inactive` (desabilitada por admin) e `Blocked`
-  (bloqueio administrativo indefinido). É **distinto do lockout**, que é temporário e mora na credencial (`LockoutEndAt`).
-  O autenticador mapeia: status `Inactive` -> reason `Inactive`; status `Blocked` **ou** lockout ativo -> reason `Blocked`.
+- O estado da conta separa dois eixos: habilitação (`IsActive`) e bloqueio administrativo (`IsBlocked`,
+  `BlockedReason`, `BlockedAt`). O lockout temporário continua na credencial (`LockoutEndAt`).
+  O autenticador mapeia: `!IsActive` -> reason `Inactive`; `IsBlocked` **ou** lockout ativo -> reason `Blocked`.
 - `Email` é coleção dedicada: `Address`, `IsPrimary`, `IsVerified`, `IsFictitious`.
 - Email pode ser múltiplo; duplicidade entre contas respeita `AllowDuplicateEmail`.
 - **Login por email** só é determinístico quando o endereço é único no realm. Regra (a ratificar na ADR-015):
@@ -314,18 +314,22 @@ UserAccount
   Username              string not null
   NormalizedUsername    string not null
   DisplayName           string not null
-  AccountStatus         string/int not null
+  IsActive              bool not null
+  IsBlocked             bool not null
+  BlockedReason         string null
+  BlockedAt             timestamp null
   ExternalId            string null
   CreatedAt             timestamp not null
   UpdatedAt             timestamp null
+  Version               concurrency token not null
 
   unique (RealmId, SubjectId)
   unique (RealmId, NormalizedUsername)
   index  (RealmId, ExternalId) where ExternalId is not null
-  index  (RealmId, AccountStatus, CreatedAt, Id)
+  index  (RealmId, IsActive, IsBlocked, CreatedAt, Id)
 ```
 
-> O índice `(RealmId, AccountStatus, CreatedAt, Id)` e o caso de uso `SearchAccounts` são **groundwork de read model**
+> O índice `(RealmId, IsActive, IsBlocked, CreatedAt, Id)` e o caso de uso `SearchAccounts` são **groundwork de read model**
 > (oportunidade), **não requeridos** pela integração com a borda; o enforcement administrativo e a API/UI ficam no
 > `plan-admin-api-ui` (#5). Mantidos por baixo custo; podem ser adiados sem impacto na integração.
 
@@ -520,7 +524,7 @@ RoyalIdentity.UserAccounts/
         Credential
         SubjectId
         Username
-        AccountStatus
+        PasswordPolicy
         Events/
       Commons/
         CreateAccount
@@ -824,13 +828,13 @@ Verificação:
 
 - [x] `UserAccount : AggregateRoot<long>` com `Id` físico interno.
 - [x] `RealmId` obrigatório no agregado.
-- [x] `SubjectId` string, imutável, gerado por default e externo-opcional por policy.
-- [x] `Username`/`NormalizedUsername`, `DisplayName`, `AccountStatus`.
+- [x] `SubjectId` string, imutável, recebido já validado/gerado pela feature/policy.
+- [x] `Username`/`NormalizedUsername`, `DisplayName`, `IsActive` e `IsBlocked`.
 - [x] `ExternalId?` opcional, não credencial.
 - [x] Emails com primário/verificado/fictício.
 - [x] Roles primeira classe.
 - [x] Credencial local mínima: hash, lockout counters, timestamps.
-- [x] `SetPassword`/`ChangePassword` com complexidade básica.
+- [x] `SetPassword`/`ChangePassword` com hash local; complexidade extraída para `PasswordPolicy`.
 - [x] `AuthenticateLocal` ou serviço de domínio equivalente: verificar senha + lockout.
 - [x] Eventos de domínio via `AddEvent`, sem persistir/despachar.
 - [x] Resultados com `Result`/`Problems`, sem throw para fluxo esperado.
@@ -845,38 +849,38 @@ lockout incrementa/zera/expira; senha ausente bloqueia login por senha.
 
 ### Resultado da Fase 5
 
-> ⛔ **REPROVADA (2026-06-18) — redesign necessário.** A entrega abaixo foi revisada e reprovada: o agregado foi
-> modelado como objeto de domínio em memória, **não para persistência EF** (filhos sem chave/`RealmId`, sem
-> unicidade/índices, sem token de concorrência) e carrega code smells rejeitados (utilitários `static`, fábricas de
-> `Problem`, `throw`, validação/normalização no agregado). Refazer modelando para EF e movendo validação para as
-> features. Detalhes e checklist: [`review-001`](../reviews/user-accounts/fase5-useraccount-domain.review-001.md).
-> O texto abaixo fica como registro histórico da primeira tentativa.
+> ✅ **REFEITA (2026-06-18).** A primeira tentativa foi reprovada em
+> [`review-001`](../reviews/user-accounts/fase5-useraccount-domain.review-001.md) e a fase foi refeita com foco em
+> modelo persistível EF/proxy, responsabilidades de domínio mais claras e validação de entrada fora do agregado.
 
-**Concluida (2026-06-18).** O módulo puro agora possui o agregado rico `UserAccount`, realm-scoped,
-com `SubjectId` imutável, username/display name/status, `ExternalId`, emails, roles e credencial local mínima.
+**Concluída (2026-06-18).** O módulo puro agora possui o agregado rico `UserAccount`, realm-scoped,
+com `SubjectId` imutável, username/display name, `IsActive`/`IsBlocked`, `ExternalId`, emails, roles,
+credencial local mínima e token de concorrência.
 
 Arquivos principais:
 
-- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccount.cs` — agregado `AggregateRoot<long>` com factory,
-  validações por `Result`/`Problems`, mutações de username/display/external id, emails, roles, senha e autenticação local.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccount.cs` — agregado `AggregateRoot<long>` persistível,
+  com construtor protegido para EF, navegações virtuais protegidas para coleções, API pública somente leitura e mutações
+  de username/display/external id, emails, roles, senha e autenticação local.
 - `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountCredential.cs` — hash local, failed attempts,
-  timestamps e lockout temporário ou administrativo.
+  timestamps e lockout temporário, em 1:1 com o agregado.
 - `RoyalIdentity.UserAccounts/Features/Accounts/Domain/IUserAccountPasswordHasher.cs` — porta do módulo para hash/verificação,
   mantendo o domínio sem dependência do core/storage.
-- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountEmail.cs` e `UserAccountRole.cs` — valores primeira classe
-  normalizados dentro da conta.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountEmail.cs` e `UserAccountRole.cs` — entidades próprias
+  (`Entity<long>`) com `RealmId`, FK do agregado e navegação virtual.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/PasswordPolicy.cs` — validação reutilizável de complexidade de senha,
+  fora do agregado.
 - `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountEvents.cs` — eventos de domínio via `AddEvent`,
   ainda sem persistência/despacho.
 - `Tests.UserAccounts/UserAccountDomainTests.cs` — cobertura dos invariantes da fase.
 
 Notas:
 
-- `SubjectId` é gerado por default por `SubjectIdGenerator` com valor aleatório URL-safe; fornecimento externo só passa
-  quando `UserAccountsRealmOptions.AllowProvidedSubjectId = true`.
-- `AuthenticateLocal` bloqueia senha ausente, aplica `AccountStatus`, incrementa/zera failed attempts e respeita expiração
-  de lockout.
-- `SetPassword`/`ChangePassword` validam complexidade básica a partir de `PasswordOptions`; histórico/expiração com enforcement
-  completo seguem fora de escopo desta fase.
+- O agregado recebe valores já validados/normalizados; geração/política de `SubjectId`, unicidade cross-account e email
+  fictício ficam nas features/repositórios das próximas fases.
+- `AuthenticateLocal` bloqueia senha ausente, aplica `IsActive`/`IsBlocked`, incrementa/zera failed attempts e respeita
+  expiração de lockout.
+- `SetPassword`/`ChangePassword` trabalham com hash; complexidade de senha é responsabilidade de `PasswordPolicy`.
 
 Verificação:
 

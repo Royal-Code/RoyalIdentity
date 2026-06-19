@@ -171,9 +171,41 @@ public class UserAccountLocalCredentialLocked(string realmId, string subjectId, 
 }
 
 /// <summary>
-/// Event raised when account status changes.
+/// Event raised when the account is activated.
 /// </summary>
-public class UserAccountStatusChanged(string realmId, string subjectId, AccountStatus status) : DomainEventBase
+public class UserAccountActivated(string realmId, string subjectId) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
+}
+
+/// <summary>
+/// Event raised when the account is deactivated.
+/// </summary>
+public class UserAccountDeactivated(string realmId, string subjectId) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
+}
+
+/// <summary>
+/// Event raised when the account is administratively blocked.
+/// </summary>
+public class UserAccountBlocked(string realmId, string subjectId, string? reason) : DomainEventBase
 {
 	/// <summary>
 	/// Gets the account realm.
@@ -186,7 +218,23 @@ public class UserAccountStatusChanged(string realmId, string subjectId, AccountS
 	public string SubjectId { get; } = subjectId;
 
 	/// <summary>
-	/// Gets the new account status.
+	/// Gets the block reason.
 	/// </summary>
-	public AccountStatus Status { get; } = status;
+	public string? Reason { get; } = reason;
+}
+
+/// <summary>
+/// Event raised when the account administrative block is cleared.
+/// </summary>
+public class UserAccountUnblocked(string realmId, string subjectId) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
 }

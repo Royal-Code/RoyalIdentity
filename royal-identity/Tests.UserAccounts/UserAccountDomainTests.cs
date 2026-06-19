@@ -1,6 +1,6 @@
-using RoyalCode.SmartProblems;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Options;
+using System.Reflection;
 
 namespace Tests.UserAccounts;
 
@@ -10,7 +10,7 @@ public class UserAccountDomainTests
 	private static readonly TestPasswordHasher PasswordHasher = new();
 
 	[Fact]
-	public void Create_GeneratesSubject_WhenSubjectIsNotProvided()
+	public void Constructor_StoresValidatedIdentity_AndInitializesCredential()
 	{
 		var account = CreateAccount();
 
@@ -18,35 +18,11 @@ public class UserAccountDomainTests
 		Assert.Equal("subject-1", account.SubjectId);
 		Assert.Equal("alice", account.Username);
 		Assert.Equal("ALICE", account.NormalizedUsername);
-		Assert.Equal(AccountStatus.Active, account.Status);
-	}
-
-	[Fact]
-	public void Create_RejectsProvidedSubject_WhenPolicyDisallowsIt()
-	{
-		var result = UserAccount.Create(
-			"realm-a",
-			"alice",
-			"Alice",
-			new UserAccountsRealmOptions(),
-			Now,
-			subjectId: "provided-subject");
-
-		Assert.True(result.IsFailure);
-	}
-
-	[Fact]
-	public void Create_AcceptsProvidedSubject_WhenPolicyAllowsIt()
-	{
-		var account = Value(UserAccount.Create(
-			"realm-a",
-			"alice",
-			"Alice",
-			new UserAccountsRealmOptions { AllowProvidedSubjectId = true },
-			Now,
-			subjectId: "provided-subject"));
-
-		Assert.Equal("provided-subject", account.SubjectId);
+		Assert.Equal("Alice", account.DisplayName);
+		Assert.True(account.IsActive);
+		Assert.False(account.IsBlocked);
+		Assert.Equal("realm-a", account.LocalCredential.RealmId);
+		Assert.Same(account, account.LocalCredential.UserAccount);
 	}
 
 	[Fact]
@@ -55,7 +31,7 @@ public class UserAccountDomainTests
 		var account = CreateAccount();
 		var subject = account.SubjectId;
 
-		var result = account.ChangeUsername("alice.renamed", Now.AddMinutes(1));
+		var result = account.ChangeUsername("alice.renamed", "ALICE.RENAMED", Now.AddMinutes(1));
 
 		Assert.True(result.IsSuccess);
 		Assert.Equal(subject, account.SubjectId);
@@ -67,14 +43,33 @@ public class UserAccountDomainTests
 	public void AddEmail_MaintainsSinglePrimary_AndStoresVerificationAndFictitiousFlags()
 	{
 		var account = CreateAccount();
+		var verifiedEmail = CreateEmail("alice@example.com", isPrimary: true, isVerified: true);
+		var fictitiousEmail = CreateEmail("subject-1@fictitious.local", isPrimary: true, isFictitious: true);
 
-		Assert.True(account.AddEmail("alice@example.com", Now, isPrimary: true, isVerified: true).IsSuccess);
-		Assert.True(account.AddEmail("subject-1@fictitious.local", Now.AddMinutes(1), isPrimary: true, isFictitious: true).IsSuccess);
+		Assert.True(account.AddEmail(verifiedEmail, Now).IsSuccess);
+		Assert.True(account.AddEmail(fictitiousEmail, Now.AddMinutes(1)).IsSuccess);
 
 		Assert.Single(account.Emails, e => e.IsPrimary);
 		Assert.Equal("subject-1@fictitious.local", account.PrimaryEmail?.Address);
 		Assert.Contains(account.Emails, e => e.Address == "alice@example.com" && e.IsVerified && !e.IsPrimary);
 		Assert.Contains(account.Emails, e => e.Address == "subject-1@fictitious.local" && e.IsFictitious && e.IsPrimary);
+		Assert.All(account.Emails, email => Assert.Same(account, email.UserAccount));
+	}
+
+	[Fact]
+	public void AddEmail_RejectsRealmMismatch_AndDuplicateNormalizedAddress()
+	{
+		var account = CreateAccount();
+
+		Assert.True(account.AddEmail(CreateEmail("alice@example.com"), Now).IsSuccess);
+
+		var duplicate = account.AddEmail(CreateEmail("Alice@example.com"), Now.AddMinutes(1));
+		var realmMismatch = account.AddEmail(
+			new UserAccountEmail("realm-b", "other@example.com", "OTHER@EXAMPLE.COM", false, false, false),
+			Now.AddMinutes(2));
+
+		Assert.True(duplicate.IsFailure);
+		Assert.True(realmMismatch.IsFailure);
 	}
 
 	[Fact]
@@ -82,29 +77,32 @@ public class UserAccountDomainTests
 	{
 		var account = CreateAccount();
 
-		Assert.True(account.AddRole("admin", Now).IsSuccess);
-		Assert.True(account.AddRole("Admin", Now.AddMinutes(1)).IsFailure);
+		Assert.True(account.AddRole(CreateRole("admin"), Now).IsSuccess);
+		Assert.True(account.AddRole(CreateRole("Admin"), Now.AddMinutes(1)).IsFailure);
 
 		var role = Assert.Single(account.Roles);
 		Assert.Equal("admin", role.Name);
 		Assert.Equal("ADMIN", role.NormalizedName);
+		Assert.Same(account, role.UserAccount);
 	}
 
 	[Fact]
-	public void SetPassword_RejectsBasicComplexityViolations()
+	public void PasswordPolicy_RejectsBasicComplexityViolations()
 	{
 		var account = CreateAccount();
 		var options = RelaxedPasswordOptions();
 		options.MinimumLength = 10;
 		options.RequireDigit = true;
+		var policy = new PasswordPolicy();
 
-		var tooShort = account.SetPassword("Aa1!", options, PasswordHasher, Now);
-		var withoutDigit = account.SetPassword("Valid-pass", options, PasswordHasher, Now);
-		var valid = account.SetPassword("Valid-pass1", options, PasswordHasher, Now);
+		var tooShort = policy.Validate("Aa1!", options, account.Username);
+		var withoutDigit = policy.Validate("Valid-pass", options, account.Username);
+		var valid = policy.Validate("Valid-pass1", options, account.Username);
 
 		Assert.True(tooShort.IsFailure);
 		Assert.True(withoutDigit.IsFailure);
 		Assert.True(valid.IsSuccess);
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
 		Assert.True(account.LocalCredential.HasPassword);
 	}
 
@@ -126,7 +124,7 @@ public class UserAccountDomainTests
 		var options = RelaxedPasswordOptions();
 		options.MaxFailedAccessAttempts = 2;
 		options.AccountLockoutDurationMinutes = 10;
-		Assert.True(account.SetPassword("Valid-pass1", options, PasswordHasher, Now).IsSuccess);
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
 
 		var firstFailure = account.AuthenticateLocal("wrong", options, PasswordHasher, Now.AddMinutes(1));
 
@@ -143,7 +141,7 @@ public class UserAccountDomainTests
 		var locked = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(3));
 
 		Assert.False(locked.Success);
-		Assert.Equal(LocalAuthenticationFailureReason.LockedOut, locked.Reason);
+		Assert.Equal(LocalAuthenticationFailureReason.Blocked, locked.Reason);
 		Assert.Equal(Now.AddMinutes(12), locked.LockoutEndAt);
 
 		var successAfterExpiration = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(13));
@@ -155,16 +153,16 @@ public class UserAccountDomainTests
 	}
 
 	[Fact]
-	public void AuthenticateLocal_MapsAccountStatusFailures()
+	public void AuthenticateLocal_MapsActivationAndBlockFailures()
 	{
 		var inactive = CreateAccount();
 		var blocked = CreateAccount();
 		var options = RelaxedPasswordOptions();
-		Assert.True(inactive.SetPassword("Valid-pass1", options, PasswordHasher, Now).IsSuccess);
-		Assert.True(blocked.SetPassword("Valid-pass1", options, PasswordHasher, Now).IsSuccess);
+		Assert.True(inactive.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
+		Assert.True(blocked.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
 
 		inactive.Deactivate(Now.AddMinutes(1));
-		blocked.Block(Now.AddMinutes(1));
+		blocked.Block("administrative", Now.AddMinutes(1));
 
 		var inactiveResult = inactive.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(2));
 		var blockedResult = blocked.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(2));
@@ -175,15 +173,53 @@ public class UserAccountDomainTests
 		Assert.Equal(LocalAuthenticationFailureReason.Blocked, blockedResult.Reason);
 	}
 
+	[Fact]
+	public void EntitySurface_IsEfFriendly_AndKeepsCollectionsProtected()
+	{
+		AssertProtectedParameterlessConstructor(typeof(UserAccount));
+		AssertProtectedParameterlessConstructor(typeof(UserAccountEmail));
+		AssertProtectedParameterlessConstructor(typeof(UserAccountRole));
+		AssertProtectedParameterlessConstructor(typeof(UserAccountCredential));
+
+		Assert.Equal(typeof(IReadOnlyCollection<UserAccountEmail>), typeof(UserAccount).GetProperty(nameof(UserAccount.Emails))?.PropertyType);
+		Assert.Equal(typeof(IReadOnlyCollection<UserAccountRole>), typeof(UserAccount).GetProperty(nameof(UserAccount.Roles))?.PropertyType);
+		AssertVirtualGetter(typeof(UserAccount), nameof(UserAccount.LocalCredential));
+		AssertVirtualGetter(typeof(UserAccountEmail), nameof(UserAccountEmail.UserAccount));
+		AssertVirtualGetter(typeof(UserAccountRole), nameof(UserAccountRole.UserAccount));
+		AssertVirtualGetter(typeof(UserAccountCredential), nameof(UserAccountCredential.UserAccount));
+		AssertProtectedVirtualNavigation(typeof(UserAccount), "EmailItems");
+		AssertProtectedVirtualNavigation(typeof(UserAccount), "RoleItems");
+	}
+
 	private static UserAccount CreateAccount()
 	{
-		return Value(UserAccount.Create(
+		return new UserAccount(
 			"realm-a",
+			"subject-1",
 			"alice",
+			"ALICE",
 			"Alice",
-			new UserAccountsRealmOptions(),
-			Now,
-			subjectIdGenerator: () => "subject-1"));
+			Now);
+	}
+
+	private static UserAccountEmail CreateEmail(
+		string address,
+		bool isPrimary = false,
+		bool isVerified = false,
+		bool isFictitious = false)
+	{
+		return new UserAccountEmail(
+			"realm-a",
+			address,
+			address.ToUpperInvariant(),
+			isPrimary,
+			isVerified,
+			isFictitious);
+	}
+
+	private static UserAccountRole CreateRole(string name)
+	{
+		return new UserAccountRole("realm-a", name, name.ToUpperInvariant());
 	}
 
 	private static PasswordOptions RelaxedPasswordOptions()
@@ -203,11 +239,33 @@ public class UserAccountDomainTests
 		};
 	}
 
-	private static T Value<T>(Result<T> result)
+	private static void AssertProtectedParameterlessConstructor(Type type)
 	{
-		return result.Match(
-			value => value,
-			problems => throw new InvalidOperationException(problems.ToString()));
+		var constructor = type.GetConstructor(
+			BindingFlags.Instance | BindingFlags.NonPublic,
+			binder: null,
+			Type.EmptyTypes,
+			modifiers: null);
+
+		Assert.NotNull(constructor);
+		Assert.True(constructor.IsFamily);
+	}
+
+	private static void AssertVirtualGetter(Type type, string propertyName)
+	{
+		var property = type.GetProperty(propertyName);
+
+		Assert.NotNull(property?.GetMethod);
+		Assert.True(property.GetMethod.IsVirtual);
+	}
+
+	private static void AssertProtectedVirtualNavigation(Type type, string propertyName)
+	{
+		var property = type.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic);
+
+		Assert.NotNull(property?.GetMethod);
+		Assert.True(property.GetMethod.IsFamily);
+		Assert.True(property.GetMethod.IsVirtual);
 	}
 
 	private sealed class TestPasswordHasher : IUserAccountPasswordHasher

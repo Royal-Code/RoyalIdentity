@@ -25,8 +25,4 @@ public enum LocalAuthenticationFailureReason
 	/// </summary>
 	Blocked,
 
-	/// <summary>
-	/// The local credential is locked after failed attempts.
-	/// </summary>
-	LockedOut
 }

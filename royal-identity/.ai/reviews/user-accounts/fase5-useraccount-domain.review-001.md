@@ -251,3 +251,44 @@ modelo relacional do plano.
 5. Validação/normalização nas **features/commands** (SmartValidations + SmartProblems); agregado recebe válido.
 6. Factories de VO/entidade; `PasswordPolicy` reusável; fictício no `Create` por política; remover smells do §3.
 7. Preservar os acertos do §5.
+
+---
+
+## 10. Redo executado — decisões e implementação (2026-06-18)
+
+A crítica foi aceita, com um ajuste importante de formulação: **"validação nunca fica no agregado" é forte demais**.
+O agregado continua responsável por invariantes locais do próprio estado (ex.: uma única primary email por conta,
+duplicidade dentro da coleção da conta, realm dos filhos, status de autenticação, lockout e transições de bloqueio).
+O que saiu do agregado foi validação de entrada/política de borda: normalização, complexidade de senha, geração/política
+de `SubjectId`, unicidade cross-account e geração de email fictício.
+
+### 10.1 Modelo refeito
+
+- `UserAccount` permanece `AggregateRoot<long>`, agora com construtor público recebendo valores já validados e
+  normalizados, e construtor protegido sem parâmetros para EF Core com `#nullable disable/restore`.
+- `UserAccountEmail` e `UserAccountRole` viraram entidades próprias (`Entity<long>`) com `Id`, `RealmId`,
+  `UserAccountId` e navegação `virtual UserAccount?`.
+- `UserAccountCredential` ficou como estado 1:1 da conta, com `UserAccountId`, `RealmId`, navegação virtual e construtor
+  protegido para EF Core.
+- As coleções públicas são `IReadOnlyCollection<T>` e não expõem adição direta. A mutação passa por `AddEmail`,
+  `ChangePrimaryEmail`, `AddRole` e `RemoveRole`.
+- Para proxy/lazy loading, o agregado usa navegações protegidas virtuais (`EmailItems`, `RoleItems`) e a API pública
+  lê por essas navegações, sem entregar a coleção mutável.
+- `AccountStatus` foi removido da superfície de domínio; o estado agora é `IsActive` + `IsBlocked`/`BlockedReason`/
+  `BlockedAt`, separando ciclo de vida de bloqueio administrativo. Lockout temporário continua na credencial.
+- Foi adicionado `Version` como token de concorrência no agregado.
+
+### 10.2 Responsabilidades movidas
+
+- `PasswordPolicy` foi extraído para validar complexidade a partir de `PasswordOptions`.
+- `SetPassword` e `ChangePassword` recebem/trabalham com hash; o agregado não conhece a regra de complexidade.
+- Normalização de username/email/role e geração/política de `SubjectId` deixam de ser responsabilidade do agregado.
+- `LocalAuthenticationResult.DisplayName` foi removido; autenticação local retorna apenas sucesso, `SubjectId`, reason
+  e `LockoutEndAt`.
+- `MarkVerified` morto foi removido de `UserAccountEmail`.
+
+### 10.3 Verificação do redo
+
+- `dotnet build RoyalIdentity.UserAccounts/RoyalIdentity.UserAccounts.csproj --no-restore -v:minimal` — verde.
+- `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-restore` — verde: 17/17.
+- `dotnet test Tests.Architecture/Tests.Architecture.csproj --no-restore` — verde: 10/10.

@@ -7,6 +7,39 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 /// </summary>
 public class UserAccountCredential
 {
+#nullable disable
+	/// <summary>
+	/// Constructor for EF Core.
+	/// </summary>
+	protected UserAccountCredential()
+	{
+	}
+#nullable restore
+
+	/// <summary>
+	/// Creates local credential state for an account.
+	/// </summary>
+	/// <param name="realmId">The realm that owns the credential row.</param>
+	public UserAccountCredential(string realmId)
+	{
+		RealmId = realmId;
+	}
+
+	/// <summary>
+	/// Gets the owner account foreign key and primary key for this 1:1 credential.
+	/// </summary>
+	public long UserAccountId { get; private set; }
+
+	/// <summary>
+	/// Gets the realm that owns this credential row.
+	/// </summary>
+	public string RealmId { get; private set; } = string.Empty;
+
+	/// <summary>
+	/// Gets the owner account navigation.
+	/// </summary>
+	public virtual UserAccount? UserAccount { get; private set; }
+
 	/// <summary>
 	/// Gets the stored password hash.
 	/// </summary>
@@ -41,6 +74,17 @@ public class UserAccountCredential
 	/// Gets whether a local password exists.
 	/// </summary>
 	public bool HasPassword => !string.IsNullOrWhiteSpace(PasswordHash);
+
+	/// <summary>
+	/// Attaches this credential to its owning aggregate.
+	/// </summary>
+	/// <param name="account">The owner account.</param>
+	internal void AttachTo(UserAccount account)
+	{
+		RealmId = account.RealmId;
+		UserAccountId = account.Id;
+		UserAccount = account;
+	}
 
 	/// <summary>
 	/// Stores a new password hash and resets failed-attempt state.

@@ -93,3 +93,4 @@ services.AddPipelines(builder =>
 - File-scoped namespaces preferred (`csharp_style_namespace_declarations = block_scoped:silent`)
 - Primary constructors preferred for simple cases (`csharp_style_prefer_primary_constructors = true:suggestion`)
 - See [.ai/rules/code-style.rules.md](.ai/rules/code-style.rules.md) for repository-specific code smells such as LINQ query expression syntax.
+- Follow the instructions in `.ai\references\external-libraries\instructions.md` and the internal references for the design of specific components/classes/patterns documented in this file.

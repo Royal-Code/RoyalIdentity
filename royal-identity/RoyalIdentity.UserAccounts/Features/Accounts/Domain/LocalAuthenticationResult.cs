@@ -8,13 +8,11 @@ public sealed record LocalAuthenticationResult
 	private LocalAuthenticationResult(
 		bool success,
 		string? subjectId,
-		string? displayName,
 		LocalAuthenticationFailureReason? reason,
 		DateTimeOffset? lockoutEndAt)
 	{
 		Success = success;
 		SubjectId = subjectId;
-		DisplayName = displayName;
 		Reason = reason;
 		LockoutEndAt = lockoutEndAt;
 	}
@@ -28,11 +26,6 @@ public sealed record LocalAuthenticationResult
 	/// Gets the immutable subject identifier when authentication succeeded.
 	/// </summary>
 	public string? SubjectId { get; }
-
-	/// <summary>
-	/// Gets the display name when authentication succeeded.
-	/// </summary>
-	public string? DisplayName { get; }
 
 	/// <summary>
 	/// Gets the failure reason when authentication failed.
@@ -51,7 +44,7 @@ public sealed record LocalAuthenticationResult
 	/// <returns>A successful result.</returns>
 	public static LocalAuthenticationResult Succeeded(UserAccount account)
 	{
-		return new(true, account.SubjectId, account.DisplayName, null, null);
+		return new(true, account.SubjectId, null, null);
 	}
 
 	/// <summary>
@@ -64,6 +57,6 @@ public sealed record LocalAuthenticationResult
 		LocalAuthenticationFailureReason reason,
 		DateTimeOffset? lockoutEndAt = null)
 	{
-		return new(false, null, null, reason, lockoutEndAt);
+		return new(false, null, reason, lockoutEndAt);
 	}
 }

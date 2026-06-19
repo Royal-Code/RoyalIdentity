@@ -9,30 +9,49 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 /// </summary>
 public class UserAccount : AggregateRoot<long>
 {
-	private readonly List<UserAccountEmail> emails = [];
-	private readonly List<UserAccountRole> roles = [];
+	private ICollection<UserAccountEmail> emails = [];
+	private ICollection<UserAccountRole> roles = [];
 
-	private UserAccount()
+#nullable disable
+	/// <summary>
+	/// Constructor for EF Core.
+	/// </summary>
+	protected UserAccount()
 	{
 	}
+#nullable restore
 
-	private UserAccount(
+	/// <summary>
+	/// Creates a new user account from already validated and normalized values.
+	/// </summary>
+	/// <param name="realmId">The owning realm.</param>
+	/// <param name="subjectId">The immutable subject identifier.</param>
+	/// <param name="username">The account username.</param>
+	/// <param name="normalizedUsername">The normalized username.</param>
+	/// <param name="displayName">The display name.</param>
+	/// <param name="createdAt">The creation timestamp.</param>
+	/// <param name="externalId">Optional external directory identifier.</param>
+	public UserAccount(
 		string realmId,
 		string subjectId,
 		string username,
+		string normalizedUsername,
 		string displayName,
-		string? externalId,
-		DateTimeOffset createdAt)
+		DateTimeOffset createdAt,
+		string? externalId = null)
 	{
 		RealmId = realmId;
 		SubjectId = subjectId;
 		Username = username;
-		NormalizedUsername = Normalize(username);
+		NormalizedUsername = normalizedUsername;
 		DisplayName = displayName;
-		ExternalId = NormalizeOptional(externalId);
-		Status = AccountStatus.Active;
+		ExternalId = externalId;
+		IsActive = true;
+		IsBlocked = false;
 		CreatedAt = createdAt;
 		UpdatedAt = createdAt;
+		LocalCredential = new UserAccountCredential(RealmId);
+		LocalCredential.AttachTo(this);
 
 		AddEvent(new UserAccountCreated(RealmId, SubjectId, Username));
 	}
@@ -63,9 +82,24 @@ public class UserAccount : AggregateRoot<long>
 	public string DisplayName { get; private set; } = string.Empty;
 
 	/// <summary>
-	/// Gets the account lifecycle status.
+	/// Gets whether the account is enabled by lifecycle rules.
 	/// </summary>
-	public AccountStatus Status { get; private set; }
+	public bool IsActive { get; private set; }
+
+	/// <summary>
+	/// Gets whether the account is administratively blocked.
+	/// </summary>
+	public bool IsBlocked { get; private set; }
+
+	/// <summary>
+	/// Gets why the account was administratively blocked.
+	/// </summary>
+	public string? BlockedReason { get; private set; }
+
+	/// <summary>
+	/// Gets when the account was administratively blocked.
+	/// </summary>
+	public DateTimeOffset? BlockedAt { get; private set; }
 
 	/// <summary>
 	/// Gets an optional external directory identifier. This is not a credential.
@@ -83,114 +117,67 @@ public class UserAccount : AggregateRoot<long>
 	public DateTimeOffset UpdatedAt { get; private set; }
 
 	/// <summary>
-	/// Gets account emails.
+	/// Gets the provider-specific concurrency token.
 	/// </summary>
-	public IReadOnlyCollection<UserAccountEmail> Emails => emails;
-
-	/// <summary>
-	/// Gets account roles.
-	/// </summary>
-	public IReadOnlyCollection<UserAccountRole> Roles => roles;
+	public uint Version { get; private set; }
 
 	/// <summary>
 	/// Gets the local password credential state.
 	/// </summary>
-	public UserAccountCredential LocalCredential { get; private set; } = new();
+	public virtual UserAccountCredential LocalCredential { get; private set; } = default!;
+
+	/// <summary>
+	/// Gets account emails.
+	/// </summary>
+	public IReadOnlyCollection<UserAccountEmail> Emails => EmailItems.ToList().AsReadOnly();
+
+	/// <summary>
+	/// Gets account roles.
+	/// </summary>
+	public IReadOnlyCollection<UserAccountRole> Roles => RoleItems.ToList().AsReadOnly();
 
 	/// <summary>
 	/// Gets the current primary email, when one exists.
 	/// </summary>
-	public UserAccountEmail? PrimaryEmail => emails.FirstOrDefault(e => e.IsPrimary);
+	public UserAccountEmail? PrimaryEmail => EmailItems.FirstOrDefault(e => e.IsPrimary);
 
 	/// <summary>
-	/// Creates a new user account with generated or policy-approved subject id.
+	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
-	/// <param name="realmId">The owning realm.</param>
-	/// <param name="username">The account username.</param>
-	/// <param name="displayName">The display name.</param>
-	/// <param name="options">The realm-scoped UserAccounts policies.</param>
-	/// <param name="createdAt">The creation timestamp.</param>
-	/// <param name="subjectId">Optional externally supplied subject id.</param>
-	/// <param name="externalId">Optional external directory identifier.</param>
-	/// <param name="subjectIdGenerator">Optional generator used when <paramref name="subjectId"/> is absent.</param>
-	/// <returns>A successful result with the account or a problem result for invalid input/policy.</returns>
-	public static Result<UserAccount> Create(
-		string realmId,
-		string username,
-		string displayName,
-		UserAccountsRealmOptions options,
-		DateTimeOffset createdAt,
-		string? subjectId = null,
-		string? externalId = null,
-		Func<string>? subjectIdGenerator = null)
+	protected virtual ICollection<UserAccountEmail> EmailItems
 	{
-		ArgumentNullException.ThrowIfNull(options);
+		get => emails;
+		set => emails = value;
+	}
 
-		var realm = NormalizeRequired(realmId);
-		if (realm is null)
-		{
-			return InvalidParameter("RealmId is required.", nameof(realmId), "user_account.realm_required")
-				.AsResult<UserAccount>();
-		}
-
-		var user = NormalizeRequired(username);
-		if (user is null)
-		{
-			return InvalidParameter("Username is required.", nameof(username), "user_account.username_required")
-				.AsResult<UserAccount>();
-		}
-
-		var name = NormalizeRequired(displayName);
-		if (name is null)
-		{
-			return InvalidParameter("DisplayName is required.", nameof(displayName), "user_account.display_name_required")
-				.AsResult<UserAccount>();
-		}
-
-		var sub = NormalizeRequired(subjectId);
-		if (sub is not null && !options.AllowProvidedSubjectId)
-		{
-			return NotAllowed(
-					"Providing SubjectId is not allowed by realm policy.",
-					nameof(subjectId),
-					"user_account.subject_id_not_allowed")
-				.AsResult<UserAccount>();
-		}
-
-		sub ??= NormalizeRequired((subjectIdGenerator ?? SubjectIdGenerator.Create)());
-		if (sub is null)
-		{
-			return InvalidParameter("SubjectId generator returned an empty value.", nameof(subjectIdGenerator), "user_account.subject_id_required")
-				.AsResult<UserAccount>();
-		}
-
-		return new UserAccount(realm, sub, user, name, externalId, createdAt);
+	/// <summary>
+	/// Collection navigation used by EF Core mapping while public access remains read-only.
+	/// </summary>
+	protected virtual ICollection<UserAccountRole> RoleItems
+	{
+		get => roles;
+		set => roles = value;
 	}
 
 	/// <summary>
 	/// Changes the username without changing the subject identifier.
 	/// </summary>
 	/// <param name="username">The new username.</param>
+	/// <param name="normalizedUsername">The new normalized username.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	/// <returns>A result describing whether the change succeeded.</returns>
-	public Result ChangeUsername(string username, DateTimeOffset changedAt)
+	public Result ChangeUsername(string username, string normalizedUsername, DateTimeOffset changedAt)
 	{
-		var value = NormalizeRequired(username);
-		if (value is null)
+		if (NormalizedUsername == normalizedUsername)
 		{
-			return InvalidParameter("Username is required.", nameof(username), "user_account.username_required");
+			return Result.Ok();
 		}
 
-		if (NormalizedUsername == Normalize(value))
-		{
-			return new Result();
-		}
-
-		Username = value;
-		NormalizedUsername = Normalize(value);
+		Username = username;
+		NormalizedUsername = normalizedUsername;
 		Touch(changedAt);
 		AddEvent(new UserAccountUsernameChanged(RealmId, SubjectId, Username));
-		return new Result();
+		return Result.Ok();
 	}
 
 	/// <summary>
@@ -201,15 +188,9 @@ public class UserAccount : AggregateRoot<long>
 	/// <returns>A result describing whether the change succeeded.</returns>
 	public Result ChangeDisplayName(string displayName, DateTimeOffset changedAt)
 	{
-		var value = NormalizeRequired(displayName);
-		if (value is null)
-		{
-			return InvalidParameter("DisplayName is required.", nameof(displayName), "user_account.display_name_required");
-		}
-
-		DisplayName = value;
+		DisplayName = displayName;
 		Touch(changedAt);
-		return new Result();
+		return Result.Ok();
 	}
 
 	/// <summary>
@@ -219,46 +200,37 @@ public class UserAccount : AggregateRoot<long>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	public void SetExternalId(string? externalId, DateTimeOffset changedAt)
 	{
-		ExternalId = NormalizeOptional(externalId);
+		ExternalId = externalId;
 		Touch(changedAt);
 	}
 
 	/// <summary>
 	/// Adds an email to the account.
 	/// </summary>
-	/// <param name="address">The email address.</param>
+	/// <param name="email">The email entity to attach.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
-	/// <param name="isPrimary">Whether this email should be primary.</param>
-	/// <param name="isVerified">Whether this email is verified.</param>
-	/// <param name="isFictitious">Whether this email is fictitious.</param>
 	/// <returns>A result describing whether the email was added.</returns>
-	public Result AddEmail(
-		string address,
-		DateTimeOffset changedAt,
-		bool isPrimary = false,
-		bool isVerified = false,
-		bool isFictitious = false)
+	public Result AddEmail(UserAccountEmail email, DateTimeOffset changedAt)
 	{
-		var value = NormalizeRequired(address);
-		if (value is null)
+		if (email.RealmId != RealmId)
 		{
-			return InvalidParameter("Email address is required.", nameof(address), "user_account.email_required");
+			return Problems.InvalidState("Email realm does not match account realm.", nameof(email), "user_account.email_realm_mismatch");
 		}
 
-		var normalized = UserAccountEmail.Normalize(value);
-		if (emails.Any(e => e.NormalizedAddress == normalized))
+		if (EmailItems.Any(e => e.NormalizedAddress == email.NormalizedAddress))
 		{
-			return InvalidState("Email already exists in this account.", nameof(address), "user_account.email_duplicate");
+			return Problems.InvalidState("Email already exists in this account.", nameof(email), "user_account.email_duplicate");
 		}
 
-		var shouldBePrimary = isPrimary || emails.Count is 0;
+		var shouldBePrimary = email.IsPrimary || EmailItems.Count is 0;
 		if (shouldBePrimary)
 		{
 			ClearPrimaryEmail();
 		}
 
-		var email = new UserAccountEmail(value, shouldBePrimary, isVerified, isFictitious);
-		emails.Add(email);
+		email.AttachTo(this);
+		email.MarkPrimary(shouldBePrimary);
+		EmailItems.Add(email);
 		Touch(changedAt);
 		AddEvent(new UserAccountEmailAdded(RealmId, SubjectId, email.Address, email.IsPrimary));
 
@@ -267,152 +239,118 @@ public class UserAccount : AggregateRoot<long>
 			AddEvent(new UserAccountPrimaryEmailChanged(RealmId, SubjectId, email.Address));
 		}
 
-		return new Result();
+		return Result.Ok();
 	}
 
 	/// <summary>
 	/// Changes the primary email.
 	/// </summary>
-	/// <param name="address">The email address to make primary.</param>
+	/// <param name="normalizedAddress">The normalized email address to make primary.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	/// <returns>A result describing whether the change succeeded.</returns>
-	public Result ChangePrimaryEmail(string address, DateTimeOffset changedAt)
+	public Result ChangePrimaryEmail(string normalizedAddress, DateTimeOffset changedAt)
 	{
-		var value = NormalizeRequired(address);
-		if (value is null)
-		{
-			return InvalidParameter("Email address is required.", nameof(address), "user_account.email_required");
-		}
-
-		var normalized = UserAccountEmail.Normalize(value);
-		var email = emails.FirstOrDefault(e => e.NormalizedAddress == normalized);
+		var email = EmailItems.FirstOrDefault(e => e.NormalizedAddress == normalizedAddress);
 		if (email is null)
 		{
-			return InvalidState("Email does not exist in this account.", nameof(address), "user_account.email_missing");
+			return Problems.InvalidState("Email does not exist in this account.", nameof(normalizedAddress), "user_account.email_missing");
 		}
 
 		ClearPrimaryEmail();
 		email.MarkPrimary(true);
 		Touch(changedAt);
 		AddEvent(new UserAccountPrimaryEmailChanged(RealmId, SubjectId, email.Address));
-		return new Result();
+		return Result.Ok();
 	}
 
 	/// <summary>
 	/// Adds a role directly to the account.
 	/// </summary>
-	/// <param name="role">The role name.</param>
+	/// <param name="role">The role entity to attach.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	/// <returns>A result describing whether the role was added.</returns>
-	public Result AddRole(string role, DateTimeOffset changedAt)
+	public Result AddRole(UserAccountRole role, DateTimeOffset changedAt)
 	{
-		var value = NormalizeRequired(role);
-		if (value is null)
+		if (role.RealmId != RealmId)
 		{
-			return InvalidParameter("Role is required.", nameof(role), "user_account.role_required");
+			return Problems.InvalidState("Role realm does not match account realm.", nameof(role), "user_account.role_realm_mismatch");
 		}
 
-		var normalized = UserAccountRole.Normalize(value);
-		if (roles.Any(r => r.NormalizedName == normalized))
+		if (RoleItems.Any(r => r.NormalizedName == role.NormalizedName))
 		{
-			return InvalidState("Role already exists in this account.", nameof(role), "user_account.role_duplicate");
+			return Problems.InvalidState("Role already exists in this account.", nameof(role), "user_account.role_duplicate");
 		}
 
-		var accountRole = new UserAccountRole(value);
-		roles.Add(accountRole);
+		role.AttachTo(this);
+		RoleItems.Add(role);
 		Touch(changedAt);
-		AddEvent(new UserAccountRoleAdded(RealmId, SubjectId, accountRole.Name));
-		return new Result();
+		AddEvent(new UserAccountRoleAdded(RealmId, SubjectId, role.Name));
+		return Result.Ok();
 	}
 
 	/// <summary>
 	/// Removes a role directly from the account.
 	/// </summary>
-	/// <param name="role">The role name.</param>
+	/// <param name="normalizedRoleName">The normalized role name.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	/// <returns>A result describing whether the role was removed.</returns>
-	public Result RemoveRole(string role, DateTimeOffset changedAt)
+	public Result RemoveRole(string normalizedRoleName, DateTimeOffset changedAt)
 	{
-		var value = NormalizeRequired(role);
-		if (value is null)
-		{
-			return InvalidParameter("Role is required.", nameof(role), "user_account.role_required");
-		}
-
-		var normalized = UserAccountRole.Normalize(value);
-		var accountRole = roles.FirstOrDefault(r => r.NormalizedName == normalized);
+		var accountRole = RoleItems.FirstOrDefault(r => r.NormalizedName == normalizedRoleName);
 		if (accountRole is null)
 		{
-			return new Result();
+			return Result.Ok();
 		}
 
-		roles.Remove(accountRole);
+		RoleItems.Remove(accountRole);
 		Touch(changedAt);
 		AddEvent(new UserAccountRoleRemoved(RealmId, SubjectId, accountRole.Name));
-		return new Result();
+		return Result.Ok();
 	}
 
 	/// <summary>
 	/// Sets or replaces the local password credential.
 	/// </summary>
-	/// <param name="password">The new plain password.</param>
-	/// <param name="options">The password policy.</param>
-	/// <param name="passwordHasher">The password hasher.</param>
+	/// <param name="passwordHash">The new password hash.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	/// <param name="mustChangePassword">Whether the user must change the password later.</param>
 	/// <returns>A result describing whether the password was stored.</returns>
 	public Result SetPassword(
-		string password,
-		PasswordOptions options,
-		IUserAccountPasswordHasher passwordHasher,
+		string passwordHash,
 		DateTimeOffset changedAt,
 		bool mustChangePassword = false)
 	{
-		ArgumentNullException.ThrowIfNull(options);
-		ArgumentNullException.ThrowIfNull(passwordHasher);
-
-		var validation = ValidatePassword(password, options);
-		if (validation.IsFailure)
-		{
-			return validation;
-		}
-
-		LocalCredential.SetPassword(passwordHasher.Hash(password), changedAt, mustChangePassword);
+		LocalCredential.SetPassword(passwordHash, changedAt, mustChangePassword);
 		Touch(changedAt);
 		AddEvent(new UserAccountPasswordChanged(RealmId, SubjectId));
-		return new Result();
+		return Result.Ok();
 	}
 
 	/// <summary>
 	/// Changes the local password after verifying the current password.
 	/// </summary>
 	/// <param name="currentPassword">The current plain password.</param>
-	/// <param name="newPassword">The new plain password.</param>
-	/// <param name="options">The password policy.</param>
+	/// <param name="newPasswordHash">The new password hash.</param>
 	/// <param name="passwordHasher">The password hasher.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	/// <returns>A result describing whether the password was changed.</returns>
 	public Result ChangePassword(
 		string currentPassword,
-		string newPassword,
-		PasswordOptions options,
+		string newPasswordHash,
 		IUserAccountPasswordHasher passwordHasher,
 		DateTimeOffset changedAt)
 	{
-		ArgumentNullException.ThrowIfNull(options);
-		ArgumentNullException.ThrowIfNull(passwordHasher);
-
 		if (!LocalCredential.HasPassword)
 		{
-			return InvalidState("Account does not have a local password.", nameof(currentPassword), "user_account.password_not_set");
+			return Problems.InvalidState("Account does not have a local password.", nameof(currentPassword), "user_account.password_not_set");
 		}
 
 		if (!passwordHasher.Verify(currentPassword, LocalCredential.PasswordHash!))
 		{
-			return InvalidParameter("Current password is invalid.", nameof(currentPassword), "user_account.current_password_invalid");
+			return Problems.InvalidParameter("Current password is invalid.", nameof(currentPassword), "user_account.current_password_invalid");
 		}
 
-		return SetPassword(newPassword, options, passwordHasher, changedAt);
+		return SetPassword(newPasswordHash, changedAt);
 	}
 
 	/// <summary>
@@ -429,15 +367,12 @@ public class UserAccount : AggregateRoot<long>
 		IUserAccountPasswordHasher passwordHasher,
 		DateTimeOffset attemptedAt)
 	{
-		ArgumentNullException.ThrowIfNull(options);
-		ArgumentNullException.ThrowIfNull(passwordHasher);
-
-		if (Status is AccountStatus.Inactive)
+		if (!IsActive)
 		{
 			return LocalAuthenticationResult.Failed(LocalAuthenticationFailureReason.Inactive);
 		}
 
-		if (Status is AccountStatus.Blocked)
+		if (IsBlocked)
 		{
 			return LocalAuthenticationResult.Failed(LocalAuthenticationFailureReason.Blocked);
 		}
@@ -451,7 +386,7 @@ public class UserAccount : AggregateRoot<long>
 		if (LocalCredential.IsLockedOut(options, attemptedAt))
 		{
 			return LocalAuthenticationResult.Failed(
-				LocalAuthenticationFailureReason.LockedOut,
+				LocalAuthenticationFailureReason.Blocked,
 				LocalCredential.LockoutEndAt);
 		}
 
@@ -479,7 +414,14 @@ public class UserAccount : AggregateRoot<long>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	public void Activate(DateTimeOffset changedAt)
 	{
-		ChangeStatus(AccountStatus.Active, changedAt);
+		if (IsActive)
+		{
+			return;
+		}
+
+		IsActive = true;
+		Touch(changedAt);
+		AddEvent(new UserAccountActivated(RealmId, SubjectId));
 	}
 
 	/// <summary>
@@ -488,16 +430,46 @@ public class UserAccount : AggregateRoot<long>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	public void Deactivate(DateTimeOffset changedAt)
 	{
-		ChangeStatus(AccountStatus.Inactive, changedAt);
+		if (!IsActive)
+		{
+			return;
+		}
+
+		IsActive = false;
+		Touch(changedAt);
+		AddEvent(new UserAccountDeactivated(RealmId, SubjectId));
 	}
 
 	/// <summary>
 	/// Blocks the account.
 	/// </summary>
+	/// <param name="reason">Optional block reason.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
-	public void Block(DateTimeOffset changedAt)
+	public void Block(string? reason, DateTimeOffset changedAt)
 	{
-		ChangeStatus(AccountStatus.Blocked, changedAt);
+		IsBlocked = true;
+		BlockedReason = reason;
+		BlockedAt = changedAt;
+		Touch(changedAt);
+		AddEvent(new UserAccountBlocked(RealmId, SubjectId, reason));
+	}
+
+	/// <summary>
+	/// Clears the administrative block.
+	/// </summary>
+	/// <param name="changedAt">The mutation timestamp.</param>
+	public void Unblock(DateTimeOffset changedAt)
+	{
+		if (!IsBlocked)
+		{
+			return;
+		}
+
+		IsBlocked = false;
+		BlockedReason = null;
+		BlockedAt = null;
+		Touch(changedAt);
+		AddEvent(new UserAccountUnblocked(RealmId, SubjectId));
 	}
 
 	/// <summary>
@@ -510,82 +482,9 @@ public class UserAccount : AggregateRoot<long>
 		Touch(changedAt);
 	}
 
-	private Result ValidatePassword(string password, PasswordOptions options)
-	{
-		if (string.IsNullOrEmpty(password))
-		{
-			return InvalidParameter("Password is required.", nameof(password), "user_account.password_required");
-		}
-
-		if (password.Length < options.MinimumLength)
-		{
-			return InvalidParameter("Password is shorter than the minimum length.", nameof(password), "user_account.password_too_short");
-		}
-
-		if (password.Length > options.MaximumLength)
-		{
-			return InvalidParameter("Password is longer than the maximum length.", nameof(password), "user_account.password_too_long");
-		}
-
-		if (options.RequireDigit && !password.Any(char.IsDigit))
-		{
-			return InvalidParameter("Password must contain a digit.", nameof(password), "user_account.password_requires_digit");
-		}
-
-		if (options.RequireLowercase && !password.Any(char.IsLower))
-		{
-			return InvalidParameter("Password must contain a lowercase letter.", nameof(password), "user_account.password_requires_lowercase");
-		}
-
-		if (options.RequireUppercase && !password.Any(char.IsUpper))
-		{
-			return InvalidParameter("Password must contain an uppercase letter.", nameof(password), "user_account.password_requires_uppercase");
-		}
-
-		if (options.RequireSpecialCharacters && password.All(char.IsLetterOrDigit))
-		{
-			return InvalidParameter("Password must contain a special character.", nameof(password), "user_account.password_requires_special");
-		}
-
-		if (options.MinimumUniqueCharacters > 0 &&
-			password.Distinct().Count() < options.MinimumUniqueCharacters)
-		{
-			return InvalidParameter("Password does not contain enough unique characters.", nameof(password), "user_account.password_unique_chars");
-		}
-
-		if (options.DisallowUsernameInPassword &&
-			password.Contains(Username, StringComparison.OrdinalIgnoreCase))
-		{
-			return InvalidParameter("Password cannot contain the username.", nameof(password), "user_account.password_contains_username");
-		}
-
-		foreach (var disallowedWord in options.DisallowedWordsInPassword)
-		{
-			if (!string.IsNullOrWhiteSpace(disallowedWord) &&
-				password.Contains(disallowedWord, StringComparison.OrdinalIgnoreCase))
-			{
-				return InvalidParameter("Password contains a disallowed word.", nameof(password), "user_account.password_disallowed_word");
-			}
-		}
-
-		return new Result();
-	}
-
-	private void ChangeStatus(AccountStatus status, DateTimeOffset changedAt)
-	{
-		if (Status == status)
-		{
-			return;
-		}
-
-		Status = status;
-		Touch(changedAt);
-		AddEvent(new UserAccountStatusChanged(RealmId, SubjectId, status));
-	}
-
 	private void ClearPrimaryEmail()
 	{
-		foreach (var email in emails.Where(e => e.IsPrimary))
+		foreach (var email in EmailItems.Where(e => e.IsPrimary))
 		{
 			email.MarkPrimary(false);
 		}
@@ -594,37 +493,5 @@ public class UserAccount : AggregateRoot<long>
 	private void Touch(DateTimeOffset changedAt)
 	{
 		UpdatedAt = changedAt;
-	}
-
-	private static string Normalize(string value)
-	{
-		return value.Trim().ToUpperInvariant();
-	}
-
-	private static string? NormalizeRequired(string? value)
-	{
-		var trimmed = value?.Trim();
-		return string.IsNullOrEmpty(trimmed) ? null : trimmed;
-	}
-
-	private static string? NormalizeOptional(string? value)
-	{
-		var trimmed = value?.Trim();
-		return string.IsNullOrEmpty(trimmed) ? null : trimmed;
-	}
-
-	private static Problem InvalidParameter(string detail, string property, string typeId)
-	{
-		return Problems.InvalidParameter(detail, property, typeId);
-	}
-
-	private static Problem InvalidState(string detail, string property, string typeId)
-	{
-		return Problems.InvalidState(detail, property, typeId);
-	}
-
-	private static Problem NotAllowed(string detail, string property, string typeId)
-	{
-		return Problems.NotAllowed(detail, property, typeId);
 	}
 }

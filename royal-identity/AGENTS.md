@@ -178,6 +178,7 @@ Known unstable areas include:
 - Primary constructors are preferred for simple cases.
 - Follow `.ai/rules/code-style.rules.md` for repository-specific style rules, including the preference for method-chain LINQ over query expression syntax.
 - Keep changes scoped to the task and follow nearby patterns.
+- Follow the instructions in `.ai\references\external-libraries\instructions.md` and the internal references for the design of specific components/classes/patterns documented in this file.
 
 ## Verification
 

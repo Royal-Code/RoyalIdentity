@@ -66,6 +66,13 @@ public class Person : Entity<int>
         Id = id;
         Name = name;
     }
+
+#nullable disable
+    /// <summary>
+    /// Construtor protegido sem parâmetros para deserialização.
+    /// </summary>
+    protected Person() { }
+#nullable enable
 }
 ```
 
@@ -83,6 +90,13 @@ public class CatalogItem : Entity<Guid, string>
         Code = code;
         Name = name;
     }
+
+#nullable disable
+    /// <summary>
+    /// Construtor protegido sem parâmetros para deserialização.
+    /// </summary>
+    protected CatalogItem() { }
+#nullable enable
 }
 ```
 
@@ -170,6 +184,13 @@ public sealed class Order : AggregateRoot<Guid>
         Number = number;
         AddEvent(new OrderCreated(Id, Number));
     }
+
+#nullable disable
+    /// <summary>
+    /// Construtor protegido sem parâmetros para deserialização.
+    /// </summary>
+    protected Order() { }
+#nullable enable
 }
 
 public sealed class OrderCreated : DomainEventBase
@@ -196,6 +217,13 @@ public sealed class ProductAggregate : AggregateRoot<Guid, string>
         Name = name;
         AddEvent(new ProductCreated(Id, Code));
     }
+
+#nullable disable
+    /// <summary>
+    /// Construtor protegido sem parâmetros para deserialização.
+    /// </summary>
+    protected ProductAggregate() { }
+#nullable enable
 }
 
 public sealed class ProductCreated : DomainEventBase
@@ -205,6 +233,8 @@ public sealed class ProductCreated : DomainEventBase
     public ProductCreated(Guid productId, string code) { ProductId = productId; Code = code; }
 }
 ```
+
+> Observação: nunca use termos como `Aggregate` ou `Entity` no nome das classes de entidades ou agregados. O Código acima é um mero exemplo.
 
 ---
 
