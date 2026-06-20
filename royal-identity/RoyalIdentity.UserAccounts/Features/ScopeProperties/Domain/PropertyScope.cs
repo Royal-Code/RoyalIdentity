@@ -132,7 +132,17 @@ public class PropertyScope : AggregateRoot<long>
 		{
 			foreach (var definitionVersion in activeVersion.DefinitionVersions)
 			{
-				draftVersion.AddDefinitionVersion(definitionVersion.CopyTo(draftVersion));
+				var definition = DefinitionItems.FirstOrDefault(d => d.ClaimType == definitionVersion.ClaimType)
+					?? definitionVersion.PropertyDefinition;
+				if (definition is null)
+				{
+					return Problems.InvalidState(
+						"Stable property definition was not loaded for the active definition version.",
+						nameof(Definitions),
+						"user_account.property_definition_not_loaded");
+				}
+
+				draftVersion.AddDefinitionVersion(definitionVersion.CopyTo(draftVersion, definition));
 			}
 		}
 

@@ -126,7 +126,9 @@ public class PropertyDefinitionVersion : Entity<long>
 		IsActive = false;
 	}
 
-	internal PropertyDefinitionVersion CopyTo(PropertyScopeVersion propertyScopeVersion)
+	internal PropertyDefinitionVersion CopyTo(
+		PropertyScopeVersion propertyScopeVersion,
+		PropertyDefinition propertyDefinition)
 	{
 		var settings = new PropertyDefinitionSettings
 		{
@@ -140,7 +142,7 @@ public class PropertyDefinitionVersion : Entity<long>
 			IsActive = IsActive
 		};
 
-		return new PropertyDefinitionVersion(RealmId, propertyScopeVersion, PropertyDefinition!, settings);
+		return new PropertyDefinitionVersion(RealmId, propertyScopeVersion, propertyDefinition, settings);
 	}
 
 	internal void AttachTo(PropertyScopeVersion propertyScopeVersion)

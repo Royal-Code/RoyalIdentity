@@ -1,9 +1,10 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalCode.WorkContext;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
-using RoyalIdentity.UserAccounts.Infrastructure.Data;
+using RoyalIdentity.UserAccounts.Sqlite;
 
 namespace Tests.UserAccounts;
 
@@ -143,6 +144,87 @@ public class UserAccountsPersistenceTests
 	}
 
 	[Fact]
+	public async Task PropertyScope_CreateDraftVersion_AfterRoundTrip_CopiesActiveDefinitions()
+	{
+		await using var provider = BuildProvider();
+		long scopeId;
+
+		await using (var write = NewContext(provider))
+		{
+			var scope = NewActiveProfileScope("nickname", new PropertyDefinitionSettings
+			{
+				ValueType = PropertyValueType.Text,
+				DisplayName = "Nickname",
+				IsRequired = true,
+				IsCollection = true
+			});
+
+			write.PropertyScopes.Add(scope);
+			await write.SaveChangesAsync();
+			scopeId = scope.Id;
+		}
+
+		await using (var update = NewContext(provider))
+		{
+			var loaded = await update.PropertyScopes
+				.Include("VersionItems.DefinitionVersionItems")
+				.Include("DefinitionItems")
+				.SingleAsync(s => s.Id == scopeId);
+
+			var result = loaded.CreateDraftVersion("Profile v2", Now.AddMinutes(2));
+
+			Assert.True(result.IsSuccess);
+			await update.SaveChangesAsync();
+		}
+
+		await using var read = NewContext(provider);
+		var reloaded = await read.PropertyScopes
+			.Include("VersionItems.DefinitionVersionItems")
+			.Include("DefinitionItems")
+			.SingleAsync(s => s.Id == scopeId);
+
+		var draft = reloaded.Versions.Single(v => v.Status == PropertyScopeVersionStatus.Draft);
+		var definitionVersion = draft.DefinitionVersions.Single();
+
+		Assert.Equal(2, draft.Version);
+		Assert.Equal("nickname", definitionVersion.ClaimType);
+		Assert.Equal(PropertyValueType.Text, definitionVersion.ValueType);
+		Assert.Equal("Nickname", definitionVersion.DisplayName);
+		Assert.True(definitionVersion.IsRequired);
+		Assert.True(definitionVersion.IsCollection);
+		Assert.True(definitionVersion.IsActive);
+		Assert.Single(reloaded.Definitions, d => d.ClaimType == "nickname");
+	}
+
+	[Fact]
+	public async Task PropertyScope_CreateDraftVersion_ReturnsProblem_WhenStableDefinitionsAreNotLoaded()
+	{
+		await using var provider = BuildProvider();
+		long scopeId;
+
+		await using (var write = NewContext(provider))
+		{
+			var scope = NewActiveProfileScope("nickname", new PropertyDefinitionSettings
+			{
+				ValueType = PropertyValueType.Text
+			});
+
+			write.PropertyScopes.Add(scope);
+			await write.SaveChangesAsync();
+			scopeId = scope.Id;
+		}
+
+		await using var read = NewContext(provider);
+		var loaded = await read.PropertyScopes
+			.Include("VersionItems.DefinitionVersionItems")
+			.SingleAsync(s => s.Id == scopeId);
+
+		var result = loaded.CreateDraftVersion("Profile v2", Now.AddMinutes(2));
+
+		Assert.True(result.IsFailure);
+	}
+
+	[Fact]
 	public async Task UserAccountPropertyValues_RoundTrip_ByDefinition()
 	{
 		await using var provider = BuildProvider();
@@ -197,6 +279,18 @@ public class UserAccountsPersistenceTests
 	}
 
 	[Fact]
+	public async Task DuplicateNormalizedUsername_InSameRealm_ViolatesUniqueIndex()
+	{
+		await using var provider = BuildProvider();
+
+		await using var ctx = NewContext(provider);
+		ctx.UserAccounts.Add(new UserAccount("realm-a", "subject-1", "alice", "ALICE", "Alice", Now));
+		ctx.UserAccounts.Add(new UserAccount("realm-a", "subject-2", "alice", "ALICE", "Alice 2", Now));
+
+		await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync());
+	}
+
+	[Fact]
 	public async Task SameSubjectId_InDifferentRealms_IsAllowed()
 	{
 		await using var provider = BuildProvider();
@@ -208,6 +302,79 @@ public class UserAccountsPersistenceTests
 		var affected = await ctx.SaveChangesAsync();
 
 		Assert.True(affected > 0);
+	}
+
+	[Fact]
+	public async Task DuplicatePrimaryEmail_ForSameAccount_ViolatesSqliteProviderIndex()
+	{
+		await using var provider = BuildProvider();
+		long accountId;
+
+		await using (var write = NewContext(provider))
+		{
+			var account = NewAccount();
+			write.UserAccounts.Add(account);
+			await write.SaveChangesAsync();
+			accountId = account.Id;
+		}
+
+		await using var ctx = NewContext(provider);
+		await ctx.Database.ExecuteSqlRawAsync(
+			"""
+			INSERT INTO "UserAccountEmails"
+				("RealmId", "UserAccountId", "Address", "NormalizedAddress", "IsPrimary", "IsVerified", "IsFictitious")
+			VALUES
+				({0}, {1}, {2}, {3}, 1, 1, 0)
+			""",
+			"realm-a",
+			accountId,
+			"alice@example.com",
+			"ALICE@EXAMPLE.COM");
+
+		var exception = await Assert.ThrowsAsync<SqliteException>(() =>
+			ctx.Database.ExecuteSqlRawAsync(
+				"""
+				INSERT INTO "UserAccountEmails"
+					("RealmId", "UserAccountId", "Address", "NormalizedAddress", "IsPrimary", "IsVerified", "IsFictitious")
+				VALUES
+					({0}, {1}, {2}, {3}, 1, 1, 0)
+				""",
+				"realm-a",
+				accountId,
+				"alice.alt@example.com",
+				"ALICE.ALT@EXAMPLE.COM"));
+
+		Assert.Equal(19, exception.SqliteErrorCode);
+	}
+
+	[Fact]
+	public async Task DuplicatePropertyScopeName_InSameRealm_ViolatesUniqueIndex()
+	{
+		await using var provider = BuildProvider();
+
+		await using var ctx = NewContext(provider);
+		ctx.PropertyScopes.Add(new PropertyScope("realm-a", "profile", "Profile", Now));
+		ctx.PropertyScopes.Add(new PropertyScope("realm-a", "profile", "Profile 2", Now));
+
+		await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync());
+	}
+
+	[Fact]
+	public async Task DuplicatePropertyDefinitionClaimType_InSameRealm_ViolatesUniqueIndex()
+	{
+		await using var provider = BuildProvider();
+
+		await using var ctx = NewContext(provider);
+		ctx.PropertyScopes.Add(NewActiveScope("profile", "nickname", new PropertyDefinitionSettings
+		{
+			ValueType = PropertyValueType.Text
+		}));
+		ctx.PropertyScopes.Add(NewActiveScope("custom-profile", "nickname", new PropertyDefinitionSettings
+		{
+			ValueType = PropertyValueType.Text
+		}));
+
+		await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync());
 	}
 
 	[Fact]
@@ -242,14 +409,14 @@ public class UserAccountsPersistenceTests
 		var provider = services.BuildServiceProvider();
 
 		using var scope = provider.CreateScope();
-		scope.ServiceProvider.GetRequiredService<UserAccountsDbContext>().Database.EnsureCreated();
+		scope.ServiceProvider.GetRequiredService<UserAccountsSqliteDbContext>().Database.EnsureCreated();
 
 		return provider;
 	}
 
-	private static UserAccountsDbContext NewContext(ServiceProvider provider)
+	private static UserAccountsSqliteDbContext NewContext(ServiceProvider provider)
 	{
-		return provider.CreateScope().ServiceProvider.GetRequiredService<UserAccountsDbContext>();
+		return provider.CreateScope().ServiceProvider.GetRequiredService<UserAccountsSqliteDbContext>();
 	}
 
 	private static UserAccount NewAccount()
@@ -259,7 +426,12 @@ public class UserAccountsPersistenceTests
 
 	private static PropertyScope NewActiveProfileScope(string claimType, PropertyDefinitionSettings settings)
 	{
-		var scope = new PropertyScope("realm-a", "profile", "Profile", Now);
+		return NewActiveScope("profile", claimType, settings);
+	}
+
+	private static PropertyScope NewActiveScope(string scopeName, string claimType, PropertyDefinitionSettings settings)
+	{
+		var scope = new PropertyScope("realm-a", scopeName, "Profile", Now);
 		var version = scope.Versions.Single();
 		Assert.True(scope.AddDefinition(version, claimType, settings).IsSuccess);
 		Assert.True(scope.ApproveVersion(version, Now.AddMinutes(1)).IsSuccess);

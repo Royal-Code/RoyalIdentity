@@ -1,5 +1,6 @@
 using RoyalCode.WorkContext.EntityFramework.Configurations;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
+using RoyalIdentity.UserAccounts.Sqlite;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -15,12 +16,12 @@ public static class UserAccountsSqliteExtensions
 	/// <param name="services">The service collection.</param>
 	/// <param name="connectionStringName">The configuration key of the connection string.</param>
 	/// <returns>The WorkContext builder for further configuration (e.g. seeding).</returns>
-	public static IWorkContextBuilder<UserAccountsDbContext> AddUserAccountsSqlite(
+	public static IWorkContextBuilder<UserAccountsSqliteDbContext> AddUserAccountsSqlite(
 		this IServiceCollection services,
 		string connectionStringName = "UserAccounts")
 	{
 		return services
-			.AddSqliteWorkContext<UserAccountsDbContext>(connectionStringName)
+			.AddSqliteWorkContext<UserAccountsSqliteDbContext>(connectionStringName)
 			.ConfigureUserAccounts();
 	}
 
@@ -30,11 +31,11 @@ public static class UserAccountsSqliteExtensions
 	/// </summary>
 	/// <param name="services">The service collection.</param>
 	/// <returns>The WorkContext builder for further configuration (e.g. seeding).</returns>
-	public static IWorkContextBuilder<UserAccountsDbContext> AddUserAccountsSqliteInMemory(
+	public static IWorkContextBuilder<UserAccountsSqliteDbContext> AddUserAccountsSqliteInMemory(
 		this IServiceCollection services)
 	{
 		return services
-			.AddSqliteInMemoryWorkContext<UserAccountsDbContext>()
+			.AddSqliteInMemoryWorkContext<UserAccountsSqliteDbContext>()
 			.ConfigureUserAccounts()
 			.EnsureDatabaseCreated();
 	}
