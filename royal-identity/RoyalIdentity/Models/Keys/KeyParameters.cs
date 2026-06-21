@@ -19,7 +19,7 @@ public class KeyParameters
     /// <param name="lifetime">Key lifetime.</param>
     /// <param name="keySize">For RSA keys, the key size must be entered. If not entered, 2048 will be used.</param>
     /// <returns>
-    ///     A new instance of <see cref=�KeyParameters�/>.
+    ///     A new instance of <see cref="KeyParameters"/>.
     /// </returns>
     /// <exception cref="NotSupportedException">
     ///     Occurs when the algorithm is not supported.

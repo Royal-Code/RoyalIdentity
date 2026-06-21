@@ -113,14 +113,20 @@ var criteria = manager.Criteria<MyEntity>();
 - `FilterBy<TFilter>(filter)`
 - `OrderBy(ISorting)`/`OrderBy(IEnumerable<ISorting>)`
 - `Select<TDto>()`
+- `UseHints<THint>(params THint[])` — carrega navegações do agregado (includes) via Operation Hints (ver nota abaixo)
 - `Collect()`/`CollectAsync()` e modo busca `AsSearch().ToList()/ToListAsync()`
 - `Exists()`, `FirstOrDefault()`, `Single()` com validação de cardinalidade
 
-> **Não existe `Include`/eager-loading de navegações em `ICriteria`/SmartSearch.** Para carregar o grafo de um agregado
-> (entidades relacionadas: filhos, owned, 1:1), use EF Core diretamente — `DbContext.Set<T>().Include(...)`, inclusive
-> include por string para navegações com backing field/protegidas — ou um `IQueryHandler` do WorkContext. SmartSearch +
-> `Selector` cobrem filtro, ordenação, paginação e **projeção para DTO**, não a carga de um agregado rastreado com suas
-> navegações. Regra prática: leitura→DTO usa `Select<TDto>()`; carregar-para-mutar o agregado usa EF `Include`.
+> **Include de navegações em `ICriteria` agora existe — via Operation Hints** (`RoyalCode.SmartSearch` 0.8.0+ com
+> `RoyalCode.OperationHint`). Em vez de espalhar `.Include(...)`, registre o grafo do agregado **uma vez** por
+> `(entidade, hint)` com `AddIncludesHandler<TEntity,THint>` (`ConfigureOperationHints`) e referencie por hint:
+> - **Por consulta:** `criteria.UseHints(MyHints.WithChildren).Collect()` — isolado a essa criteria.
+> - **Ambiente (escopo):** `container.AddHint(MyHints.WithChildren)` — vale para todas as criterias do escopo.
+>
+> Os includes aplicam só nos terminais de **entidade** (`Collect`/`FirstOrDefault`/`Single`/`AsSearch().ToList()`), nunca
+> em `Exists()` nem após `Select<TDto>()`. O mesmo hint dirige também o caminho `Find` (pós-carga). Sem `OperationHint`
+> registrado, nada muda (no-op) e você ainda pode cair para `DbContext.Set<T>().Include(...)` manual quando necessário.
+> Regra prática: leitura→DTO usa `Select<TDto>()`; carregar o agregado (para mutar/expor o grafo) usa **hints**.
 
 Diferenças entre `Collect/CollectAsync` e `AsSearch().ToList/ToListAsync`:
 - `Collect/CollectAsync`: retorna a coleção de itens já filtrados/ordenados/projetados, sem metadados de paginação. Em EF Core, mantém as entidades anexadas ao `ChangeTracker` (rastreadas), permitindo atualizações subsequentes e detecção de mudanças.

@@ -28,7 +28,7 @@ Active plans (check status before modifying affected areas):
 
 Architectural Decision Records (accepted decisions; read before changing the affected area):
 
-- [adrs/](adrs/) — ADR-001..015 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**)
+- [adrs/](adrs/) — ADR-001..016 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**, **ADR-016 shared technical tier `RoyalCode.*` (`RoyalCode.Security`); amends ADR-013**)
 
 Backlog (deferred items with design notes):
 
@@ -104,6 +104,6 @@ Rules for ADRs:
 - They are stored in the `adrs\` directory;
 - They follow the naming convention: `ADR-{NNN}.md`.
 
-ADRs with good structure are ADR-001 through ADR-009.
+ADRs with good structure are ADR-001 through ADR-009, and ADR-016.
 ADRs with acceptable structure: ADR-010 and ADR-011.
 ADRs with poor structure are ADR-012 through ADR-015; these contain a design rather than a decision.
