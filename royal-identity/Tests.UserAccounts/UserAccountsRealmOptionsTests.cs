@@ -103,6 +103,65 @@ public class UserAccountsRealmOptionsTests
 	}
 
 	[Fact]
+	public void Validate_Rejects_EmailAsUsername_WithDuplicateEmail()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			EmailAsUsername = true,
+			AllowDuplicateEmail = true
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("Email login", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Rejects_FictitiousPatternWithoutSubjectToken_WhenDuplicateEmailDisallowed()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			AllowFictitiousEmail = true,
+			AllowDuplicateEmail = false,
+			FictitiousEmailPattern = "user@fictitious.local"
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("FictitiousEmailPattern", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Allows_FictitiousPatternWithSubjectToken_WhenDuplicateEmailDisallowed()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			AllowFictitiousEmail = true,
+			AllowDuplicateEmail = false,
+			FictitiousEmailPattern = "{subjectId}@fictitious.local"
+		};
+
+		var errors = options.Validate();
+
+		Assert.DoesNotContain(errors, e => e.Contains("FictitiousEmailPattern", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Allows_FictitiousPatternWithoutSubjectToken_WhenDuplicateEmailAllowed()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			AllowFictitiousEmail = true,
+			AllowDuplicateEmail = true,
+			FictitiousEmailPattern = "user@fictitious.local"
+		};
+
+		var errors = options.Validate();
+
+		Assert.DoesNotContain(errors, e => e.Contains("FictitiousEmailPattern", StringComparison.Ordinal));
+	}
+
+	[Fact]
 	public void Validate_Rejects_DuplicateFixedClaimType()
 	{
 		var options = new UserAccountsRealmOptions();

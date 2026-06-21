@@ -6,6 +6,11 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 public enum LocalAuthenticationFailureReason
 {
 	/// <summary>
+	/// No account matched the supplied login. Surfaced as a generic failure externally to avoid enumeration.
+	/// </summary>
+	NotFound,
+
+	/// <summary>
 	/// The supplied credential did not match.
 	/// </summary>
 	InvalidCredentials,
@@ -25,4 +30,8 @@ public enum LocalAuthenticationFailureReason
 	/// </summary>
 	Blocked,
 
+	/// <summary>
+	/// The local credential is temporarily locked out after too many failed attempts.
+	/// </summary>
+	LockedOut,
 }

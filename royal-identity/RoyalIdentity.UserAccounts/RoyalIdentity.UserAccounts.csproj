@@ -16,6 +16,7 @@
 		<PackageReference Include="RoyalCode.Aggregates" Version="$(RcDomainVer)" />
 		<PackageReference Include="RoyalCode.SmartCommands" Version="$(RcSmartCommandsVer)" />
 		<PackageReference Include="RoyalCode.SmartCommands.Generators" Version="$(RcSmartCommandsVer)" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<PackageReference Include="RoyalCode.SmartCommands.WorkContext" Version="$(RcSmartCommandsWorkContextVer)" />
 		<PackageReference Include="RoyalCode.SmartSearch.EntityFramework" Version="$(RcSmartSearchVer)" />
 		<PackageReference Include="RoyalCode.SmartSelector" Version="$(RcSmartSelectorVer)" />
 		<PackageReference Include="RoyalCode.SmartSelector.Generators" Version="$(RcSmartSelectorVer)" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />

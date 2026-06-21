@@ -150,6 +150,15 @@ public class UserAccountsRealmOptions
 			errors.Add("Email login requires AllowDuplicateEmail to be false.");
 		}
 
+		// Without a per-subject token, every generated fictitious email collides; with AllowDuplicateEmail = false
+		// there is no realm-level uniqueness backstop (the unique index is per account, not per realm), so the
+		// collision would pass silently. Require the token at configuration time.
+		if (AllowFictitiousEmail && !AllowDuplicateEmail &&
+			!FictitiousEmailPattern.Contains("{subjectId}", StringComparison.Ordinal))
+		{
+			errors.Add("FictitiousEmailPattern must contain '{subjectId}' when AllowDuplicateEmail is false, otherwise generated emails would collide across accounts in the realm.");
+		}
+
 		if (PasswordOptions.MinimumLength > PasswordOptions.MaximumLength)
 		{
 			errors.Add("PasswordOptions.MinimumLength cannot be greater than PasswordOptions.MaximumLength.");

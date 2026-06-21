@@ -19,8 +19,8 @@ risco que introduz.
 | Options do módulo | Parcial em `Tests.UserAccounts` | variações combinadas de login/email/projeções |
 | `UserAccount` domínio | Boa cobertura inicial | casos negativos de coleção/email/roles e eventos |
 | Scope properties domínio | Boa cobertura inicial | mutações de draft/pending/rejected e required prospectivo |
-| Persistência | Não iniciada | round-trip completo, índices, constraints e queries |
-| Casos de uso | Não iniciada | busca por subject/login, autenticação e projeção via features |
+| Persistência | Coberta (Fase 7) | round-trip completo, índices, constraints e queries (Sqlite in-memory) |
+| Casos de uso | Coberta (Fase 8) | create/find/login/auth/claims/properties via `UserAccountUseCasesTests` (18 casos) |
 | Integração IdP | Parcial/fake | contract tests contra fake e módulo real |
 | Regressão end-to-end | Não iniciada | suite do IdP contra fake e contra módulo opt-in |
 

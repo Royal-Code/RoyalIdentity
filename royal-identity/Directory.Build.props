@@ -17,6 +17,7 @@
 	<PropertyGroup>
 		<RcDomainVer>0.8.1</RcDomainVer>
 		<RcSmartCommandsVer>0.0.9</RcSmartCommandsVer>
+		<RcSmartCommandsWorkContextVer>0.0.6</RcSmartCommandsWorkContextVer>
 		<RcSmartSearchVer>0.10.1</RcSmartSearchVer>
 		<RcSmartSelectorVer>0.4.0</RcSmartSelectorVer>
 		<RcWorkContextVer>0.8.9</RcWorkContextVer>

@@ -407,7 +407,7 @@ public class UserAccount : AggregateRoot<long>
 		if (LocalCredential.IsLockedOut(options, attemptedAt))
 		{
 			return LocalAuthenticationResult.Failed(
-				LocalAuthenticationFailureReason.Blocked,
+				LocalAuthenticationFailureReason.LockedOut,
 				LocalCredential.LockoutEndAt);
 		}
 

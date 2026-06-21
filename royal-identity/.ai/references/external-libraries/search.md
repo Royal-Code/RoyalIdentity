@@ -116,6 +116,12 @@ var criteria = manager.Criteria<MyEntity>();
 - `Collect()`/`CollectAsync()` e modo busca `AsSearch().ToList()/ToListAsync()`
 - `Exists()`, `FirstOrDefault()`, `Single()` com validação de cardinalidade
 
+> **Não existe `Include`/eager-loading de navegações em `ICriteria`/SmartSearch.** Para carregar o grafo de um agregado
+> (entidades relacionadas: filhos, owned, 1:1), use EF Core diretamente — `DbContext.Set<T>().Include(...)`, inclusive
+> include por string para navegações com backing field/protegidas — ou um `IQueryHandler` do WorkContext. SmartSearch +
+> `Selector` cobrem filtro, ordenação, paginação e **projeção para DTO**, não a carga de um agregado rastreado com suas
+> navegações. Regra prática: leitura→DTO usa `Select<TDto>()`; carregar-para-mutar o agregado usa EF `Include`.
+
 Diferenças entre `Collect/CollectAsync` e `AsSearch().ToList/ToListAsync`:
 - `Collect/CollectAsync`: retorna a coleção de itens já filtrados/ordenados/projetados, sem metadados de paginação. Em EF Core, mantém as entidades anexadas ao `ChangeTracker` (rastreadas), permitindo atualizações subsequentes e detecção de mudanças.
 - `AsSearch().ToList/ToListAsync`: retorna `ResultList<T>` com metadados de busca (Page, ItemsPerPage, Count, Pages, Sortings) aplicando defaults configurados. Use quando precisa de paginação, ordenação serializável e informações agregadas para UI/APIs.

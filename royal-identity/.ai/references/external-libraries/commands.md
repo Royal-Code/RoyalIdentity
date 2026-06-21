@@ -32,7 +32,7 @@ Benefícios principais:
 
 - `RoyalCode.SmartCommands`:
   - `CommandAttribute`: marca o método como um comando elegível para geração.
-  - `AddHandlersServicesAttribute`: marca a classe para registrar handlers decorados/serviços auxiliares (geração de DI).
+  - `AddHandlersServicesAttribute`: aplique em uma classe **`static partial` dedicada** (NÃO na classe de comando — gera o diagnóstico `RCCMD000` caso contrário). Recebe um título obrigatório que é inserido **literalmente** no nome do método gerado; use um único token PascalCase **sem espaços**. Gera `Add{Titulo}HandlersServices<TContext>(this IServiceCollection)` que registra **todos** os handlers de comando (`I{Cmd}Handler`) do assembly.
 
 - `RoyalCode.SmartCommands.EntityFramework`:
   - `CommandsDbContextExtensions.AddUnitOfWorkAccessor<TContext>()`: registra adapters `IUnitOfWorkAccessor<T>` e `IRepositoriesAccessor<T>` usando EF Core (`DbContext`).
@@ -213,30 +213,85 @@ public partial class CreateProduct
 
 Quando a resposta for `Result<Product>`, `MapIdResultValue` pode ser usado para garantir que o campo `Id` exista no valor retornado e construir `Location` em 201 com `MapCreatedRoute`.
 
-### 6.5 Integração com WorkContext
+### 6.5 Integração com WorkContext (receita validada)
+
+Recomendado para módulos sobre `IWorkContext`. Use `WithWorkContext` no método de comando. Os 4 passos abaixo
+foram validados (SmartCommands 0.0.9 + SmartCommands.WorkContext 0.0.6 + WorkContext 0.8.9, net10.0).
+
+**Resolução de parâmetros do `Execute`** (feita pelo handler gerado — este é o ponto que mais confunde):
+- parâmetro `IWorkContext` → recebe `accessor.Context` (a UoW corrente);
+- parâmetro `CancellationToken` → repassado;
+- **qualquer outro parâmetro — serviços E um `DbContext` concreto — vira injeção no construtor do handler gerado**
+  (resolvido do DI). Logo, um `DbContext` recebido é a instância **escopada do DI**, não algo derivado de `accessor`.
+  Com `WithWorkContext`, mutações feitas via esse `DbContext` só são persistidas por `CompleteAsync` se ele for o
+  **mesmo `DbContext` escopado** que o `IWorkContext` encapsula. (Se o módulo usa um `DbContext` base + subclasse por
+  provider, faça `services.AddScoped<BaseDbContext>(sp => sp.GetRequiredService<TProviderDbContext>())` para alinhar
+  as instâncias e poder consultar com `Include` de forma agnóstica de provider.)
+
+**1) Classe de comando** (`partial`): propriedades de entrada + `HasProblems` + `Execute`.
 ```csharp
-services.AddWorkContext<MyDbContext>()
-    .ConfigureDbContextPool((sp,b) => b.UseSqlite("DataSource=:memory:"))
-    .AddUnitOfWorkAccessor<MyDbContext>();
+public partial class CreateProduct
+{
+    public string Name { get; set; } = string.Empty;
+
+    public bool HasProblems(out Problems? problems)
+        => Rules.Set<CreateProduct>().NotEmpty(Name).HasProblems(out problems);
+
+    [Command, WithValidateModel, WithWorkContext]
+    public async Task<Result<Product>> Execute(IWorkContext context, IClock clock, CancellationToken ct)
+    {
+        var product = new Product(Name, clock.UtcNow); // IClock vem por injeção no ctor do handler
+        context.Add(product);                          // CompleteAsync (no handler) persiste
+        return product;
+    }
+}
 ```
 
-O handler gerado quando `WithWorkContext` estiver presente usará `IWorkContext` como accessor, mantendo semântica de UoW/Repos.
+**2) Agregador de DI** — classe `static partial` separada (uma por módulo):
+```csharp
+[AddHandlersServices("MyModule")] // gera AddMyModuleHandlersServices<TContext>(IServiceCollection)
+public static partial class MyModuleCommandServices { }
+```
 
-Módulo de configuração reutilizável:
+**3) Registro** (o `TContext` fechado é `IWorkContext`):
+```csharp
+services.ConfigureWorkContextAdapterOptions(_ => { }); // OBRIGATÓRIO: registra IOptions<WorkContextAdapterOptions>
+services.AddUnitOfWorkAccessor<IWorkContext>();         // overload de IServiceCollection (o builder usa IUnitOfWorkBuilder, não IWorkContextBuilder)
+services.AddMyModuleHandlersServices<IWorkContext>();   // gerado pelo [AddHandlersServices]
+```
+
+**4) Execução** — resolva a interface gerada e chame `HandleAsync`:
+```csharp
+var handler = sp.GetRequiredService<ICreateProductHandler>();
+var result = await handler.HandleAsync(new CreateProduct { Name = "X" }, ct);
+```
+
+O gerador emite `ICreateProductHandler` + `CreateProductHandler<TContext> where TContext : IWorkContext`; pipeline:
+validar `HasProblems` → `BeginAsync` → `Execute(...)` → `CompleteAsync` (salva). Retorne `Result`/`Result<T>` para os
+`Problems` de validação propagarem.
+
+> **Gotcha — carga de agregado:** `ICriteria<T>`/SmartSearch **não** tem `Include` (ver `search.md`). Para carregar o
+> grafo do agregado (entidades relacionadas), receba o `DbContext` concreto no `Execute` e use `db.Set<T>().Include(...)`
+> (inclusive include por string para navegações com backing field), ou um `IQueryHandler` (`ConfigureQueries`).
+
+Módulo de configuração reutilizável (mapeamentos/repos/searches/queries):
 ```csharp
 public static class MyModuleConfigureWorkContext
 {
     public static IWorkContextBuilder<TDbContext> ConfigureMyModule<TDbContext>(this IWorkContextBuilder<TDbContext> builder)
         where TDbContext : DbContext
     {
-        return builder.ConfigureModel(modelBuilder => modelBuilder.MapMyModule())
-            .AddRepositories(typeof(MyModuleConfigureWorkContext).Assembly)
+        return builder
+            .ConfigureRepositories(typeof(MyModuleConfigureWorkContext).Assembly)
             .ConfigureSearches(typeof(MyModuleConfigureWorkContext).Assembly)
-            .ConfigureCommands(typeof(MyModuleConfigureWorkContext).Assembly)
             .ConfigureQueries(typeof(MyModuleConfigureWorkContext).Assembly);
     }
 }
 ```
+
+> **Dois mecanismos distintos de comando — não confunda:** os handlers gerados por `[Command]`/`AddHandlersServices`
+> são resolvidos **diretamente** como `I{Cmd}Handler` (acima). `ConfigureCommands(assembly)` + `context.SendAsync(cmd)`
+> é o **dispatcher** do WorkContext (`ICommandHandler<T>`), um caminho separado. Para comandos gerados, use a receita acima.
 
 ## 7. Comportamento do Handler Gerado (pipeline)
 

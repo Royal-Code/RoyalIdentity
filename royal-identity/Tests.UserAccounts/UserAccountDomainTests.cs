@@ -142,7 +142,7 @@ public class UserAccountDomainTests
 		var locked = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(3));
 
 		Assert.False(locked.Success);
-		Assert.Equal(LocalAuthenticationFailureReason.Blocked, locked.Reason);
+		Assert.Equal(LocalAuthenticationFailureReason.LockedOut, locked.Reason);
 		Assert.Equal(Now.AddMinutes(12), locked.LockoutEndAt);
 
 		var successAfterExpiration = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(13));

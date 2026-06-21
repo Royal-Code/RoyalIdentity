@@ -1,10 +1,10 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1-7 concluídas; próxima fase: casos de uso mínimos para integração com o IdP
+## Status: EM EXECUÇÃO - Fases 1-8 concluídas; próxima fase: integração com a borda do IdP
 
 ## Progresso
 
-`███████░░░` **70%** - 7 de 10 fases
+`████████░░` **80%** - 8 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -15,7 +15,7 @@
 | Fase 5 - Domínio de contas (`UserAccount`) | Concluida |
 | Fase 6 - Propriedades dinâmicas por escopo | Concluida |
 | Fase 7 - Persistência própria EFCore + providers | Concluida |
-| Fase 8 - Casos de uso mínimos para integração com o IdP | Não iniciada |
+| Fase 8 - Casos de uso mínimos para integração com o IdP | Concluida |
 | Fase 9 - Integração com a borda do IdP | Não iniciada |
 | Fase 10 - Contract tests, DI opt-in, seeds e regressão | Não iniciada |
 
@@ -1116,35 +1116,32 @@ API/UI administrativa.
 
 **Tarefas:**
 
-- [ ] Criar/semear conta (`CreateAccount`/`SeedAccount`) com `SubjectId` determinístico quando informado.
-- [ ] Buscar conta por `(RealmId, SubjectId)`.
-- [ ] Buscar conta por login username/email conforme `UserAccountsRealmOptions`.
-- [ ] Autenticar localmente e aplicar lockout.
-- [ ] Ler status ativo/inativo.
-- [ ] Projetar claims por scopes e claim types.
-- [ ] Definir properties de escopo para seeds/testes.
-- [ ] Alterar senha para suportar testes de credencial mínima.
-- [ ] Implementar os casos da Fase 8 da matriz de testes
+- [x] Criar/semear conta (`CreateAccount`/`SeedAccount`) com `SubjectId` determinístico quando informado.
+- [x] Buscar conta por `(RealmId, SubjectId)`.
+- [x] Buscar conta por login username/email conforme `UserAccountsRealmOptions`.
+- [x] Autenticar localmente e aplicar lockout.
+- [x] Ler status ativo/inativo.
+- [x] Projetar claims por scopes e claim types.
+- [x] Definir properties de escopo para seeds/testes.
+- [x] Alterar senha para suportar testes de credencial mínima.
+- [x] Implementar os casos da Fase 8 da matriz de testes
       ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
 
 **Garantias obrigatórias (dívidas das reviews das Fases 5 e 6 — fechar nesta fase):**
 
-- [ ] **Lar único da normalização.** Hoje os ctors/entidades recebem `NormalizedUsername`/`NormalizedAddress`/
-      `NormalizedName` **prontos** e **nada no módulo os produz** (só os testes). A Fase 8 deve introduzir **um** ponto
-      de normalização (serviço injetável `IUserAccountNormalizer` **ou** factories de VO que normalizam) usado por
-      **todas** as features de conta. Proibido cada feature normalizar do seu jeito (risco de divergência).
-- [ ] **Validação de entrada nos commands** via SmartValidations (`Rules.Set<>()`) + SmartProblems; o agregado e os
-      serviços recebem valores **já válidos e não-nulos** (não reintroduzir validação de entrada no agregado).
-- [ ] **Factories de VO/entidade** que produzem instâncias **válidas e normalizadas** (ex.: criar `UserAccountEmail`/
-      `UserAccountRole` pela feature com normalização), em vez de ctor recebendo normalizado cru de qualquer caller.
-- [ ] **Email fictício no `Create`** da conta conforme `UserAccountsRealmOptions` (`AllowFictitiousEmail`/pattern/
-      `IsVerified` default) — **não** por flag solta em `AddEmail`.
-- [ ] **`SubjectId`:** política `AllowProvidedSubjectId` + geração no **caso de uso de criação** (não no ctor do agregado);
-      `(RealmId, SubjectId)` único.
-- [ ] **Unicidade de email por realm** quando `AllowDuplicateEmail = false`: garantida no **caso de uso/repositório em
-      transação** (o agregado só faz dedup intra-conta).
-- [ ] **Manter o estilo das Fases 5-6:** sem utilitário `static`, sem `throw` em fluxo esperado, validação fora do agregado,
-      entidades modeladas para EF (chave/`RealmId`/FK).
+- [x] **Lar único da normalização.** Introduzido `IUserAccountNormalizer` (`DefaultUserAccountNormalizer`) injetável;
+      **todas** as features de conta normalizam por ele. Nenhuma feature normaliza por conta própria.
+- [x] **Validação de entrada nos commands** via SmartValidations (`Rules.Set<>()`) + SmartProblems; o agregado e os
+      serviços recebem valores já normalizados/válidos.
+- [x] **Factories de VO/entidade normalizadas:** os casos de uso constroem `UserAccountEmail`/`UserAccountRole`/identidade
+      já normalizados (via `IUserAccountNormalizer`), nunca recebendo normalizado cru de caller arbitrário.
+- [x] **Email fictício no `Create`** conforme `UserAccountsRealmOptions` (`AllowFictitiousEmail`/pattern/`IsVerified`
+      default), materializado no caso de uso — não por flag em `AddEmail`.
+- [x] **`SubjectId`:** política `AllowProvidedSubjectId` + geração via `ISubjectIdGenerator` no caso de uso de criação;
+      `(RealmId, SubjectId)` único (checado no caso de uso + índice único como backstop).
+- [x] **Unicidade de email por realm** quando `AllowDuplicateEmail = false`: garantida no caso de uso dentro da UoW.
+- [x] **Estilo das Fases 5-6 mantido:** sem utilitário `static` (o `SubjectIdGenerator` estático virou `ISubjectIdGenerator`),
+      sem `throw` em fluxo esperado, validação fora do agregado, entidades modeladas para EF.
 
 **Critérios de aceite:** casos de uso suficientes para `ISubjectStore`, `ILocalUserAuthenticator` e `IUserClaimsProvider`;
 sem endpoints HTTP; sem casos administrativos completos; **e as Garantias obrigatórias acima atendidas**.
@@ -1153,7 +1150,83 @@ sem endpoints HTTP; sem casos administrativos completos; **e as Garantias obriga
 
 ### Resultado da Fase 8
 
-*a preencher*
+> ✅ **CONCLUÍDA (2026-06-20).** Casos de uso mínimos implementados como **SmartCommands** (escritas) e **read services**
+> (leituras), com normalização única e geração de `SubjectId` injetáveis. Build da solução verde; suíte completa verde
+> (`Tests.UserAccounts` 56/56 — 18 novos de casos de uso; Architecture 10/10, Pipelines 3/3, Identity 9/9,
+> Integration 196/196).
+
+**Decisão de implementação (confirmada com o usuário):** escritas via **SmartCommands** (gerador `[Command]`); lar da
+normalização via **`IUserAccountNormalizer` injetável**.
+
+**Mecânica do SmartCommands + WorkContext (validada por protótipo antes de escrever os casos reais):**
+
+- Classe de comando = `partial` com propriedades de entrada + `HasProblems(out Problems?)` (SmartValidations) +
+  método `[Command, WithValidateModel, WithWorkContext] Execute(...)`. O gerador emite `I{Cmd}Handler.HandleAsync(cmd, ct)`
+  e `{Cmd}Handler<TContext>`; serviços extras do `Execute` viram injeções no construtor do handler; o `IWorkContext`/UoW
+  é gerido pelo handler (Begin → Execute → Complete/Save).
+- DI: um único agregador `[AddHandlersServices("UserAccounts")]` gera `AddUserAccountsHandlersServices<TContext>()`
+  (registra todos os handlers do assembly). `ConfigureUserAccounts` passou a registrar também
+  `ConfigureWorkContextAdapterOptions` + `AddUnitOfWorkAccessor<IWorkContext>()` + os serviços do módulo
+  (`AddUserAccountsServices`) e a **alias do `UserAccountsDbContext` base para a subclasse do provider** (para os casos de
+  uso consultarem com `Include` de forma agnóstica de provider).
+- **Leituras** (carga do agregado com `Include`) usam `UserAccountsDbContext` direto (via o método `Execute`/read service),
+  pois `ICriteria`/SmartSearch **não** tem `Include`; SmartSearch fica para list/paged read-models futuros.
+
+**Entregue (módulo puro):**
+
+- Commons: `IUserAccountNormalizer`/`DefaultUserAccountNormalizer` (lar único da normalização); `ISubjectIdGenerator`/
+  `DefaultSubjectIdGenerator` (substitui o `SubjectIdGenerator` estático removido); `UserAccountReader` (find por
+  subject/login com `Include`, load de scopes ativos — sempre filtrando `RealmId`); `UserAccountsCommandServices`
+  (`[AddHandlersServices]`); `UserAccountsServiceCollectionExtensions.AddUserAccountsServices` (registra colaboradores com
+  `TryAdd` para permitir override do host).
+- Comandos (`Features/Accounts/UseCases`, `Features/ScopeProperties/UseCases`): `CreateUserAccount` (política/geração de
+  `SubjectId`, normalização, unicidade subject/username/email na UoW, email fictício por política, senha opcional via
+  `PasswordPolicy`+hasher); `AuthenticateLocalCredential` (resolve login por política, aplica regras do agregado, persiste
+  contadores/lockout, preserva o motivo interno); `ChangeUserAccountPassword`; `SetUserAccountScopeProperty` (valida contra
+  a active version; falha para scope/version inativa e claim type não definido).
+- Read services: `UserAccountClaimsReader` (combina fixed fields + roles + dynamic values por interseção scope/claim type;
+  conta inativa ⇒ sem claims); `PropertyValueTypeChangeGuard` (bloqueia troca de `ValueType` com valores persistidos —
+  fecha a dívida da Fase 7; pronto para o caso de uso de aprovação de schema, fora do escopo mínimo).
+- Domínio: `LocalAuthenticationFailureReason` ganhou `NotFound` e `LockedOut` (lockout deixou de ser conflado com
+  `Blocked`); `AuthenticateLocal` mapeia lockout para `LockedOut`.
+
+**Providers/infra:** adicionado `RoyalCode.SmartCommands.WorkContext` (`RcSmartCommandsWorkContextVer=0.0.6`) ao módulo
+puro (continua "RoyalCode libs + EFCore only", sem ASP.NET — Architecture 10/10).
+
+**Decisões de design (desvios registrados para revisão):**
+
+- **Leituras como read services, não SmartCommands.** `UserAccountReader`/`UserAccountClaimsReader` são serviços simples
+  injetáveis (somente leitura); SmartCommands é orientado a escrita/UoW e `ICriteria` não carrega o grafo. As portas da
+  Fase 9 (`ISubjectStore`/`IUserClaimsProvider`) consomem esses read services; o `ILocalUserAuthenticator` consome o
+  comando de autenticação (escrita, por causa dos contadores/lockout).
+- **Alias do DbContext base → subclasse do provider** em DI, para os casos de uso consultarem com `Include` sem conhecer o
+  provider. A UoW do comando salva no mesmo `DbContext` escopado (mutações via o `db` aliasado são persistidas).
+- **Hasher é seam do host:** o módulo **não** registra `IUserAccountPasswordHasher` (a borda do IdP fornece). `TimeProvider`
+  é injetado (default `TimeProvider.System`, override-able) — sem relógio estático.
+- **Login por email/“verificado”:** candidato por email é aceito quando `IsVerified` **ou** o realm não exige verificação
+  (`VerifyEmail = false`); prefere primário, desempata por menor `UserAccountId`. Documentado em `UserAccountReader` —
+  ponto a confirmar com o produto.
+
+**Cobertura de testes (`UserAccountUseCasesTests`, 18 casos):** geração/provisão de `SubjectId` + política; unicidade
+subject/username/email e isolamento entre realms; email fictício; resolução de login (normalização de username; política/
+verificação de email); motivos internos de autenticação (NotFound/PasswordNotSet/InvalidCredentials/LockedOut/Inactive/
+Blocked) + sucesso; troca de senha; set property (active version, scope inativo, sem active version); projeção de claims
+(fixed + roles + dynamic; conta inativa ⇒ vazio); guarda de troca de `ValueType`.
+
+**Adiado (com razão):** caso de uso administrativo de **aprovação/edição de schema** que invoca `PropertyValueTypeChangeGuard`
+fica para API/UI administrativa (fora do conjunto mínimo de integração com o IdP). O guard já existe e está testado.
+
+**Pós-review ([review-003](../reviews/user-accounts/fase8-idp-use-cases.review-003.md)):**
+
+- **P1 (válido):** email fictício pulava a checagem de unicidade. Como o índice `(RealmId, NormalizedAddress)` **não é
+  único** (só `(RealmId, UserAccountId, NormalizedAddress)` é), não havia backstop. Corrigido na **fronteira de
+  configuração**: `UserAccountsRealmOptions.Validate` agora exige `{subjectId}` no `FictitiousEmailPattern` quando
+  `AllowDuplicateEmail = false` (mesmo lugar/abordagem da regra `email-login × AllowDuplicateEmail`; enforced via
+  `EnsureValid` no binding do realm). Preferida à checagem em runtime, que faria a criação da 2ª conta falhar.
+- **P2 (verdadeiro, decisão de contrato):** `ChangeUserAccountPassword`/`CreateUserAccount` são casos de uso de
+  **seed/admin** — toggles user-facing (`AllowChangePassword`/`AllowRegistration`) **não** são aplicados aqui por
+  intenção; documentado nos XML docs dos dois. O fluxo user-facing (gated) pertence à futura camada HTTP/UI. (A review
+  flagrou só o change-password; o create tem a mesma natureza — resolvido de forma consistente nos dois.)
 
 ---
 
