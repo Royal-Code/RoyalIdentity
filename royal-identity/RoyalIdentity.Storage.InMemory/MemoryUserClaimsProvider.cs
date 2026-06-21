@@ -32,7 +32,7 @@ public sealed class MemoryUserClaimsProvider(ConcurrentDictionary<string, Memory
         var all = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Name, details.DisplayName),
-            new(Jwt.ClaimTypes.PreferredUserName, details.DisplayName),
+            new(Jwt.ClaimTypes.PreferredUserName, details.Username),
         };
         all.AddRange(details.Claims.Select(c => new Claim(c.Type, c.Value, c.ValueType)));
         all.AddRange(details.Roles.Select(r => new Claim(Jwt.ClaimTypes.Role, r)));

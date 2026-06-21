@@ -118,6 +118,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
             client.RedirectUris.Add("http://localhost:5000/**");
             client.AllowedIdentityTokenSigningAlgorithms.Add(SecurityAlgorithms.EcdsaSha256);
         });
+        SeedAlice(realm);
 
         var storage = factory.Services.GetRequiredService<IStorage>();
         var resources = await storage.GetResourceStore(realm).FindResourcesByScopeAsync(
@@ -194,6 +195,18 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
         factory.Services.GetRequiredService<MemoryStorage>().GetRealmMemoryStore(realm).ResourceServers[serverName] = server;
 
         return scopeName;
+    }
+
+    private void SeedAlice(RealmModel realm)
+    {
+        factory.Services.GetRequiredService<MemoryStorage>().GetRealmMemoryStore(realm).UserAccounts["alice"] = new MemoryUserAccount
+        {
+            SubjectId = MemoryStorage.AliceSubjectId,
+            Username = "alice",
+            PasswordHash = PasswordHash.Create("alice"),
+            DisplayName = "Alice",
+            IsActive = true
+        };
     }
 
     private string AddClient(

@@ -458,18 +458,7 @@ public class UserAccountUseCasesTests
 		return services.BuildServiceProvider();
 	}
 
-	private static UserAccountsRealmOptions Options()
-	{
-		var options = new UserAccountsRealmOptions();
-		options.PasswordOptions.MinimumLength = 4;
-		options.PasswordOptions.RequireSpecialCharacters = false;
-		options.PasswordOptions.RequireDigit = false;
-		options.PasswordOptions.RequireUppercase = false;
-		options.PasswordOptions.RequireLowercase = false;
-		options.PasswordOptions.MinimumUniqueCharacters = 0;
-		options.PasswordOptions.DisallowUsernameInPassword = false;
-		return options;
-	}
+	private static UserAccountsRealmOptions Options() => UserAccountsTestOptions.Relaxed();
 
 	private static CreateUserAccount NewCreate(
 		string realmId,

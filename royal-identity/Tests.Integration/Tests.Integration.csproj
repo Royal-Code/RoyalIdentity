@@ -3,6 +3,8 @@
 	<Import Project="../tests.targets" />
 
 	<ItemGroup>
+	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
+	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Sqlite\RoyalIdentity.UserAccounts.Sqlite.csproj" />
 	  <ProjectReference Include="..\Tests.Host\Tests.Host.csproj" />
 	</ItemGroup>
 

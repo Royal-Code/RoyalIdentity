@@ -1,10 +1,10 @@
 # Plan: Módulo de Contas de Usuário (`RoyalIdentity.UserAccounts`) - V2
 
-## Status: EM EXECUÇÃO - Fases 1-8 concluídas; próxima fase: integração com a borda do IdP
+## Status: CONCLUIDO - Fases 1-10 concluidas; fake permanece default e modulo opt-in validado
 
 ## Progresso
 
-`████████░░` **80%** - 8 de 10 fases
+`██████████` **100%** - 10 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -16,8 +16,8 @@
 | Fase 6 - Propriedades dinâmicas por escopo | Concluida |
 | Fase 7 - Persistência própria EFCore + providers | Concluida |
 | Fase 8 - Casos de uso mínimos para integração com o IdP | Concluida |
-| Fase 9 - Integração com a borda do IdP | Não iniciada |
-| Fase 10 - Contract tests, DI opt-in, seeds e regressão | Não iniciada |
+| Fase 9 - Integração com a borda do IdP | Concluida |
+| Fase 10 - Contract tests, DI opt-in, seeds e regressão | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -1236,17 +1236,17 @@ fica para API/UI administrativa (fora do conjunto mínimo de integração com o 
 
 **Tarefas:**
 
-- [ ] `SubjectStore : ISubjectStore`.
-- [ ] `LocalUserAuthenticator : ILocalUserAuthenticator`.
-- [ ] `UserClaimsProvider : IUserClaimsProvider`.
-- [ ] `UserAccountsUserDirectory : IUserDirectory`.
-- [ ] `AddUserAccountsForRoyalIdentity(...)`.
-- [ ] Adaptar `Realm` do core para `RealmId` + `UserAccountsRealmOptions`.
-- [ ] Garantir que portas retornadas são realm-bound e não recebem realm em método.
-- [ ] Garantir que integration não acessa internals do módulo.
-- [ ] Implementar os casos da Fase 9 da matriz de testes
+- [x] `SubjectStore : ISubjectStore`.
+- [x] `LocalUserAuthenticator : ILocalUserAuthenticator`.
+- [x] `UserClaimsProvider : IUserClaimsProvider`.
+- [x] `UserAccountsUserDirectory : IUserDirectory`.
+- [x] `AddUserAccountsForRoyalIdentity(...)`.
+- [x] Adaptar `Realm` do core para `RealmId` + `UserAccountsRealmOptions`.
+- [x] Garantir que portas retornadas são realm-bound e não recebem realm em método.
+- [x] Garantir que integration não acessa internals do módulo.
+- [x] Implementar os casos da Fase 9 da matriz de testes
       ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
-- [ ] Ligar `UserAccountsRealmOptions` (via `UserAccountsRealmBinding`) ao `LocalUserAuthenticator` para dirigir
+- [x] Ligar `UserAccountsRealmOptions` (via `UserAccountsRealmBinding`) ao `LocalUserAuthenticator` para dirigir
       login-por-email/lockout por realm. **Dívida da Fase 4:** o fake `MemoryUserDirectory.GetLocalAuthenticator`
       usa `MemoryAccountOptions` defaults estáticos (ver `// TODO` no código) — o caminho real precisa honrar a opção do realm.
 
@@ -1257,7 +1257,57 @@ equivalente ao fake para os contratos de borda.
 
 ### Resultado da Fase 9
 
-*a preencher*
+**Concluída (2026-06-20).** O projeto `RoyalIdentity.UserAccounts.Integration` agora implementa as quatro portas da
+borda do IdP delegando aos casos de uso/serviços de leitura da Fase 8, sem acessar internals do módulo (só tipos
+públicos) e mantendo o módulo puro independente do core.
+
+**Arquivos novos (`.Integration`):**
+
+- `SubjectStore.cs` (`ISubjectStore`) — realm-bound; mapeia `UserAccount` → `Subject(SubjectId, DisplayName, IsActive)`
+  via `UserAccountReader`; nunca vaza o `UserAccount.Id` físico. `IsActiveAsync` reusa o mesmo lookup.
+- `LocalUserAuthenticator.cs` (`ILocalUserAuthenticator`) — delega ao `IAuthenticateLocalCredentialHandler` (que persiste
+  failed-attempts/lockout na unit-of-work) e mapeia `LocalAuthenticationResult` → `AuthenticationResult`. Reason interno
+  preservado por mapeamento: `LockedOut`→`Blocked`, `PasswordNotSet`→`InvalidCredentials`, `NotFound/Inactive/Blocked/
+  InvalidCredentials` diretos; `Result` com problems → `InvalidCredentials` genérico (anti-enumeração).
+- `UserClaimsProvider.cs` (`IUserClaimsProvider`) — projeta via `UserAccountClaimsReader` e cria `Claim` da BCL **apenas
+  na borda** (`AccountClaimValue` → `Claim(type, value)`); scopes/claim types como **interseção**, nunca grant implícito.
+- `UserAccountsUserDirectory.cs` (`IUserDirectory`) — gateway scoped; única tradução `Realm` → `RealmId` +
+  `UserAccountsRealmOptions` (via `UserAccountsRealmBindingFactory`); cada getter devolve a porta realm-bound (sem realm no método).
+- `PasswordProtectorAccountHasher.cs` (`IUserAccountPasswordHasher`) — ponte do seam de hashing do módulo para o
+  `IPasswordProtector` do IdP (respeita override do host; o protector default completa síncrono).
+- `UserAccountsIntegrationExtensions.AddUserAccountsForRoyalIdentity(...)` — wiring opt-in: `TryAdd` do resolver de
+  options + binding factory + hasher; `Replace` do `IUserDirectory` (troca o fake in-memory pelo gateway do módulo).
+
+**Arquivos alterados:**
+
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/LocalAuthenticationResult.cs` — `Succeeded` passa a carregar o
+  `DisplayName` da conta, para a borda montar o `Subject` (OIDC `name`) sem segundo lookup.
+- `RoyalIdentity.Storage.InMemory/MemoryUserDirectory.cs` — comentário do `GetLocalAuthenticator` atualizado: o caminho
+  real per-realm agora existe na `.Integration`; o fake permanece como referência mínima até a Fase 10.
+
+**Testes:** `Tests.UserAccounts/UserAccountsIntegrationTests.cs` (9 casos da matriz Fase 9, sobre o módulo real + Sqlite
+in-memory via `AddUserAccountsForRoyalIdentity`): subject store realm-bound + inativação; autenticação com sucesso
+(subject + displayName) e mapeamento de cada reason interno (incl. `LockedOut`→`Blocked`, `PasswordNotSet`→
+`InvalidCredentials`); falha nunca carrega subject; claims combinando fixed fields/roles/dynamic como `Claim` da BCL;
+interseção (claim não solicitada não sai; claim solicitada ausente no módulo não sai); conta inativa → sem claims.
+
+**Verificação:**
+
+- `dotnet build RoyalIdentity.sln` — 0 erros (warnings pré-existentes fora do escopo).
+- `dotnet test RoyalIdentity.sln --no-build` — verde: Tests.Architecture 10/10 (fronteiras de assembly intactas),
+  Tests.Pipelines 3/3, Tests.Identity 9/9, **Tests.UserAccounts 72/72** (+9 da Fase 9), Tests.Integration 196/196.
+
+**Notas/decisões:**
+
+- `ILocalUserAuthenticator` precisa de `Subject(SubjectId, DisplayName, IsActive)` no sucesso; em vez de um segundo
+  query na borda, enriqueci `LocalAuthenticationResult.Succeeded` com `DisplayName` (a conta já está em mãos no domínio).
+  `IsActive` no sucesso é sempre `true`.
+- `IUserDirectory` é registrado **Scoped** (consome colaboradores scoped do módulo); seus consumidores no core são
+  Transient (`IProfileService`) e Scoped (`LoginFlowService`), ambos resolvidos no escopo da request — sem captive dependency.
+- A resolução de options por realm continua via `DefaultUserAccountsRealmOptionsResolver` (defaults do módulo por realm);
+  a persistência própria das options é groundwork de fases/planos futuros (não bloqueia a integração).
+- Sync-over-async no `PasswordProtectorAccountHasher`: o domínio verifica senha síncrono; o protector default completa
+  síncrono e, sob ASP.NET Core (sem sync context), não há deadlock. Documentado no próprio arquivo.
 
 ---
 
@@ -1267,25 +1317,25 @@ equivalente ao fake para os contratos de borda.
 
 **Tarefas:**
 
-- [ ] Criar contract tests compartilhados para `IUserDirectory`:
+- [x] Criar contract tests compartilhados para `IUserDirectory`:
       `ISubjectStore`, `ILocalUserAuthenticator`, `IUserClaimsProvider`.
-- [ ] Implementar os casos da Fase 10 da matriz de testes
+- [x] Implementar os casos da Fase 10 da matriz de testes
       ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)).
-- [ ] Rodar contract tests contra fake in-memory.
-- [ ] Rodar contract tests contra `UserAccounts` + Sqlite in-memory.
-- [ ] Seeds de paridade Alice/Bob:
+- [x] Rodar contract tests contra fake in-memory.
+- [x] Rodar contract tests contra `UserAccounts` + Sqlite in-memory.
+- [x] Seeds de paridade Alice/Bob:
       - `SubjectId` determinístico;
       - username/displayName;
       - email;
       - roles;
       - property scopes `profile`/`email`;
       - projections fixas.
-- [ ] Registrar integração opt-in no host/test factory.
-- [ ] Manter fake como referência/default até suite verde.
-- [ ] Rodar testes do módulo.
-- [ ] Rodar suite do IdP contra fake.
-- [ ] Rodar suite do IdP contra módulo opt-in.
-- [ ] Documentar diferidos: admin, lifecycle, federação, MFA/passwordless, outbox/inbox/replicação.
+- [x] Registrar integração opt-in no host/test factory.
+- [x] Manter fake como referência/default até suite verde.
+- [x] Rodar testes do módulo.
+- [x] Rodar suite do IdP contra fake.
+- [x] Rodar suite do IdP contra módulo opt-in.
+- [x] Documentar diferidos: admin, lifecycle, federação, MFA/passwordless, outbox/inbox/replicação.
 
 **Critérios de aceite:** contract tests passam nas duas implementações; suíte do IdP verde contra módulo opt-in;
 fake permanece disponível; diferidos registrados.
@@ -1294,7 +1344,24 @@ fake permanece disponível; diferidos registrados.
 
 ### Resultado da Fase 10
 
-*a preencher*
+- `Tests.UserAccounts/UserDirectoryContractTests.cs` — contract tests compartilhados do `IUserDirectory`,
+  executados contra `MemoryUserDirectory` e contra `UserAccounts` + SQLite in-memory. Cobrem subject store,
+  autenticacao local, lockout/reset de contador, passwordless/inactive, realm isolation e claims de seed.
+- `Tests.Integration/Prepare/UserAccountsAppFactory.cs` — test factory opt-in: mantem o storage do IdP em memoria,
+  registra `AddUserAccountsSqliteInMemory()` + `AddUserAccountsForRoyalIdentity()` e semeia Alice/Bob no modulo com
+  `SubjectId` deterministico, username/displayName, email verificado, roles e property scopes `profile`/`email`.
+- `Tests.Integration/Characterization/UserAccountsOptInRegressionTests.cs` — regressao HTTP do IdP com modulo opt-in:
+  login/profile, principal minimo de sessao, userinfo/id token via claims seam, logout/session e isolamento por realm.
+- Ajustes de paridade:
+  - `MemoryUserClaimsProvider` agora projeta `preferred_username` a partir de `Username`, nao `DisplayName`.
+  - `RealmMemoryStore` semeia Alice/Bob apenas no `DemoRealm`; outros realms nao recebem contas por acidente.
+  - `SigningAlgorithmTests` semeia explicitamente Alice no realm criado pelo teste, em vez de depender do vazamento
+    anterior do fake.
+- Diferidos continuam fora deste plano: API/UI administrativa, security lifecycle, federacao/login externo,
+  MFA/passwordless e outbox/inbox/replicacao.
+
+**Testes executados:** `dotnet test Tests.UserAccounts`, `dotnet test Tests.Integration`,
+`dotnet test Tests.Architecture`, `dotnet test RoyalIdentity.sln`.
 
 ---
 

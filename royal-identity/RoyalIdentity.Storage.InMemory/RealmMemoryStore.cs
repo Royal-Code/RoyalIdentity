@@ -21,6 +21,9 @@ public class RealmMemoryStore
     {
         this.realm = realm;
         Clients = isServer ? ServerClients(realm) : DemoClients(realm);
+        UserAccounts = realm.Id == MemoryStorage.DemoRealm.Id
+            ? DemoUsers()
+            : new ConcurrentDictionary<string, MemoryUserAccount>();
     }
 
     /// <summary>Constructor for programmatically created realms — starts with no clients.</summary>
@@ -28,6 +31,7 @@ public class RealmMemoryStore
     {
         this.realm = realm;
         Clients = new ConcurrentDictionary<string, Client>();
+        UserAccounts = new ConcurrentDictionary<string, MemoryUserAccount>();
     }
 
     public ConcurrentDictionary<string, Client> Clients { get; }
@@ -158,37 +162,42 @@ public class RealmMemoryStore
         }
     };
 
-    public ConcurrentDictionary<string, MemoryUserAccount> UserAccounts { get; } = new()
-    {
-        ["alice"] = new MemoryUserAccount
-        {
-            SubjectId = MemoryStorage.AliceSubjectId,
-            Username = "alice",
-            PasswordHash = PasswordHash.Create("alice"),
-            DisplayName = "Alice",
-            IsActive = true,
-            Claims =
-            [
-                new Claim("email", "Alice@example.com"),
-                new Claim("role", "admin")
-            ]
-        },
-        ["bob"] = new MemoryUserAccount
-        {
-            SubjectId = MemoryStorage.BobSubjectId,
-            Username = "bob",
-            PasswordHash = PasswordHash.Create("bob"),
-            DisplayName = "Bob",
-            IsActive = true,
-            Claims =
-            [
-                new Claim("email", "bob@example.com"),
-                new Claim("role", "admin")
-            ]
-        }
-    };
+    public ConcurrentDictionary<string, MemoryUserAccount> UserAccounts { get; }
 
     #region Factory
+
+    private static ConcurrentDictionary<string, MemoryUserAccount> DemoUsers()
+    {
+        return new ConcurrentDictionary<string, MemoryUserAccount>
+        {
+            ["alice"] = new MemoryUserAccount
+            {
+                SubjectId = MemoryStorage.AliceSubjectId,
+                Username = "alice",
+                PasswordHash = PasswordHash.Create("alice"),
+                DisplayName = "Alice",
+                IsActive = true,
+                Claims =
+                [
+                    new Claim("email", "Alice@example.com"),
+                    new Claim("role", "admin")
+                ]
+            },
+            ["bob"] = new MemoryUserAccount
+            {
+                SubjectId = MemoryStorage.BobSubjectId,
+                Username = "bob",
+                PasswordHash = PasswordHash.Create("bob"),
+                DisplayName = "Bob",
+                IsActive = true,
+                Claims =
+                [
+                    new Claim("email", "bob@example.com"),
+                    new Claim("role", "admin")
+                ]
+            }
+        };
+    }
 
     private static ConcurrentDictionary<string, Client> ServerClients(Realm realm)
     {
