@@ -1,4 +1,4 @@
-# Plan: Projeto compartilhado de seguranca (`RoyalCode.Security`)
+# Plan: Projeto compartilhado de seguranca (`RoyalIdentity.Security`)
 
 ## Status: PLANEJADO - 0 de 8 fases concluidas
 
@@ -34,9 +34,12 @@ O backlog registra o trabalho em [backlog-001.md](../backlogs/backlog-001.md), s
   referenciar o core;
 - o futuro `RoyalIdentity.KMS`, que precisara manipular chaves, certificados e segredos sem depender do IdP.
 
-Este plano ajusta o nome do projeto para **`RoyalCode.Security`**, porque o escopo desejado e uma biblioteca
-reutilizavel de componentes tecnicos, nao um modulo de dominio do IdP. A decisao de introduzir o tier `RoyalCode.*`
-(distinto de `RoyalIdentity.*`) esta registrada no [ADR-016](../../adrs/ADR-016.md), que emenda o ADR-013.
+Este plano nomeia o projeto **`RoyalIdentity.Security`**, porque o escopo desejado e uma biblioteca
+reutilizavel de componentes tecnicos, nao um modulo de dominio do IdP. O projeto fica no namespace do produto
+(`RoyalIdentity.*`) como uma biblioteca tecnica de folha (sem dependencia do core nem de outros modulos de dominio),
+e **nao** sob o ecossistema externo de bibliotecas `RoyalCode.*` (SmartCommands, WorkContext, Entities, etc.), para
+nao colidir com esses pacotes de terceiros. A decisao esta registrada no [ADR-016](../../adrs/ADR-016.md), que emenda
+o ADR-013.
 
 O projeto deve conter apenas componentes genericos: cripto utilitaria, identificadores opacos, encoding, hashing,
 comparacao constante, password hashing reutilizavel e material de chaves. Ele nao deve conter fluxos OIDC,
@@ -46,11 +49,11 @@ conhecimento de realm, clients, stores, pipelines, ASP.NET DataProtection, nem a
 
 ## Objetivo
 
-1. Criar o projeto `RoyalCode.Security` dentro da solution `RoyalIdentity.sln`.
-2. Colocar `RoyalCode.Security` no virtual folder **`src`** da solution.
-3. Criar o projeto de testes `Tests.RoyalCode.Security`.
-4. Colocar `Tests.RoyalCode.Security` no virtual folder **`test`** da solution.
-5. Migrar para `RoyalCode.Security` as primitivas genericas atualmente espalhadas no core:
+1. Criar o projeto `RoyalIdentity.Security` dentro da solution `RoyalIdentity.sln`.
+2. Colocar `RoyalIdentity.Security` no virtual folder **`src`** da solution.
+3. Criar o projeto de testes `Tests.Security`.
+4. Colocar `Tests.Security` no virtual folder **`test`** da solution.
+5. Migrar para `RoyalIdentity.Security` as primitivas genericas atualmente espalhadas no core:
    - `CryptoRandom`;
    - `Base64Url`;
    - hashing SHA e helpers de hash;
@@ -66,7 +69,7 @@ conhecimento de realm, clients, stores, pipelines, ASP.NET DataProtection, nem a
 
 ## Fora de escopo
 
-- Criar um modulo de dominio `RoyalIdentity.Security`. O projeto e `RoyalCode.Security` e nao conhece o IdP.
+- Criar um modulo de dominio `RoyalIdentity.Security`. O projeto e `RoyalIdentity.Security` e nao conhece o IdP.
 - Criar projeto `.AspNetCore`, integracao com ASP.NET DataProtection ou key ring do ASP.NET.
 - Mover `ProtectedDataMessageStore` ou `IDataProtectionProvider`.
 - Mover `SecretEvaluatorBase`, `PrivateKeyJwtSecretEvaluator`, `DefaultClientSecretChecker` ou qualquer fluxo de
@@ -85,35 +88,35 @@ conhecimento de realm, clients, stores, pipelines, ASP.NET DataProtection, nem a
 
 ### Nome, projetos e solution folders
 
-- Projeto de componentes: `RoyalCode.Security`.
-- Projeto de testes: `Tests.RoyalCode.Security`.
+- Projeto de componentes: `RoyalIdentity.Security`.
+- Projeto de testes: `Tests.Security`.
 - Fisicamente, ambos ficam no diretorio raiz da solution, seguindo o padrao atual dos projetos:
 
 ```text
-RoyalCode.Security/
-Tests.RoyalCode.Security/
+RoyalIdentity.Security/
+Tests.Security/
 ```
 
 - Virtual folders na solution:
-  - `RoyalCode.Security` fica em `src`.
-  - `Tests.RoyalCode.Security` fica em `test`.
+  - `RoyalIdentity.Security` fica em `src`.
+  - `Tests.Security` fica em `test`.
 
 ### Dependencias
 
-- `RoyalCode.Security` nao referencia `RoyalIdentity`, `RoyalIdentity.Pipelines`, `RoyalIdentity.UserAccounts`,
+- `RoyalIdentity.Security` nao referencia `RoyalIdentity`, `RoyalIdentity.Pipelines`, `RoyalIdentity.UserAccounts`,
   storage, Razor, Server ou ASP.NET.
-- `RoyalCode.Security` remove o `FrameworkReference` global `Microsoft.AspNetCore.App` no `.csproj`, como o modulo
+- `RoyalIdentity.Security` remove o `FrameworkReference` global `Microsoft.AspNetCore.App` no `.csproj`, como o modulo
   puro `RoyalIdentity.UserAccounts` ja faz.
 - Dependencias permitidas:
   - BCL (`System.Security.Cryptography`, `System.Text`, etc.);
   - `Microsoft.IdentityModel.Tokens`, quando necessario para `SecurityKey`, `SigningCredentials` e `JsonWebKey`.
 - `RoyalIdentity`, `RoyalIdentity.Storage.InMemory` e `RoyalIdentity.UserAccounts` podem referenciar
-  `RoyalCode.Security`.
+  `RoyalIdentity.Security`.
 - `RoyalIdentity.Pipelines` continua sem dependencia de dominio ou seguranca do IdP.
 
 ### Visibilidade da API
 
-- A API de `RoyalCode.Security` e `public`. O projeto e consumido por tres projetos hoje (core, storage, modulo puro)
+- A API de `RoyalIdentity.Security` e `public`. O projeto e consumido por tres projetos hoje (core, storage, modulo puro)
   e pelo futuro KMS; nao ha `InternalsVisibleTo`. Empacotamento NuGet externo continua fora de escopo, mas a
   superficie publica deve ser tratada como estavel desde a Fase 1.
 
@@ -133,7 +136,7 @@ Tests.RoyalCode.Security/
 Componente:
 
 ```text
-RoyalCode.Security.Cryptography.CryptoRandom
+RoyalIdentity.Security.Cryptography.CryptoRandom
 ```
 
 API alvo minima:
@@ -169,7 +172,7 @@ Regras:
 Componente:
 
 ```text
-RoyalCode.Security.Encoding.Base64Url
+RoyalIdentity.Security.Encoding.Base64Url
 ```
 
 API alvo minima:
@@ -188,10 +191,10 @@ Regras:
 - Preservar round-trip dos valores gerados hoje.
 - Aceitar valores sem padding.
 - Rejeitar ou retornar `false` para tamanho invalido.
-- O .NET 9+ ja expoe `System.Buffers.Text.Base64Url`. Decisao: `RoyalCode.Security.Encoding.Base64Url` e uma
+- O .NET 9+ ja expoe `System.Buffers.Text.Base64Url`. Decisao: `RoyalIdentity.Security.Encoding.Base64Url` e uma
   fachada fina que delega ao tipo da BCL (mesma semantica de no-padding), em vez de reimplementar conversao manual.
   A fachada preserva o nome curto consumido pelo core e evita colisao de `using` com `System.Buffers.Text.Base64Url`.
-  Dentro do namespace `RoyalCode.Security.Encoding`, qualquer uso de `System.Text.Encoding` deve ser totalmente
+  Dentro do namespace `RoyalIdentity.Security.Encoding`, qualquer uso de `System.Text.Encoding` deve ser totalmente
   qualificado ou via alias para evitar ambiguidade.
 
 #### Hashing basico
@@ -199,8 +202,8 @@ Regras:
 Componentes:
 
 ```text
-RoyalCode.Security.Cryptography.Hashing
-RoyalCode.Security.Cryptography.HashExtensions
+RoyalIdentity.Security.Cryptography.Hashing
+RoyalIdentity.Security.Cryptography.HashExtensions
 ```
 
 API alvo minima:
@@ -230,7 +233,7 @@ Regras:
 Componente:
 
 ```text
-RoyalCode.Security.Cryptography.FixedTimeComparer
+RoyalIdentity.Security.Cryptography.FixedTimeComparer
 ```
 
 API alvo minima:
@@ -263,9 +266,9 @@ Regras:
 Componente:
 
 ```text
-RoyalCode.Security.Passwords.PasswordHash
-RoyalCode.Security.Passwords.PasswordHashOptions
-RoyalCode.Security.Passwords.PasswordVerificationResult
+RoyalIdentity.Security.Passwords.PasswordHash
+RoyalIdentity.Security.Passwords.PasswordHashOptions
+RoyalIdentity.Security.Passwords.PasswordVerificationResult
 ```
 
 API alvo minima:
@@ -292,7 +295,7 @@ Regras:
   `bool` esperado por `IPasswordProtector.VerifyAsync`. `Success` e `SuccessRehashNeeded` mapeiam para `true`.
 - **Adocao do formato versionado / rehash-on-login:** `NeedsRehash` so tem valor se alguem reidratar hashes legados.
   A orquestracao de rehash-on-login (verificar legado -> em sucesso, se `NeedsRehash`, regravar no formato novo)
-  pertence ao consumidor/dominio de contas, **nao** a `RoyalCode.Security`. Este plano apenas entrega `NeedsRehash`;
+  pertence ao consumidor/dominio de contas, **nao** a `RoyalIdentity.Security`. Este plano apenas entrega `NeedsRehash`;
   A orquestracao fica **deferido para o backlog** (registrar item). Sem isso, `NeedsRehash` permanece disponivel
   porem nao adotado para usuarios existentes - o que e aceitavel para o escopo deste plano, desde que registrado.
 - Password policy e lockout permanecem no dominio de contas.
@@ -302,11 +305,11 @@ Regras:
 Componentes:
 
 ```text
-RoyalCode.Security.Keys.KeyParameters
-RoyalCode.Security.Keys.KeySerializationFormat
-RoyalCode.Security.Keys.KeyEncoding
-RoyalCode.Security.Keys.ECKeyHelper
-RoyalCode.Security.Keys.SecurityKeyExtensions
+RoyalIdentity.Security.Keys.KeyParameters
+RoyalIdentity.Security.Keys.KeySerializationFormat
+RoyalIdentity.Security.Keys.KeyEncoding
+RoyalIdentity.Security.Keys.ECKeyHelper
+RoyalIdentity.Security.Keys.SecurityKeyExtensions
 ```
 
 API alvo minima:
@@ -345,7 +348,7 @@ Regras:
 - `WithoutPrivateKey` para RSA/ECDsa entra em `SecurityKeyExtensions`.
 - `ECKeyHelper` entra como utilitario generico de export/import/serialize/deserialize de `ECParameters`.
 - `ValidationKeysInfo` deve ser avaliado na Fase 4:
-  - mover para `RoyalCode.Security.Keys` se for apenas wrapper tecnico;
+  - mover para `RoyalIdentity.Security.Keys` se for apenas wrapper tecnico;
   - manter no IdP se continuar sendo contrato da borda `IKeyManager`.
 
 #### X509
@@ -353,8 +356,8 @@ Regras:
 Componentes candidatos:
 
 ```text
-RoyalCode.Security.Certificates.X509CertificateExtensions
-RoyalCode.Security.Certificates.X509
+RoyalIdentity.Security.Certificates.X509CertificateExtensions
+RoyalIdentity.Security.Certificates.X509
 ```
 
 Regras:
@@ -377,21 +380,21 @@ Regras:
 
 | Hoje | Destino planejado | Observacoes |
 |---|---|---|
-| `RoyalIdentity/Utils/CryptoRandom.cs` | `RoyalCode.Security.Cryptography.CryptoRandom` | Preservar semantica de tamanho em bytes e formatos. |
+| `RoyalIdentity/Utils/CryptoRandom.cs` | `RoyalIdentity.Security.Cryptography.CryptoRandom` | Preservar semantica de tamanho em bytes e formatos. |
 | `RoyalIdentity.UserAccounts/.../DefaultSubjectIdGenerator.cs` | wrapper sobre `CryptoRandom` | O contrato `ISubjectIdGenerator` fica no modulo. |
-| `RoyalIdentity/Utils/Base64Url.cs` | `RoyalCode.Security.Encoding.Base64Url` | Usar nativo do .NET se possivel. |
-| `RoyalIdentity/Extensions/HashExtensions.cs` | `RoyalCode.Security.Cryptography.HashExtensions` | Chamar `Hashing` central. |
+| `RoyalIdentity/Utils/Base64Url.cs` | `RoyalIdentity.Security.Encoding.Base64Url` | Usar nativo do .NET se possivel. |
+| `RoyalIdentity/Extensions/HashExtensions.cs` | `RoyalIdentity.Security.Cryptography.HashExtensions` | Chamar `Hashing` central. |
 | `RoyalIdentity/Utils/CryptoHelper.cs` | parte em `Hashing`, parte fica no IdP | OIDC hash claims continuam no core. |
 | `RoyalIdentity/Utils/PkceHelper.cs` | fica no IdP, usando `Hashing`/`Base64Url` | PKCE e protocolo OIDC. |
-| `RoyalIdentity/Utils/TimeConstantComparer.cs` | `RoyalCode.Security.Cryptography.FixedTimeComparer` | Corrigir implementacao. |
-| `RoyalIdentity/Utils/PasswordHash.cs` | `RoyalCode.Security.Passwords.PasswordHash` | Adicionar formato versionado e verificar legado. |
+| `RoyalIdentity/Utils/TimeConstantComparer.cs` | `RoyalIdentity.Security.Cryptography.FixedTimeComparer` | Corrigir implementacao. |
+| `RoyalIdentity/Utils/PasswordHash.cs` | `RoyalIdentity.Security.Passwords.PasswordHash` | Adicionar formato versionado e verificar legado. |
 | `RoyalIdentity/Users/Defaults/DefaultPasswordProtector.cs` | fica no IdP, usa `PasswordHash` | Adapter local, sem interface compartilhada nova. |
-| `RoyalIdentity/Models/Keys/KeyParameters.cs` | `RoyalCode.Security.Keys.KeyParameters` | Remover dependencia de `KeyOptions`; factory do IdP fica no core. |
-| `RoyalIdentity/Models/Keys/KeyEncoding.cs` | `RoyalCode.Security.Keys.KeyEncoding` | Mover. |
-| `RoyalIdentity/Models/Keys/KeySerializationFormat.cs` | `RoyalCode.Security.Keys.KeySerializationFormat` | Mover. |
-| `RoyalIdentity/Utils/ECKeyHelper.cs` | `RoyalCode.Security.Keys.ECKeyHelper` | Mover com testes. |
-| `RoyalIdentity/Extensions/SecurityKeyExtensions.cs` | `RoyalCode.Security.Keys.SecurityKeyExtensions` | Mover com testes de public key. |
-| `RoyalIdentity/Utils/X509.cs` | `RoyalCode.Security.Certificates.*` | Mover thumbprint primeiro; store finder se valer o custo. |
+| `RoyalIdentity/Models/Keys/KeyParameters.cs` | `RoyalIdentity.Security.Keys.KeyParameters` | Remover dependencia de `KeyOptions`; factory do IdP fica no core. |
+| `RoyalIdentity/Models/Keys/KeyEncoding.cs` | `RoyalIdentity.Security.Keys.KeyEncoding` | Mover. |
+| `RoyalIdentity/Models/Keys/KeySerializationFormat.cs` | `RoyalIdentity.Security.Keys.KeySerializationFormat` | Mover. |
+| `RoyalIdentity/Utils/ECKeyHelper.cs` | `RoyalIdentity.Security.Keys.ECKeyHelper` | Mover com testes. |
+| `RoyalIdentity/Extensions/SecurityKeyExtensions.cs` | `RoyalIdentity.Security.Keys.SecurityKeyExtensions` | Mover com testes de public key. |
+| `RoyalIdentity/Utils/X509.cs` | `RoyalIdentity.Security.Certificates.*` | Mover thumbprint primeiro; store finder se valer o custo. |
 
 ---
 
@@ -400,21 +403,21 @@ Regras:
 ```text
 RoyalIdentity.Pipelines
 
-RoyalCode.Security
+RoyalIdentity.Security
   - sem referencia ao IdP
   - sem ASP.NET
   - componentes tecnicos reutilizaveis
 
 RoyalIdentity
   -> RoyalIdentity.Pipelines
-  -> RoyalCode.Security
+  -> RoyalIdentity.Security
 
 RoyalIdentity.Storage.InMemory
   -> RoyalIdentity
-  -> RoyalCode.Security (se necessario diretamente)
+  -> RoyalIdentity.Security (se necessario diretamente)
 
 RoyalIdentity.UserAccounts
-  -> RoyalCode.Security
+  -> RoyalIdentity.Security
   - nao referencia RoyalIdentity
   - nao referencia ASP.NET
 
@@ -428,9 +431,9 @@ RoyalIdentity.UserAccounts.PostgreSql / Sqlite
 
 Guardrails:
 
-- `RoyalCode.Security` nunca referencia `RoyalIdentity*`.
-- `RoyalCode.Security` nunca referencia `Microsoft.AspNetCore*`.
-- `RoyalIdentity.UserAccounts` pode referenciar `RoyalCode.Security`, mas continua sem referencia ao core.
+- `RoyalIdentity.Security` nunca referencia `RoyalIdentity*`.
+- `RoyalIdentity.Security` nunca referencia `Microsoft.AspNetCore*`.
+- `RoyalIdentity.UserAccounts` pode referenciar `RoyalIdentity.Security`, mas continua sem referencia ao core.
 - O core continua sem referencia ao modulo `UserAccounts`.
 
 ---
@@ -438,9 +441,9 @@ Guardrails:
 ## Ordem de execucao
 
 > **Protocolo aditivo-depois-deleta (vale para todo o plano):** as Fases 2 a 4 **adicionam** os componentes em
-> `RoyalCode.Security` sem remover nada do core - os tipos originais continuam compilando e em uso. A Fase 5/6 troca
+> `RoyalIdentity.Security` sem remover nada do core - os tipos originais continuam compilando e em uso. A Fase 5/6 troca
 > os consumidores para os tipos novos. A **remocao** dos tipos originais do core acontece **exclusivamente na Fase 7**.
-> Onde a tabela de mapeamento ou as tarefas dizem "mover", leia-se "adicionar em `RoyalCode.Security` agora, remover
+> Onde a tabela de mapeamento ou as tarefas dizem "mover", leia-se "adicionar em `RoyalIdentity.Security` agora, remover
 > do core na Fase 7". Isso evita janela de build quebrado entre fases (ex.: core sem `KeyParameters` antes da troca).
 
 1. Criar projetos e guardrails antes de adicionar codigo.
@@ -458,21 +461,21 @@ Guardrails:
 
 ### Tarefas
 
-- [ ] Criar projeto `RoyalCode.Security/RoyalCode.Security.csproj`.
+- [ ] Criar projeto `RoyalIdentity.Security/RoyalIdentity.Security.csproj`.
 - [ ] Remover `FrameworkReference Include="Microsoft.AspNetCore.App"` do projeto.
 - [ ] Adicionar package/reference minimo para `Microsoft.IdentityModel.Tokens` apenas se a Fase 4 precisar.
 - [ ] Criar marker interno/publico simples para testes de arquitetura, se necessario.
-- [ ] Criar projeto `Tests.RoyalCode.Security/Tests.RoyalCode.Security.csproj`.
-- [ ] Referenciar `RoyalCode.Security` no projeto de testes.
+- [ ] Criar projeto `Tests.Security/Tests.Security.csproj`.
+- [ ] Referenciar `RoyalIdentity.Security` no projeto de testes.
 - [ ] Adicionar os projetos na solution.
-- [ ] Colocar `RoyalCode.Security` no virtual folder `src`.
-- [ ] Colocar `Tests.RoyalCode.Security` no virtual folder `test`.
+- [ ] Colocar `RoyalIdentity.Security` no virtual folder `src`.
+- [ ] Colocar `Tests.Security` no virtual folder `test`.
 - [ ] Estender o projeto existente `Tests.Architecture` (`ModuleBoundaryTests.cs` ja usa `GetReferencedAssemblies()`
   + parsing de `.csproj`; seguir esse mesmo padrao) garantindo:
-  - [ ] `RoyalCode.Security` nao referencia `RoyalIdentity`;
-  - [ ] `RoyalCode.Security` nao referencia `RoyalIdentity.UserAccounts`;
-  - [ ] `RoyalCode.Security` nao referencia `Microsoft.AspNetCore*`;
-  - [ ] `RoyalIdentity.UserAccounts` pode referenciar `RoyalCode.Security` sem quebrar a regra de modulo puro.
+  - [ ] `RoyalIdentity.Security` nao referencia `RoyalIdentity`;
+  - [ ] `RoyalIdentity.Security` nao referencia `RoyalIdentity.UserAccounts`;
+  - [ ] `RoyalIdentity.Security` nao referencia `Microsoft.AspNetCore*`;
+  - [ ] `RoyalIdentity.UserAccounts` pode referenciar `RoyalIdentity.Security` sem quebrar a regra de modulo puro.
 
 ### Resultado da Fase 1
 
@@ -486,8 +489,8 @@ Projetos criados, solution organizada e guardrails prontos antes de qualquer mig
 
 ### Tarefas
 
-- [ ] Implementar `CryptoRandom` em `RoyalCode.Security`.
-- [ ] Implementar `Base64Url` em `RoyalCode.Security`.
+- [ ] Implementar `CryptoRandom` em `RoyalIdentity.Security`.
+- [ ] Implementar `Base64Url` em `RoyalIdentity.Security`.
 - [ ] Implementar `Hashing` e `HashExtensions` genericos.
 - [ ] Implementar `FixedTimeComparer` usando `CryptographicOperations.FixedTimeEquals`.
 - [ ] Adicionar testes de `CryptoRandom`:
@@ -514,7 +517,7 @@ Projetos criados, solution organizada e guardrails prontos antes de qualquer mig
 
 ### Resultado da Fase 2
 
-Primitivas pequenas existem em `RoyalCode.Security` com testes proprios, ainda sem trocar consumidores.
+Primitivas pequenas existem em `RoyalIdentity.Security` com testes proprios, ainda sem trocar consumidores.
 
 ---
 
@@ -553,22 +556,22 @@ Password hashing reutilizavel pronto, sem interface compartilhada nova e com com
 
 ### Tarefas
 
-> Fase aditiva: adicionar os tipos em `RoyalCode.Security` sem remover os originais do core (remocao e Fase 7).
+> Fase aditiva: adicionar os tipos em `RoyalIdentity.Security` sem remover os originais do core (remocao e Fase 7).
 > Antes da Fase 4, reconciliar a edicao em andamento de `RoyalIdentity/Models/Keys/KeyParameters.cs` (ver Riscos),
 > para que a copia adicionada parta do estado correto.
 
-- [ ] Adicionar `KeyEncoding` em `RoyalCode.Security` (original permanece ate a Fase 7).
-- [ ] Adicionar `KeySerializationFormat` em `RoyalCode.Security`.
-- [ ] Adicionar `ECKeyHelper` em `RoyalCode.Security`.
-- [ ] Adicionar `SecurityKeyExtensions` em `RoyalCode.Security`.
-- [ ] Adicionar `KeyParameters` em `RoyalCode.Security` sem dependencia de `RoyalIdentity.Options.KeyOptions`.
+- [ ] Adicionar `KeyEncoding` em `RoyalIdentity.Security` (original permanece ate a Fase 7).
+- [ ] Adicionar `KeySerializationFormat` em `RoyalIdentity.Security`.
+- [ ] Adicionar `ECKeyHelper` em `RoyalIdentity.Security`.
+- [ ] Adicionar `SecurityKeyExtensions` em `RoyalIdentity.Security`.
+- [ ] Adicionar `KeyParameters` em `RoyalIdentity.Security` sem dependencia de `RoyalIdentity.Options.KeyOptions`.
 - [ ] Criar factory generica para key material quando nao couber no construtor de `KeyParameters`.
 - [ ] Decidir e implementar o destino de `ValidationKeysInfo`.
 - [ ] Decidir e registrar no plano: mover `X509CertificateExtensions.CreateThumbprintCnf()` (se puramente tecnico e
   testavel com certificado em memoria) ou manter no core.
 - [ ] Decidir e registrar no plano: mover o helper fluente `X509` de busca em certificate stores (so se nao exigir
   store do SO / nao fragilizar CI) ou manter no core.
-- [ ] Migrar testes existentes de `Tests.Identity/Keys/KeyParametersTests.cs` para `Tests.RoyalCode.Security`.
+- [ ] Migrar testes existentes de `Tests.Identity/Keys/KeyParametersTests.cs` para `Tests.Security`.
 - [ ] Adicionar novos testes:
   - [ ] RSA XML round-trip;
   - [ ] RSA JSON round-trip;
@@ -594,17 +597,17 @@ Material de chaves fica disponivel como componente reutilizavel para IdP e futur
 
 ### Tarefas
 
-- [ ] Adicionar referencia de `RoyalIdentity` para `RoyalCode.Security`.
-- [ ] Atualizar usos de `RoyalIdentity.Utils.CryptoRandom` para `RoyalCode.Security`.
+- [ ] Adicionar referencia de `RoyalIdentity` para `RoyalIdentity.Security`.
+- [ ] Atualizar usos de `RoyalIdentity.Utils.CryptoRandom` para `RoyalIdentity.Security`.
 - [ ] Atualizar usos de `Base64Url`.
-- [ ] Atualizar `HashExtensions`/hash helpers para usarem `RoyalCode.Security`.
+- [ ] Atualizar `HashExtensions`/hash helpers para usarem `RoyalIdentity.Security`.
 - [ ] Atualizar `TimeConstantComparer` para usar `FixedTimeComparer` ou remover o tipo local.
 - [ ] Atualizar o call-site de PKCE em `PkceMatchValidator` para usar `FixedTimeComparer` (in-scope, mesmo o
   validator permanecendo no core).
 - [ ] Atualizar o call-site de client secret em `SecretEvaluatorBase` para usar `FixedTimeComparer` (in-scope; o
   evaluator NAO migra, apenas a comparacao interna muda).
 - [ ] Adicionar/ajustar testes de regressao de PKCE e de autenticacao de client secret apos a troca do comparador.
-- [ ] Atualizar `DefaultPasswordProtector` para usar `RoyalCode.Security.Passwords.PasswordHash`, mapeando
+- [ ] Atualizar `DefaultPasswordProtector` para usar `RoyalIdentity.Security.Passwords.PasswordHash`, mapeando
   `PasswordVerificationResult` para `bool` (incluindo `SuccessRehashNeeded` -> `true`) e absorvendo a remocao do
   throw em hash malformado.
 - [ ] Atualizar `CryptoHelper.CreateHashClaimValue` para delegar a primitiva generica de left-half hash.
@@ -618,7 +621,7 @@ Material de chaves fica disponivel como componente reutilizavel para IdP e futur
 
 ### Resultado da Fase 5
 
-O core usa `RoyalCode.Security` para primitivas, mas conserva regras OIDC, realm, clients, tokens e stores no IdP.
+O core usa `RoyalIdentity.Security` para primitivas, mas conserva regras OIDC, realm, clients, tokens e stores no IdP.
 
 ---
 
@@ -628,13 +631,13 @@ O core usa `RoyalCode.Security` para primitivas, mas conserva regras OIDC, realm
 
 ### Tarefas
 
-- [ ] Adicionar referencia de `RoyalIdentity.UserAccounts` para `RoyalCode.Security`.
+- [ ] Adicionar referencia de `RoyalIdentity.UserAccounts` para `RoyalIdentity.Security`.
 - [ ] Trocar `DefaultSubjectIdGenerator` para chamar `CryptoRandom.CreateUniqueId(32, Base64Url)`.
 - [ ] Garantir que o modulo puro continua sem referencia ao core e sem ASP.NET.
-- [ ] Atualizar `RoyalIdentity.Storage.InMemory` para usar `RoyalCode.Security` onde ainda usa utilitarios do core.
+- [ ] Atualizar `RoyalIdentity.Storage.InMemory` para usar `RoyalIdentity.Security` onde ainda usa utilitarios do core.
 - [ ] Atualizar seeds do fake/in-memory que criam password hashes.
 - [ ] Confirmar que `PasswordProtectorAccountHasher` continua apenas como adapter de borda, sem mover para
-  `RoyalCode.Security`.
+  `RoyalIdentity.Security`.
 - [ ] Rodar/ajustar testes de `Tests.UserAccounts` ligados a `SubjectId`, autenticacao local e contract tests.
 - [ ] Rodar/ajustar testes de integracao que usam PKCE, secrets e tokens.
 
@@ -674,7 +677,7 @@ Duplicacao removida ou explicitamente marcada como transitoria, sem tipos generi
 
 ### Tarefas
 
-- [ ] Rodar `dotnet test Tests.RoyalCode.Security`.
+- [ ] Rodar `dotnet test Tests.Security`.
 - [ ] Rodar `dotnet test Tests.Identity`.
 - [ ] Rodar `dotnet test Tests.UserAccounts`.
 - [ ] Rodar `dotnet test Tests.Architecture`.
@@ -696,7 +699,7 @@ Plano fechado com biblioteca reutilizavel, consumidores migrados e suites releva
 
 ## Invariantes a preservar
 
-- O projeto `RoyalCode.Security` nao conhece realm, client, scope, token store, user store ou pipelines.
+- O projeto `RoyalIdentity.Security` nao conhece realm, client, scope, token store, user store ou pipelines.
 - O modulo puro `RoyalIdentity.UserAccounts` continua sem dependencia do core `RoyalIdentity`.
 - Hashes de senha legados continuam verificaveis.
 - Tokens, authorization codes, refresh tokens e JWT ids continuam usando entropia criptografica.
@@ -704,9 +707,9 @@ Plano fechado com biblioteca reutilizavel, consumidores migrados e suites releva
 - Comparacao de secrets e PKCE nao deve usar comparacao string early-exit para material sensivel.
 - Chaves de assinatura antigas continuam carregando e validando tokens emitidos antes da migracao.
 - JWKs publicos nao devem expor material privado.
-- A escolha de algoritmo por realm/client/resource continua no core, nao em `RoyalCode.Security`.
+- A escolha de algoritmo por realm/client/resource continua no core, nao em `RoyalIdentity.Security`.
 - DataProtection do ASP.NET continua fora deste projeto.
-- Todos os componentes de `RoyalCode.Security` sao stateless e thread-safe: sao helpers estaticos chamados
+- Todos os componentes de `RoyalIdentity.Security` sao stateless e thread-safe: sao helpers estaticos chamados
   concorrentemente em hot paths (emissao de token, autenticacao). Isso e propriedade load-bearing ao extrair para
   biblioteca compartilhada - preservar via APIs thread-safe da BCL (`RandomNumberGenerator`, `SHA*.HashData`,
   PBKDF2 stateless), sem estado mutavel compartilhado.
@@ -715,10 +718,10 @@ Plano fechado com biblioteca reutilizavel, consumidores migrados e suites releva
 
 ## Criterios globais de aceite
 
-- `RoyalCode.Security` compila em `net10.0`.
-- `RoyalCode.Security` nao referencia `RoyalIdentity*`.
-- `RoyalCode.Security` nao referencia `Microsoft.AspNetCore*`.
-- `Tests.RoyalCode.Security` cobre todos os componentes migrados.
+- `RoyalIdentity.Security` compila em `net10.0`.
+- `RoyalIdentity.Security` nao referencia `RoyalIdentity*`.
+- `RoyalIdentity.Security` nao referencia `Microsoft.AspNetCore*`.
+- `Tests.Security` cobre todos os componentes migrados.
 - `RoyalIdentity`, `RoyalIdentity.Storage.InMemory` e `RoyalIdentity.UserAccounts` usam os componentes reutilizaveis.
 - Nao ha duplicacao ativa de `CryptoRandom`, `Base64Url`, password hash, fixed-time compare ou key material.
 - Testes de key material migrados de `Tests.Identity` continuam verdes.
@@ -734,7 +737,7 @@ Plano fechado com biblioteca reutilizavel, consumidores migrados e suites releva
 - **Compatibilidade de chaves:** mover `KeyParameters` sem preservar XML/JSON/encoding pode invalidar chaves armazenadas.
 - **Churn de namespace:** muitos testes usam `CryptoRandom`, `Sha512` e `KeyParameters`; a migracao precisa ser mecanica
   e revisada.
-- **Dependencia pesada:** `RoyalCode.Security` nao deve herdar ASP.NET por acidente via `Directory.Build.props`.
+- **Dependencia pesada:** `RoyalIdentity.Security` nao deve herdar ASP.NET por acidente via `Directory.Build.props`.
 - **Comparacao constante mal implementada:** apenas mover `TimeConstantComparer` preservaria uma primitiva fraca.
 - **Mistura com OIDC:** nomes como `at_hash`, `c_hash`, `PKCE`, `ClientSecret` e `PrivateKeyJwt` devem permanecer no core.
 - **KMS futuro:** se `KeyParameters` ficar IdP-specific demais, o KMS voltara a duplicar modelos.
@@ -754,5 +757,5 @@ Plano fechado com biblioteca reutilizavel, consumidores migrados e suites releva
 - [foundation/architecture.md](../foundation/architecture.md) - arquitetura modular e futuro KMS.
 - [ADR-013](../../adrs/ADR-013.md) - arquitetura modular e fronteiras.
 - [ADR-015](../../adrs/ADR-015.md) - modulo `UserAccounts` e modulo puro sem dependencia do core.
-- [ADR-016](../../adrs/ADR-016.md) - tier tecnico compartilhado `RoyalCode.*` (emenda o ADR-013).
+- [ADR-016](../../adrs/ADR-016.md) - biblioteca tecnica compartilhada `RoyalIdentity.Security` (emenda o ADR-013).
 - [fase5-useraccount-domain.review-001.md](../reviews/user-accounts/fase5-useraccount-domain.review-001.md) - nota original sobre `SubjectIdGenerator` e `RoyalIdentity.Security`.
