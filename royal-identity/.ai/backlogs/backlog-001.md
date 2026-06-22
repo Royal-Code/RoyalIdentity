@@ -178,17 +178,16 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 ## Rehash-on-login de hashes de senha (orquestração)
 
 **Área:** Segurança / Contas de usuário
-**Deferral:** A Fase 3 do `plan-royalidentity-security.md` entrega a primitiva
-`PasswordHash.NeedsRehash(storedHash, options)`, que detecta iterações abaixo da política, algoritmo/sizes
-diferentes ou formato malformado/não reconhecido. **A orquestração** — ao autenticar com sucesso, se rehash for
-necessário, regravar o hash no formato/política atual e persistir — pertence ao consumidor/domínio de contas
-(`UserAccounts` / `IPasswordProtector`), **não** a `RoyalIdentity.Security`.
-**Quando revisitar:** Ao endurecer credenciais do módulo de contas (ex.: aumentar iterações de PBKDF2 ou migrar
-algoritmo).
+**Status:** Não aplicável no momento. A primitiva `PasswordHash.NeedsRehash(...)` e o resultado tri-estado
+`PasswordVerificationResult` foram **removidos**: há um único formato versionado (`$RIPWD$`) e nenhum legado de
+produção a migrar (o formato pré-release `$PBKDF2$` foi descartado antes de qualquer release). Sem legado e com um
+só conjunto de parâmetros, não há cenário em que um hash armazenado precise ser regravado. `PasswordHash.Verify`
+retorna `bool`.
+**Quando revisitar:** Apenas se um upgrade futuro de parâmetros PBKDF2 (ex.: aumentar iterações ou migrar algoritmo)
+tornar hashes existentes mais fracos que a política corrente. Nesse momento, reintroduzir:
+1. `PasswordHash.NeedsRehash(storedHash, options)` na lib de segurança (detecção pura, sem conhecer realm);
+2. a orquestração no domínio de contas (`UserAccounts` / `IPasswordProtector`): ao autenticar com sucesso, se
+   `NeedsRehash`, chamar `Create(password, currentOptions)` e persistir o novo hash na mesma transação de login.
 **Nota de design:**
-- Fluxo: `Verify` retorna sucesso → se `NeedsRehash(hash, currentOptions)`, chamar
-  `PasswordHash.Create(password, currentOptions)` e salvar o novo hash dentro da mesma transação de login.
 - Como só é possível regravar com a senha em mãos, a adoção é naturalmente *on-login* (não há migração em lote).
 - O consumidor decide a política (`PasswordHashOptions`) por realm; a primitiva não conhece realm.
-- O formato `$PBKDF2$.{salt}.{hash}` foi removido antes da primeira release final; não há migração legada de produção
-  a suportar.

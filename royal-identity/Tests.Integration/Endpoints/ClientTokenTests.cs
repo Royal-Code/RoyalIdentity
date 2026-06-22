@@ -356,7 +356,7 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     {
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersScope = $"orders:read:{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
@@ -421,7 +421,7 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     {
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
 
@@ -477,7 +477,7 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         // via the scope parameter, even when the client is otherwise allowed the resource server.
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"audience-only-{suffix}";
         var scopeName = $"{serverName}:read";
 
@@ -527,7 +527,7 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         // the resource parameter — the resource axis is independent of the scope gate.
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"audience-only-reachable-{suffix}";
         var scopeName = $"{serverName}:read";
         var resourceUri = $"https://audience-only-{suffix}.demo.local/api";
@@ -582,7 +582,7 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         // A disabled resource server makes its resources unavailable -> invalid_target.
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"disabled-rs-{suffix}";
         var resourceUri = $"https://disabled-{suffix}.demo.local/api";
 
@@ -632,7 +632,7 @@ public class ClientTokenTests : IClassFixture<AppFactory>
         // the client's allowed resource servers; audience-only servers (AllowScopeRequests = false) are excluded.
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
 
         var normalServer = $"normal-{suffix}";
         var normalScope = $"{normalServer}:read";

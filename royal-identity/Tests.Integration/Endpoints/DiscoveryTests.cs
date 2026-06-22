@@ -77,7 +77,7 @@ public class DiscoveryTests : IClassFixture<AppFactory>
         // scope parameter, so they must not be advertised in scopes_supported (reachable only via resource).
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"audience-only-discovery-{suffix}";
         var hiddenScope = $"{serverName}:read";
 

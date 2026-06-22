@@ -23,6 +23,26 @@
 
 ---
 
+## Correcao pos-conclusao (2026-06-22)
+
+Apos o fechamento das 8 fases, uma revisao identificou que a Fase 7 ("Remocao de duplicacoes e shims temporarios")
+nao havia eliminado todas as duplicacoes — varios tipos do core continuavam como wrappers/shims, e a classe
+`KeyParameters` do core seguia duplicada. Esta correcao conclui o objetivo original da Fase 7:
+
+- **Wrappers do core removidos (sem shims):** `RoyalIdentity.Utils.CryptoRandom`, `Utils.Base64Url`,
+  `Utils.PasswordHash`, `Utils.TimeConstantComparer`, `Utils.ECKeyHelper` e `Extensions.HashExtensions` foram
+  **deletados**. Todos os call-sites passaram a usar diretamente os tipos de `RoyalIdentity.Security.*`
+  (via `using` explicito/alias na producao e `Using` de projeto na suite de integracao). Nao restam shims `[Obsolete]`.
+- **`KeyParameters` duplicado removido:** `RoyalIdentity/Models/Keys/{KeyParameters,KeyEncoding,KeySerializationFormat}.cs`
+  foram deletados; o core usa exclusivamente `RoyalIdentity.Security.Keys.*`. A geracao a partir de `KeyOptions`
+  permanece no adaptador `RoyalIdentity.Models.Keys.KeyParametersFactory` (delega a `KeyMaterialFactory`). O teste
+  `Tests.Identity/Keys/KeyParametersCompatibilityTests` passou a exercitar a factory do IdP.
+- **Rehash removido:** como ha um unico formato (`$RIPWD$`) e nenhum legado a migrar, `PasswordHash.Verify` agora
+  retorna `bool`. `PasswordVerificationResult` e `PasswordHash.NeedsRehash` foram removidos; o item de backlog de
+  rehash-on-login foi remarcado como "nao aplicavel" (reintroduzir apenas se houver upgrade futuro de parametros).
+
+---
+
 ## Contexto
 
 O backlog registra o trabalho em [backlog-001.md](../backlogs/backlog-001.md), secao
@@ -270,7 +290,6 @@ Componente:
 ```text
 RoyalIdentity.Security.Passwords.PasswordHash
 RoyalIdentity.Security.Passwords.PasswordHashOptions
-RoyalIdentity.Security.Passwords.PasswordVerificationResult
 ```
 
 API alvo minima:
@@ -280,8 +299,7 @@ public static class PasswordHash
 {
 	public static string Create(string password);
 	public static string Create(string password, PasswordHashOptions options);
-	public static PasswordVerificationResult Verify(string password, string storedHash);
-	public static bool NeedsRehash(string storedHash, PasswordHashOptions options);
+	public static bool Verify(string password, string storedHash);
 }
 ```
 
@@ -291,16 +309,15 @@ Regras:
 - Formato novo deve ser versionado e autocontido, incluindo algoritmo, iteracoes, salt e hash.
 - O formato experimental pre-release (`$PBKDF2$.{salt}.{hash}`, salt/hash em Base64 padrao) **nao** deve continuar
   verificavel: como o projeto ainda nao teve release final, nao ha legado de producao a preservar. `Verify` deve
-  tratar esse formato como nao reconhecido e retornar `PasswordVerificationResult.Failed`.
-- **Mudanca de comportamento intencional:** o `Verify` atual lanca `ArgumentException` para hash malformado; o novo
-  `Verify` retorna `PasswordVerificationResult` (falha), nunca lanca. Isso alinha com a regra de nao usar throw em
-  fluxo esperado. Deve haver teste cobrindo "hash malformado retorna falha, nao lanca e nao autentica".
-- O `DefaultPasswordProtector` do core passa a chamar esta implementacao e mapeia `PasswordVerificationResult` para o
-  `bool` esperado por `IPasswordProtector.VerifyAsync`. `Success` e `SuccessRehashNeeded` mapeiam para `true`, embora
-  a implementacao atual nao retorne `SuccessRehashNeeded` porque nao ha formato legado suportado.
-- **Adocao do formato versionado / rehash-on-login:** `NeedsRehash` continua util para upgrades futuros de parametros
-  (iteracoes, algoritmo ou tamanhos). A orquestracao de rehash-on-login (verificar com sucesso -> se `NeedsRehash`,
-  regravar no formato/politica atual) pertence ao consumidor/dominio de contas, **nao** a `RoyalIdentity.Security`.
+  tratar esse formato como nao reconhecido e retornar `false`.
+- **Mudanca de comportamento intencional:** o `Verify` legado lancava `ArgumentException` para hash malformado; o novo
+  `Verify` retorna `false`, nunca lanca. Isso alinha com a regra de nao usar throw em fluxo esperado. Deve haver teste
+  cobrindo "hash malformado retorna false, nao lanca e nao autentica".
+- O `DefaultPasswordProtector` do core delega direto a este `Verify` (bool), sem mapeamento intermediario.
+- **Sem maquinaria de rehash:** como ha um unico formato (`$RIPWD$`) e nenhum legado a migrar, `Verify` retorna apenas
+  `bool` — nao ha `PasswordVerificationResult` nem `NeedsRehash`. Se um upgrade futuro de parametros PBKDF2 exigir
+  rehash-on-login, a deteccao (`NeedsRehash`) e o tri-estado podem ser reintroduzidos junto com a orquestracao no
+  dominio de contas, que e onde a politica por realm vive.
 - Password policy e lockout permanecem no dominio de contas.
 
 #### Key material e `KeyParameters`

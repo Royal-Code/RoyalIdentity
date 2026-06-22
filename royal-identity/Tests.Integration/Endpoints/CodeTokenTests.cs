@@ -342,7 +342,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     {
         var storage = factory.Services.GetRequiredService<IStorage>();
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var clientId = $"code-resource-client-{CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex)}";
+        var clientId = $"code-resource-client-{CryptoRandom.CreateUniqueId(4, OutputFormat.Hex)}";
         memoryStorage.GetDemoRealmStore().Clients[clientId] = new Client
         {
             Realm = MemoryStorage.DemoRealm,
@@ -403,7 +403,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         var storage = factory.Services.GetRequiredService<IStorage>();
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = memoryStorage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
         store.ResourceServers[ordersServer] = new ResourceServer(
@@ -479,7 +479,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         var storage = factory.Services.GetRequiredService<IStorage>();
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = memoryStorage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-with-scope-{suffix}";
         var ordersScope = $"orders:read:{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
@@ -567,7 +567,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         var storage = factory.Services.GetRequiredService<IStorage>();
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = memoryStorage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
 
         // resource-capable RS kept in the subset
         var ordersServer = $"orders-{suffix}";
@@ -659,7 +659,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     {
         var storage = factory.Services.GetRequiredService<IStorage>();
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"code-unauthorized-subset-client-{suffix}";
         memoryStorage.GetDemoRealmStore().Clients[clientId] = new Client
         {

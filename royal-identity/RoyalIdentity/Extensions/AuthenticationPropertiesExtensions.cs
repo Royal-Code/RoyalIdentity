@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using RoyalIdentity.Utils;
+using Base64Url = RoyalIdentity.Security.Encoding.Base64Url;
 
 namespace RoyalIdentity.Extensions;
 

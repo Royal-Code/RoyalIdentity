@@ -106,7 +106,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
     {
         var client = factory.CreateClient();
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"plain-pkce-client-{suffix}";
         var redirectUri = $"{client.BaseAddress}callback";
 

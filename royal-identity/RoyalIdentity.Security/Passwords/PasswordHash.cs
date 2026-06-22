@@ -14,10 +14,9 @@ namespace RoyalIdentity.Security.Passwords;
 /// algorithm, iteration count, salt and hash so it can be verified without external configuration.
 /// </para>
 /// <para>
-/// <see cref="Verify"/> never throws: a malformed or unrecognized stored hash yields
-/// <see cref="PasswordVerificationResult.Failed"/> (this is an intentional behaviour change from the legacy
-/// helper, which threw on malformed input). Password policy and lockout are not handled here; they remain a
-/// concern of the account domain.
+/// <see cref="Verify"/> never throws: a malformed or unrecognized stored hash returns <see langword="false"/>
+/// (this is an intentional behaviour change from the legacy helper, which threw on malformed input). Password
+/// policy and lockout are not handled here; they remain a concern of the account domain.
 /// </para>
 /// </remarks>
 public static class PasswordHash
@@ -51,49 +50,20 @@ public static class PasswordHash
     }
 
     /// <summary>
-    /// Verifies <paramref name="password"/> against <paramref name="storedHash"/>. Returns
-    /// <see cref="PasswordVerificationResult.Success"/> for a matching current hash and
-    /// <see cref="PasswordVerificationResult.Failed"/> otherwise (including malformed or unrecognized input — never throws).
+    /// Verifies <paramref name="password"/> against <paramref name="storedHash"/>. Returns <see langword="true"/>
+    /// for a matching hash and <see langword="false"/> otherwise (including malformed or unrecognized input — never throws).
     /// </summary>
-    public static PasswordVerificationResult Verify(string password, string storedHash)
+    public static bool Verify(string password, string storedHash)
     {
         if (password is null || string.IsNullOrEmpty(storedHash))
-            return PasswordVerificationResult.Failed;
-
-        return VerifyCurrent(password, storedHash);
-    }
-
-    /// <summary>
-    /// Returns <see langword="true"/> if <paramref name="storedHash"/> is not in the format described by
-    /// <paramref name="options"/> (weaker iteration count, different algorithm/sizes, or malformed/unrecognized)
-    /// and should therefore be re-created. Rehash-on-login orchestration is the consumer's concern.
-    /// </summary>
-    public static bool NeedsRehash(string storedHash, PasswordHashOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-
-        if (string.IsNullOrEmpty(storedHash))
-            return true;
+            return false;
 
         if (!TryParseCurrent(storedHash, out var parsed))
-            return true;
-
-        return parsed.Algorithm != options.Algorithm
-            || parsed.Iterations < options.Iterations
-            || parsed.Hash.Length != options.HashSize
-            || parsed.Salt.Length != options.SaltSize;
-    }
-
-    private static PasswordVerificationResult VerifyCurrent(string password, string storedHash)
-    {
-        if (!TryParseCurrent(storedHash, out var parsed))
-            return PasswordVerificationResult.Failed;
+            return false;
 
         var actual = Rfc2898DeriveBytes.Pbkdf2(password, parsed.Salt, parsed.Iterations, parsed.Algorithm, parsed.Hash.Length);
 
-        return CryptographicOperations.FixedTimeEquals(actual, parsed.Hash)
-            ? PasswordVerificationResult.Success
-            : PasswordVerificationResult.Failed;
+        return CryptographicOperations.FixedTimeEquals(actual, parsed.Hash);
     }
 
     private static bool TryParseCurrent(string storedHash, out ParsedHash parsed)

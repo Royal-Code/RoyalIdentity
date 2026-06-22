@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
-using FixedTimeComparer = RoyalIdentity.Security.Cryptography.FixedTimeComparer;
+using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contexts.Validators;

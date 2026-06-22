@@ -3,7 +3,7 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using FixedTimeComparer = RoyalIdentity.Security.Cryptography.FixedTimeComparer;
+using RoyalIdentity.Security.Cryptography;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 

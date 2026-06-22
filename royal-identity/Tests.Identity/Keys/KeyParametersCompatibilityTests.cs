@@ -1,9 +1,14 @@
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Options;
+using RoyalIdentity.Security.Keys;
 
 namespace Tests.Identity.Keys;
 
+/// <summary>
+/// Exercises the IdP-specific <see cref="KeyParametersFactory"/> adapter, which validates the algorithm against
+/// realm <see cref="KeyOptions"/> and delegates material generation to the leaf security library.
+/// </summary>
 public class KeyParametersCompatibilityTests
 {
 	[Theory]
@@ -14,7 +19,7 @@ public class KeyParametersCompatibilityTests
 		string algorithm,
 		int expectedKeySizeInBytes)
 	{
-		var keyParameters = KeyParameters.Create(new KeyOptions(), algorithm);
+		var keyParameters = KeyParametersFactory.Create(new KeyOptions(), algorithm);
 
 		Assert.Equal(KeyEncoding.Base64, keyParameters.Encoding);
 

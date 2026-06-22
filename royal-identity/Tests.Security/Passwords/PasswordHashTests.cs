@@ -14,20 +14,20 @@ public class PasswordHashTests
     }
 
     [Fact]
-    public void Verify_Returns_Success_For_Correct_Password_On_Current_Hash()
+    public void Verify_Returns_True_For_Correct_Password()
     {
         const string password = "correct horse battery staple";
         var hash = PasswordHash.Create(password);
 
-        Assert.Equal(PasswordVerificationResult.Success, PasswordHash.Verify(password, hash));
+        Assert.True(PasswordHash.Verify(password, hash));
     }
 
     [Fact]
-    public void Verify_Returns_Failed_For_Wrong_Password()
+    public void Verify_Returns_False_For_Wrong_Password()
     {
         var hash = PasswordHash.Create("right");
 
-        Assert.Equal(PasswordVerificationResult.Failed, PasswordHash.Verify("wrong", hash));
+        Assert.False(PasswordHash.Verify("wrong", hash));
     }
 
     [Theory]
@@ -38,54 +38,28 @@ public class PasswordHashTests
     [InlineData("$RIPWD$1$PBKDF2-SHA256$notanumber$AAAA$BBBB")] // non-numeric iterations
     [InlineData("$RIPWD$99$PBKDF2-SHA256$100000$AAAA$BBBB")]    // unknown version
     [InlineData("$RIPWD$1$PBKDF2-MD5$100000$AAAA$BBBB")]        // unsupported algorithm token
-    public void Verify_Returns_Failed_For_Malformed_Hash_Without_Throwing(string storedHash)
+    public void Verify_Returns_False_For_Malformed_Hash_Without_Throwing(string storedHash)
     {
         // Must not throw and must not authenticate.
-        Assert.Equal(PasswordVerificationResult.Failed, PasswordHash.Verify("whatever", storedHash));
+        Assert.False(PasswordHash.Verify("whatever", storedHash));
     }
 
     [Fact]
-    public void Verify_Returns_Failed_For_PreRelease_Pbkdf2_Format()
+    public void Verify_Returns_False_For_PreRelease_Pbkdf2_Format()
     {
         const string password = "pre-release-password";
         var preReleaseHash = CreatePreReleasePbkdf2Hash(password);
 
-        Assert.Equal(PasswordVerificationResult.Failed, PasswordHash.Verify(password, preReleaseHash));
+        Assert.False(PasswordHash.Verify(password, preReleaseHash));
     }
 
     [Fact]
-    public void NeedsRehash_True_For_PreRelease_Pbkdf2_Hash()
+    public void Verify_Returns_True_For_Hash_Created_With_Non_Default_Algorithm()
     {
-        Assert.True(PasswordHash.NeedsRehash(CreatePreReleasePbkdf2Hash("x"), PasswordHashOptions.Default));
-    }
-
-    [Fact]
-    public void NeedsRehash_False_For_Current_Default_Hash()
-    {
-        Assert.False(PasswordHash.NeedsRehash(PasswordHash.Create("x"), PasswordHashOptions.Default));
-    }
-
-    [Fact]
-    public void NeedsRehash_True_For_Fewer_Iterations()
-    {
-        var weaker = PasswordHash.Create("x", new PasswordHashOptions { Iterations = 50_000 });
-
-        Assert.True(PasswordHash.NeedsRehash(weaker, PasswordHashOptions.Default)); // default is 100,000
-    }
-
-    [Fact]
-    public void NeedsRehash_True_For_Different_Algorithm_And_Hash_Still_Verifies()
-    {
+        // The format is self-describing, so a hash created with a different PRF still verifies.
         var sha512 = PasswordHash.Create("x", new PasswordHashOptions { Algorithm = HashAlgorithmName.SHA512 });
 
-        Assert.True(PasswordHash.NeedsRehash(sha512, PasswordHashOptions.Default)); // default is SHA-256
-        Assert.Equal(PasswordVerificationResult.Success, PasswordHash.Verify("x", sha512));
-    }
-
-    [Fact]
-    public void NeedsRehash_True_For_Malformed_Hash()
-    {
-        Assert.True(PasswordHash.NeedsRehash("garbage", PasswordHashOptions.Default));
+        Assert.True(PasswordHash.Verify("x", sha512));
     }
 
     [Fact]

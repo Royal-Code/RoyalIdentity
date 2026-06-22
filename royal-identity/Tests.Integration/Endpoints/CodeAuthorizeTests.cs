@@ -379,7 +379,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     public async Task Get_WithImplicitResourceIndicatorAndNoApiScope_ShouldReturnAccessToken()
     {
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"implicit-resource-client-{suffix}";
         storage.GetDemoRealmStore().Clients[clientId] = new Client
         {
@@ -425,7 +425,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
         // ADR-012 (l.91): id_token-only requests are restricted to identity scopes. A resource indicator
         // pulls in a resource server, which is not allowed for response_type=id_token only.
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"id-token-resource-client-{suffix}";
         storage.GetDemoRealmStore().Clients[clientId] = new Client
         {
@@ -469,7 +469,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
         // (caught at ResourcesValidator, before login).
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var store = storage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
 
         var firstServer = $"signing-a-{suffix}";
         var firstScope = $"{firstServer}:read";

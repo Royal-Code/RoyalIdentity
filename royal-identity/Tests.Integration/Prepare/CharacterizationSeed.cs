@@ -1,5 +1,4 @@
 using RoyalIdentity.Models;
-using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Security.Passwords;
 using RoyalIdentity.Users;
 using System.Security.Claims;

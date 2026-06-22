@@ -3,9 +3,8 @@ using System.Security.Cryptography;
 namespace RoyalIdentity.Security.Passwords;
 
 /// <summary>
-/// Parameters for creating PBKDF2 password hashes and for deciding whether a stored hash needs rehashing.
-/// The defaults define the current project baseline (PBKDF2-HMAC-SHA256, 100,000 iterations, 16-byte salt,
-/// 32-byte output), so current-format hashes are not flagged for rehash solely due to a parameter change.
+/// Parameters for creating PBKDF2 password hashes. The defaults define the current project baseline
+/// (PBKDF2-HMAC-SHA256, 100,000 iterations, 16-byte salt, 32-byte output).
 /// </summary>
 public sealed class PasswordHashOptions
 {

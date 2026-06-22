@@ -3,6 +3,7 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Options;
+using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 
@@ -92,7 +93,7 @@ public class DefaultBackChannelLogoutNotifier : IBackChannelLogoutNotifier
                 new(JwtRegisteredClaimNames.Sub, request.Subject),
                 new(JwtRegisteredClaimNames.Aud, request.ClientId),
                 new(JwtRegisteredClaimNames.Iat, clock.GetUtcNow().ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new(JwtRegisteredClaimNames.Jti, CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex)),
+                new(JwtRegisteredClaimNames.Jti, CryptoRandom.CreateUniqueId(16, OutputFormat.Hex)),
                 new(Jwt.ClaimTypes.Events, json, Server.ClaimValueTypes.Json)
             };
 

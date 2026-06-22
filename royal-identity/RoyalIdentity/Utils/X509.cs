@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using Base64Url = RoyalIdentity.Security.Encoding.Base64Url;
 
 namespace RoyalIdentity.Utils;
 

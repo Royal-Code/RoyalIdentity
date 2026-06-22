@@ -1,10 +1,12 @@
 ﻿// Ignore Spelling: Opuas
 
 using RoyalIdentity.Contexts;
+using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Base64Url = RoyalIdentity.Security.Encoding.Base64Url;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -24,7 +26,7 @@ public class DefaultSessionStateGenerator : ISessionStateGenerator
             origin += ":" + uri.Port;
 
         var opuas = GenerateOpuas(sessionId, principal);
-        var salt = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex);
+        var salt = CryptoRandom.CreateUniqueId(16, OutputFormat.Hex);
 
         var bytes = Encoding.UTF8.GetBytes(clientId + origin + opuas + salt);
         byte[] hash;
