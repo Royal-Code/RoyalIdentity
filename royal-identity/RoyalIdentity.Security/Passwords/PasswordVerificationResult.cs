@@ -13,8 +13,8 @@ public enum PasswordVerificationResult
     Success = 1,
 
     /// <summary>
-    /// The password matched, but the stored hash should be re-created in the current format (e.g. it is in the
-    /// legacy format). Consumers may treat this as success and, optionally, rehash on login.
+    /// The password matched, but the stored hash should be re-created in the current format (for example, after
+    /// a future parameter upgrade). Consumers may treat this as success and, optionally, rehash on login.
     /// </summary>
     SuccessRehashNeeded = 2
 }

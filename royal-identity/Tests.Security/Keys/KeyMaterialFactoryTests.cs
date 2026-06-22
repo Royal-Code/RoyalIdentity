@@ -46,21 +46,28 @@ public class KeyMaterialFactoryTests
     }
 
     [Theory]
-    [InlineData(SecurityAlgorithms.HmacSha256)]
-    [InlineData(SecurityAlgorithms.HmacSha384)]
-    [InlineData(SecurityAlgorithms.HmacSha512)]
-    public void Create_Hmac_Produces_Materializable_Key(string algorithm)
+    [InlineData(SecurityAlgorithms.HmacSha256, 32)]
+    [InlineData(SecurityAlgorithms.HmacSha384, 48)]
+    [InlineData(SecurityAlgorithms.HmacSha512, 64)]
+    public void Create_Hmac_Produces_Algorithm_Appropriate_Signing_Key(string algorithm, int expectedKeySizeInBytes)
     {
         // Regression: the original core factory marked HMAC keys as KeyEncoding.Plain while storing a
         // Base64 value, which made CreateSymmetricSecurityKey throw. The generic factory fixes this by
-        // marking the encoding Base64 so the key actually materializes.
+        // marking the encoding Base64 and sizing key material according to the HMAC algorithm.
         var keyParameters = KeyMaterialFactory.Create(algorithm);
 
         Assert.Equal(KeySerializationFormat.None, keyParameters.Format);
         Assert.Equal(KeyEncoding.Base64, keyParameters.Encoding);
 
         var symmetricKey = keyParameters.CreateSymmetricSecurityKey();
-        Assert.Equal(32, symmetricKey.Key.Length);
+        Assert.Equal(expectedKeySizeInBytes, symmetricKey.Key.Length);
+
+        var data = System.Text.Encoding.UTF8.GetBytes("hmac-data");
+        using var signer = new SymmetricSignatureProvider(symmetricKey, algorithm);
+        var signature = signer.Sign(data);
+
+        using var verifier = new SymmetricSignatureProvider(symmetricKey, algorithm);
+        Assert.True(verifier.Verify(data, signature));
     }
 
     [Fact]

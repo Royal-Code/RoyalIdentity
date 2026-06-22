@@ -1,5 +1,7 @@
 ﻿using HtmlAgilityPack;
+using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Models;
 using RoyalIdentity.Responses.HttpResults;
 using RoyalIdentity.Utils;
 using System.Net;
@@ -97,6 +99,78 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         Assert.NotNull(tokenEndpointParameters.RefreshToken);
         Assert.NotNull(tokenEndpointParameters.IdentityToken);
         Assert.NotNull(tokenEndpointParameters.Scope);
+    }
+
+    [Fact]
+    public async Task Login_WithPlainPkce_WhenClientAllowsPlain_MustGenerateToken()
+    {
+        var client = factory.CreateClient();
+        var storage = factory.Services.GetRequiredService<MemoryStorage>();
+        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var clientId = $"plain-pkce-client-{suffix}";
+        var redirectUri = $"{client.BaseAddress}callback";
+
+        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        {
+            Realm = MemoryStorage.DemoRealm,
+            Id = clientId,
+            Name = "Plain PKCE Client",
+            RequireClientSecret = false,
+            RequirePkce = true,
+            AllowPlainTextPkce = true,
+            AllowedIdentityScopes = { "openid", "profile" },
+            AllowedResponseTypes = { "code" },
+            RedirectUris = { redirectUri }
+        };
+
+        var codeVerifier = CryptoRandom.CreateUniqueId();
+        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+            .AddQueryString("client_id", clientId)
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile")
+            .AddQueryString("redirect_uri", redirectUri)
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", codeVerifier)
+            .AddQueryString("code_challenge_method", Oidc.CodeChallenge.Methods.Plain);
+
+        var loginPage = await client.GetAsync(path);
+        var content = await loginPage.Content.ReadAsStringAsync();
+        var doc = new HtmlDocument();
+        doc.LoadHtml(content);
+        var form = doc.DocumentNode.SelectSingleNode("//form");
+        var formAction = new FormAction(client, form)
+            .SetValue("Input.Username", "alice")
+            .SetValue("Input.Password", "alice");
+
+        var response = await formAction.SubmitAsync();
+        var json = await response.Content.ReadAsStringAsync();
+        var callbackData = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(callbackData);
+        Assert.Contains("code", callbackData.Keys);
+
+        var tokenContent = new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "authorization_code",
+                ["code"] = callbackData["code"],
+                ["client_id"] = clientId,
+                ["redirect_uri"] = redirectUri,
+                ["code_verifier"] = codeVerifier
+            });
+
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var tokenResponse = await client.PostAsync(tokenUrl, tokenContent);
+        var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, tokenResponse.StatusCode);
+
+        var tokenEndpointParameters = JsonSerializer.Deserialize<TokenEndpointParameters>(tokenJson);
+        Assert.NotNull(tokenEndpointParameters);
+        Assert.NotNull(tokenEndpointParameters.AccessToken);
+        Assert.NotNull(tokenEndpointParameters.IdentityToken);
     }
 
     [Fact]

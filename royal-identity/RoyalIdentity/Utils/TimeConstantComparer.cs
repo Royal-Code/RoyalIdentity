@@ -1,10 +1,11 @@
-using System.Runtime.CompilerServices;
+using FixedTimeComparer = RoyalIdentity.Security.Cryptography.FixedTimeComparer;
 
 namespace RoyalIdentity.Utils;
 
 /// <summary>
 /// Helper class to do equality checks without leaking timing information
 /// </summary>
+[Obsolete("Use RoyalIdentity.Security.Cryptography.FixedTimeComparer instead. This shim will be removed in Phase 7.")]
 public static class TimeConstantComparer
 {
     /// <summary>
@@ -15,6 +16,5 @@ public static class TimeConstantComparer
     /// <returns>
     /// 	<c>true</c> if the specified strings are equal; otherwise, <c>false</c>.
     /// </returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsEqual(string s1, string s2) => s1.AsSpan().SequenceEqual(s2.AsSpan());
+    public static bool IsEqual(string s1, string s2) => FixedTimeComparer.IsEqualUtf8(s1, s2);
 }

@@ -5,8 +5,8 @@ using RoyalIdentity.Security.Cryptography;
 namespace RoyalIdentity.Security.Passwords;
 
 /// <summary>
-/// Reusable PBKDF2 password hashing with a versioned, self-describing format and backward compatibility with
-/// the legacy <c>$PBKDF2$.{salt}.{hash}</c> format. All methods are stateless and thread-safe.
+/// Reusable PBKDF2 password hashing with a versioned, self-describing format. All methods are stateless and
+/// thread-safe.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -25,12 +25,6 @@ public static class PasswordHash
     private const string Scheme = "RIPWD";
     private const string CurrentVersion = "1";
     private const string Pbkdf2Prefix = "PBKDF2-";
-
-    // Legacy format produced by RoyalIdentity/Utils/PasswordHash.cs (PBKDF2-HMAC-SHA256, 100k iterations,
-    // 16-byte salt, 32-byte hash). Kept verifiable; such hashes are reported as SuccessRehashNeeded.
-    private const string LegacyPrefix = "$PBKDF2$.";
-    private const int LegacyIterations = 100_000;
-    private static readonly HashAlgorithmName LegacyAlgorithm = HashAlgorithmName.SHA256;
 
     /// <summary>Creates a hash for <paramref name="password"/> using the default options.</summary>
     public static string Create(string password) => Create(password, PasswordHashOptions.Default);
@@ -58,33 +52,27 @@ public static class PasswordHash
 
     /// <summary>
     /// Verifies <paramref name="password"/> against <paramref name="storedHash"/>. Returns
-    /// <see cref="PasswordVerificationResult.SuccessRehashNeeded"/> for a matching legacy hash,
-    /// <see cref="PasswordVerificationResult.Success"/> for a matching current hash, and
-    /// <see cref="PasswordVerificationResult.Failed"/> otherwise (including malformed input — never throws).
+    /// <see cref="PasswordVerificationResult.Success"/> for a matching current hash and
+    /// <see cref="PasswordVerificationResult.Failed"/> otherwise (including malformed or unrecognized input — never throws).
     /// </summary>
     public static PasswordVerificationResult Verify(string password, string storedHash)
     {
         if (password is null || string.IsNullOrEmpty(storedHash))
             return PasswordVerificationResult.Failed;
 
-        return storedHash.StartsWith(LegacyPrefix, StringComparison.Ordinal)
-            ? VerifyLegacy(password, storedHash)
-            : VerifyCurrent(password, storedHash);
+        return VerifyCurrent(password, storedHash);
     }
 
     /// <summary>
     /// Returns <see langword="true"/> if <paramref name="storedHash"/> is not in the format described by
-    /// <paramref name="options"/> (legacy format, weaker iteration count, different algorithm/sizes, or
-    /// malformed) and should therefore be re-created. Rehash-on-login orchestration is the consumer's concern.
+    /// <paramref name="options"/> (weaker iteration count, different algorithm/sizes, or malformed/unrecognized)
+    /// and should therefore be re-created. Rehash-on-login orchestration is the consumer's concern.
     /// </summary>
     public static bool NeedsRehash(string storedHash, PasswordHashOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         if (string.IsNullOrEmpty(storedHash))
-            return true;
-
-        if (storedHash.StartsWith(LegacyPrefix, StringComparison.Ordinal))
             return true;
 
         if (!TryParseCurrent(storedHash, out var parsed))
@@ -94,24 +82,6 @@ public static class PasswordHash
             || parsed.Iterations < options.Iterations
             || parsed.Hash.Length != options.HashSize
             || parsed.Salt.Length != options.SaltSize;
-    }
-
-    private static PasswordVerificationResult VerifyLegacy(string password, string storedHash)
-    {
-        var parts = storedHash[LegacyPrefix.Length..].Split('.');
-        if (parts.Length is not 2
-            || !TryFromBase64(parts[0], out var salt)
-            || !TryFromBase64(parts[1], out var expected)
-            || expected.Length is 0)
-        {
-            return PasswordVerificationResult.Failed;
-        }
-
-        var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, LegacyIterations, LegacyAlgorithm, expected.Length);
-
-        return CryptographicOperations.FixedTimeEquals(actual, expected)
-            ? PasswordVerificationResult.SuccessRehashNeeded
-            : PasswordVerificationResult.Failed;
     }
 
     private static PasswordVerificationResult VerifyCurrent(string password, string storedHash)

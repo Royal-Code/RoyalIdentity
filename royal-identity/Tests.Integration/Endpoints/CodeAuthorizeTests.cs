@@ -366,7 +366,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             .AddQueryString("scope", "openid profile")
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-            .AddQueryString("code_challenge_method", "Plain");
+            .AddQueryString("code_challenge_method", Oidc.CodeChallenge.Methods.Plain);
 
         // Act
         var response = await client.GetAsync(path);

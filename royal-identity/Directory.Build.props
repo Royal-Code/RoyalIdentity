@@ -11,14 +11,14 @@
 	<PropertyGroup>
 		<AspVer>10.0.0</AspVer>
 		<ExtVer>10.0.0</ExtVer>
-		<IdVer>8.14.0</IdVer>
+		<IdVer>8.19.1</IdVer>
 	</PropertyGroup>
 	<!-- RoyalCode library versions for the UserAccounts module family (validated on net10.0, plan v2 Fase 3). -->
 	<PropertyGroup>
 		<RcDomainVer>0.8.1</RcDomainVer>
 		<RcSmartCommandsVer>0.0.9</RcSmartCommandsVer>
-		<RcSmartCommandsWorkContextVer>0.0.6</RcSmartCommandsWorkContextVer>
-		<RcSmartSearchVer>0.10.1</RcSmartSearchVer>
+		<RcSmartCommandsWorkContextVer>0.0.9</RcSmartCommandsWorkContextVer>
+		<RcSmartSearchVer>0.10.2</RcSmartSearchVer>
 		<RcSmartSelectorVer>0.4.0</RcSmartSelectorVer>
 		<RcWorkContextVer>0.8.9</RcWorkContextVer>
 	</PropertyGroup>

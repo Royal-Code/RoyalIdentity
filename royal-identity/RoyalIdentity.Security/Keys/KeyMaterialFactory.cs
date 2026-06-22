@@ -87,7 +87,7 @@ public static class KeyMaterialFactory
             case SecurityAlgorithms.HmacSha384:
             case SecurityAlgorithms.HmacSha512:
 
-                byte[] bytes = new byte[32];
+                byte[] bytes = new byte[GetHmacKeySizeInBytes(algorithm)];
                 RandomNumberGenerator.Fill(bytes);
                 key = Convert.ToBase64String(bytes);
 
@@ -109,6 +109,17 @@ public static class KeyMaterialFactory
         }
 
         return keyParameters;
+    }
+
+    private static int GetHmacKeySizeInBytes(string algorithm)
+    {
+        return algorithm switch
+        {
+            SecurityAlgorithms.HmacSha256 => 32,
+            SecurityAlgorithms.HmacSha384 => 48,
+            SecurityAlgorithms.HmacSha512 => 64,
+            _ => throw new NotSupportedException($"The specified HMAC algorithm '{algorithm}' is not recognized or supported.")
+        };
     }
 
     private static string SerializeRsaToXml(RSAParameters rsaParameters)

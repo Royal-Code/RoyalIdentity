@@ -93,12 +93,12 @@ public class KeyParameters
             case SecurityAlgorithms.HmacSha384:
             case SecurityAlgorithms.HmacSha512:
 
-                byte[] bytes = new byte[32];
+                byte[] bytes = new byte[GetHmacKeySizeInBytes(algorithm)];
                 RandomNumberGenerator.Fill(bytes);
                 key = Convert.ToBase64String(bytes);
 
                 format = KeySerializationFormat.None;
-                encoding = KeyEncoding.Plain;
+                encoding = KeyEncoding.Base64;
 
                 break;
 
@@ -277,6 +277,17 @@ public class KeyParameters
         var xmlSerializer = new XmlSerializer(typeof(RSAParameters));
         xmlSerializer.Serialize(stringWriter, rsaParameters);
         return stringWriter.ToString();
+    }
+
+    private static int GetHmacKeySizeInBytes(string algorithm)
+    {
+        return algorithm switch
+        {
+            SecurityAlgorithms.HmacSha256 => 32,
+            SecurityAlgorithms.HmacSha384 => 48,
+            SecurityAlgorithms.HmacSha512 => 64,
+            _ => throw new NotSupportedException($"The specified HMAC algorithm '{algorithm}' is not recognized or supported.")
+        };
     }
 
     public (SecurityKey, JsonWebKey?) GetValidationKey()

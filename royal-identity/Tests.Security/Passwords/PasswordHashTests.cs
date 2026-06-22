@@ -45,19 +45,18 @@ public class PasswordHashTests
     }
 
     [Fact]
-    public void Verify_Accepts_Legacy_Pbkdf2_Format_As_RehashNeeded()
+    public void Verify_Returns_Failed_For_PreRelease_Pbkdf2_Format()
     {
-        const string password = "legacy-password";
-        var legacy = CreateLegacyHash(password);
+        const string password = "pre-release-password";
+        var preReleaseHash = CreatePreReleasePbkdf2Hash(password);
 
-        Assert.Equal(PasswordVerificationResult.SuccessRehashNeeded, PasswordHash.Verify(password, legacy));
-        Assert.Equal(PasswordVerificationResult.Failed, PasswordHash.Verify("nope", legacy));
+        Assert.Equal(PasswordVerificationResult.Failed, PasswordHash.Verify(password, preReleaseHash));
     }
 
     [Fact]
-    public void NeedsRehash_True_For_Legacy_Hash()
+    public void NeedsRehash_True_For_PreRelease_Pbkdf2_Hash()
     {
-        Assert.True(PasswordHash.NeedsRehash(CreateLegacyHash("x"), PasswordHashOptions.Default));
+        Assert.True(PasswordHash.NeedsRehash(CreatePreReleasePbkdf2Hash("x"), PasswordHashOptions.Default));
     }
 
     [Fact]
@@ -103,9 +102,9 @@ public class PasswordHashTests
         Assert.DoesNotContain(password, PasswordHash.Create(password));
     }
 
-    // Mirrors RoyalIdentity/Utils/PasswordHash.cs: PBKDF2-HMAC-SHA256, 100,000 iterations, 16-byte salt,
-    // 32-byte hash, formatted as "$PBKDF2$.{base64 salt}.{base64 hash}".
-    private static string CreateLegacyHash(string password)
+    // Pre-release format removed before the first final release: PBKDF2-HMAC-SHA256, 100,000 iterations,
+    // 16-byte salt, 32-byte hash, formatted as "$PBKDF2$.{base64 salt}.{base64 hash}".
+    private static string CreatePreReleasePbkdf2Hash(string password)
     {
         var salt = new byte[16];
         RandomNumberGenerator.Fill(salt);
