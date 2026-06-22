@@ -1,15 +1,15 @@
 # Plan: Projeto compartilhado de seguranca (`RoyalIdentity.Security`)
 
-## Status: PLANEJADO - 0 de 8 fases concluidas
+## Status: EM ANDAMENTO - 2 de 8 fases concluidas
 
 ## Progresso
 
-`----------` **0%** - 0 de 8 fases
+`##------` **25%** - 2 de 8 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Esqueleto, solution folders e guardrails de dependencia | Pendente |
-| Fase 2 - Random, Base64Url, hashing basico e comparacao constante | Pendente |
+| Fase 1 - Esqueleto, solution folders e guardrails de dependencia | Concluida |
+| Fase 2 - Random, Base64Url, hashing basico e comparacao constante | Concluida |
 | Fase 3 - Password hashing reutilizavel e compatibilidade legado | Pendente |
 | Fase 4 - Key material, `KeyParameters` e helpers de chaves | Pendente |
 | Fase 5 - Troca no core `RoyalIdentity` | Pendente |
@@ -457,67 +457,78 @@ Guardrails:
 
 ## Fase 1 - Esqueleto, solution folders e guardrails de dependencia
 
-**Estado:** Pendente
+**Estado:** Concluida
 
 ### Tarefas
 
-- [ ] Criar projeto `RoyalIdentity.Security/RoyalIdentity.Security.csproj`.
-- [ ] Remover `FrameworkReference Include="Microsoft.AspNetCore.App"` do projeto.
-- [ ] Adicionar package/reference minimo para `Microsoft.IdentityModel.Tokens` apenas se a Fase 4 precisar.
-- [ ] Criar marker interno/publico simples para testes de arquitetura, se necessario.
-- [ ] Criar projeto `Tests.Security/Tests.Security.csproj`.
-- [ ] Referenciar `RoyalIdentity.Security` no projeto de testes.
-- [ ] Adicionar os projetos na solution.
-- [ ] Colocar `RoyalIdentity.Security` no virtual folder `src`.
-- [ ] Colocar `Tests.Security` no virtual folder `test`.
-- [ ] Estender o projeto existente `Tests.Architecture` (`ModuleBoundaryTests.cs` ja usa `GetReferencedAssemblies()`
+- [x] Criar projeto `RoyalIdentity.Security/RoyalIdentity.Security.csproj`.
+- [x] Remover `FrameworkReference Include="Microsoft.AspNetCore.App"` do projeto.
+- [x] Adicionar package/reference minimo para `Microsoft.IdentityModel.Tokens` apenas se a Fase 4 precisar.
+  (Decisao: **nao** adicionado agora; a condicao so vale na Fase 4, quando entra o key material. Documentado no `.csproj`.)
+- [x] Criar marker interno/publico simples para testes de arquitetura, se necessario. (`SecurityAssemblyMarker` publico.)
+- [x] Criar projeto `Tests.Security/Tests.Security.csproj`.
+- [x] Referenciar `RoyalIdentity.Security` no projeto de testes.
+- [x] Adicionar os projetos na solution.
+- [x] Colocar `RoyalIdentity.Security` no virtual folder `src`.
+- [x] Colocar `Tests.Security` no virtual folder `test`.
+- [x] Estender o projeto existente `Tests.Architecture` (`ModuleBoundaryTests.cs` ja usa `GetReferencedAssemblies()`
   + parsing de `.csproj`; seguir esse mesmo padrao) garantindo:
-  - [ ] `RoyalIdentity.Security` nao referencia `RoyalIdentity`;
-  - [ ] `RoyalIdentity.Security` nao referencia `RoyalIdentity.UserAccounts`;
-  - [ ] `RoyalIdentity.Security` nao referencia `Microsoft.AspNetCore*`;
-  - [ ] `RoyalIdentity.UserAccounts` pode referenciar `RoyalIdentity.Security` sem quebrar a regra de modulo puro.
+  - [x] `RoyalIdentity.Security` nao referencia `RoyalIdentity`; (`SecurityLibrary_DoesNotReference_Core`)
+  - [x] `RoyalIdentity.Security` nao referencia `RoyalIdentity.UserAccounts`; (`SecurityLibrary_DoesNotReference_AnyDomainModule`)
+  - [x] `RoyalIdentity.Security` nao referencia `Microsoft.AspNetCore*`; (`SecurityLibrary_DoesNotDependOn_AspNetCore`)
+  - [x] `RoyalIdentity.UserAccounts` pode referenciar `RoyalIdentity.Security` sem quebrar a regra de modulo puro.
+    (Regra de pureza usa match exato do core; `PureModule_MayReference_SecurityLibrary_WithoutBreakingPurity` trava o invariante.)
 
 ### Resultado da Fase 1
 
 Projetos criados, solution organizada e guardrails prontos antes de qualquer migracao de comportamento.
 
+**Execucao (2026-06-21):** `dotnet test Tests.Security` -> 1/1 verde; `dotnet test Tests.Architecture` -> 14/14 verde
+(10 existentes + 4 novos da fronteira `RoyalIdentity.Security`). Build dos projetos novos sem erros (warnings
+pre-existentes do core apenas). `RoyalIdentity.Security` em `src`, `Tests.Security` em `test`.
+
 ---
 
 ## Fase 2 - Random, Base64Url, hashing basico e comparacao constante
 
-**Estado:** Pendente
+**Estado:** Concluida
 
 ### Tarefas
 
-- [ ] Implementar `CryptoRandom` em `RoyalIdentity.Security`.
-- [ ] Implementar `Base64Url` em `RoyalIdentity.Security`.
-- [ ] Implementar `Hashing` e `HashExtensions` genericos.
-- [ ] Implementar `FixedTimeComparer` usando `CryptographicOperations.FixedTimeEquals`.
-- [ ] Adicionar testes de `CryptoRandom`:
-  - [ ] tamanho em bytes preservado para `CreateRandomKey`;
-  - [ ] `CreateUniqueId` em Base64Url sem padding;
-  - [ ] `CreateUniqueId` em Base64;
-  - [ ] `CreateUniqueId` em Hex;
-  - [ ] `Next` e ranges basicos;
-  - [ ] teste de sanidade de unicidade sem depender de probabilidade fragil.
-- [ ] Adicionar testes de `Base64Url`:
-  - [ ] vetores conhecidos de round-trip;
-  - [ ] inputs com e sem padding;
-  - [ ] input invalido em `Decode` e `TryDecode`.
-- [ ] Adicionar testes de hashing:
-  - [ ] SHA256/SHA512 com vetores conhecidos;
-  - [ ] extensoes retornam o mesmo formato legado esperado;
-  - [ ] left-half hash base64url com algoritmo 256/384/512.
-- [ ] Adicionar testes de `FixedTimeComparer`:
-  - [ ] igualdade verdadeira;
-  - [ ] igualdade falsa;
-  - [ ] tamanhos diferentes;
-  - [ ] comparacao UTF-8;
-  - [ ] comparacao Base64.
+- [x] Implementar `CryptoRandom` em `RoyalIdentity.Security`. (`Cryptography/CryptoRandom.cs` + `OutputFormat`; delega aos APIs estaticos de `RandomNumberGenerator`.)
+- [x] Implementar `Base64Url` em `RoyalIdentity.Security`. (`Encoding/Base64Url.cs`; fachada sobre `System.Buffers.Text.Base64Url`.)
+- [x] Implementar `Hashing` e `HashExtensions` genericos. (`Cryptography/Hashing.cs` + `Cryptography/HashExtensions.cs`.)
+- [x] Implementar `FixedTimeComparer` usando `CryptographicOperations.FixedTimeEquals`. (`Cryptography/FixedTimeComparer.cs`.)
+- [x] Adicionar testes de `CryptoRandom`:
+  - [x] tamanho em bytes preservado para `CreateRandomKey`;
+  - [x] `CreateUniqueId` em Base64Url sem padding;
+  - [x] `CreateUniqueId` em Base64;
+  - [x] `CreateUniqueId` em Hex;
+  - [x] `Next` e ranges basicos;
+  - [x] teste de sanidade de unicidade sem depender de probabilidade fragil.
+- [x] Adicionar testes de `Base64Url`:
+  - [x] vetores conhecidos de round-trip;
+  - [x] inputs com e sem padding;
+  - [x] input invalido em `Decode` e `TryDecode`.
+- [x] Adicionar testes de hashing:
+  - [x] SHA256/SHA512 com vetores conhecidos; (tambem SHA384)
+  - [x] extensoes retornam o mesmo formato legado esperado;
+  - [x] left-half hash base64url com algoritmo 256/384/512. (com vetor `at_hash` do OIDC Core para SHA-256)
+- [x] Adicionar testes de `FixedTimeComparer`:
+  - [x] igualdade verdadeira;
+  - [x] igualdade falsa;
+  - [x] tamanhos diferentes;
+  - [x] comparacao UTF-8;
+  - [x] comparacao Base64.
 
 ### Resultado da Fase 2
 
 Primitivas pequenas existem em `RoyalIdentity.Security` com testes proprios, ainda sem trocar consumidores.
+
+**Execucao (2026-06-21):** `dotnet test Tests.Security` -> 51/51 verde; `dotnet test Tests.Architecture` -> 14/14 verde.
+Ajuste de implementacao: `Base64Url.TryDecode` usa `System.Buffers.Text.Base64Url.IsValid` como guarda, porque o
+`TryDecodeFromChars` da BCL ainda lanca `FormatException` em conteudo invalido (o "Try" cobre so o tamanho do buffer).
+Nenhum consumidor trocado ainda (protocolo aditivo).
 
 ---
 

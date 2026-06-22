@@ -4,6 +4,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Security\RoyalIdentity.Security.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.UserAccounts\RoyalIdentity.UserAccounts.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.UserAccounts.PostgreSql\RoyalIdentity.UserAccounts.PostgreSql.csproj" />

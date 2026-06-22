@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Shared technical library (ADR-016): generic, reusable security primitives
+		(crypto random, Base64Url, hashing, fixed-time comparison, password hashing, key material),
+		added from Phase 2 onward of plan-royalidentity-security.
+
+		Leaf library: MUST NOT reference the IdP core (RoyalIdentity), any domain module, storage,
+		Razor/Server, nor ASP.NET. The global Directory.Build.props adds the Microsoft.AspNetCore.App
+		framework reference to every project, so it is explicitly removed here (same as the pure module).
+		These boundaries are enforced by the architecture tests in Tests.Architecture.
+
+		Microsoft.IdentityModel.Tokens is intentionally NOT referenced yet; it is added in Phase 4 when
+		key material (KeyParameters, SecurityKey helpers) lands.
+	-->
+	<ItemGroup>
+		<FrameworkReference Remove="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+</Project>

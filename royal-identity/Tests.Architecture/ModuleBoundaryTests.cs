@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Xml.Linq;
+using RoyalIdentity.Security;
 using RoyalIdentity.UserAccounts;
 using RoyalIdentity.UserAccounts.Integration;
 using RoyalIdentity.UserAccounts.PostgreSql;
@@ -22,9 +23,11 @@ public class ModuleBoundaryTests
     private static readonly Assembly Integration = typeof(UserAccountsIntegrationMarker).Assembly;
     private static readonly Assembly PostgreSqlProvider = typeof(PostgreSqlProviderMarker).Assembly;
     private static readonly Assembly SqliteProvider = typeof(SqliteProviderMarker).Assembly;
+    private static readonly Assembly SecurityLibrary = typeof(SecurityAssemblyMarker).Assembly; // RoyalIdentity.Security
 
     private const string CoreName = "RoyalIdentity";
     private const string ModulePrefix = "RoyalIdentity.UserAccounts";
+    private const string SecurityName = "RoyalIdentity.Security";
 
     public static TheoryData<string, Assembly> ProviderAssemblies => new()
     {
@@ -45,6 +48,8 @@ public class ModuleBoundaryTests
         var refs = Core.GetReferencedAssemblies(); // sanity: core assembly exists/loads
         Assert.NotEmpty(refs);
 
+        // Exact-name match (not a "RoyalIdentity*" prefix) is deliberate: the pure module may depend on a leaf
+        // technical library such as RoyalIdentity.Security (ADR-016) without that counting as a core dependency.
         var moduleRefs = PureModule.GetReferencedAssemblies().Select(a => a.Name!);
         Assert.DoesNotContain(moduleRefs, n => n == CoreName);
     }
@@ -96,6 +101,38 @@ public class ModuleBoundaryTests
 
         var integrationRefs = Integration.GetReferencedAssemblies().Select(a => a.Name!);
         Assert.Contains(CoreName, integrationRefs);
+    }
+
+    [Fact]
+    public void SecurityLibrary_DoesNotReference_Core()
+    {
+        var refs = SecurityLibrary.GetReferencedAssemblies().Select(a => a.Name!);
+        Assert.DoesNotContain(refs, n => n == CoreName);
+    }
+
+    [Fact]
+    public void SecurityLibrary_DoesNotReference_AnyDomainModule()
+    {
+        var refs = SecurityLibrary.GetReferencedAssemblies().Select(a => a.Name!);
+        Assert.DoesNotContain(refs, n => n.StartsWith(ModulePrefix, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SecurityLibrary_DoesNotDependOn_AspNetCore()
+    {
+        var refs = SecurityLibrary.GetReferencedAssemblies().Select(a => a.Name!);
+        Assert.DoesNotContain(refs, n => n.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PureModule_MayReference_SecurityLibrary_WithoutBreakingPurity()
+    {
+        // The security library is a leaf technical library (ADR-016), distinct from the IdP core and from
+        // ASP.NET. The pure-module purity rules forbid only the exact core assembly and the ASP.NET prefix,
+        // so a future RoyalIdentity.UserAccounts -> RoyalIdentity.Security edge (plan Fase 6) stays legal.
+        // This locks that invariant before the reference exists.
+        Assert.NotEqual(CoreName, SecurityName);
+        Assert.False(SecurityName.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
     }
 
     [Fact]
