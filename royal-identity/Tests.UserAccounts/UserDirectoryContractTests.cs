@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
+using RoyalIdentity.Security.Passwords;
 using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Storage.InMemory.Extensions;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
@@ -16,7 +17,6 @@ using RoyalIdentity.UserAccounts.Sqlite;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
-using RoyalIdentity.Utils;
 
 namespace Tests.UserAccounts;
 

@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using RoyalIdentity.Security.Passwords;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Defaults;
-using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Users;

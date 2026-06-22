@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using RoyalIdentity.Security.Cryptography;
 
 namespace RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 
@@ -11,11 +11,5 @@ public sealed class DefaultSubjectIdGenerator : ISubjectIdGenerator
 
 	/// <inheritdoc />
 	public string NewSubjectId()
-	{
-		var bytes = RandomNumberGenerator.GetBytes(ByteLength);
-		return Convert.ToBase64String(bytes)
-			.TrimEnd('=')
-			.Replace('+', '-')
-			.Replace('/', '_');
-	}
+		=> CryptoRandom.CreateUniqueId(ByteLength, OutputFormat.Base64Url);
 }

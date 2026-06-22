@@ -6,11 +6,14 @@ using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Scopes;
-using RoyalIdentity.Utils;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Tests.Integration.Prepare;
+using CryptoRandom = RoyalIdentity.Security.Cryptography.CryptoRandom;
+using Hashing = RoyalIdentity.Security.Cryptography.Hashing;
+using OutputFormat = RoyalIdentity.Security.Cryptography.OutputFormat;
+using PasswordHash = RoyalIdentity.Security.Passwords.PasswordHash;
 using RealmModel = RoyalIdentity.Models.Realm;
 
 namespace Tests.Integration.Endpoints;
@@ -159,7 +162,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
         using var scope = factory.Services.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IRealmManager>();
         var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
-        var suffix = CryptoRandom.CreateUniqueId(6, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(6, OutputFormat.Hex);
         var realm = await manager.CreateAsync($"signing-{suffix}", $"signing-{suffix}.test", $"Signing {suffix}");
 
         realm.Options.Keys.MainSigningCredentialsAlgorithm = SecurityAlgorithms.EcdsaSha256;
@@ -180,7 +183,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
 
     private string AddResourceServer(RealmModel realm, string name, IEnumerable<string> signingAlgorithms)
     {
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"{name}-{suffix}";
         var scopeName = $"{serverName}:read";
         var server = new ResourceServer(ScopeVisibility.Public, serverName, $"{name} API", $"{name} API")
@@ -215,7 +218,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
         IEnumerable<string>? allowedIdentityScopes = null,
         Action<Client>? configureClient = null)
     {
-        var clientId = $"client-{CryptoRandom.CreateUniqueId(6, CryptoRandom.OutputFormat.Hex)}";
+        var clientId = $"client-{CryptoRandom.CreateUniqueId(6, OutputFormat.Hex)}";
         var client = new Client
         {
             Realm = realm,
@@ -223,7 +226,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
             Name = $"Client {clientId}",
             RequireClientSecret = true,
             AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret($"{clientId}-secret".Sha512()) },
+            ClientSecrets = { new ClientSecret(Hashing.Sha512Base64($"{clientId}-secret")) },
         };
 
         foreach (var scope in allowedScopes)

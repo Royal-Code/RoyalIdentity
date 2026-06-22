@@ -1,6 +1,7 @@
 using RoyalIdentity.Models;
+using RoyalIdentity.Security.Cryptography;
+using RoyalIdentity.Security.Passwords;
 using RoyalIdentity.Users;
-using RoyalIdentity.Utils;
 using System.Security.Claims;
 
 namespace Tests.Integration.Prepare;

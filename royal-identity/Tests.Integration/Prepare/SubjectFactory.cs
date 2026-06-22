@@ -1,7 +1,7 @@
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users;
-using RoyalIdentity.Utils;
+using RoyalIdentity.Security.Cryptography;
 using System.Security.Claims;
 
 namespace Tests.Integration.Prepare;

@@ -129,10 +129,12 @@ public class ModuleBoundaryTests
     {
         // The security library is a leaf technical library (ADR-016), distinct from the IdP core and from
         // ASP.NET. The pure-module purity rules forbid only the exact core assembly and the ASP.NET prefix,
-        // so a future RoyalIdentity.UserAccounts -> RoyalIdentity.Security edge (plan Fase 6) stays legal.
-        // This locks that invariant before the reference exists.
+        // so the RoyalIdentity.UserAccounts -> RoyalIdentity.Security edge (plan Fase 6) is legal.
         Assert.NotEqual(CoreName, SecurityName);
         Assert.False(SecurityName.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
+
+        var refs = PureModule.GetReferencedAssemblies().Select(a => a.Name!);
+        Assert.Contains(SecurityName, refs);
     }
 
     [Fact]

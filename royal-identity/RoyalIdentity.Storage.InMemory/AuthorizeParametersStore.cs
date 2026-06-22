@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Utils;
+using RoyalIdentity.Security.Cryptography;
 
 namespace RoyalIdentity.Storage.InMemory;
 
