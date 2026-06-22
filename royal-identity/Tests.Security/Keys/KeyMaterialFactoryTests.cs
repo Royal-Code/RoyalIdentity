@@ -1,7 +1,6 @@
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Security.Keys;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Tests.Security.Keys;
 
@@ -22,7 +21,7 @@ public class KeyMaterialFactoryTests
         var rsaKey = keyParameters.CreateRsaSecurityKey();
         Assert.Equal(PrivateKeyStatus.Exists, rsaKey.PrivateKeyStatus);
 
-        var data = Encoding.UTF8.GetBytes("data");
+        var data = System.Text.Encoding.UTF8.GetBytes("data");
         var sig = rsaKey.Rsa!.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         Assert.True(rsaKey.Rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
     }
@@ -41,7 +40,7 @@ public class KeyMaterialFactoryTests
         var ecKey = keyParameters.CreateECDsaSecurityKey();
         Assert.NotNull(ecKey.ECDsa);
 
-        var data = Encoding.UTF8.GetBytes("data");
+        var data = System.Text.Encoding.UTF8.GetBytes("data");
         var sig = ecKey.ECDsa!.SignData(data, HashAlgorithmName.SHA256);
         Assert.True(ecKey.ECDsa.VerifyData(data, sig, HashAlgorithmName.SHA256));
     }

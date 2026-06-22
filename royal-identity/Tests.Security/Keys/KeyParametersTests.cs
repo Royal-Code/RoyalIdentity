@@ -1,7 +1,6 @@
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Security.Keys;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Xml.Serialization;
 
@@ -82,7 +81,7 @@ public class KeyParametersTests
         var signingKey = keyParameters.CreateRsaSecurityKey();
         var verificationKey = keyParameters.CreateRsaSecurityKey();
 
-        var data = Encoding.UTF8.GetBytes("Test Data");
+        var data = System.Text.Encoding.UTF8.GetBytes("Test Data");
         var signature = signingKey.Rsa!.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
         Assert.True(verificationKey.Rsa!.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
@@ -138,7 +137,7 @@ public class KeyParametersTests
         var signingKey = keyParameters.CreateECDsaSecurityKey();
         var verificationKey = keyParameters.CreateECDsaSecurityKey();
 
-        var data = Encoding.UTF8.GetBytes("Test Data");
+        var data = System.Text.Encoding.UTF8.GetBytes("Test Data");
         var signature = signingKey.ECDsa!.SignData(data, HashAlgorithmName.SHA256);
 
         Assert.True(verificationKey.ECDsa!.VerifyData(data, signature, HashAlgorithmName.SHA256));
@@ -193,7 +192,7 @@ public class KeyParametersTests
 
         var key = keyParameters.CreateSymmetricSecurityKey();
 
-        var data = Encoding.UTF8.GetBytes("Test Data");
+        var data = System.Text.Encoding.UTF8.GetBytes("Test Data");
         using var hmac = new HMACSHA256(key.Key);
         var signature = hmac.ComputeHash(data);
 
