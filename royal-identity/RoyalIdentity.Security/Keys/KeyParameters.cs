@@ -195,11 +195,9 @@ public class KeyParameters
             var ecKey = CreateECDsaSecurityKey();
             key = ecKey;
 
-            // if ecKey has a private key, we need to convert it to a public key
-            if (ecKey.PrivateKeyStatus == PrivateKeyStatus.Exists)
-            {
-                ecKey = ecKey.WithoutPrivateKey();
-            }
+            // ECDsaSecurityKey.PrivateKeyStatus returns Unknown on Linux even for keys with private
+            // material, so we always attempt to strip — WithoutPrivateKey is a no-op when already public.
+            ecKey = ecKey.WithoutPrivateKey();
 
             // generate the JWK from the EC key
             jwk = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(ecKey);
