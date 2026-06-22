@@ -705,23 +705,43 @@ O core usa `RoyalIdentity.Security` para primitivas, mas conserva regras OIDC, r
 
 ## Fase 6 - Troca em `UserAccounts`, fake in-memory e testes de borda
 
-**Estado:** Pendente
+**Estado:** Concluida
 
 ### Tarefas
 
-- [ ] Adicionar referencia de `RoyalIdentity.UserAccounts` para `RoyalIdentity.Security`.
-- [ ] Trocar `DefaultSubjectIdGenerator` para chamar `CryptoRandom.CreateUniqueId(32, Base64Url)`.
-- [ ] Garantir que o modulo puro continua sem referencia ao core e sem ASP.NET.
-- [ ] Atualizar `RoyalIdentity.Storage.InMemory` para usar `RoyalIdentity.Security` onde ainda usa utilitarios do core.
-- [ ] Atualizar seeds do fake/in-memory que criam password hashes.
-- [ ] Confirmar que `PasswordProtectorAccountHasher` continua apenas como adapter de borda, sem mover para
+- [x] Adicionar referencia de `RoyalIdentity.UserAccounts` para `RoyalIdentity.Security`.
+- [x] Trocar `DefaultSubjectIdGenerator` para chamar `CryptoRandom.CreateUniqueId(32, Base64Url)`.
+- [x] Garantir que o modulo puro continua sem referencia ao core e sem ASP.NET.
+- [x] Atualizar `RoyalIdentity.Storage.InMemory` para usar `RoyalIdentity.Security` onde ainda usa utilitarios do core.
+  (Verificacao: nao ha mais `using RoyalIdentity.Utils` em `RoyalIdentity.Storage.InMemory`.)
+- [x] Atualizar seeds do fake/in-memory que criam password hashes.
+  (Verificacao: seeds e fixtures afetados usam `RoyalIdentity.Security.Passwords`.)
+- [x] Confirmar que `PasswordProtectorAccountHasher` continua apenas como adapter de borda, sem mover para
   `RoyalIdentity.Security`.
-- [ ] Rodar/ajustar testes de `Tests.UserAccounts` ligados a `SubjectId`, autenticacao local e contract tests.
-- [ ] Rodar/ajustar testes de integracao que usam PKCE, secrets e tokens.
+  (Verificacao: `RoyalIdentity.UserAccounts.Integration/PasswordProtectorAccountHasher.cs` continua ponte para `IPasswordProtector`.)
+- [x] Rodar/ajustar testes de `Tests.UserAccounts` ligados a `SubjectId`, autenticacao local e contract tests.
+  (`Tests.UserAccounts` -> 91/91 verde.)
+- [x] Rodar/ajustar testes de integracao que usam PKCE, secrets e tokens.
+  (Suites focadas -> 143/143 verde: autenticacao local, subject id, login/consent UI, code/token/refresh,
+  client secrets e signing algorithms.)
 
 ### Resultado da Fase 6
 
 Core, modulo puro e fake deixam de duplicar primitivas e passam a consumir a mesma biblioteca reutilizavel.
+
+**Build Status:** PASSED (2026-06-22 ~10:44) - 38 avisos pre-existentes, sem erros introduzidos.
+
+**Mudancas principais:**
+- `RoyalIdentity.UserAccounts`: Referência para `RoyalIdentity.Security` adicionada; `DefaultSubjectIdGenerator` usa `CryptoRandom.CreateUniqueId`.
+- `RoyalIdentity.Storage.InMemory`: 2 arquivos migraram de `RoyalIdentity.Utils` para `RoyalIdentity.Security.*`.
+- `Tests.UserAccounts`, `Tests.Integration`: Imports atualizados com type aliases para evitar ambiguidade.
+- `Tests.Architecture/ModuleBoundaryTests.cs`: Teste atualizado para validar aresta legal `UserAccounts -> Security`.
+
+**Execucao (2026-06-22):**
+- `dotnet build RoyalIdentity.sln` -> build verde.
+- `Tests.UserAccounts` -> 91/91 verde.
+- Suites focadas de `Tests.Integration` -> 143/143 verde.
+- `ModuleBoundaryTests` -> 12/12 verde.
 
 ---
 
