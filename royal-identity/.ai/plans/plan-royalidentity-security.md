@@ -1,17 +1,17 @@
 # Plan: Projeto compartilhado de seguranca (`RoyalIdentity.Security`)
 
-## Status: EM ANDAMENTO - 3 de 8 fases concluidas
+## Status: EM ANDAMENTO - 4 de 8 fases concluidas
 
 ## Progresso
 
-`###-----` **37%** - 3 de 8 fases
+`####----` **50%** - 4 de 8 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Esqueleto, solution folders e guardrails de dependencia | Concluida |
 | Fase 2 - Random, Base64Url, hashing basico e comparacao constante | Concluida |
 | Fase 3 - Password hashing reutilizavel e compatibilidade legado | Concluida |
-| Fase 4 - Key material, `KeyParameters` e helpers de chaves | Pendente |
+| Fase 4 - Key material, `KeyParameters` e helpers de chaves | Concluida |
 | Fase 5 - Troca no core `RoyalIdentity` | Pendente |
 | Fase 6 - Troca em `UserAccounts`, fake in-memory e testes de borda | Pendente |
 | Fase 7 - Remocao de duplicacoes e shims temporarios | Pendente |
@@ -572,7 +572,7 @@ cruzada definitiva core->lib (hash criado pelo `PasswordHash` legado, verificado
 
 ## Fase 4 - Key material, `KeyParameters` e helpers de chaves
 
-**Estado:** Pendente
+**Estado:** Concluida
 
 ### Tarefas
 
@@ -580,34 +580,65 @@ cruzada definitiva core->lib (hash criado pelo `PasswordHash` legado, verificado
 > Antes da Fase 4, reconciliar a edicao em andamento de `RoyalIdentity/Models/Keys/KeyParameters.cs` (ver Riscos),
 > para que a copia adicionada parta do estado correto.
 
-- [ ] Adicionar `KeyEncoding` em `RoyalIdentity.Security` (original permanece ate a Fase 7).
-- [ ] Adicionar `KeySerializationFormat` em `RoyalIdentity.Security`.
-- [ ] Adicionar `ECKeyHelper` em `RoyalIdentity.Security`.
-- [ ] Adicionar `SecurityKeyExtensions` em `RoyalIdentity.Security`.
-- [ ] Adicionar `KeyParameters` em `RoyalIdentity.Security` sem dependencia de `RoyalIdentity.Options.KeyOptions`.
-- [ ] Criar factory generica para key material quando nao couber no construtor de `KeyParameters`.
-- [ ] Decidir e implementar o destino de `ValidationKeysInfo`.
-- [ ] Decidir e registrar no plano: mover `X509CertificateExtensions.CreateThumbprintCnf()` (se puramente tecnico e
-  testavel com certificado em memoria) ou manter no core.
-- [ ] Decidir e registrar no plano: mover o helper fluente `X509` de busca em certificate stores (so se nao exigir
-  store do SO / nao fragilizar CI) ou manter no core.
-- [ ] Migrar testes existentes de `Tests.Identity/Keys/KeyParametersTests.cs` para `Tests.Security`.
-- [ ] Adicionar novos testes:
-  - [ ] RSA XML round-trip;
-  - [ ] RSA JSON round-trip;
-  - [ ] RSA assina e verifica;
-  - [ ] ECDsa XML round-trip;
-  - [ ] ECDsa JSON round-trip;
-  - [ ] ECDsa assina e verifica;
-  - [ ] symmetric key Base64 round-trip;
-  - [ ] symmetric key Hex round-trip;
-  - [ ] `WithoutPrivateKey` remove material privado e preserva `KeyId`;
-  - [ ] `GetValidationKey` gera JWK publico sem material privado;
-  - [ ] algoritmo nao suportado falha explicitamente.
+- [x] Adicionar `KeyEncoding` em `RoyalIdentity.Security` (original permanece ate a Fase 7). (`Keys/KeyEncoding.cs`.)
+- [x] Adicionar `KeySerializationFormat` em `RoyalIdentity.Security`. (`Keys/KeySerializationFormat.cs`.)
+- [x] Adicionar `ECKeyHelper` em `RoyalIdentity.Security`. (`Keys/ECKeyHelper.cs`; copia fiel, mesma forma XML/JSON.)
+- [x] Adicionar `SecurityKeyExtensions` em `RoyalIdentity.Security`. (`Keys/SecurityKeyExtensions.cs`; `WithoutPrivateKey` RSA/EC.)
+- [x] Adicionar `KeyParameters` em `RoyalIdentity.Security` sem dependencia de `RoyalIdentity.Options.KeyOptions`.
+  (`Keys/KeyParameters.cs`; sem o `Create(KeyOptions...)`; `GetValidationKey` agora retorna tupla nomeada `(Key, JsonWebKey)`.)
+- [x] Criar factory generica para key material quando nao couber no construtor de `KeyParameters`.
+  (`Keys/KeyMaterialFactory.cs`; `Create(algorithm, lifetime?, rsaKeySizeInBits)` sem `KeyOptions`.)
+- [x] Decidir e implementar o destino de `ValidationKeysInfo`. **Decisao: manter no core.** E o tipo de retorno de
+  `IKeyManager.GetValidationKeysAsync(Realm, ...)` e parametriza `Realm`; e contrato da borda `IKeyManager`, nao um
+  wrapper tecnico puro. Permanece em `RoyalIdentity/Models/Keys/ValidationKeysInfo.cs`.
+- [x] Decidir e registrar no plano: mover `X509CertificateExtensions.CreateThumbprintCnf()`. **Decisao: mover.**
+  E primitiva puramente tecnica (RFC 8705 `x5t#S256`), testavel com certificado self-signed em memoria; ja usa
+  `Base64Url` (disponivel na lib). Movido para `Certificates/X509CertificateExtensions.cs`.
+- [x] Decidir e registrar no plano: mover o helper fluente `X509` de busca em certificate stores. **Decisao: manter
+  no core.** Depende do certificate store do SO (`X509Store`), o que fragilizaria a CI. Permanece em
+  `RoyalIdentity/Utils/X509.cs`.
+- [x] Migrar testes existentes de `Tests.Identity/Keys/KeyParametersTests.cs` para `Tests.Security`.
+  (Removido de `Tests.Identity`; cobertura generica reescrita e ampliada em `Tests.Security/Keys/KeyParametersTests.cs`.
+  O `KeyParameters` do core continua exercitado indiretamente por `Tests.Integration/SigningAlgorithmTests` via a
+  factory `KeyOptions` ate a remocao na Fase 7.)
+- [x] Adicionar novos testes:
+  - [x] RSA XML round-trip;
+  - [x] RSA JSON round-trip;
+  - [x] RSA assina e verifica;
+  - [x] ECDsa XML round-trip;
+  - [x] ECDsa JSON round-trip;
+  - [x] ECDsa assina e verifica;
+  - [x] symmetric key Base64 round-trip;
+  - [x] symmetric key Hex round-trip;
+  - [x] `WithoutPrivateKey` remove material privado e preserva `KeyId`;
+  - [x] `GetValidationKey` gera JWK publico sem material privado;
+  - [x] algoritmo nao suportado falha explicitamente.
 
 ### Resultado da Fase 4
 
 Material de chaves fica disponivel como componente reutilizavel para IdP e futuro KMS.
+
+**Reconciliacao do WIP:** a arvore de trabalho estava limpa no inicio da fase (nenhuma edicao pendente em
+`KeyParameters.cs`), entao nao houve WIP a reconciliar; a copia adicionada partiu do estado commitado.
+
+**`Microsoft.IdentityModel.Tokens`:** adicionado ao `.csproj` da lib via `$(IdVer)` (8.14.0, compartilhado com o core).
+Nao carrega dependencia de ASP.NET, entao o guardrail `SecurityLibrary_DoesNotDependOn_AspNetCore` continua valido.
+
+**Mudanca de comportamento intencional (HMAC):** a factory original do core marcava chaves HMAC com
+`KeyEncoding.Plain` enquanto guardava o valor em Base64 - como `GetKeyBytes()` lanca para `Plain`, a materializacao
+de chaves HMAC geradas pela factory do core estava latentemente quebrada (nenhum teste cobria esse caminho; os testes
+de HMAC sempre construiram `KeyParameters` com `KeyEncoding.Base64`). A `KeyMaterialFactory` nova corrige isso usando
+`KeyEncoding.Base64`, de modo que a chave HMAC gerada realmente materializa. Coberto por
+`KeyMaterialFactoryTests.Create_Hmac_Produces_Materializable_Key`. Isso so afeta chaves recem-geradas; chaves
+armazenadas nao sao impactadas.
+
+**Verificacao (PENDENTE - sem .NET SDK no ambiente):** este ambiente de execucao remoto **nao tem o .NET SDK**
+instalado e a politica de rede bloqueia a instalacao (403 nos endpoints do dotnet/NuGet), portanto **nao foi possivel
+rodar `dotnet build`/`dotnet test` nesta sessao**. O codigo e os testes foram escritos espelhando os tipos originais
+ja verdes do core e os padroes das Fases 1-3. Antes de fechar formalmente a fase, executar em ambiente com SDK:
+`dotnet build RoyalIdentity.Security`, `dotnet test Tests.Security`, `dotnet test Tests.Architecture` e
+`dotnet test Tests.Identity` (esta ultima para confirmar que a remocao do `KeyParametersTests.cs` migrado nao deixou
+lacuna inesperada). Registrar os resultados aqui apos a execucao.
 
 ---
 
