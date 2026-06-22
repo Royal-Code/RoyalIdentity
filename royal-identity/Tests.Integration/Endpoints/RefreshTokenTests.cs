@@ -280,7 +280,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenRefreshTokenRequestsResourceSubsetWithApiScopes_ShouldDownscopeScopesAndAudience()
     {
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-refresh-with-scope-{suffix}";
         var ordersScope = $"orders:read:{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
@@ -361,7 +361,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     private string AddOrdersResourceServer()
     {
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
 
@@ -387,7 +387,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var storage = factory.Services.GetRequiredService<IStorage>();
         var store = memoryStorage.GetDemoRealmStore();
-        var suffix = CryptoRandom.CreateUniqueId(4, CryptoRandom.OutputFormat.Hex);
+        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"refresh-resource-client-{suffix}";
 
         var allowedResourceServers = store.ResourceServers.Values

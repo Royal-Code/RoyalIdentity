@@ -3,6 +3,7 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
+using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 using RoyalIdentity.Extensions;
@@ -49,7 +50,7 @@ public class DefaultTokenFactory : ITokenFactory
             request.IdentityType,
             ct));
 
-        var jti = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex);
+        var jti = CryptoRandom.CreateUniqueId(16, OutputFormat.Hex);
         if (request.Client.IncludeJwtId)
         {
             claims.Add(new Claim(JwtRegisteredClaimNames.Jti, jti));

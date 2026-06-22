@@ -11,6 +11,10 @@
 
 	<ItemGroup>
 		<Using Include="Xunit" />
+		<!-- Leaf security library (ADR-016): CryptoRandom/OutputFormat/HashExtensions and Base64Url are used
+		     pervasively across the integration suite for test-data generation and PKCE. -->
+		<Using Include="RoyalIdentity.Security.Cryptography" />
+		<Using Include="RoyalIdentity.Security.Encoding" />
 	</ItemGroup>
 
 </Project>

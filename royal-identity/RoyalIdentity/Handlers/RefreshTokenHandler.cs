@@ -10,6 +10,7 @@ using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Utils;
 using System.Security.Claims;
 
@@ -107,7 +108,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         {
             logger.LogDebug("Refreshing access token");
 
-            var jti = CryptoRandom.CreateUniqueId(16, CryptoRandom.OutputFormat.Hex);
+            var jti = CryptoRandom.CreateUniqueId(16, OutputFormat.Hex);
 
             newAccessToken = accessToken.Renew(
                 jti,

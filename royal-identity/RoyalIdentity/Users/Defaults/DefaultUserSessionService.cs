@@ -2,6 +2,7 @@ using System.Security.Claims;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Users.Contracts;
+using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Users.Defaults;

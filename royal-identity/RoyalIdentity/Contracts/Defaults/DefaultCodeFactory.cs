@@ -3,6 +3,7 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Tokens;
+using RoyalIdentity.Security.Cryptography;
 
 namespace RoyalIdentity.Contracts.Defaults;
 

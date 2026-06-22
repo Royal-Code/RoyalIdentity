@@ -12,7 +12,6 @@ public class DefaultPasswordProtector : IPasswordProtector
 
     public ValueTask<bool> VerifyPasswordAsync(string password, string hash, CancellationToken ct = default)
     {
-        var result = PasswordHash.Verify(password, hash);
-        return ValueTask.FromResult(result is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded);
+        return ValueTask.FromResult(PasswordHash.Verify(password, hash));
     }
 }
