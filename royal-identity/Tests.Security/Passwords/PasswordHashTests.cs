@@ -53,13 +53,63 @@ public class PasswordHashTests
         Assert.False(PasswordHash.Verify(password, preReleaseHash));
     }
 
-    [Fact]
-    public void Verify_Returns_True_For_Hash_Created_With_Non_Default_Algorithm()
+    [Theory]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void Verify_Returns_True_For_Hash_Created_With_Supported_Algorithm(string algorithmName)
     {
         // The format is self-describing, so a hash created with a different PRF still verifies.
-        var sha512 = PasswordHash.Create("x", new PasswordHashOptions { Algorithm = HashAlgorithmName.SHA512 });
+        var algorithm = new HashAlgorithmName(algorithmName);
+        var hash = PasswordHash.Create("x", new PasswordHashOptions { Algorithm = algorithm });
 
-        Assert.True(PasswordHash.Verify("x", sha512));
+        Assert.True(PasswordHash.Verify("x", hash));
+    }
+
+    [Fact]
+    public void Create_Throws_When_Options_Are_Null()
+    {
+        Assert.Throws<ArgumentNullException>(() => PasswordHash.Create("x", null!));
+    }
+
+    [Theory]
+    [InlineData("MD5")]
+    [InlineData("SHA1")]
+    public void Create_Throws_When_Algorithm_Is_Not_Supported(string algorithmName)
+    {
+        var options = new PasswordHashOptions { Algorithm = new HashAlgorithmName(algorithmName) };
+
+        Assert.Throws<ArgumentException>(() => PasswordHash.Create("x", options));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Create_Throws_When_Iterations_Are_Not_Positive(int iterations)
+    {
+        var options = new PasswordHashOptions { Iterations = iterations };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => PasswordHash.Create("x", options));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(15)]
+    public void Create_Throws_When_Salt_Size_Is_Too_Small(int saltSize)
+    {
+        var options = new PasswordHashOptions { SaltSize = saltSize };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => PasswordHash.Create("x", options));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(15)]
+    public void Create_Throws_When_Hash_Size_Is_Too_Small(int hashSize)
+    {
+        var options = new PasswordHashOptions { HashSize = hashSize };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => PasswordHash.Create("x", options));
     }
 
     [Fact]

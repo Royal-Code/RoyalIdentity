@@ -83,7 +83,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var codeVerifier = CryptoRandom.CreateUniqueId();
-        var codeChallenge = PkceHelper.GenerateCodeChallengeS256(codeVerifier);
+        var codeChallenge = PkceHelper.GenerateStoredS256CodeChallengeHash(codeVerifier);
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             "demo_client",
@@ -139,7 +139,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
 
         var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var codeVerifier = CryptoRandom.CreateUniqueId();
-        var codeChallenge = PkceHelper.GenerateCodeChallengeS256(codeVerifier);
+        var codeChallenge = PkceHelper.GenerateStoredS256CodeChallengeHash(codeVerifier);
 
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             "demo_client",

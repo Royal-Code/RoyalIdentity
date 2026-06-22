@@ -24,6 +24,8 @@ public static class PasswordHash
     private const string Scheme = "RIPWD";
     private const string CurrentVersion = "1";
     private const string Pbkdf2Prefix = "PBKDF2-";
+    private const int MinimumSaltSize = 16;
+    private const int MinimumHashSize = 16;
 
     /// <summary>Creates a hash for <paramref name="password"/> using the default options.</summary>
     public static string Create(string password) => Create(password, PasswordHashOptions.Default);
@@ -34,6 +36,8 @@ public static class PasswordHash
     {
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(options);
+
+        ValidateOptions(options);
 
         var algorithmToken = AlgorithmToToken(options.Algorithm);
         var salt = CryptoRandom.CreateRandomKey(options.SaltSize);
@@ -64,6 +68,40 @@ public static class PasswordHash
         var actual = Rfc2898DeriveBytes.Pbkdf2(password, parsed.Salt, parsed.Iterations, parsed.Algorithm, parsed.Hash.Length);
 
         return CryptographicOperations.FixedTimeEquals(actual, parsed.Hash);
+    }
+
+    private static void ValidateOptions(PasswordHashOptions options)
+    {
+        if (!IsSupportedAlgorithm(options.Algorithm))
+        {
+            throw new ArgumentException(
+                $"Unsupported password hashing algorithm: {options.Algorithm.Name}",
+                nameof(options));
+        }
+
+        if (options.Iterations <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(PasswordHashOptions.Iterations),
+                options.Iterations,
+                "Password hashing iterations must be greater than zero.");
+        }
+
+        if (options.SaltSize < MinimumSaltSize)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(PasswordHashOptions.SaltSize),
+                options.SaltSize,
+                $"Password hashing salt size must be at least {MinimumSaltSize} bytes.");
+        }
+
+        if (options.HashSize < MinimumHashSize)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(PasswordHashOptions.HashSize),
+                options.HashSize,
+                $"Password hashing hash size must be at least {MinimumHashSize} bytes.");
+        }
     }
 
     private static bool TryParseCurrent(string storedHash, out ParsedHash parsed)
@@ -100,6 +138,13 @@ public static class PasswordHash
             return Pbkdf2Prefix + "SHA512";
 
         throw new ArgumentException($"Unsupported password hashing algorithm: {algorithm.Name}", nameof(algorithm));
+    }
+
+    private static bool IsSupportedAlgorithm(HashAlgorithmName algorithm)
+    {
+        return algorithm == HashAlgorithmName.SHA256
+            || algorithm == HashAlgorithmName.SHA384
+            || algorithm == HashAlgorithmName.SHA512;
     }
 
     private static bool TryTokenToAlgorithm(string token, out HashAlgorithmName algorithm)

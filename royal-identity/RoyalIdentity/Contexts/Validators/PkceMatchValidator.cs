@@ -39,7 +39,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
             case Oidc.CodeChallenge.Methods.Plain:
 
                 equals = FixedTimeComparer.IsEqualUtf8(
-                    context.CodeVerifier.Sha256(),
+                    PkceHelper.HashCodeChallengeForStorage(context.CodeVerifier),
                     code.CodeChallenge);
 
                 if (!equals)
@@ -49,7 +49,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
 
             case Oidc.CodeChallenge.Methods.Sha256:
 
-                var transformedCodeVerifier = PkceHelper.GenerateCodeChallengeS256(context.CodeVerifier);
+                var transformedCodeVerifier = PkceHelper.GenerateStoredS256CodeChallengeHash(context.CodeVerifier);
 
                 equals = FixedTimeComparer.IsEqualUtf8(
                     transformedCodeVerifier, 

@@ -1,8 +1,5 @@
 ﻿using System.ComponentModel;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Text.Json;
-using Base64Url = RoyalIdentity.Security.Encoding.Base64Url;
 
 namespace RoyalIdentity.Utils;
 
@@ -68,29 +65,5 @@ public class X509CertificatesFinder
 
         var certColl = store.Certificates.Find(_findType, findValue, validOnly);
         return certColl.Cast<X509Certificate2>();
-    }
-}
-
-/// <summary>
-/// Extensions methods for X509Certificate2
-/// </summary>
-[EditorBrowsable(EditorBrowsableState.Never)]
-public static class X509CertificateExtensions
-{
-    /// <summary>
-    /// Create the value of a thumbprint-based cnf claim
-    /// </summary>
-    /// <param name="certificate"></param>
-    /// <returns></returns>
-    public static string CreateThumbprintCnf(this X509Certificate2 certificate)
-    {
-        var hash = certificate.GetCertHash(HashAlgorithmName.SHA256);
-
-        var values = new Dictionary<string, string>
-        {
-            { "x5t#S256", Base64Url.Encode(hash) }
-        };
-
-        return JsonSerializer.Serialize(values);
     }
 }

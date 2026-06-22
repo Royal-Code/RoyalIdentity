@@ -3,7 +3,7 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Tokens;
-using RoyalIdentity.Security.Cryptography;
+using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -47,7 +47,7 @@ public class DefaultCodeFactory : ICodeFactory
             context.RedirectUri)
         {
             SessionId = context.SessionId,
-            CodeChallenge = context.CodeChallenge.Sha256(),
+            CodeChallenge = PkceHelper.HashCodeChallengeForStorage(context.CodeChallenge),
             CodeChallengeMethod = context.CodeChallengeMethod,
             Nonce = context.Nonce,
             StateHash = context.StateHash,

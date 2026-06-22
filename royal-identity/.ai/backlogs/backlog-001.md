@@ -142,7 +142,7 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 
 ## Projeto compartilhado de segurança (RoyalIdentity.Security) — ✅ CONCLUÍDO
 
-**Status:** CONCLUÍDO (2025-06-22)
+**Status:** CONCLUÍDO (2026-06-22)
 
 **Área:** Segurança / Infra compartilhada
 
@@ -151,15 +151,15 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 **Resultado final:**
 - **Componentes entregues:** CryptoRandom, Base64Url, HashExtensions, FixedTimeComparer, PasswordHash (com formato $RIPWD$ reutilizável), KeyParameters, ECKeyHelper, SecurityKeyExtensions
 - **Consumidores migrados:** RoyalIdentity (core), RoyalIdentity.Storage.InMemory, RoyalIdentity.UserAccounts
-- **Testes:** Tests.Security com 109 testes ✓ 100% aprovados
+- **Testes:** Tests.Security com 116 testes aprovados
 - **Build:** 0 erros, 9 warnings pré-existentes
-- **Suites amplas (Fase 8):** 430/430 testes aprovados
-  - Tests.Security: 109/109 ✓
-  - Tests.Identity: 11/11 ✓
-  - Tests.Pipelines: 3/3 ✓
-  - Tests.UserAccounts: 91/91 ✓
-  - Tests.Integration: 202/202 ✓
-  - Tests.Architecture: 14/14 ✓
+- **Suites amplas (Fase 8):** 440/440 testes aprovados
+  - Tests.Security: 116/116
+  - Tests.Identity: 13/13
+  - Tests.Pipelines: 3/3
+  - Tests.UserAccounts: 91/91
+  - Tests.Integration: 202/202
+  - Tests.Architecture: 15/15
 
 **Fases executadas:**
 1. Esqueleto, guardrails e estrutura
@@ -168,7 +168,7 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 4. Key material: KeyParameters, ECKeyHelper, extensões
 5. Migração do core (RoyalIdentity)
 6. Migração de módulos (UserAccounts, Storage.InMemory)
-7. Duplicação removida — todos os tipos migrados convertidos a shims [Obsolete] delegadores
+7. Duplicação removida — tipos migrados removidos do core, sem shims delegadores
 8. Validação ampla e documentação — projeto entregue
 
 **Manutenção futura:** Nenhuma — projeto completo. Possível extensão apenas se KMS ou novos módulos tiverem requisitos de segurança não cobertos.
@@ -178,16 +178,15 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 ## Rehash-on-login de hashes de senha (orquestração)
 
 **Área:** Segurança / Contas de usuário
-**Status:** Não aplicável no momento. A primitiva `PasswordHash.NeedsRehash(...)` e o resultado tri-estado
-`PasswordVerificationResult` foram **removidos**: há um único formato versionado (`$RIPWD$`) e nenhum legado de
-produção a migrar (o formato pré-release `$PBKDF2$` foi descartado antes de qualquer release). Sem legado e com um
-só conjunto de parâmetros, não há cenário em que um hash armazenado precise ser regravado. `PasswordHash.Verify`
-retorna `bool`.
+**Status:** Não aplicável no momento. A detecção de rehash e o resultado tri-estado foram **removidos**: há um único
+formato versionado (`$RIPWD$`) e nenhum legado de produção a migrar (o formato pré-release `$PBKDF2$` foi descartado
+antes de qualquer release). Sem legado e com um só conjunto de parâmetros, não há cenário em que um hash armazenado
+precise ser regravado. `PasswordHash.Verify` retorna `bool`.
 **Quando revisitar:** Apenas se um upgrade futuro de parâmetros PBKDF2 (ex.: aumentar iterações ou migrar algoritmo)
-tornar hashes existentes mais fracos que a política corrente. Nesse momento, reintroduzir:
-1. `PasswordHash.NeedsRehash(storedHash, options)` na lib de segurança (detecção pura, sem conhecer realm);
+tornar hashes existentes mais fracos que a política corrente. Nesse momento, introduzir:
+1. uma primitiva de detecção na lib de segurança (pura, sem conhecer realm);
 2. a orquestração no domínio de contas (`UserAccounts` / `IPasswordProtector`): ao autenticar com sucesso, se
-   `NeedsRehash`, chamar `Create(password, currentOptions)` e persistir o novo hash na mesma transação de login.
+   a detecção indicar rehash, chamar `Create(password, currentOptions)` e persistir o novo hash na mesma transação de login.
 **Nota de design:**
 - Como só é possível regravar com a senha em mãos, a adoção é naturalmente *on-login* (não há migração em lote).
 - O consumidor decide a política (`PasswordHashOptions`) por realm; a primitiva não conhece realm.

@@ -3,6 +3,7 @@
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
+using RoyalIdentity.Security.Certificates;
 using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Utils;
 using System.Security.Claims;

@@ -38,8 +38,12 @@ nao havia eliminado todas as duplicacoes — varios tipos do core continuavam co
   permanece no adaptador `RoyalIdentity.Models.Keys.KeyParametersFactory` (delega a `KeyMaterialFactory`). O teste
   `Tests.Identity/Keys/KeyParametersCompatibilityTests` passou a exercitar a factory do IdP.
 - **Rehash removido:** como ha um unico formato (`$RIPWD$`) e nenhum legado a migrar, `PasswordHash.Verify` agora
-  retorna `bool`. `PasswordVerificationResult` e `PasswordHash.NeedsRehash` foram removidos; o item de backlog de
+  retorna `bool`. O resultado tri-estado e a deteccao de rehash foram removidos; o item de backlog de
   rehash-on-login foi remarcado como "nao aplicavel" (reintroduzir apenas se houver upgrade futuro de parametros).
+- **Fechamento final dos achados (2026-06-22):** `CreateThumbprintCnf` e `SecurityKeyExtensions` ficaram apenas em
+  `RoyalIdentity.Security`; o core removeu as duplicacoes. `PasswordHash.Create` passou a validar opcoes publicas, o
+  fluxo PKCE ganhou helpers explicitos para challenge RFC7636 e hash de armazenamento, e os testes finais ficaram
+  verdes em `dotnet test RoyalIdentity.sln` (440/440).
 
 ---
 
@@ -315,9 +319,8 @@ Regras:
   cobrindo "hash malformado retorna false, nao lanca e nao autentica".
 - O `DefaultPasswordProtector` do core delega direto a este `Verify` (bool), sem mapeamento intermediario.
 - **Sem maquinaria de rehash:** como ha um unico formato (`$RIPWD$`) e nenhum legado a migrar, `Verify` retorna apenas
-  `bool` — nao ha `PasswordVerificationResult` nem `NeedsRehash`. Se um upgrade futuro de parametros PBKDF2 exigir
-  rehash-on-login, a deteccao (`NeedsRehash`) e o tri-estado podem ser reintroduzidos junto com a orquestracao no
-  dominio de contas, que e onde a politica por realm vive.
+  `bool`. Se um upgrade futuro de parametros PBKDF2 exigir rehash-on-login, a deteccao e um resultado mais rico podem
+  ser reintroduzidos junto com a orquestracao no dominio de contas, que e onde a politica por realm vive.
 - Password policy e lockout permanecem no dominio de contas.
 
 #### Key material e `KeyParameters`
@@ -560,19 +563,17 @@ Cobertura adicional adicionada para overloads de preenchimento de buffer de `Cry
 ### Tarefas
 
 - [x] Implementar `PasswordHashOptions`. (`Passwords/PasswordHashOptions.cs`; defaults = params atuais do projeto.)
-- [x] Implementar `PasswordVerificationResult`. (`Failed`/`Success`/`SuccessRehashNeeded`.)
 - [x] Implementar `PasswordHash.Create(...)` com formato novo versionado. (`$RIPWD$1$PBKDF2-{SHA}${iter}${salt}${hash}`.)
-- [x] Implementar `PasswordHash.Verify(...)`. (Nunca lanca; formato pre-release `$PBKDF2$` retorna `Failed`.)
+- [x] Implementar `PasswordHash.Verify(...)` retornando `bool`. (Nunca lanca; formato pre-release `$PBKDF2$` retorna `false`.)
 - [x] Remover suporte ao formato experimental pre-release `$PBKDF2$.{salt}.{hash}`.
-- [x] Implementar `NeedsRehash(...)`. (Iteracoes abaixo da politica, algoritmo/sizes diferentes ou malformado/nao reconhecido.)
-- [x] Registrar no backlog a orquestracao futura de rehash-on-login para upgrades de parametros, deixando claro que
-  `NeedsRehash` e entregue aqui mas nao ha migracao legada de `$PBKDF2$` a suportar.
+- [x] Registrar no backlog que rehash-on-login fica fora do escopo atual e so deve voltar se houver upgrade futuro de parametros.
 - [x] Adicionar testes:
   - [x] senha correta valida hash novo;
   - [x] senha errada falha;
   - [x] hash malformado retorna falha (nao lanca, nao autentica);
   - [x] formato pre-release `$PBKDF2$` valido e rejeitado como nao suportado;
-  - [x] `NeedsRehash` detecta iteracoes/algoritmo antigos;
+  - [x] opcoes publicas invalidas falham cedo em `Create`;
+  - [x] algoritmos suportados SHA256/SHA384/SHA512 verificam corretamente;
   - [x] salts diferentes geram hashes diferentes para a mesma senha;
   - [x] hash gerado nao contem a senha em texto claro.
 
@@ -584,11 +585,12 @@ explicita do formato experimental pre-release `$PBKDF2$`.
 **Execucao (2026-06-21):** `dotnet test Tests.Security` -> 76/76 verde. Implementacao usa a primitiva da BCL
 `Rfc2898DeriveBytes.Pbkdf2` (PBKDF2-HMAC-SHA256, senha em UTF-8) em vez do `Microsoft.AspNetCore.Cryptography.KeyDerivation`
 do core, para nao introduzir dependencia de ASP.NET na biblioteca de folha; ambas produzem os mesmos bytes (PBKDF2
-padrao). Mudanca de contrato: `Verify` nao lanca em hash malformado (retorna `Failed`).
+padrao). Mudanca de contrato: `Verify` nao lanca em hash malformado (retorna `false`).
 
 **Ajuste pos-revisao (2026-06-22):** removida a verificacao de `$PBKDF2$`. A decisao substitui a intencao inicial de
-compatibilidade porque ainda nao houve release final, logo nao existe legado de producao a preservar. O teste agora
-constroi um hash `$PBKDF2$` valido para a senha e confirma que `Verify` retorna `Failed`.
+compatibilidade porque ainda nao houve release final, logo nao existe legado de producao a preservar. `Create` valida
+`PasswordHashOptions` (algoritmo, iteracoes, salt e tamanho de hash), e o teste agora constroi um hash `$PBKDF2$`
+valido para a senha e confirma que `Verify` retorna `false`.
 
 ---
 
@@ -643,7 +645,7 @@ Material de chaves fica disponivel como componente reutilizavel para IdP e futur
 **Reconciliacao do WIP:** a arvore de trabalho estava limpa no inicio da fase (nenhuma edicao pendente em
 `KeyParameters.cs`), entao nao houve WIP a reconciliar; a copia adicionada partiu do estado commitado.
 
-**`Microsoft.IdentityModel.Tokens`:** adicionado ao `.csproj` da lib via `$(IdVer)` (8.14.0, compartilhado com o core).
+**`Microsoft.IdentityModel.Tokens`:** adicionado ao `.csproj` da lib via `$(IdVer)` (8.19.1, compartilhado com o core).
 Nao carrega dependencia de ASP.NET, entao o guardrail `SecurityLibrary_DoesNotDependOn_AspNetCore` continua valido.
 
 **Mudanca de comportamento intencional (HMAC):** a factory original do core marcava chaves HMAC com
@@ -658,7 +660,7 @@ core em `Tests.Identity`. Isso so afeta chaves recem-geradas; chaves armazenadas
 
 **Verificacao (2026-06-22 via GitHub Actions CI):** build e testes executados no workflow
 `.github/workflows/build-and-test.yml` (Ubuntu, .NET 10). Resultado final (run #3, commit `2fa057d`):
-`dotnet test RoyalIdentity.sln` — **109/109 verde** em `Tests.Security`, `Tests.Architecture` verde.
+`dotnet test RoyalIdentity.sln` — `Tests.Security` verde, `Tests.Architecture` verde.
 
 Ajuste de compatibilidade Linux: `ECDsaSecurityKey.PrivateKeyStatus` retorna `Unknown` no Linux (OpenSSL) mesmo para
 chaves com material privado. Correcoes aplicadas antes de fechar a fase:
@@ -687,9 +689,8 @@ chaves com material privado. Correcoes aplicadas antes de fechar a fase:
 - [x] Atualizar o call-site de client secret em `SecretEvaluatorBase` para usar `FixedTimeComparer` (in-scope; o
   evaluator NAO migra, apenas a comparacao interna muda).
 - [x] Adicionar/ajustar testes de regressao de PKCE e de autenticacao de client secret apos a troca do comparador.
-- [x] Atualizar `DefaultPasswordProtector` para usar `RoyalIdentity.Security.Passwords.PasswordHash`, mapeando
-  `PasswordVerificationResult` para `bool` (incluindo `SuccessRehashNeeded` -> `true`) e absorvendo a remocao do
-  throw em hash malformado.
+- [x] Atualizar `DefaultPasswordProtector` para usar `RoyalIdentity.Security.Passwords.PasswordHash` diretamente
+  (`Verify` retorna `bool`) e absorver a remocao do throw em hash malformado.
 - [x] Atualizar `CryptoHelper.CreateHashClaimValue` para delegar a primitiva generica de left-half hash.
 - [x] Manter `PkceHelper` no core, mas delegando hash/encoding aos componentes reutilizaveis.
 - [x] Atualizar `KeyParameters`, `KeyEncoding`, `KeySerializationFormat`, `ECKeyHelper` e extensions de chaves para
@@ -704,17 +705,18 @@ chaves com material privado. Correcoes aplicadas antes de fechar a fase:
 O core usa `RoyalIdentity.Security` para primitivas, mas conserva regras OIDC, realm, clients, tokens e stores no IdP.
 
 **Ajuste pos-revisao (2026-06-22):**
-- `TimeConstantComparer` ficou como shim obsoleto delegando a `FixedTimeComparer`, sem preservar `SequenceEqual`.
+- `TimeConstantComparer` foi removido; comparacoes sensiveis usam `FixedTimeComparer` diretamente.
 - O fluxo PKCE `plain` ganhou teste positivo com client que permite `AllowPlainTextPkce`; o teste negativo existente
   passou a usar a constante lowercase `plain`, cobrindo a politica e nao erro de casing.
 - `DefaultPasswordProtector` ganhou teste para hash malformado/nao suportado retornar `false`.
+- O fluxo PKCE ganhou helpers explicitos para challenge S256 RFC7636 e hash de armazenamento.
 
 **Verificacao local pos-revisao (2026-06-22):**
-- `dotnet test Tests.Security` -> 109/109 verde.
-- `dotnet test Tests.Identity` -> 11/11 verde.
+- `dotnet test Tests.Security` -> 116/116 verde.
+- `dotnet test Tests.Identity` -> 13/13 verde.
 - `dotnet test Tests.Integration` -> 202/202 verde.
-- `dotnet test Tests.Architecture` -> 14/14 verde.
-- `dotnet test RoyalIdentity.sln` -> verde (Security 109, Identity 11, Architecture 14, Pipelines 3,
+- `dotnet test Tests.Architecture` -> 15/15 verde.
+- `dotnet test RoyalIdentity.sln` -> verde (Security 116, Identity 13, Architecture 15, Pipelines 3,
   UserAccounts 91, Integration 202). Warnings restantes sao pre-existentes/de ambiente: `NETSDK1086`, `NU1903`,
   `NU1510`, `NU1701` e nullable/obsoleto em projetos nao alterados.
 
@@ -768,33 +770,28 @@ Core, modulo puro e fake deixam de duplicar primitivas e passam a consumir a mes
 
 ### Tarefas
 
-- [x] Remover `RoyalIdentity/Utils/CryptoRandom.cs` ou transforma-lo em shim temporario `[Obsolete]` apenas se houver
-  necessidade de compatibilidade incremental.
-- [x] Remover `RoyalIdentity/Utils/Base64Url.cs` ou shim temporario.
-- [x] Remover `RoyalIdentity/Utils/PasswordHash.cs` ou shim temporario.
-- [x] Remover `RoyalIdentity/Utils/TimeConstantComparer.cs` ou shim temporario.
+- [x] Remover `RoyalIdentity/Utils/CryptoRandom.cs`.
+- [x] Remover `RoyalIdentity/Utils/Base64Url.cs`.
+- [x] Remover `RoyalIdentity/Utils/PasswordHash.cs`.
+- [x] Remover `RoyalIdentity/Utils/TimeConstantComparer.cs`.
 - [x] Remover partes duplicadas de `HashExtensions`.
 - [x] Remover/mover `ECKeyHelper` duplicado.
 - [x] Remover/mover `SecurityKeyExtensions` duplicado.
+- [x] Remover/mover `X509CertificateExtensions.CreateThumbprintCnf` duplicado.
 - [x] Remover/mover enums duplicados de key encoding/serialization.
-- [x] Rodar `rg` para garantir que nao ha novos usos dos tipos antigos fora de shims intencionais.
-- [x] Se shims forem mantidos, registrar prazo de remocao neste plano ou no backlog.
+- [x] Rodar `rg` para garantir que nao ha novos usos dos tipos antigos.
+- [x] Adicionar teste de arquitetura garantindo que o core nao expoe os tipos duplicados removidos.
 
 ### Resultado da Fase 7
 
-✅ Concluída 2025-06-22. Todos os tipos migrados foram convertidos a shims delegadores com marca [Obsolete]:
-- `CryptoRandom` → delega para `RoyalIdentity.Security.Cryptography.CryptoRandom`
-- `Base64Url` → delega para `RoyalIdentity.Security.Encoding.Base64Url`
-- `PasswordHash` → delega para `RoyalIdentity.Security.Passwords.PasswordHash`
-- `TimeConstantComparer` → delega para `RoyalIdentity.Security.FixedTimeComparer`
-- `HashExtensions` → delega para `RoyalIdentity.Security.Cryptography.HashExtensions`
-- `ECKeyHelper` → delega para `RoyalIdentity.Security.Keys.ECKeyHelper`
+Concluida em 2026-06-22. Os tipos migrados foram removidos do core, sem shims delegadores:
+- `CryptoRandom`, `Base64Url`, `PasswordHash`, `TimeConstantComparer`, `HashExtensions` e `ECKeyHelper` foram removidos.
+- `SecurityKeyExtensions` existe apenas em `RoyalIdentity.Security.Keys`.
+- `CreateThumbprintCnf` existe apenas em `RoyalIdentity.Security.Certificates`.
+- `KeyParameters`, `KeyEncoding` e `KeySerializationFormat` existem apenas em `RoyalIdentity.Security.Keys`.
 
-Nenhuma duplicação ativa de tipos criptográficos permanece no core. Enums e extensões locais 
-(`KeyEncoding`, `KeySerializationFormat`, `SecurityKeyExtensions`) continuam no core como parte do 
-vocabulário domain-specific do IdP, não são tipos genéricos de segurança.
-
-Sem erros de compilação. Build completo: 0 erros, 9 warnings pré-existentes.
+O core preserva apenas responsabilidades de IdP: stores, realm, tokens, adapters e factory baseada em `KeyOptions`.
+`ModuleBoundaryTests` garante que `RoyalIdentity` nao expoe mais os tipos duplicados de certificado/chaves.
 
 ---
 
@@ -804,30 +801,30 @@ Sem erros de compilação. Build completo: 0 erros, 9 warnings pré-existentes.
 
 ### Tarefas
 
-- [x] Rodar `dotnet test Tests.Security` - 109 testes aprovados
-- [x] Rodar `dotnet test Tests.Identity` - 11 testes aprovados
+- [x] Rodar `dotnet test Tests.Security` - 116 testes aprovados
+- [x] Rodar `dotnet test Tests.Identity` - 13 testes aprovados
 - [x] Rodar `dotnet test Tests.UserAccounts` - 91 testes aprovados
-- [x] Rodar `dotnet test Tests.Architecture` - 14 testes aprovados
+- [x] Rodar `dotnet test Tests.Architecture` - 15 testes aprovados
 - [x] Rodar testes de integração focados - 202 testes aprovados (Tests.Integration)
 - [x] Rodar testes de pipelines - 3 testes aprovados
-- [x] Rodar `dotnet test RoyalIdentity.sln` suite completa - 430 testes aprovados
+- [x] Rodar `dotnet test RoyalIdentity.sln` suite completa - 440 testes aprovados
 - [x] Atualizar `backlog-001.md` - projeto marcado concluído
 - [x] Registrar comandos e resultados neste plano
 
 ### Resultado da Fase 8
 
-✅ Concluída 2025-06-22. Biblioteca reutilizável entregue e consumidores migrados com validação completa.
+Concluida em 2026-06-22. Biblioteca reutilizavel entregue e consumidores migrados com validacao completa.
 
 **Resumo de execução:**
-- Build: 95.4s, 0 erros, 9 warnings pré-existentes (não introduzidos)
+- Build/test completo: 0 erros; warnings pre-existentes/de ambiente (`NETSDK1086`, `NU1903`, `NU1510`, `NU1701` e nullable/obsoleto em projetos nao alterados)
 - Testes por suíte:
-  - Tests.Security: 109/109 ✓
-  - Tests.Identity: 11/11 ✓
-  - Tests.Pipelines: 3/3 ✓
-  - Tests.UserAccounts: 91/91 ✓
-  - Tests.Integration: 202/202 ✓
-  - Tests.Architecture: 14/14 ✓
-  - **Total: 430/430 testes aprovados** ✓
+  - Tests.Security: 116/116
+  - Tests.Identity: 13/13
+  - Tests.Pipelines: 3/3
+  - Tests.UserAccounts: 91/91
+  - Tests.Integration: 202/202
+  - Tests.Architecture: 15/15
+  - **Total: 440/440 testes aprovados**
 
 **Invariantes preservados:**
 - RoyalIdentity.Security não referencia RoyalIdentity*, ASP.NET Core ou domínio de IdP
@@ -840,15 +837,15 @@ Sem erros de compilação. Build completo: 0 erros, 9 warnings pré-existentes.
 - Realm/client/resource isolation mantido no core, não em RoyalIdentity.Security
 
 **Critérios de aceite cumpridos:**
-✓ RoyalIdentity.Security compila em net10.0
-✓ Nenhuma referência a RoyalIdentity*, Microsoft.AspNetCore*
-✓ Tests.Security cobre todos os componentes (109 testes)
-✓ RoyalIdentity, Storage.InMemory e UserAccounts usam componentes reutilizáveis
-✓ Zero duplicação ativa de tipos criptográficos
-✓ Testes de key material continuam verdes
-✓ Testes de token/signing/PKCE/secret continuam verdes
-✓ Contract tests de UserAccounts continuam verdes
-✓ Architecture tests garantem as novas fronteiras
+- RoyalIdentity.Security compila em net10.0.
+- Nenhuma referencia a RoyalIdentity*, Microsoft.AspNetCore*.
+- Tests.Security cobre todos os componentes (116 testes).
+- RoyalIdentity, Storage.InMemory e UserAccounts usam componentes reutilizaveis.
+- Zero duplicacao ativa de tipos criptograficos no core.
+- Testes de key material continuam verdes.
+- Testes de token/signing/PKCE/secret continuam verdes.
+- Contract tests de UserAccounts continuam verdes.
+- Architecture tests garantem as novas fronteiras.
 
 ---
 
@@ -878,7 +875,7 @@ Sem erros de compilação. Build completo: 0 erros, 9 warnings pré-existentes.
 - `RoyalIdentity.Security` nao referencia `Microsoft.AspNetCore*`.
 - `Tests.Security` cobre todos os componentes migrados.
 - `RoyalIdentity`, `RoyalIdentity.Storage.InMemory` e `RoyalIdentity.UserAccounts` usam os componentes reutilizaveis.
-- Nao ha duplicacao ativa de `CryptoRandom`, `Base64Url`, password hash, fixed-time compare ou key material.
+- Nao ha duplicacao ativa de `CryptoRandom`, `Base64Url`, password hash, fixed-time compare, certificados ou key material.
 - Testes de key material migrados de `Tests.Identity` continuam verdes.
 - Testes de token/signing/PKCE/secret continuam verdes.
 - Contract tests de `UserAccounts` continuam verdes.
@@ -889,7 +886,8 @@ Sem erros de compilação. Build completo: 0 erros, 9 warnings pré-existentes.
 ## Riscos
 
 - **Compatibilidade de password hash:** `$PBKDF2$` era formato experimental pre-release e foi removido antes da release
-  final; seeds/testes devem usar `$RIPWD$`. Upgrades futuros de parametros devem usar `NeedsRehash`.
+  final; seeds/testes devem usar `$RIPWD$`. Upgrades futuros de parametros devem introduzir deteccao de rehash junto
+  com a orquestracao no dominio de contas.
 - **Compatibilidade de chaves:** mover `KeyParameters` sem preservar XML/JSON/encoding pode invalidar chaves armazenadas.
 - **Churn de namespace:** muitos testes usam `CryptoRandom`, `Sha512` e `KeyParameters`; a migracao precisa ser mecanica
   e revisada.
@@ -900,9 +898,9 @@ Sem erros de compilação. Build completo: 0 erros, 9 warnings pré-existentes.
 - **WIP em `KeyParameters`:** `RoyalIdentity/Models/Keys/KeyParameters.cs` (e `.ai/references/external-libraries/search.md`)
   estao modificados na arvore de trabalho. A Fase 4 adiciona/adapta exatamente esse tipo; reconciliar ou commitar o WIP
   antes da Fase 4 para a copia adicionada partir do estado correto e evitar conflito.
-- **Mudanca de contrato no `Verify`:** trocar throw-on-malformed por `PasswordVerificationResult` e melhor (sem throw em
-  fluxo esperado), mas e uma mudanca de comportamento; garantir que `DefaultPasswordProtector` e chamadores nao dependam
-  da excecao anterior.
+- **Mudanca de contrato no `Verify`:** trocar throw-on-malformed por `bool` e melhor (sem throw em fluxo esperado),
+  mas e uma mudanca de comportamento; garantir que `DefaultPasswordProtector` e chamadores nao dependam da excecao
+  anterior.
 
 ---
 

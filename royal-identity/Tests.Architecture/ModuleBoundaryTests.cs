@@ -125,6 +125,13 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
+    public void Core_DoesNotExpose_Duplicated_Security_Extension_Types()
+    {
+        Assert.Null(Core.GetType("RoyalIdentity.Utils.X509CertificateExtensions", throwOnError: false));
+        Assert.Null(Core.GetType("RoyalIdentity.Extensions.SecurityKeyExtensions", throwOnError: false));
+    }
+
+    [Fact]
     public void PureModule_MayReference_SecurityLibrary_WithoutBreakingPurity()
     {
         // The security library is a leaf technical library (ADR-016), distinct from the IdP core and from

@@ -3,7 +3,7 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Utils;
+using RoyalIdentity.Security.Certificates;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 

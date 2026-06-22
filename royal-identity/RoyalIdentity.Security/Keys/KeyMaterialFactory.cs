@@ -50,9 +50,11 @@ public static class KeyMaterialFactory
             case SecurityAlgorithms.RsaSsaPssSha384:
             case SecurityAlgorithms.RsaSsaPssSha512:
 
-                var rsa = RSA.Create(rsaKeySizeInBits);
-                var rsaParameters = rsa.ExportParameters(true);
-                key = SerializeRsaToXml(rsaParameters);
+                using (var rsa = RSA.Create(rsaKeySizeInBits))
+                {
+                    var rsaParameters = rsa.ExportParameters(true);
+                    key = SerializeRsaToXml(rsaParameters);
+                }
 
                 format = KeySerializationFormat.Xml;
                 encoding = KeyEncoding.Plain;
@@ -61,7 +63,10 @@ public static class KeyMaterialFactory
 
             case SecurityAlgorithms.EcdsaSha256:
 
-                key = ECKeyHelper.ExportECParametersToXml(ECDsa.Create(ECCurve.NamedCurves.nistP256), true);
+                using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+                {
+                    key = ECKeyHelper.ExportECParametersToXml(ecdsa, true);
+                }
                 format = KeySerializationFormat.Xml;
                 encoding = KeyEncoding.Plain;
 
@@ -69,7 +74,10 @@ public static class KeyMaterialFactory
 
             case SecurityAlgorithms.EcdsaSha384:
 
-                key = ECKeyHelper.ExportECParametersToXml(ECDsa.Create(ECCurve.NamedCurves.nistP384), true);
+                using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP384))
+                {
+                    key = ECKeyHelper.ExportECParametersToXml(ecdsa, true);
+                }
                 format = KeySerializationFormat.Xml;
                 encoding = KeyEncoding.Plain;
 
@@ -77,7 +85,10 @@ public static class KeyMaterialFactory
 
             case SecurityAlgorithms.EcdsaSha512:
 
-                key = ECKeyHelper.ExportECParametersToXml(ECDsa.Create(ECCurve.NamedCurves.nistP521), true);
+                using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP521))
+                {
+                    key = ECKeyHelper.ExportECParametersToXml(ecdsa, true);
+                }
                 format = KeySerializationFormat.Xml;
                 encoding = KeyEncoding.Plain;
 
