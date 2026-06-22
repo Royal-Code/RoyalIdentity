@@ -1,16 +1,16 @@
 # Plan: Projeto compartilhado de seguranca (`RoyalIdentity.Security`)
 
-## Status: EM ANDAMENTO - 2 de 8 fases concluidas
+## Status: EM ANDAMENTO - 3 de 8 fases concluidas
 
 ## Progresso
 
-`##------` **25%** - 2 de 8 fases
+`###-----` **37%** - 3 de 8 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Esqueleto, solution folders e guardrails de dependencia | Concluida |
 | Fase 2 - Random, Base64Url, hashing basico e comparacao constante | Concluida |
-| Fase 3 - Password hashing reutilizavel e compatibilidade legado | Pendente |
+| Fase 3 - Password hashing reutilizavel e compatibilidade legado | Concluida |
 | Fase 4 - Key material, `KeyParameters` e helpers de chaves | Pendente |
 | Fase 5 - Troca no core `RoyalIdentity` | Pendente |
 | Fase 6 - Troca em `UserAccounts`, fake in-memory e testes de borda | Pendente |
@@ -525,39 +525,48 @@ pre-existentes do core apenas). `RoyalIdentity.Security` em `src`, `Tests.Securi
 
 Primitivas pequenas existem em `RoyalIdentity.Security` com testes proprios, ainda sem trocar consumidores.
 
-**Execucao (2026-06-21):** `dotnet test Tests.Security` -> 51/51 verde; `dotnet test Tests.Architecture` -> 14/14 verde.
+**Execucao (2026-06-21):** `dotnet test Tests.Security` -> 58/58 verde; `dotnet test Tests.Architecture` -> 14/14 verde.
 Ajuste de implementacao: `Base64Url.TryDecode` usa `System.Buffers.Text.Base64Url.IsValid` como guarda, porque o
 `TryDecodeFromChars` da BCL ainda lanca `FormatException` em conteudo invalido (o "Try" cobre so o tamanho do buffer).
-Nenhum consumidor trocado ainda (protocolo aditivo).
+Cobertura adicional adicionada para overloads de preenchimento de buffer de `CryptoRandom` e tamanho invalido de
+`Base64Url`. Nenhum consumidor trocado ainda (protocolo aditivo).
 
 ---
 
 ## Fase 3 - Password hashing reutilizavel e compatibilidade legado
 
-**Estado:** Pendente
+**Estado:** Concluida
 
 ### Tarefas
 
-- [ ] Implementar `PasswordHashOptions`.
-- [ ] Implementar `PasswordVerificationResult`.
-- [ ] Implementar `PasswordHash.Create(...)` com formato novo versionado.
-- [ ] Implementar `PasswordHash.Verify(...)`.
-- [ ] Implementar verificacao do formato legado atual `$PBKDF2$.{salt}.{hash}`.
-- [ ] Implementar `NeedsRehash(...)`.
-- [ ] Registrar no backlog a orquestracao de rehash-on-login (consumidor/dominio de contas), deixando claro que
+- [x] Implementar `PasswordHashOptions`. (`Passwords/PasswordHashOptions.cs`; defaults = params legados.)
+- [x] Implementar `PasswordVerificationResult`. (`Failed`/`Success`/`SuccessRehashNeeded`.)
+- [x] Implementar `PasswordHash.Create(...)` com formato novo versionado. (`$RIPWD$1$PBKDF2-{SHA}${iter}${salt}${hash}`.)
+- [x] Implementar `PasswordHash.Verify(...)`. (Nunca lanca; legado matcheado -> `SuccessRehashNeeded`.)
+- [x] Implementar verificacao do formato legado atual `$PBKDF2$.{salt}.{hash}`. (PBKDF2-HMAC-SHA256, 100k, salt 16, hash 32.)
+- [x] Implementar `NeedsRehash(...)`. (Legado, iteracoes abaixo da politica, algoritmo/sizes diferentes ou malformado.)
+- [x] Registrar no backlog a orquestracao de rehash-on-login (consumidor/dominio de contas), deixando claro que
   `NeedsRehash` e entregue aqui mas a adocao para hashes legados fica fora do escopo deste plano.
-- [ ] Adicionar testes:
-  - [ ] senha correta valida hash novo;
-  - [ ] senha errada falha;
-  - [ ] hash malformado retorna falha (nao lanca, nao autentica);
-  - [ ] formato legado atual continua verificavel;
-  - [ ] `NeedsRehash` detecta iteracoes/algoritmo antigos;
-  - [ ] salts diferentes geram hashes diferentes para a mesma senha;
-  - [ ] hash gerado nao contem a senha em texto claro.
+  (Item novo em `backlog-001.md`: "Rehash-on-login de hashes de senha (orquestracao)".)
+- [x] Adicionar testes:
+  - [x] senha correta valida hash novo;
+  - [x] senha errada falha;
+  - [x] hash malformado retorna falha (nao lanca, nao autentica);
+  - [x] formato legado atual continua verificavel;
+  - [x] `NeedsRehash` detecta iteracoes/algoritmo antigos;
+  - [x] salts diferentes geram hashes diferentes para a mesma senha;
+  - [x] hash gerado nao contem a senha em texto claro.
 
 ### Resultado da Fase 3
 
 Password hashing reutilizavel pronto, sem interface compartilhada nova e com compatibilidade para hashes existentes.
+
+**Execucao (2026-06-21):** `dotnet test Tests.Security` -> 76/76 verde. Implementacao usa a primitiva da BCL
+`Rfc2898DeriveBytes.Pbkdf2` (PBKDF2-HMAC-SHA256, senha em UTF-8) em vez do `Microsoft.AspNetCore.Cryptography.KeyDerivation`
+do core, para nao introduzir dependencia de ASP.NET na biblioteca de folha; ambas produzem os mesmos bytes (PBKDF2
+padrao). O teste de compat. legado constroi um hash no formato antigo com a mesma primitiva/parametros; a verificacao
+cruzada definitiva core->lib (hash criado pelo `PasswordHash` legado, verificado pela lib) entra na Fase 5/6, quando
+`Tests.Identity` puder referenciar ambos. Mudanca de contrato: `Verify` nao lanca em hash malformado (retorna `Failed`).
 
 ---
 

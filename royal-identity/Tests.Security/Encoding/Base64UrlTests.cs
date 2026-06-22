@@ -57,6 +57,12 @@ public class Base64UrlTests
     }
 
     [Fact]
+    public void Decode_Invalid_Length_Throws_FormatException()
+    {
+        Assert.Throws<FormatException>(() => Base64Url.Decode("A"));
+    }
+
+    [Fact]
     public void TryDecode_Valid_Returns_True_With_Bytes()
     {
         Assert.True(Base64Url.TryDecode("Zm9vYmFy", out var bytes));
@@ -67,6 +73,13 @@ public class Base64UrlTests
     public void TryDecode_Invalid_Returns_False_And_Empty()
     {
         Assert.False(Base64Url.TryDecode("not valid @@@@", out var bytes));
+        Assert.Empty(bytes);
+    }
+
+    [Fact]
+    public void TryDecode_Invalid_Length_Returns_False_And_Empty()
+    {
+        Assert.False(Base64Url.TryDecode("A", out var bytes));
         Assert.Empty(bytes);
     }
 

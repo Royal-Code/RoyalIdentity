@@ -154,3 +154,27 @@ e o core convergindo no gerador de `SubjectId`/hash), ou ao implementar o hashin
 - Não criar agora; evitar projeto-âncora prematuro (anti-YAGNI). Registrado a partir da review
   `.ai/reviews/user-accounts/fase5-useraccount-domain.review-001.md` (§4/§D / `SubjectIdGenerator`).
 - Deve ser referenciável pelo módulo **puro** (sem arrastar o IdP) — pacote/projeto leve, só primitivas de segurança.
+
+> **Promovido a plano ativo (2026-06-21):** virou [ADR-016](../../adrs/ADR-016.md) +
+> [plan-royalidentity-security.md](../plans/plan-royalidentity-security.md) (biblioteca técnica de folha
+> `RoyalIdentity.Security`, projeto de testes `Tests.Security`). A nota acima é o registro original do deferral.
+
+---
+
+## Rehash-on-login de hashes de senha (orquestração)
+
+**Área:** Segurança / Contas de usuário
+**Deferral:** A Fase 3 do `plan-royalidentity-security.md` entrega a primitiva: `PasswordHash.Verify` sinaliza
+`PasswordVerificationResult.SuccessRehashNeeded` para hashes no formato legado (`$PBKDF2$.{salt}.{hash}`), e
+`PasswordHash.NeedsRehash(storedHash, options)` detecta formato legado, iterações abaixo da política ou
+algoritmo/sizes diferentes. **A orquestração** — ao autenticar com sucesso, se rehash for necessário, regravar o
+hash no formato novo e persistir — pertence ao consumidor/domínio de contas (`UserAccounts` /
+`IPasswordProtector`), **não** a `RoyalIdentity.Security`. Sem essa adoção, `NeedsRehash`/`SuccessRehashNeeded`
+ficam disponíveis porém não exercidos para usuários existentes — aceitável para o escopo do plano de segurança.
+**Quando revisitar:** Ao endurecer credenciais do módulo de contas (ex.: aumentar iterações de PBKDF2, migrar
+algoritmo) ou quando houver demanda de upgrade transparente de hashes legados.
+**Nota de design:**
+- Fluxo: `Verify` retorna sucesso → se `SuccessRehashNeeded` (ou `NeedsRehash(hash, currentOptions)`), chamar
+  `PasswordHash.Create(password, currentOptions)` e salvar o novo hash dentro da mesma transação de login.
+- Como só é possível regravar com a senha em mãos, a adoção é naturalmente *on-login* (não há migração em lote).
+- O consumidor decide a política (`PasswordHashOptions`) por realm; a primitiva não conhece realm.

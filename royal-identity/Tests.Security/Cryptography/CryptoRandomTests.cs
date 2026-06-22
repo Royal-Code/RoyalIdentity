@@ -17,6 +17,32 @@ public class CryptoRandomTests
     }
 
     [Fact]
+    public void CreateRandomKey_ByteArray_Fills_Buffer()
+    {
+        var bytes = Enumerable.Repeat((byte)0xA5, 64).ToArray();
+
+        CryptoRandom.CreateRandomKey(bytes);
+
+        Assert.Contains(bytes, b => b != 0xA5);
+    }
+
+    [Fact]
+    public void CreateRandomKey_Span_Fills_Buffer()
+    {
+        var bytes = Enumerable.Repeat((byte)0xA5, 64).ToArray();
+
+        CryptoRandom.CreateRandomKey(bytes.AsSpan());
+
+        Assert.Contains(bytes, b => b != 0xA5);
+    }
+
+    [Fact]
+    public void CreateRandomKey_Null_ByteArray_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => CryptoRandom.CreateRandomKey((byte[])null!));
+    }
+
+    [Fact]
     public void CreateUniqueId_Base64Url_Has_No_Padding_And_Roundtrips_To_EntropyBytes()
     {
         var id = CryptoRandom.CreateUniqueId(32, OutputFormat.Base64Url);
@@ -79,6 +105,22 @@ public class CryptoRandomTests
             var value = CryptoRandom.NextDouble();
             Assert.True(value is >= 0.0 and < 1.0, $"value out of range: {value}");
         }
+    }
+
+    [Fact]
+    public void NextBytes_Fills_Buffer()
+    {
+        var bytes = Enumerable.Repeat((byte)0xA5, 64).ToArray();
+
+        CryptoRandom.NextBytes(bytes);
+
+        Assert.Contains(bytes, b => b != 0xA5);
+    }
+
+    [Fact]
+    public void NextBytes_Null_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => CryptoRandom.NextBytes(null!));
     }
 
     [Fact]
