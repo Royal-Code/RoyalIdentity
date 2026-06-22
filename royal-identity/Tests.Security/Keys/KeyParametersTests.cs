@@ -93,7 +93,7 @@ public class KeyParametersTests
     public void ECDsa_Xml_RoundTrip_Creates_Key()
     {
         using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var ecKeyXml = ECKeyHelper.ExportECParametersToXml(ecdsa, true);
+        var ecKeyXml = ecdsa.ExportECParametersToXml(true);
 
         var keyParameters = new KeyParameters(
             "key-id", "ECDsa Key", "ES256",
@@ -112,7 +112,7 @@ public class KeyParametersTests
     public void ECDsa_Json_RoundTrip_Creates_Key()
     {
         using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var serialized = ECKeyHelper.SerializeECParameters(ecdsa.ExportParameters(true));
+        var serialized = ecdsa.ExportParameters(true).SerializeECParameters();
 
         var keyParameters = new KeyParameters(
             "key-id", "ECDsa Key", "ES256",
@@ -128,7 +128,7 @@ public class KeyParametersTests
     public void ECDsa_Signs_And_Verifies()
     {
         using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var serialized = ECKeyHelper.SerializeECParameters(ecdsa.ExportParameters(true));
+        var serialized = ecdsa.ExportParameters(true).SerializeECParameters();
 
         var keyParameters = new KeyParameters(
             "keyId", "name", "ES256",
@@ -233,7 +233,7 @@ public class KeyParametersTests
         var keyParameters = new KeyParameters(
             "ec-kid", "name", "ES256",
             KeySerializationFormat.Json, KeyEncoding.Plain,
-            ECKeyHelper.SerializeECParameters(ecdsa.ExportParameters(true)));
+            ecdsa.ExportParameters(true).SerializeECParameters());
 
         var (key, jwk) = keyParameters.GetValidationKey();
 

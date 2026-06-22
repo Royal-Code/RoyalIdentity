@@ -65,7 +65,7 @@ public static class KeyMaterialFactory
 
                 using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
                 {
-                    key = ECKeyHelper.ExportECParametersToXml(ecdsa, true);
+                    key = ecdsa.ExportECParametersToXml(true);
                 }
                 format = KeySerializationFormat.Xml;
                 encoding = KeyEncoding.Plain;
@@ -76,7 +76,7 @@ public static class KeyMaterialFactory
 
                 using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP384))
                 {
-                    key = ECKeyHelper.ExportECParametersToXml(ecdsa, true);
+                    key = ecdsa.ExportECParametersToXml(true);
                 }
                 format = KeySerializationFormat.Xml;
                 encoding = KeyEncoding.Plain;
@@ -87,7 +87,7 @@ public static class KeyMaterialFactory
 
                 using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP521))
                 {
-                    key = ECKeyHelper.ExportECParametersToXml(ecdsa, true);
+                    key = ecdsa.ExportECParametersToXml(true);
                 }
                 format = KeySerializationFormat.Xml;
                 encoding = KeyEncoding.Plain;

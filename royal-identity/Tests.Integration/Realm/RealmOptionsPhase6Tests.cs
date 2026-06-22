@@ -96,7 +96,7 @@ public class RealmOptionsPhase6Tests : IClassFixture<AppFactory>
         Assert.True(realmOptions.MutualTls.AlwaysEmitConfirmationClaim);
         Assert.Equal(SecurityAlgorithms.RsaSha512, realmOptions.Keys.MainSigningCredentialsAlgorithm);
         Assert.Equal(TimeSpan.FromDays(12), realmOptions.Keys.DefaultSigningCredentialsLifetime);
-        Assert.Equal(4096, realmOptions.Keys.RsaKeySizeInBytes);
+        Assert.Equal(4096, realmOptions.Keys.RsaKeySizeInBits);
         Assert.Contains(SecurityAlgorithms.RsaSha512, realmOptions.Keys.SigningCredentialsAlgorithms);
         Assert.Equal("server-copy+jwt", realmOptions.AccessTokenJwtType);
         Assert.True(realmOptions.EmitScopesAsSpaceDelimitedStringInJwt);
@@ -262,7 +262,7 @@ public class RealmOptionsPhase6Tests : IClassFixture<AppFactory>
             {
                 MainSigningCredentialsAlgorithm = SecurityAlgorithms.RsaSha512,
                 DefaultSigningCredentialsLifetime = TimeSpan.FromDays(12),
-                RsaKeySizeInBytes = 4096
+                RsaKeySizeInBits = 4096
             },
             AccessTokenJwtType = "server-copy+jwt",
             EmitScopesAsSpaceDelimitedStringInJwt = true,

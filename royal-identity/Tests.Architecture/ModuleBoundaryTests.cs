@@ -125,10 +125,29 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
-    public void Core_DoesNotExpose_Duplicated_Security_Extension_Types()
+    public void Core_DoesNotExpose_Migrated_Security_Types()
     {
-        Assert.Null(Core.GetType("RoyalIdentity.Utils.X509CertificateExtensions", throwOnError: false));
-        Assert.Null(Core.GetType("RoyalIdentity.Extensions.SecurityKeyExtensions", throwOnError: false));
+        // Types moved to RoyalIdentity.Security (plan Fase 7). Matched by simple name so the guard does not
+        // depend on the now-deleted original namespaces and still fails if any is reintroduced in the core.
+        string[] migratedTypeNames =
+        [
+            "CryptoRandom",
+            "Base64Url",
+            "PasswordHash",
+            "TimeConstantComparer",
+            "HashExtensions",
+            "ECKeyHelper",
+            "SecurityKeyExtensions",
+            "X509CertificateExtensions",
+            "KeyParameters",
+            "KeyEncoding",
+            "KeySerializationFormat",
+        ];
+
+        var coreTypeNames = Core.GetTypes().Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var name in migratedTypeNames)
+            Assert.DoesNotContain(name, coreTypeNames);
     }
 
     [Fact]

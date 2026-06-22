@@ -63,19 +63,19 @@ public class KeyParameters
 
     public virtual SecurityKey GetSecurityKey()
     {
-        if (SecurityAlgorithm.StartsWith("RS"))
+        if (SecurityAlgorithm.StartsWith("RS", StringComparison.Ordinal))
         {
             return CreateRsaSecurityKey();
         }
-        else if (SecurityAlgorithm.StartsWith("PS"))
+        else if (SecurityAlgorithm.StartsWith("PS", StringComparison.Ordinal))
         {
             return CreateRsaSecurityKey();
         }
-        else if (SecurityAlgorithm.StartsWith("ES"))
+        else if (SecurityAlgorithm.StartsWith("ES", StringComparison.Ordinal))
         {
             return CreateECDsaSecurityKey();
         }
-        else if (SecurityAlgorithm.StartsWith("HS"))
+        else if (SecurityAlgorithm.StartsWith("HS", StringComparison.Ordinal))
         {
             return CreateSymmetricSecurityKey();
         }
@@ -85,7 +85,7 @@ public class KeyParameters
 
     public virtual RsaSecurityKey CreateRsaSecurityKey()
     {
-        if (!SecurityAlgorithm.StartsWith("RS") && !SecurityAlgorithm.StartsWith("PS"))
+        if (!SecurityAlgorithm.StartsWith("RS", StringComparison.Ordinal) && !SecurityAlgorithm.StartsWith("PS", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The secret type must be RSA.");
         }
@@ -113,7 +113,7 @@ public class KeyParameters
 
     public virtual ECDsaSecurityKey CreateECDsaSecurityKey()
     {
-        if (!SecurityAlgorithm.StartsWith("ES"))
+        if (!SecurityAlgorithm.StartsWith("ES", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The secret type must be ECDsa.");
         }
@@ -136,7 +136,7 @@ public class KeyParameters
 
     public virtual SymmetricSecurityKey CreateSymmetricSecurityKey()
     {
-        if (!SecurityAlgorithm.StartsWith("HS"))
+        if (!SecurityAlgorithm.StartsWith("HS", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The secret type must be Symmetric.");
         }
@@ -174,7 +174,7 @@ public class KeyParameters
         SecurityKey key;
         JsonWebKey? jwk;
 
-        if (SecurityAlgorithm.StartsWith("RS") || SecurityAlgorithm.StartsWith("PS"))
+        if (SecurityAlgorithm.StartsWith("RS", StringComparison.Ordinal) || SecurityAlgorithm.StartsWith("PS", StringComparison.Ordinal))
         {
             var rsaKey = CreateRsaSecurityKey();
             key = rsaKey;
@@ -190,7 +190,7 @@ public class KeyParameters
             jwk.KeyId = KeyId;
             jwk.Alg = SecurityAlgorithm;
         }
-        else if (SecurityAlgorithm.StartsWith("ES"))
+        else if (SecurityAlgorithm.StartsWith("ES", StringComparison.Ordinal))
         {
             var ecKey = CreateECDsaSecurityKey();
             key = ecKey;
@@ -204,7 +204,7 @@ public class KeyParameters
             jwk.KeyId = KeyId;
             jwk.Alg = SecurityAlgorithm;
         }
-        else if (SecurityAlgorithm.StartsWith("HS"))
+        else if (SecurityAlgorithm.StartsWith("HS", StringComparison.Ordinal))
         {
             key = CreateSymmetricSecurityKey();
 

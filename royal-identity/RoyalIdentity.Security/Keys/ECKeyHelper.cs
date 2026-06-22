@@ -11,7 +11,11 @@ namespace RoyalIdentity.Security.Keys;
 /// Generic export/import/serialize/deserialize helpers for <see cref="ECParameters"/>.
 /// Protocol-agnostic; preserves the XML and JSON shapes already accepted by existing keys.
 /// </summary>
-public class ECKeyHelper
+/// <remarks>
+/// Export/serialize members are exposed as extensions on <see cref="ECDsa"/>/<see cref="ECParameters"/>;
+/// the string-to-key parsers stay as plain static utilities since a <c>string</c> extension would not read naturally.
+/// </remarks>
+public static class ECKeyHelper
 {
     /// <summary>
     /// Exports the ECParameters to an XML string.
@@ -19,7 +23,7 @@ public class ECKeyHelper
     /// <param name="ecdsa">The ECDsa instance from which to export the parameters.</param>
     /// <param name="includePrivateParameters">Whether to include private parameters.</param>
     /// <returns>The XML string representing the ECParameters.</returns>
-    public static string ExportECParametersToXml(ECDsa ecdsa, bool includePrivateParameters)
+    public static string ExportECParametersToXml(this ECDsa ecdsa, bool includePrivateParameters)
     {
         ECParameters ecParameters = ecdsa.ExportParameters(includePrivateParameters);
 
@@ -83,7 +87,7 @@ public class ECKeyHelper
         return new ECDsaSecurityKey(ecdsa);
     }
 
-    public static string SerializeECParameters(ECParameters ecParameters)
+    public static string SerializeECParameters(this ECParameters ecParameters)
     {
         // Custom serialization of the ECParameters
         return JsonSerializer.Serialize(new ECParametersSerializable(ecParameters));

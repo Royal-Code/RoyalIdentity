@@ -15,7 +15,7 @@ public class KeyOptions
     {
         MainSigningCredentialsAlgorithm = other.MainSigningCredentialsAlgorithm;
         DefaultSigningCredentialsLifetime = other.DefaultSigningCredentialsLifetime;
-        RsaKeySizeInBytes = other.RsaKeySizeInBytes;
+        RsaKeySizeInBits = other.RsaKeySizeInBits;
 
         SigningCredentialsAlgorithms.Clear();
         foreach (var algorithm in other.SigningCredentialsAlgorithms)
@@ -35,9 +35,9 @@ public class KeyOptions
     public TimeSpan? DefaultSigningCredentialsLifetime { get; set; } = TimeSpan.FromDays(356);
 
     /// <summary>
-    /// The size to create a new RSA signature credential.
+    /// The size, in bits, used to create a new RSA signing credential.
     /// </summary>
-    public int RsaKeySizeInBytes { get; set; } = 2048;
+    public int RsaKeySizeInBits { get; set; } = 2048;
 
     /// <summary>
     /// The signing credentials algorithms allowed.

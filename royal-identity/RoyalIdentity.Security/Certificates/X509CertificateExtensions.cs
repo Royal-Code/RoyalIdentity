@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
@@ -14,7 +13,6 @@ namespace RoyalIdentity.Security.Certificates;
 /// The fluent certificate-store finder (<c>X509</c>) stays in the IdP core because it depends on the
 /// operating system certificate store, which would make CI brittle.
 /// </remarks>
-[EditorBrowsable(EditorBrowsableState.Never)]
 public static class X509CertificateExtensions
 {
     /// <summary>

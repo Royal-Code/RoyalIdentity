@@ -20,6 +20,6 @@ public static class KeyParametersFactory
         algorithm ??= keyOptions.MainSigningCredentialsAlgorithm;
         lifetime ??= keyOptions.DefaultSigningCredentialsLifetime;
 
-        return KeyMaterialFactory.Create(algorithm, lifetime, keyOptions.RsaKeySizeInBytes);
+        return KeyMaterialFactory.Create(algorithm, lifetime, keyOptions.RsaKeySizeInBits);
     }
 }
