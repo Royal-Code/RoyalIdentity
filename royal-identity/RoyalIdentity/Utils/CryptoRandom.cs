@@ -1,4 +1,5 @@
 using SecurityRandom = RoyalIdentity.Security.Cryptography.CryptoRandom;
+using SecurityOutputFormat = RoyalIdentity.Security.Cryptography.OutputFormat;
 
 namespace RoyalIdentity.Utils;
 
@@ -20,7 +21,7 @@ public static class CryptoRandom
     public static void CreateRandomKey(byte[] bytes) => SecurityRandom.CreateRandomKey(bytes);
 
     public static string CreateUniqueId(int length = 33, OutputFormat format = OutputFormat.Base64Url)
-        => SecurityRandom.CreateUniqueId(length, (SecurityRandom.OutputFormat)(int)format);
+        => SecurityRandom.CreateUniqueId(length, (SecurityOutputFormat)(int)format);
 
     public static int Next() => SecurityRandom.Next();
 
