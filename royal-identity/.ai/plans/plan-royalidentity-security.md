@@ -632,13 +632,18 @@ de HMAC sempre construiram `KeyParameters` com `KeyEncoding.Base64`). A `KeyMate
 `KeyMaterialFactoryTests.Create_Hmac_Produces_Materializable_Key`. Isso so afeta chaves recem-geradas; chaves
 armazenadas nao sao impactadas.
 
-**Verificacao (PENDENTE - sem .NET SDK no ambiente):** este ambiente de execucao remoto **nao tem o .NET SDK**
-instalado e a politica de rede bloqueia a instalacao (403 nos endpoints do dotnet/NuGet), portanto **nao foi possivel
-rodar `dotnet build`/`dotnet test` nesta sessao**. O codigo e os testes foram escritos espelhando os tipos originais
-ja verdes do core e os padroes das Fases 1-3. Antes de fechar formalmente a fase, executar em ambiente com SDK:
-`dotnet build RoyalIdentity.Security`, `dotnet test Tests.Security`, `dotnet test Tests.Architecture` e
-`dotnet test Tests.Identity` (esta ultima para confirmar que a remocao do `KeyParametersTests.cs` migrado nao deixou
-lacuna inesperada). Registrar os resultados aqui apos a execucao.
+**Verificacao (2026-06-22 via GitHub Actions CI):** build e testes executados no workflow
+`.github/workflows/build-and-test.yml` (Ubuntu, .NET 10). Resultado final (run #3, commit `2fa057d`):
+`dotnet test RoyalIdentity.sln` — **109/109 verde** em `Tests.Security`, `Tests.Architecture` verde.
+
+Ajuste de compatibilidade Linux: `ECDsaSecurityKey.PrivateKeyStatus` retorna `Unknown` no Linux (OpenSSL) mesmo para
+chaves com material privado. Correcoes aplicadas antes de fechar a fase:
+- `SecurityKeyExtensions.WithoutPrivateKey(ECDsaSecurityKey)`: substituiu guarda `PrivateKeyStatus == Exists` por
+  `try { ExportParameters(true) } catch (CryptographicException)` para detectar material privado diretamente.
+- `KeyParameters.GetValidationKey()`: chama `WithoutPrivateKey()` sempre para ECDsa (sem-op quando ja publica),
+  em vez de condicional em `PrivateKeyStatus`.
+- `SecurityKeyExtensionsTests`: substituiu `Assert.Equal(PrivateKeyStatus.Exists, ...)` por
+  `Assert.NotNull(ecdsa.ExportParameters(true).D)` para nao depender de `PrivateKeyStatus` no Linux.
 
 ---
 
