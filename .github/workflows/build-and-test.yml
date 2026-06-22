@@ -1,0 +1,51 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # The solution lives in the royal-identity/ subdirectory of the repository.
+        working-directory: royal-identity
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Targets net10.0 (see royal-identity/Directory.Build.props).
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('royal-identity/**/*.csproj', 'royal-identity/**/*.props', 'royal-identity/**/*.targets') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore RoyalIdentity.sln
+
+      - name: Build
+        run: dotnet build RoyalIdentity.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test RoyalIdentity.sln --configuration Release --no-build --verbosity normal

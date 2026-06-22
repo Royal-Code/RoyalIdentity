@@ -1,5 +1,5 @@
-﻿using RoyalIdentity.Contracts.Storage;
-using RoyalIdentity.Models.Keys;
+using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Security.Keys;
 using System.Collections.Concurrent;
 
 namespace RoyalIdentity.Storage.InMemory;
@@ -24,7 +24,7 @@ public class KeyStore : IKeyStore
         KeyParameters.TryGetValue(keyId, out var key);
 
         if (key is null)
-            throw new ArgumentException($"The key with the Id ‘{keyId}’ was not found", nameof(keyId));
+            throw new ArgumentException($"The key with the Id '{keyId}' was not found", nameof(keyId));
 
         return Task.FromResult(key);
     }
@@ -33,10 +33,9 @@ public class KeyStore : IKeyStore
     {
         List<KeyParameters> keyParameters = [];
 
-        foreach(var keyId in keyIds)
+        foreach (var keyId in keyIds)
         {
             var key = await GetKeyAsync(keyId, ct);
-
             keyParameters.Add(key);
         }
 

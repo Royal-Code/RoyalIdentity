@@ -1,8 +1,9 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Keys;
+using RoyalIdentity.Security.Keys;
 using RoyalIdentity.Utils.Caching;
 
 namespace RoyalIdentity.Contracts.Defaults;
@@ -37,7 +38,7 @@ public class DefaultKeyManager : IKeyManager
     }
 
     public async ValueTask<SigningCredentials?> GetSigningCredentialsAsync(
-        Realm realm, 
+        Realm realm,
         ICollection<string> allowedIdentityTokenSigningAlgorithms,
         CancellationToken ct)
     {
@@ -68,14 +69,11 @@ public class DefaultKeyManager : IKeyManager
 
     public async Task<SigningCredentials> CreateSigningCredentialsAsync(Realm realm, CancellationToken ct)
     {
-        // create new key for SigningCredentials
-        var key = KeyParameters.Create(realm.Options.Keys);
+        var key = KeyParametersFactory.Create(realm.Options.Keys);
 
-        // store the key
         var store = storage.GetKeyStore(realm);
         await store.AddKeyAsync(key, ct);
 
-        // updates the host's cache, other instances will update when the cache expires.
         var cache = caching.GetKeyCache(realm);
         var args = new Arguments(realm, storage, logger, ct);
         await cache.SigningCredentials.Update(GetSigningKeyIds, GetSigningCredentials, args);
@@ -87,9 +85,6 @@ public class DefaultKeyManager : IKeyManager
     private static async Task<IReadOnlyList<string>> GetSigningKeyIds(Arguments args)
     {
         args.Logger.LogDebug("Obtendo nomes dos segredos das chaves de assinatura.");
-
-        // Gets all the secret names of the current keys,
-        // which are fit for use on the specified day (today).
         var store = args.Storage.GetKeyStore(args.Realm);
         return await store.ListAllCurrentKeysIdsAsync(ct: args.CancellationToken);
     }
@@ -97,9 +92,6 @@ public class DefaultKeyManager : IKeyManager
     private static async Task<IReadOnlyList<string>> GetValidationKeyIds(Arguments args)
     {
         args.Logger.LogDebug("Obtendo nomes dos segredos das chaves de validação.");
-
-        // Gets all the secret names of the current and expired keys,
-        // just doesn't include future keys.
         var store = args.Storage.GetKeyStore(args.Realm);
         return await store.ListAllKeysIdsAsync(ct: args.CancellationToken);
     }
@@ -107,17 +99,14 @@ public class DefaultKeyManager : IKeyManager
     private static async Task<IReadOnlyList<SigningCredentials>> GetSigningCredentials(IReadOnlyList<string> keyNames, Arguments args)
     {
         args.Logger.LogDebug("Lendo as chaves de assinatura do banco de dados: {KeyNames}", keyNames);
-
         var store = args.Storage.GetKeyStore(args.Realm);
         var parameters = await store.GetKeysAsync(keyNames, args.CancellationToken);
-
         return parameters.Select(x => x.CreateSigningCredentials()).ToList();
     }
 
     private static async Task<ValidationKeysInfo> GetValidationKeys(IReadOnlyList<string> keyNames, Arguments args)
     {
         args.Logger.LogDebug("Lendo as chaves de validação do banco de dados: {KeyNames}", keyNames);
-
         var store = args.Storage.GetKeyStore(args.Realm);
         var parameters = await store.GetKeysAsync(keyNames, args.CancellationToken);
 
@@ -125,9 +114,9 @@ public class DefaultKeyManager : IKeyManager
             .Select(s => s.GetValidationKey())
             .Aggregate((new List<SecurityKey>(), new List<JsonWebKey>()), (lists, pair) =>
             {
-                lists.Item1.Add(pair.Item1);
-                if (pair.Item2 is not null)
-                    lists.Item2.Add(pair.Item2);
+                lists.Item1.Add(pair.Key);
+                if (pair.JsonWebKey is not null)
+                    lists.Item2.Add(pair.JsonWebKey);
                 return lists;
             });
 
@@ -141,11 +130,8 @@ public class DefaultKeyManager : IKeyManager
     private readonly struct Arguments
     {
         public Realm Realm { get; }
-
         public IStorage Storage { get; }
-
         public ILogger Logger { get; }
-
         public CancellationToken CancellationToken { get; }
 
         public Arguments(Realm realm, IStorage storage, ILogger logger, CancellationToken ct)

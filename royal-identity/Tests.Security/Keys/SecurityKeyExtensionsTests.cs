@@ -31,12 +31,13 @@ public class SecurityKeyExtensionsTests
         using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var key = new ECDsaSecurityKey(ecdsa) { KeyId = "ec-kid" };
 
-        Assert.Equal(PrivateKeyStatus.Exists, key.PrivateKeyStatus);
+        // Verify private material exists directly — PrivateKeyStatus may return Unknown on Linux
+        // even for keys that have private material, so we don't rely on it here.
+        Assert.NotNull(ecdsa.ExportParameters(true).D);
 
         var publicKey = key.WithoutPrivateKey();
 
         Assert.Equal("ec-kid", publicKey.KeyId);
-        Assert.NotEqual(PrivateKeyStatus.Exists, publicKey.PrivateKeyStatus);
         Assert.Throws<CryptographicException>(() => publicKey.ECDsa!.ExportParameters(true));
     }
 

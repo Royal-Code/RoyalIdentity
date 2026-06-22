@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
 using RoyalIdentity.Pipelines.Abstractions;
+using FixedTimeComparer = RoyalIdentity.Security.Cryptography.FixedTimeComparer;
 using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contexts.Validators;
@@ -37,7 +38,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         {
             case Oidc.CodeChallenge.Methods.Plain:
 
-                equals = TimeConstantComparer.IsEqual(
+                equals = FixedTimeComparer.IsEqualUtf8(
                     context.CodeVerifier.Sha256(),
                     code.CodeChallenge);
 
@@ -50,7 +51,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
 
                 var transformedCodeVerifier = PkceHelper.GenerateCodeChallengeS256(context.CodeVerifier);
 
-                equals = TimeConstantComparer.IsEqual(
+                equals = FixedTimeComparer.IsEqualUtf8(
                     transformedCodeVerifier, 
                     code.CodeChallenge);
 
