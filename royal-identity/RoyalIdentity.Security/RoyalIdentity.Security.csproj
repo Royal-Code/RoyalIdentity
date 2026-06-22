@@ -10,11 +10,16 @@
 		framework reference to every project, so it is explicitly removed here (same as the pure module).
 		These boundaries are enforced by the architecture tests in Tests.Architecture.
 
-		Microsoft.IdentityModel.Tokens is intentionally NOT referenced yet; it is added in Phase 4 when
-		key material (KeyParameters, SecurityKey helpers) lands.
+		Microsoft.IdentityModel.Tokens lands in Phase 4 with the key material (KeyParameters,
+		SecurityKey helpers). It carries no ASP.NET dependency, so the AspNetCore-boundary test holds.
+		$(IdVer) is shared with the core via Directory.Build.props.
 	-->
 	<ItemGroup>
 		<FrameworkReference Remove="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="$(IdVer)" />
 	</ItemGroup>
 
 </Project>
