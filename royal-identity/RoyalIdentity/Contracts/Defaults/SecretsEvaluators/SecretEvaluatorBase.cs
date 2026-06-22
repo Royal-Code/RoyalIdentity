@@ -3,7 +3,7 @@ using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Utils;
+using FixedTimeComparer = RoyalIdentity.Security.Cryptography.FixedTimeComparer;
 
 namespace RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 
@@ -92,10 +92,10 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
             switch (secretBytes.Length)
             {
                 case 32:
-                    isValid = TimeConstantComparer.IsEqual(sharedSecret.Value, secret.Sha256());
+                    isValid = FixedTimeComparer.IsEqualBase64(sharedSecret.Value, secret.Sha256());
                     break;
                 case 64:
-                    isValid = TimeConstantComparer.IsEqual(sharedSecret.Value, secret.Sha512());
+                    isValid = FixedTimeComparer.IsEqualBase64(sharedSecret.Value, secret.Sha512());
                     break;
                 default:
                     logger.LogError(context, $"Secret: {secretDescription} uses invalid hashing algorithm.");

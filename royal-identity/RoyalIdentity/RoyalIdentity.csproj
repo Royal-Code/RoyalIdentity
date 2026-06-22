@@ -2,6 +2,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\RoyalIdentity.Pipelines\RoyalIdentity.Pipelines.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Security\RoyalIdentity.Security.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,9 +1,9 @@
 ﻿using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Models;
-using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
+using RoyalIdentity.Security.Keys;
 using RoyalIdentity.Users;
 using RoyalIdentity.Utils;
 using System.Collections.Concurrent;

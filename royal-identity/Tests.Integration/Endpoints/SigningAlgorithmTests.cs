@@ -166,9 +166,9 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
         await storage.Realms.SaveAsync(realm);
 
         var now = DateTime.UtcNow;
-        var rsa = KeyParameters.Create(realm.Options.Keys, SecurityAlgorithms.RsaSha256);
+        var rsa = KeyParametersFactory.Create(realm.Options.Keys, SecurityAlgorithms.RsaSha256);
         rsa.Created = now.AddMinutes(-2);
-        var ecdsa = KeyParameters.Create(realm.Options.Keys, SecurityAlgorithms.EcdsaSha256);
+        var ecdsa = KeyParametersFactory.Create(realm.Options.Keys, SecurityAlgorithms.EcdsaSha256);
         ecdsa.Created = now.AddMinutes(-1);
 
         var keyStore = storage.GetKeyStore(realm);
