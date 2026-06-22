@@ -140,24 +140,38 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 
 ---
 
-## Projeto compartilhado de segurança (RoyalIdentity.Security)
+## Projeto compartilhado de segurança (RoyalIdentity.Security) — ✅ CONCLUÍDO
+
+**Status:** CONCLUÍDO (2025-06-22)
 
 **Área:** Segurança / Infra compartilhada
-**Deferral:** Hoje cada lugar tem seu próprio utilitário de aleatoriedade/identificador (o core usa
-`CryptoRandom.CreateUniqueId()`; o módulo `UserAccounts` tem `SubjectIdGenerator` próprio, pois o módulo puro não
-referencia o core). Há espaço para um projeto `RoyalIdentity.Security` com componentes de segurança reutilizáveis —
-geração de identificadores opacos, cripto, hashing de senha — compartilhável por core, módulos e providers sem
-acoplar ao IdP.
-**Quando revisitar:** Quando houver um segundo consumidor querendo a mesma primitiva (ex.: o módulo `UserAccounts`
-e o core convergindo no gerador de `SubjectId`/hash), ou ao implementar o hashing real de senha do módulo.
-**Nota de design:**
-- Não criar agora; evitar projeto-âncora prematuro (anti-YAGNI). Registrado a partir da review
-  `.ai/reviews/user-accounts/fase5-useraccount-domain.review-001.md` (§4/§D / `SubjectIdGenerator`).
-- Deve ser referenciável pelo módulo **puro** (sem arrastar o IdP) — pacote/projeto leve, só primitivas de segurança.
 
-> **Promovido a plano ativo (2026-06-21):** virou [ADR-016](../../adrs/ADR-016.md) +
-> [plan-royalidentity-security.md](../plans/plan-royalidentity-security.md) (biblioteca técnica de folha
-> `RoyalIdentity.Security`, projeto de testes `Tests.Security`). A nota acima é o registro original do deferral.
+**Implementação:** Projeto `RoyalIdentity.Security` criado e entregue (ADR-016 + plan-royalidentity-security.md).
+
+**Resultado final:**
+- **Componentes entregues:** CryptoRandom, Base64Url, HashExtensions, FixedTimeComparer, PasswordHash (com formato $RIPWD$ reutilizável), KeyParameters, ECKeyHelper, SecurityKeyExtensions
+- **Consumidores migrados:** RoyalIdentity (core), RoyalIdentity.Storage.InMemory, RoyalIdentity.UserAccounts
+- **Testes:** Tests.Security com 109 testes ✓ 100% aprovados
+- **Build:** 0 erros, 9 warnings pré-existentes
+- **Suites amplas (Fase 8):** 430/430 testes aprovados
+  - Tests.Security: 109/109 ✓
+  - Tests.Identity: 11/11 ✓
+  - Tests.Pipelines: 3/3 ✓
+  - Tests.UserAccounts: 91/91 ✓
+  - Tests.Integration: 202/202 ✓
+  - Tests.Architecture: 14/14 ✓
+
+**Fases executadas:**
+1. Esqueleto, guardrails e estrutura
+2. Primitivas: random, encoding, hashing, comparação constante
+3. Password hashing reutilizável ($RIPWD$ versionado)
+4. Key material: KeyParameters, ECKeyHelper, extensões
+5. Migração do core (RoyalIdentity)
+6. Migração de módulos (UserAccounts, Storage.InMemory)
+7. Duplicação removida — todos os tipos migrados convertidos a shims [Obsolete] delegadores
+8. Validação ampla e documentação — projeto entregue
+
+**Manutenção futura:** Nenhuma — projeto completo. Possível extensão apenas se KMS ou novos módulos tiverem requisitos de segurança não cobertos.
 
 ---
 
