@@ -229,6 +229,10 @@ agora, **se o custo for aceitável**. Decisão necessária:
 > Risco de (b): refatora o que o v2 entregou e o `IUserAccountPasswordHasher`/autenticador já consomem. Risco de (a):
 > migração maior quando os planos de MFA/passwordless chegarem. **Recomendação do pré-plano: (b) se o custo couber.**
 
+#### Q1 - Resposta 1
+
+A classe `UserAccountCredential` tem muita peculiariedades para autenticação por password. A variável no `UserAccount` se chama `LocalCredential`. É muito específico, e acredito que tentar transformar em algo genérico pode gerar gambiarras no futuro. Então prefiro manter assim.
+
 ### Q2 — Histórico de senha: armazenamento e política (pré-plano §2)
 **Bloqueia:** Fase 3.
 - (a) **Tabela própria** `PasswordHistory` (recomendado), (b) JSON na credencial, ou (c) só eventos (não recomendado)?
@@ -239,11 +243,22 @@ agora, **se o custo for aceitável**. Decisão necessária:
 - Como a comparação é feita: a senha candidata é verificada com `IPasswordProtector`/`IUserAccountPasswordHasher`
   contra **cada hash histórico** (salt impede comparar hash com hash) — confirmar limite de N comparações por troca.
 
+#### Q2 - Resposta 1
+
+- Usar **Tabela própria**. 
+- Políticas por **quantidade** e **idade**.
+- apenas armazenar hash forte versionado.
+- tem que ter a nova senha plana, aplicar o hash conforme o hash do histórico e comparar.
+
 ### Q3 — Desafio de troca forçada: token de ação vs sessão parcial (pré-plano §3/§4)
 **Bloqueia:** Fases 4 e 5.
 - (a) **Token de ação transitório** de uso único com `Purpose=ChangeExpiredPassword` (recomendado; reusa o modelo de
   tokens de ação; não cria sessão), ou (b) **sessão parcial de required-action** (estilo Keycloak) que **nunca** pode
   emitir token até a ação ser satisfeita?
+
+#### Q3 - Resposta 1
+
+- Preciso de mais detalhes de cada uma das opções. Minha visão é em direção a opção `a`, mas eu precisaria entender o estilo KeyCloak e quais as consequencias e implicações.
 
 ### Q4 — Forma do "required action" na borda de autenticação (pré-plano §4)
 **Bloqueia:** Fases 1 e 4 (emenda à ADR-014 + core).
@@ -252,6 +267,13 @@ Hoje `AuthenticationResult` (core) e `LocalAuthenticationResult` (módulo) só t
   (mais extensível p/ verificações futuras)?
 - `MustChangePassword` setado por admin deve **incrementar `SecurityStamp`**? (relaciona com Q6)
 - Deve existir **opção por realm** para invalidar sessões quando admin seta `MustChangePassword`? (relaciona com Q7)
+
+#### Q4 - Resposta 1
+
+- Acho que retornar junto um `RequiredAction` seria interessante.
+- Acho que `MustChangePassword` só deve invalidar seções se configurado no Realm, por padrão acho que não deveria.
+- `MustChangePassword` setado por admin deve **incrementar `SecurityStamp`**: se existe uma opção de um administrador marcar uma senha ou conta como necessária para trocar a senha, ou seja, existir um campo `MustChangePassword`, então deve incrementar. Se for algo como senha expirada, aí não.
+- Sim, deve ter opção.
 
 ### Q5 — Lockout/bloqueio: campos simples vs taxonomia separada (pré-plano §6)
 **Bloqueia:** Fase 7.
@@ -263,6 +285,12 @@ Hoje `AuthenticationResult` (core) e `LocalAuthenticationResult` (módulo) só t
 - Lockout indefinido (`AccountLockoutDurationMinutes = 0`) exige **unlock administrativo**: confirmar o caso de uso
   `UnlockPasswordCredential` (já há `UserAccount.UnlockLocalCredential`).
 
+#### Q5 - Resposta 1
+
+- **separar** `PasswordLockout` de `AccountAccessRestriction`.
+- `UserAccountBlockState` já é um bloqueio administrativo. Este é mais pessoal. Para bloqueios como `GeoBlock`/`TimeWindow`/`ClientRestriction` é necessário outras abordagens, para ser aplicada para todos, ou para determinados grupos de usuários. Precisa refinar isso e elaborar um design multifuncional.
+- Deve existir um **unlock administrativo**. O desbloqueio pode ocorrer por troca de senha ou manualmente por um administrador. No futuro deve existir um motor de permissão, essas funções administrativas poderão requerer permissões específicas.
+
 ### Q6 — `SecurityStamp`: local, gatilhos limítrofes e ponto de comparação (pré-plano §7)
 **Bloqueia:** Fases 2 e 8.
 - Campo em **`UserAccount.SecurityStamp`** ou em um **`UserSecurityState`** dedicado no módulo?
@@ -270,6 +298,13 @@ Hoje `AuthenticationResult` (core) e `LocalAuthenticationResult` (módulo) só t
   alterado; `MustChangePassword` por admin; roles/permissões alteradas (revogação imediata de autorização?).
 - **Intervalo de revalidação** do cookie; comparação em **emissão de token**, **validação de cookie**, ou **ambos**?
 - `SecurityStamp` único para autenticação **e** autorização, ou **stamp separado** de autorização para roles/permissões?
+
+#### Q6 - Resposta 1
+
+- `SecurityStamp` me parece um campo, talvez poderia ser um value object.
+- Cada um destes "Gatilhos **dependentes de política**" altera `SecurityStamp`.
+-  **Intervalo de revalidação** em **emissão de token**.
+- `SecurityStamp` único.
 
 ### Q7 — Política de invalidação: formato e defaults (pré-plano §8)
 **Bloqueia:** Fases 1 e 8.
@@ -281,6 +316,12 @@ Hoje `AuthenticationResult` (core) e `LocalAuthenticationResult` (módulo) só t
 - Troca forçada por expiração deve **sempre** invalidar sessões antigas? O usuário pode escolher "sair de outros
   dispositivos" ao trocar a senha?
 
+#### Q7 - Resposta 1
+
+- São muitas opções vagas, me traga opções, recomendação, consequencias e implicações. Justifique o recomendado.
+- Ok.
+- Senha expirada não força fim da seção. Apenas quando trocar a senha, conforme políticas já definidas.
+
 ### Q8 — Eventos/auditoria/outbox: escopo neste plano (pré-plano §9)
 **Bloqueia:** Fase 9.
 - Confirmar **Opção B** (auditoria durável + outbox seletivo). Mas: **a auditoria durável e o outbox são construídos
@@ -288,6 +329,11 @@ Hoje `AuthenticationResult` (core) e `LocalAuthenticationResult` (módulo) só t
   **diferindo** a persistência durável/outbox para `plan-data-persistence` (§2)? O v2 deixou eventos de domínio
   **não despachados**; o core já tem `IEventDispatcher`/`IEventObserver`.
 - Lista de eventos candidatos e classificação (auditoria vs outbox) no pré-plano §9 — ratificar.
+
+#### Q8 - Resposta 1
+
+- No outbox serão armazeados eventos de domínio que outros sistemas precisam consumir, geralmente para replicação de dados ou por alguma necessidade de interação. Os eventos deve ser despachados de qualquer forma. Não será armazenado nada em outbox ainda, pois não há design, requisitos, planos de como funcionará o outbox. Também não há nada planejado de auditoria, como opções do que auditar por Realm. Mas isso pode ser feito um design agora, pois é mais simples, e na teoria todos eventos de segurança podem ser auditados. O ponto é como auditar isso.
+- Tudo deve ser eventos de domínio, podem deixar estes como possíbilidade, e conforme existirem operações no domínio, podem ser criados eventos. One Big Shot na frente é ruim como decisão, pode falsificar as reais necessidades, é melhor a regra de intenção de negócio gera evento de domínio.
 
 ### Q9 — Telefone: entra no agregado neste plano? (pré-plano "Email/telefone" + §6 das emendas)
 **Bloqueia:** Fase 6.
@@ -298,6 +344,10 @@ email/**phone**". Decidir:
 - (b) **adiar telefone** inteiramente (somente email neste plano), removendo `phone` do escopo até um plano futuro.
 > Se (a), há **emenda à ADR-015** (campos fixos/projeção) e novas `FixedFieldClaimProjection` para phone.
 
+#### Q9 - Resposta 1
+
+- Pode ser modelado o telefone da mesma forma que o email. Mas acho que é algo muito mais opcional que email.
+
 ### Q10 — Email: `VerifiedAt` e semântica de `email_verified` (pré-plano "Emendas sugeridas" #3/#4)
 **Bloqueia:** Fase 6.
 - Adicionar **`VerifiedAt`** em `UserAccountEmail` (hoje só há `IsVerified`)?
@@ -305,12 +355,21 @@ email/**phone**". Decidir:
   `EmailVerified → email_verified` já existe; falta amarrar à verificação real e garantir que **troca de email
   reseta `IsVerified`**).
 
+#### Q10 - Resposta 1
+
+- Não precisa de `VerifiedAt`.
+- troca de email gera novo objeto, não é um reset do campo.
+
 ### Q11 — Concorrência: estratégia concreta por provider (pré-plano §10)
 **Bloqueia:** Fases 2, 7 e 10.
 - Contador de falhas: **update atômico** (`... set failed = failed + 1 ... returning ...` no PostgreSql) vs
   **optimistic concurrency + retry** (usando `UserAccount.Version`) — e a alternativa transacional equivalente no
   Sqlite. Cobrir os 7 cenários do pré-plano §10 (falhas simultâneas; sucesso×falha; consumo duplo de token; nova
   emissão×consumo; troca de senha×emissão de token; admin unblock×falha; verificação de email×troca de email).
+
+#### Q11 - Resposta 1
+
+- Usar `optimistic concurrency + retry` parece uma alternativa melhor, porém exige um design bem elaborado do lado da aplicação para que isso seja garantido que funcione.
 
 ### Q12 — Endpoints/telas user-facing: neste plano ou no plano de UI? (roadmap §3 vs §5)
 **Bloqueia:** Fases 4, 5 e 6 (parte HTTP/UI).
@@ -322,6 +381,10 @@ recorte:
   `plan-admin-api-ui`/um plano de UI de conta.
 > Hoje há `Manage/ProfilePage.razor`, login/consent/logout; **não há** telas de troca/recuperação/verificação de senha.
 
+#### Q12 - Resposta 1
+
+- Este plano entrega apenas **domínio + casos de uso + costura**. As telas e endpoints ficam para parte de admin.
+
 ### Q13 — Costura de execução da invalidação (módulo → IdP) (pré-plano §8)
 **Bloqueia:** Fases 1, 5 e 8.
 O módulo decide a política e **publica um comando/evento de invalidação**; o IdP executa sobre sessão/cookie/refresh.
@@ -329,6 +392,10 @@ Decidir a forma da costura no core (emenda à ADR-014): novos métodos no store 
 `EndOthersForSubjectAsync(exceptSid)`) + revogação de refresh tokens por subject/sessão (`IRefreshTokenStore`), e o
 **porto** que a `.Integration` chama para disparar a execução. Confirmar se `IUserSessionStore`/`IUserSessionService`
 ganham as APIs de revogação por subject (hoje só por `sid`).
+
+#### Q13 - Resposta 1
+
+- Pode ser criada novas API/métodos nos serviços atuais do IdP, conforme necessidade. O importante é garantir que estamos fazendo o melhor design, não simplesmente enfiando mais métodos de forma procedural. Cabe uma avaliação de opções, mas é possível criar novos métodos.
 
 ### Q14 — `UserSession.ExpiresAt` × cookie lifetime × `UserSsoLifetime` × expiração de senha/lockout (roadmap §3; `UserSession.cs:38`)
 **Bloqueia:** Fase 8.
@@ -343,6 +410,15 @@ roadmap §3 pede explicitamente a "relação com `UserSsoLifetime`, cookie lifet
   não invalidando a sessão).
 - Expiração de senha/lockout **derrubam a sessão** ou apenas barram **nova** autenticação? (Decisão fechada §Senha diz
   que sessões ativas seguem válidas salvo política — confirmar que expiração de senha não é exceção implícita.)
+
+#### Q14 - Resposta 1
+
+- Temos duas opções quanto ao `ExpiresAt. Ter por Realm, ou ter ambas, por Realm e por Client como opcional.
+  Se apenas por Realm, é mais simples controlar. Se por Client também, será necessário um tratamento especial no cookie.
+  A opção de ter também por client precisa de um design mais avançado.
+  Avalia as duas opções, qual implicação vs benefícios, como é em outros IdP, como implementar, qual impacto no que tem hoje.
+- O `IsSessionValidAsync` entra no problema de design acima.
+- Expiração de senha não derruba seção. Bloqueio me parece opcional/configurável.
 
 ### Q15 — Seam core-owned para capturar e validar `SecurityStamp` (módulo → IdP sem dependência inversa)
 **Bloqueia:** Fases 2 e 8.
@@ -365,6 +441,14 @@ Consequências a registrar na ADR-017:
   evitar comportamentos divergentes;
 - o fake in-memory e o módulo opt-in precisam implementar o mesmo contrato, preservando os contract tests da ADR-015;
 - Q15 é diferente de Q13: Q15 lê/valida o estado atual de segurança; Q13 executa revogação ativa de sessões/refresh.
+
+#### Q15 - Resposta 1
+
+Um dos motivos de separar a conta de usuários do IdP é para poder usar múltiplos módulos como fornecedores de usuários.
+Não podemos restringir demais as funcionalidades e o funcionamento do módulo de usuários pelo IdP.
+Pode ser que em uma compania, já exista um sistema que controle usuários e tenha funcionalidades diferentes, requisitos diferentes.
+Então devemos pensar em montar essa integração como peças que se encaixam e podem ser trocadas por requisitos e limitações.
+A partir disso, e do que já foi respondido também na Q14, podes avaliar uma solução para esta questão.
 
 ---
 
