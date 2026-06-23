@@ -192,7 +192,9 @@ UserAccountCredential
   bem-sucedido; alteração de display name/perfil comum; mudança de property dinâmica de perfil (pré-plano §7).
 - A **fonte de verdade** do stamp é persistida na conta/credencial; o stamp é **capturado em `UserSession` na criação**;
   a comparação acontece em `IUserSessionService.IsSessionValidAsync` **quando a política do realm exigir** (pré-plano
-  §7 "Onde guardar e comparar"). Casos limítrofes de incremento, intervalo e ponto exato de comparação são **Q6**.
+  §7 "Onde guardar e comparar"). Como o core não pode referenciar o módulo `UserAccounts`, a leitura/validação do
+  stamp atual precisa de um seam core-owned, realm-bound e implementado pelo fake e pela `.Integration` (Q15).
+  Casos limítrofes de incremento, intervalo e ponto exato de comparação são **Q6**.
 
 ### Concorrência (princípios; detalhes em Q11)
 
@@ -304,7 +306,7 @@ email/**phone**". Decidir:
   reseta `IsVerified`**).
 
 ### Q11 — Concorrência: estratégia concreta por provider (pré-plano §10)
-**Bloqueia:** Fases 7 e 10.
+**Bloqueia:** Fases 2, 7 e 10.
 - Contador de falhas: **update atômico** (`... set failed = failed + 1 ... returning ...` no PostgreSql) vs
   **optimistic concurrency + retry** (usando `UserAccount.Version`) — e a alternativa transacional equivalente no
   Sqlite. Cobrir os 7 cenários do pré-plano §10 (falhas simultâneas; sucesso×falha; consumo duplo de token; nova
@@ -321,7 +323,7 @@ recorte:
 > Hoje há `Manage/ProfilePage.razor`, login/consent/logout; **não há** telas de troca/recuperação/verificação de senha.
 
 ### Q13 — Costura de execução da invalidação (módulo → IdP) (pré-plano §8)
-**Bloqueia:** Fases 1 e 8.
+**Bloqueia:** Fases 1, 5 e 8.
 O módulo decide a política e **publica um comando/evento de invalidação**; o IdP executa sobre sessão/cookie/refresh.
 Decidir a forma da costura no core (emenda à ADR-014): novos métodos no store de sessão (`EndAllForSubjectAsync`,
 `EndOthersForSubjectAsync(exceptSid)`) + revogação de refresh tokens por subject/sessão (`IRefreshTokenStore`), e o
@@ -342,6 +344,28 @@ roadmap §3 pede explicitamente a "relação com `UserSsoLifetime`, cookie lifet
 - Expiração de senha/lockout **derrubam a sessão** ou apenas barram **nova** autenticação? (Decisão fechada §Senha diz
   que sessões ativas seguem válidas salvo política — confirmar que expiração de senha não é exceção implícita.)
 
+### Q15 — Seam core-owned para capturar e validar `SecurityStamp` (módulo → IdP sem dependência inversa)
+**Bloqueia:** Fases 2 e 8.
+Situação: a **fonte de verdade** do `SecurityStamp` fica no módulo puro `UserAccounts`, mas `UserSession` e
+`IUserSessionService.IsSessionValidAsync` pertencem ao core. O core **não pode** referenciar `UserAccounts`, e o módulo
+puro **não pode** referenciar o core. Sem uma porta explícita, a implementação tenderia a uma de duas quebras:
+dependência inversa do core para o módulo, ou validação no-op/duplicada que não garante a política.
+
+Decidir a forma do seam core-owned, sempre realm-bound na construção e com primitivos/BCL na assinatura:
+- (a) estender `IUserDirectory` com algo como `GetUserSecurityStateProvider(realm)`, retornando uma porta
+  `IUserSecurityStateProvider` com `GetSecurityStampAsync(subjectId)` e/ou
+  `IsSecurityStampValidAsync(subjectId, sessionStamp)`;
+- (b) carregar o stamp no resultado de autenticação apenas para criação da sessão, e usar outro validator core-owned
+  para revalidação posterior;
+- (c) introduzir um `IUserSessionSecurityValidator` no core, implementado pelo fake e pela `.Integration`.
+
+Consequências a registrar na ADR-017:
+- a criação de sessão precisa saber qual stamp capturar, mas `IUserSessionService.StartAsync` hoje recebe só `Subject`;
+- validação de cookie, `IProfileService.IsActiveAsync` e emissão/renovação de tokens devem passar pela mesma regra para
+  evitar comportamentos divergentes;
+- o fake in-memory e o módulo opt-in precisam implementar o mesmo contrato, preservando os contract tests da ADR-015;
+- Q15 é diferente de Q13: Q15 lê/valida o estado atual de segurança; Q13 executa revogação ativa de sessões/refresh.
+
 ---
 
 ## Modelo relacional proposto (sujeito às Questões)
@@ -356,7 +380,7 @@ roadmap §3 pede explicitamente a "relação com `UserSsoLifetime`, cookie lifet
 -- Opção em UserAccount:
 UserAccount.SecurityStamp      string not null   -- regenerado nos gatilhos da Decisão fechada §SecurityStamp
 -- (UserSession ganha cópia capturada na criação; ver emenda ADR-014)
-UserSession.SecurityStamp      string null       -- comparado em IsSessionValidAsync quando a policy do realm exigir
+UserSession.SecurityStamp      string null       -- comparado em IsSessionValidAsync via seam Q15 quando a policy exigir
 ```
 
 ### `PasswordHistory` (Q2) — tabela própria proposta
@@ -444,16 +468,17 @@ where realm_id = @realmId and token_hash = @tokenHash and purpose = @purpose
 
 ## Contratos de borda alvo (emendas à ADR-014, aditivas)
 
-> Dependem de Q4 (required action), Q6 (security stamp em sessão), Q13 (revogação por subject). Forma exata fechada
-> na Fase 1.
+> Dependem de Q4 (required action), Q6 (security stamp em sessão), Q13 (revogação por subject) e Q15 (seam de leitura/
+> validação do stamp atual). Forma exata fechada na Fase 1.
 
 | Porta / tipo | Hoje | Emenda proposta |
 |---|---|---|
 | `AuthenticationResult` / `AuthenticationFailureReason` (core) | sucesso/falha+motivo | required action (`PasswordChangeRequired`/`Expired`) — Q4 |
 | `LocalAuthenticationResult` (módulo) | sucesso/falha+motivo+lockout | espelhar required action — Q4 |
-| `UserSession` (core) | `SubjectId`,`sid`,`amr`,`idp`,`auth_time`,`clients`,`IsActive`,`ExpiresAt`(reservado) | + `SecurityStamp` capturado na criação — Q6 |
+| `UserSession` (core) | `SubjectId`,`sid`,`amr`,`idp`,`auth_time`,`clients`,`IsActive`,`ExpiresAt`(reservado) | + `SecurityStamp` capturado na criação — Q6/Q15 |
 | `IUserSessionStore` (core, puro) | `Create`/`FindById`/`RecordClient`/`End` (por `sid`) | + revogação por subject (`EndAllForSubject`/`EndOthersForSubject`) — Q13 |
-| `IUserSessionService` (core) | `GetCurrent`/`IsSessionValid`/`Start`/`End`/`RecordClient` | `IsSessionValid` compara `SecurityStamp` quando policy exigir — Q6 |
+| `IUserSessionService` (core) | `GetCurrent`/`IsSessionValid`/`Start`/`End`/`RecordClient` | `IsSessionValid` compara `SecurityStamp` via seam core-owned quando policy exigir — Q6/Q15 |
+| novo porto de estado de segurança (core-owned) | — | leitura/validação do stamp atual para captura e revalidação de sessão — Q15 |
 | novo porto de revogação (core) | — | costura que a `.Integration` chama p/ executar invalidação (sessões+refresh) — Q13 |
 
 `IUserAccountPasswordHasher` (módulo) e `IPasswordProtector` (core) **permanecem** como o seam de hash já estabelecido
@@ -493,11 +518,12 @@ RoyalIdentity.UserAccounts/                  (módulo puro — sem core, sem ASP
 
 RoyalIdentity.UserAccounts.Integration/      (única ponte com o IdP)
   + adaptação do required action (Q4) p/ AuthenticationResult
+  + implementação do seam core-owned de estado de segurança para capturar/validar SecurityStamp (Q15)
   + tradução da política de invalidação -> porto de revogação do core (Q13)
   + IUserAccountActionNotifier? (envio de email/SMS — gateway; ver Q12/Fora de escopo)
 
 RoyalIdentity (core)                         (emendas aditivas atrás da ADR-014)
-  AuthenticationResult/UserSession/IUserSessionStore/IUserSessionService + porto de revogação
+  AuthenticationResult/UserSession/IUserSessionStore/IUserSessionService + porto de estado de segurança + porto de revogação
 RoyalIdentity.Razor                          (telas SSR mínimas — só se Q12 = (a))
 ```
 
@@ -535,19 +561,19 @@ dotnet test RoyalIdentity.sln --no-build --nologo
 
 ## Fase 1 - ADR-017, emendas e options de ciclo de segurança por realm
 
-**Depende de:** decidir Q1–Q14 (esta fase é onde as decisões são tomadas e registradas).
+**Depende de:** decidir Q1–Q15 (esta fase é onde as decisões são tomadas e registradas).
 
 **O que/como:** registrar as decisões antes de codar. Criar a **ADR-017** ("Ciclo de segurança da conta") como
 documento autoritativo; emendar **ADR-014** (required action no resultado de autenticação; `SecurityStamp` em
-`UserSession`; revogação por subject) e **ADR-015** (evolução de credencial Q1; telefone Q9; bloco de options); criar o
-bloco `SecurityLifecycle`/invalidação em `UserAccountsRealmOptions`.
+`UserSession`; seam core-owned para validar stamp; revogação por subject) e **ADR-015** (evolução de credencial Q1;
+telefone Q9; bloco de options); criar o bloco `SecurityLifecycle`/invalidação em `UserAccountsRealmOptions`.
 
 **Tarefas:**
 
-- [ ] Criar `adrs/ADR-017.md` decidindo Q1–Q14 (cada questão vira decisão registrada; seguir a regra de ADR do
+- [ ] Criar `adrs/ADR-017.md` decidindo Q1–Q15 (cada questão vira decisão registrada; seguir a regra de ADR do
       CLAUDE.md — decisão, não design).
 - [ ] Emendar `adrs/ADR-014.md`: required action na borda de autenticação; `SecurityStamp` em `UserSession`;
-      revogação por subject no store/serviço de sessão (aditivo).
+      seam core-owned para leitura/validação do stamp atual; revogação por subject no store/serviço de sessão (aditivo).
 - [ ] Emendar `adrs/ADR-015.md`: decisão de credencial (Q1); telefone no agregado (Q9); bloco de options de ciclo.
 - [ ] Modelar o bloco de options por realm em `UserAccountsRealmOptions` (invalidação Q7; expiração/histórico já em
       `PasswordOptions`; consolidar sem duplicar dono).
@@ -563,7 +589,7 @@ contradiz o plano; options têm dono único.
 
 ## Fase 2 - Modelo de credencial, `SecurityStamp` e concorrência
 
-**Depende de:** Q1 (credencial), Q6 (security stamp), Q11 (concorrência).
+**Depende de:** Q1 (credencial), Q6 (security stamp), Q11 (concorrência), Q15 (seam do stamp).
 
 **O que/como:** materializar a decisão de credencial (manter singular ou evoluir para coleção) e introduzir o
 `SecurityStamp` como versionador de estado sensível, com a base de concorrência.
@@ -576,7 +602,8 @@ contradiz o plano; options têm dono único.
       `RoyalIdentity.Security.CryptoRandom`, com método de regeneração e os gatilhos da Decisão fechada §SecurityStamp.
 - [ ] Garantir update atômico/optimistic dos contadores e do stamp (Q11), reusando `UserAccount.Version`.
 - [ ] Mapear/migrar o schema (PostgreSql/Sqlite) sem quebrar round-trip do v2.
-- [ ] Emenda no core: `UserSession` ganha `SecurityStamp` capturado na criação (aditivo, atrás da ADR-014).
+- [ ] Emenda no core: `UserSession` ganha `SecurityStamp` capturado na criação via seam decidido em Q15 (aditivo,
+      atrás da ADR-014).
 
 **Critérios de aceite:** stamp persistido e regenerável; gatilhos corretos incrementam, os de perfil não; round-trip
 EF verde; `UserSession` carrega o stamp; mudança de credencial e stamp ocorrem na mesma transação.
@@ -635,7 +662,8 @@ verde.
 
 ## Fase 5 - Recuperação de senha e tokens de ação
 
-**Depende de:** Q3 (modelo de token compartilhado), Q12 (HTTP/UI), Q7 (invalidação no reset).
+**Depende de:** Q3 (modelo de token compartilhado), Q7 (invalidação no reset), Q12 (HTTP/UI),
+Q13 (costura/registro da invalidação).
 
 **O que/como:** implementar `UserAccountActionToken` e o fluxo de recuperação com anti-enumeração e uso único
 idempotente.
@@ -646,12 +674,14 @@ idempotente.
 - [ ] `RequestPasswordRecovery` (gated por `AllowForgotPassword`): resposta pública **sempre igual**; só emite token se a
       conta existir e a policy permitir; rate limit por IP/realm/identificador normalizado; sem revelar existência/estado.
 - [ ] `ResetPasswordWithToken`: consumo idempotente (update condicional); aplica complexidade/histórico (Fase 3);
-      dispara invalidação conforme Q7 (reset costuma revogar sessões/refresh por default — a ratificar).
+      registra/publica a solicitação de invalidação conforme Q7/Q13 (reset costuma revogar sessões/refresh por default
+      — a ratificar). A execução efetiva sobre stores de sessão/refresh é concluída na Fase 8.
 - [ ] Gateway de notificação (`INotificationGateway`/no-op) para entregar o link/código (ver Arquitetura alvo).
 - [ ] Endpoints/telas SSR **apenas se Q12 = (a)**.
 
 **Critérios de aceite:** token só verificável uma vez; nova emissão revoga anteriores; conta inexistente não cria token
-nem revela; reset aplica políticas de senha; invalidação conforme policy; hashes de token nunca expostos.
+nem revela; reset aplica políticas de senha; solicitação de invalidação segue a policy decidida; hashes de token nunca
+expostos.
 
 **Testes:** unidade (emissão/consumo/revogação/anti-enumeração); concorrência de consumo (Fase 10 amplia).
 
@@ -707,15 +737,16 @@ modeladas mas não implementadas.
 ## Fase 8 - Invalidação de sessões/cookies/refresh tokens
 
 **Depende de:** Q6 (security stamp/comparação), Q7 (política/defaults), Q13 (costura de execução),
-Q14 (`ExpiresAt`/`UserSsoLifetime`/cookie lifetime).
+Q14 (`ExpiresAt`/`UserSsoLifetime`/cookie lifetime), Q15 (seam do stamp).
 
 **O que/como:** ligar o `SecurityStamp` à validação de sessão e executar a política de invalidação por realm sobre
 sessões/cookies/refresh tokens, com a execução no IdP (a costura é a emenda da ADR-014).
 
 **Tarefas:**
 
-- [ ] `IUserSessionService.IsSessionValidAsync` compara o `SecurityStamp` da sessão com o atual **quando a policy do
-      realm exigir** (intervalo/ponto conforme Q6); cookie `OnValidatePrincipal` continua sendo a costura por request.
+- [ ] `IUserSessionService.IsSessionValidAsync` compara o `SecurityStamp` da sessão com o atual por meio do seam
+      decidido em Q15 **quando a policy do realm exigir** (intervalo/ponto conforme Q6); cookie `OnValidatePrincipal`
+      continua sendo a costura por request.
 - [ ] Emenda no core (Q13): revogação por subject no store/serviço de sessão (`EndAllForSubject`/`EndOthersForSubject`)
       e revogação de refresh tokens por subject/sessão (`IRefreshTokenStore`); implementar no fake in-memory.
 - [ ] `.Integration` traduz a política do módulo (Q7) em chamadas ao porto de revogação do core (idempotentes, pós-commit).
@@ -801,11 +832,11 @@ verde com integração opt-in; fake permanece disponível; fronteiras de arquite
 
 ## Critérios globais de aceite
 
-1. ADR-017 criada decidindo Q1–Q14; ADR-014/015 emendadas; documentação alinhada.
+1. ADR-017 criada decidindo Q1–Q15; ADR-014/015 emendadas; documentação alinhada.
 2. Senha local cobre: troca (user-facing gated), recuperação, histórico, expiração com enforcement e `MustChangePassword`.
 3. Lockout temporário e bloqueio administrativo são estados distintos; unlock administrativo funciona.
 4. Verificação de email (e telefone, se Q9=(a)) por token de ação, com `email_verified` coerente.
-5. `SecurityStamp` implementado, capturado na sessão e usado na validação quando a policy exigir.
+5. `SecurityStamp` implementado, capturado na sessão e usado na validação por seam core-owned quando a policy exigir.
 6. Invalidação por realm de sessões/cookies/refresh tokens funciona pela costura `.Integration` → core (Q13).
 7. Eventos de segurança emitidos/classificados (auditoria/outbox conforme Q8).
 8. Concorrência coberta pelos 7 cenários; consumo/revogação idempotentes.
@@ -824,6 +855,9 @@ verde com integração opt-in; fake permanece disponível; fronteiras de arquite
   Avaliar custo×benefício antes; se incerto, manter singular e registrar migração.
 - **`SecurityStamp` mal escopado:** se incrementar em mudanças de perfil, derruba sessões à toa; se de menos, deixa
   credencial comprometida válida. Q6 deve fixar gatilhos e ponto de comparação.
+- **Seam do `SecurityStamp` mal definido:** se o core tentar ler diretamente o módulo, viola as fronteiras da
+  ADR-013/014/015; se a validação ficar no-op ou duplicada, a política de invalidação por stamp não é confiável. Q15
+  deve fechar a porta core-owned usada por fake e `.Integration`.
 - **Anti-enumeração:** fácil de vazar por diferença de tempo/resposta/mensagem entre conta existente e inexistente.
   Cobrir com testes específicos.
 - **Concorrência:** contadores de falha e consumo de token são pontos clássicos de corrida; preferir updates atômicos a
