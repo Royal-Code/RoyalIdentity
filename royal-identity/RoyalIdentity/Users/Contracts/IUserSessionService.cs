@@ -20,6 +20,15 @@ public interface IUserSessionService
     Task<UserSession> StartAsync(
         Subject subject, string authenticationMethod, string identityProvider, CancellationToken ct = default);
 
+    /// <summary>Starts a new session and captures the provider security stamp when one is available.</summary>
+    Task<UserSession> StartAsync(
+        Subject subject,
+        string authenticationMethod,
+        string identityProvider,
+        string? securityStamp,
+        CancellationToken ct = default)
+        => StartAsync(subject, authenticationMethod, identityProvider, ct);
+
     /// <summary>Ends the session with the given id and returns it, or <c>null</c> when not found.</summary>
     Task<UserSession?> EndAsync(string sessionId, CancellationToken ct = default);
 

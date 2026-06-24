@@ -50,6 +50,8 @@ public class UserAccountsPersistenceTests
 		Assert.True(loaded.IsBlocked);
 		Assert.Equal("fraud", loaded.BlockedReason);
 		Assert.Equal(Now.AddMinutes(1), loaded.BlockedAt);
+		Assert.NotEmpty(loaded.SecurityStamp.Value);
+		Assert.Equal(Now, loaded.SessionsValidAfter);
 		Assert.Equal("hashed-secret", loaded.LocalCredential.PasswordHash);
 		Assert.Equal(2, loaded.Emails.Count);
 		Assert.Equal("alice@example.com", loaded.PrimaryEmail?.Address);
@@ -400,6 +402,32 @@ public class UserAccountsPersistenceTests
 			Assert.NotNull(found);
 			Assert.Equal("subject-1", found!.SubjectId);
 		}
+	}
+
+	[Fact]
+	public async Task UserAccount_Version_RejectsConcurrentUpdates()
+	{
+		await using var provider = BuildProvider();
+		long accountId;
+
+		await using (var seed = NewContext(provider))
+		{
+			var account = NewAccount();
+			seed.UserAccounts.Add(account);
+			await seed.SaveChangesAsync();
+			accountId = account.Id;
+		}
+
+		await using var first = NewContext(provider);
+		await using var second = NewContext(provider);
+		var firstAccount = await first.UserAccounts.SingleAsync(a => a.Id == accountId);
+		var secondAccount = await second.UserAccounts.SingleAsync(a => a.Id == accountId);
+
+		Assert.True(firstAccount.ChangeDisplayName("Alice First", Now.AddMinutes(1)).IsSuccess);
+		await first.SaveChangesAsync();
+
+		Assert.True(secondAccount.ChangeDisplayName("Alice Second", Now.AddMinutes(2)).IsSuccess);
+		await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
 	}
 
 	private static ServiceProvider BuildProvider()

@@ -22,6 +22,8 @@ public class UserAccountDomainTests
 		Assert.True(account.IsActive);
 		Assert.False(account.IsBlocked);
 		Assert.False(account.BlockState.IsBlocked);
+		Assert.NotEmpty(account.SecurityStamp.Value);
+		Assert.Equal(Now, account.SessionsValidAfter);
 		Assert.Equal("realm-a", account.LocalCredential.RealmId);
 		Assert.Same(account, account.LocalCredential.UserAccount);
 	}
@@ -105,6 +107,90 @@ public class UserAccountDomainTests
 		Assert.True(valid.IsSuccess);
 		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
 		Assert.True(account.LocalCredential.HasPassword);
+	}
+
+	[Fact]
+	public void SetPassword_RegeneratesSecurityStamp_AndMovesSessionsValidAfter()
+	{
+		var account = CreateAccount();
+		var initialStamp = account.SecurityStamp;
+		var changedAt = Now.AddMinutes(1);
+
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), changedAt).IsSuccess);
+
+		Assert.NotEqual(initialStamp, account.SecurityStamp);
+		Assert.Equal(changedAt, account.SessionsValidAfter);
+		Assert.Equal(changedAt, account.UpdatedAt);
+	}
+
+	[Fact]
+	public void SensitiveNonCredentialChanges_RegenerateSecurityStamp_WithoutMovingSessionsValidAfter()
+	{
+		var account = CreateAccount();
+		var initialStamp = account.SecurityStamp;
+		var initialValidAfter = account.SessionsValidAfter;
+
+		Assert.True(account.AddEmail(CreateEmail("alice@example.com"), Now.AddMinutes(1)).IsSuccess);
+		var emailStamp = account.SecurityStamp;
+
+		Assert.NotEqual(initialStamp, emailStamp);
+		Assert.Equal(initialValidAfter, account.SessionsValidAfter);
+
+		Assert.True(account.AddRole(CreateRole("admin"), Now.AddMinutes(2)).IsSuccess);
+
+		Assert.NotEqual(emailStamp, account.SecurityStamp);
+		Assert.Equal(initialValidAfter, account.SessionsValidAfter);
+	}
+
+	[Fact]
+	public void ProfileChanges_DoNotRegenerateSecurityStamp()
+	{
+		var account = CreateAccount();
+		var initialStamp = account.SecurityStamp;
+		var initialValidAfter = account.SessionsValidAfter;
+
+		Assert.True(account.ChangeDisplayName("Alice L.", Now.AddMinutes(1)).IsSuccess);
+		Assert.True(account.ChangeUsername("alice.l", "ALICE.L", Now.AddMinutes(2)).IsSuccess);
+
+		Assert.Equal(initialStamp, account.SecurityStamp);
+		Assert.Equal(initialValidAfter, account.SessionsValidAfter);
+	}
+
+	[Fact]
+	public void AuthenticateLocal_DoesNotRegenerateSecurityStamp_OrMoveSessionsValidAfter()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
+		var stampAfterPassword = account.SecurityStamp;
+		var validAfterPassword = account.SessionsValidAfter;
+
+		var failed = account.AuthenticateLocal("wrong", options, PasswordHasher, Now.AddMinutes(1));
+		var succeeded = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(2));
+
+		Assert.False(failed.Success);
+		Assert.True(succeeded.Success);
+		Assert.Equal(stampAfterPassword, account.SecurityStamp);
+		Assert.Equal(validAfterPassword, account.SessionsValidAfter);
+	}
+
+	[Fact]
+	public void RegenerateSecurityStamp_CanOptionallyMoveSessionsValidAfter()
+	{
+		var account = CreateAccount();
+		var initialStamp = account.SecurityStamp;
+		var initialValidAfter = account.SessionsValidAfter;
+
+		account.RegenerateSecurityStamp(Now.AddMinutes(1));
+		var regeneratedStamp = account.SecurityStamp;
+
+		Assert.NotEqual(initialStamp, regeneratedStamp);
+		Assert.Equal(initialValidAfter, account.SessionsValidAfter);
+
+		account.RegenerateSecurityStamp(Now.AddMinutes(2), invalidateSessions: true);
+
+		Assert.NotEqual(regeneratedStamp, account.SecurityStamp);
+		Assert.Equal(Now.AddMinutes(2), account.SessionsValidAfter);
 	}
 
 	[Fact]
@@ -214,6 +300,7 @@ public class UserAccountDomainTests
 
 		Assert.Equal(typeof(IReadOnlyCollection<UserAccountEmail>), typeof(UserAccount).GetProperty(nameof(UserAccount.Emails))?.PropertyType);
 		Assert.Equal(typeof(IReadOnlyCollection<UserAccountRole>), typeof(UserAccount).GetProperty(nameof(UserAccount.Roles))?.PropertyType);
+		Assert.Equal(typeof(SecurityStamp), typeof(UserAccount).GetProperty(nameof(UserAccount.SecurityStamp))?.PropertyType);
 		AssertVirtualGetter(typeof(UserAccount), nameof(UserAccount.LocalCredential));
 		AssertVirtualGetter(typeof(UserAccountEmail), nameof(UserAccountEmail.UserAccount));
 		AssertVirtualGetter(typeof(UserAccountRole), nameof(UserAccountRole.UserAccount));

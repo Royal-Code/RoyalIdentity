@@ -1,15 +1,15 @@
 # Plan: Credenciais e Ciclo de Segurança da Conta (`plan-users-security-lifecycle`)
 
-## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fase 1 concluída (ADR-017 + emendas + options)
+## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–2 concluídas
 
 ## Progresso
 
-`#---------` **10%** - 1 de 10 fases
+`##--------` **20%** - 2 de 10 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - ADR-017, emendas e options de ciclo de segurança por realm | Concluida |
-| Fase 2 - Modelo de credencial, `SecurityStamp` e concorrência | Pendente |
+| Fase 2 - Modelo de credencial, `SecurityStamp` e concorrência | Concluida |
 | Fase 3 - Política de senha: histórico e expiração com enforcement | Pendente |
 | Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada) | Pendente |
 | Fase 5 - Recuperação de senha e tokens de ação | Pendente |
@@ -1048,14 +1048,14 @@ não contradiz o plano; options têm dono único.
 
 **Tarefas:**
 
-- [ ] Preservar `UserAccountCredential` singular (Q1 — decidido: manter), com o seam `IUserAccountPasswordHasher` e o
+- [x] Preservar `UserAccountCredential` singular (Q1 — decidido: manter), com o seam `IUserAccountPasswordHasher` e o
       autenticador atuais; não genericizar.
-- [ ] Adicionar `SecurityStamp` (value object) **e** `SessionsValidAfter` em `UserAccount` (Q6/Q7 — decidido);
+- [x] Adicionar `SecurityStamp` (value object) **e** `SessionsValidAfter` em `UserAccount` (Q6/Q7 — decidido);
       `SecurityStamp` gerado por `RoyalIdentity.Security.CryptoRandom`. `SecurityStamp` muda em **todos** os gatilhos;
       `SessionsValidAfter` move **só** nos gatilhos que devem derrubar sessões/tokens (enforcement via `SessionsValidAfter`).
-- [ ] Garantir update atômico/optimistic dos contadores e do stamp (Q11), reusando `UserAccount.Version`.
-- [ ] Mapear/migrar o schema (PostgreSql/Sqlite) sem quebrar round-trip do v2.
-- [ ] Emenda no core: `UserSession` ganha `SecurityStamp` capturado na criação via seam decidido em Q15 (aditivo,
+- [x] Garantir update atômico/optimistic dos contadores e do stamp (Q11), reusando `UserAccount.Version`.
+- [x] Mapear/migrar o schema (PostgreSql/Sqlite) sem quebrar round-trip do v2.
+- [x] Emenda no core: `UserSession` ganha `SecurityStamp` capturado na criação via seam decidido em Q15 (aditivo,
       atrás da ADR-014).
 
 **Critérios de aceite:** stamp persistido e regenerável; `SessionsValidAfter` persistido e atualizado só nos gatilhos de
@@ -1066,7 +1066,16 @@ credencial, stamp e invalidação ocorrem na mesma transação quando aplicável
 
 ### Resultado da Fase 2
 
-*a preencher*
+Concluída.
+
+- `UserAccountCredential` foi preservado como credencial local singular.
+- `UserAccount` ganhou `SecurityStamp` (VO gerado por `CryptoRandom`) e `SessionsValidAfter`.
+- Senha e regeneração com invalidação movem stamp + `SessionsValidAfter`; email/primário/roles regeneram só o stamp; perfil/login não mexem no stamp.
+- `UserAccount.Version` agora avança nas mutações do aggregate, deixando a concorrência otimista efetiva em SQLite; PostgreSQL segue usando `xmin`.
+- EF persiste `SecurityStamp` por conversão string e `SessionsValidAfter`; round-trip v2 permanece verde.
+- `UserSession` ganhou `SecurityStamp` nullable; `IUserSessionService` tem overload aditivo para capturar o stamp quando a seam Q15 estiver disponível.
+- A leitura real pelo `IUserSecurityStateProvider` e o enforcement por `SessionsValidAfter` continuam na Fase 8, conforme Q15.
+- Verificação: `dotnet test Tests.UserAccounts --nologo`; `dotnet test Tests.Integration --nologo --filter "FullyQualifiedName~DefaultUserSessionServiceTests|FullyQualifiedName~SubjectPrincipalFactoryTests"`; `dotnet build RoyalIdentity.sln --nologo`.
 
 ---
 

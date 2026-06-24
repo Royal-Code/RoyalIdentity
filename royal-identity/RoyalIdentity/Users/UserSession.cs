@@ -22,6 +22,9 @@ public sealed class UserSession
     /// <summary>When the session started (drives the <c>auth_time</c> claim).</summary>
     public required DateTime StartedAt { get; init; }
 
+    /// <summary>Security stamp captured when the session starts, when the user provider exposes one.</summary>
+    public string? SecurityStamp { get; init; }
+
     /// <summary>Whether the session is active. Logout/expiry set this to <c>false</c>.</summary>
     public bool IsActive { get; set; } = true;
 

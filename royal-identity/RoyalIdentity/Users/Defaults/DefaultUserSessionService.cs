@@ -40,6 +40,14 @@ public sealed class DefaultUserSessionService(
 
     public Task<UserSession> StartAsync(
         Subject subject, string authenticationMethod, string identityProvider, CancellationToken ct = default)
+        => StartAsync(subject, authenticationMethod, identityProvider, securityStamp: null, ct);
+
+    public Task<UserSession> StartAsync(
+        Subject subject,
+        string authenticationMethod,
+        string identityProvider,
+        string? securityStamp,
+        CancellationToken ct = default)
     {
         var session = new UserSession
         {
@@ -48,6 +56,7 @@ public sealed class DefaultUserSessionService(
             AuthenticationMethod = authenticationMethod,
             IdentityProvider = identityProvider,
             StartedAt = clock.GetUtcNow().UtcDateTime,
+            SecurityStamp = securityStamp,
         };
 
         return Store.CreateAsync(session, ct);

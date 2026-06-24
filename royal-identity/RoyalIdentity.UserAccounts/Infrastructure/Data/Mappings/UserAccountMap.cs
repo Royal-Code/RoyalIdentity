@@ -27,6 +27,12 @@ public sealed class UserAccountMap : IEntityTypeConfiguration<UserAccount>
 		builder.Property(a => a.ExternalId);
 		builder.Property(a => a.CreatedAt).IsRequired();
 		builder.Property(a => a.UpdatedAt).IsRequired();
+		builder.Property(a => a.SecurityStamp)
+			.HasConversion(
+				stamp => stamp.Value,
+				value => SecurityStamp.FromPersisted(value))
+			.IsRequired();
+		builder.Property(a => a.SessionsValidAfter).IsRequired();
 		builder.Property(a => a.Version).IsConcurrencyToken();
 
 		// Administrative block state stored inline on the account row.

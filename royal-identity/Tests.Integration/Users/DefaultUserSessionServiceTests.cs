@@ -54,6 +54,20 @@ public class DefaultUserSessionServiceTests
     }
 
     [Fact]
+    public async Task StartAsync_CapturesSecurityStamp_WhenProvided()
+    {
+        var (service, _) = Build();
+
+        var session = await service.StartAsync(
+            new Subject("sub-1", "Display", true),
+            "pwd",
+            "local",
+            "stamp-1");
+
+        Assert.Equal("stamp-1", session.SecurityStamp);
+    }
+
+    [Fact]
     public async Task IsSessionValid_Active_True_Absent_False_Ended_False()
     {
         var (service, _) = Build();

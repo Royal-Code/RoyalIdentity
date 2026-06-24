@@ -50,6 +50,8 @@ public class UserAccount : AggregateRoot<long>
 		ExternalId = externalId;
 		IsActive = true;
 		BlockState = UserAccountBlockState.Unblocked();
+		SecurityStamp = SecurityStamp.New();
+		SessionsValidAfter = createdAt;
 		CreatedAt = createdAt;
 		UpdatedAt = createdAt;
 		LocalCredential = new UserAccountCredential(RealmId);
@@ -122,6 +124,16 @@ public class UserAccount : AggregateRoot<long>
 	/// Gets the last mutation timestamp.
 	/// </summary>
 	public DateTimeOffset UpdatedAt { get; private set; }
+
+	/// <summary>
+	/// Gets the opaque version of the account's security-sensitive state.
+	/// </summary>
+	public SecurityStamp SecurityStamp { get; private set; } = SecurityStamp.New();
+
+	/// <summary>
+	/// Gets the point after which sessions and tokens remain valid when security-state invalidation is enforced.
+	/// </summary>
+	public DateTimeOffset SessionsValidAfter { get; private set; }
 
 	/// <summary>
 	/// Gets the provider-specific concurrency token.
@@ -252,7 +264,7 @@ public class UserAccount : AggregateRoot<long>
 		email.AttachTo(this);
 		email.MarkPrimary(shouldBePrimary);
 		EmailItems.Add(email);
-		Touch(changedAt);
+		TouchSecurityState(changedAt, invalidateSessions: false);
 		AddEvent(new UserAccountEmailAdded(RealmId, SubjectId, email.Address, email.IsPrimary));
 
 		if (email.IsPrimary)
@@ -279,7 +291,7 @@ public class UserAccount : AggregateRoot<long>
 
 		ClearPrimaryEmail();
 		email.MarkPrimary(true);
-		Touch(changedAt);
+		TouchSecurityState(changedAt, invalidateSessions: false);
 		AddEvent(new UserAccountPrimaryEmailChanged(RealmId, SubjectId, email.Address));
 		return Result.Ok();
 	}
@@ -304,7 +316,7 @@ public class UserAccount : AggregateRoot<long>
 
 		role.AttachTo(this);
 		RoleItems.Add(role);
-		Touch(changedAt);
+		TouchSecurityState(changedAt, invalidateSessions: false);
 		AddEvent(new UserAccountRoleAdded(RealmId, SubjectId, role.Name));
 		return Result.Ok();
 	}
@@ -324,7 +336,7 @@ public class UserAccount : AggregateRoot<long>
 		}
 
 		RoleItems.Remove(accountRole);
-		Touch(changedAt);
+		TouchSecurityState(changedAt, invalidateSessions: false);
 		AddEvent(new UserAccountRoleRemoved(RealmId, SubjectId, accountRole.Name));
 		return Result.Ok();
 	}
@@ -342,9 +354,19 @@ public class UserAccount : AggregateRoot<long>
 		bool mustChangePassword = false)
 	{
 		LocalCredential.SetPassword(passwordHash, changedAt, mustChangePassword);
-		Touch(changedAt);
+		TouchSecurityState(changedAt, invalidateSessions: true);
 		AddEvent(new UserAccountPasswordChanged(RealmId, SubjectId));
 		return Result.Ok();
+	}
+
+	/// <summary>
+	/// Regenerates the account security stamp.
+	/// </summary>
+	/// <param name="changedAt">The mutation timestamp.</param>
+	/// <param name="invalidateSessions">Whether this change moves the session invalidation marker.</param>
+	public void RegenerateSecurityStamp(DateTimeOffset changedAt, bool invalidateSessions = false)
+	{
+		TouchSecurityState(changedAt, invalidateSessions);
 	}
 
 	/// <summary>
@@ -547,5 +569,18 @@ public class UserAccount : AggregateRoot<long>
 	private void Touch(DateTimeOffset changedAt)
 	{
 		UpdatedAt = changedAt;
+		Version++;
+	}
+
+	private void TouchSecurityState(DateTimeOffset changedAt, bool invalidateSessions)
+	{
+		SecurityStamp = SecurityStamp.New();
+
+		if (invalidateSessions)
+		{
+			SessionsValidAfter = changedAt;
+		}
+
+		Touch(changedAt);
 	}
 }
