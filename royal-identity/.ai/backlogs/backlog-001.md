@@ -190,3 +190,20 @@ tornar hashes existentes mais fracos que a política corrente. Nesse momento, in
 **Nota de design:**
 - Como só é possível regravar com a senha em mãos, a adoção é naturalmente *on-login* (não há migração em lote).
 - O consumidor decide a política (`PasswordHashOptions`) por realm; a primitiva não conhece realm.
+
+---
+
+## Restrições de acesso por realm/grupo (Geo/Time/Client)
+
+**Área:** Segurança / Contas de usuário / Autorização
+**Deferral:** Surgiu na Q5 do [plan-users-security-lifecycle.md](../plans/plan-users-security-lifecycle.md). O plano de
+*security lifecycle* cobre apenas o **bloqueio administrativo pessoal** (`UserAccountBlockState` com janela
+`StartsAt`/`EndsAt`) e o **lockout por falha** (`PasswordLockout`, derivado da credencial). A proposta inicial de uma
+tabela `AccountAccessRestriction` **per-account** para Geo/Time/Client foi **aposentada**: o autor avaliou que essas
+restrições aplicam-se a **todos os usuários ou a grupos**, não por conta, e exigem um **design multifuncional próprio**.
+**Quando revisitar:** Quando houver demanda de restrição por geolocalização, janela de horário ou client/app — e/ou junto
+do **motor de permissões** futuro (funções administrativas gated por permissões).
+**Nota de design:**
+- Modelar como **políticas por realm/grupo**, não como linhas por conta.
+- Tipos previstos: `GeoBlock`, `TimeWindow`, `ClientRestriction`.
+- Relaciona-se com o futuro motor de permissões (quem pode aplicar/remover restrições) e com a UI/API administrativa.

@@ -1,6 +1,6 @@
 # Plan: Credenciais e Ciclo de Segurança da Conta (`plan-users-security-lifecycle`)
 
-## Status: PLANEJADO - 0 de 10 fases (aguardando resolução das Questões em aberto)
+## Status: PLANEJADO - 15 questões decididas (Q1–Q15); pronto para ADR-017 + Fase 1
 
 ## Progresso
 
@@ -23,14 +23,13 @@
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
 > (um bloco `#` por fase concluida, `%` e `X de 10`). Ex.: 3 fases => `###-------` **30%** - 3 de 10.
 
-> **Aviso de prontidão:** este plano **não está pronto para implementação**. Várias fases estão **bloqueadas
-> pelas [Questões em aberto](#questões-em-aberto)**. O autor deve decidir cada questão (registrando a decisão na
-> ADR-017 e neste documento) **antes** de iniciar a fase que depende dela. Os modelos relacionais e contratos abaixo
-> são **propostas iniciais**, não decisões fechadas, exceto onde marcado em [Decisões fechadas](#decisões-fechadas).
+> **Aviso de prontidão:** as **15 questões estão decididas** (ver `#### QN - Conclusão`). Próximo passo: **Fase 1** —
+> registrar as decisões na **ADR-017** e emendar ADR-014/015. Os modelos relacionais e contratos abaixo já refletem as
+> decisões; ajustes finos de assinatura fecham na ADR-017.
 
-> **Rodada 1 de respostas (analisada):** **fechadas** — Q1, Q2, Q4, Q6, Q9, Q10, Q11, Q12 (ver `#### QN - Conclusão`).
-> **Pendentes de 2ª rodada** — Q3, Q5, Q7, Q8, Q13, Q14, Q15 (ver `#### QN - Comentários e Questões 2`). A reconciliação
-> central **stamp × invalidação** (Q4/Q6) está consolidada em **Q7-2**.
+> **Rodada 2 (analisada):** **todas as 15 questões decididas** (ver `#### QN - Conclusão`). A reconciliação central
+> **stamp × invalidação** foi fechada na Q7 com **`SecurityStamp` (versão geral) + `SessionsValidAfter` (marcador de
+> invalidação)**.
 
 ---
 
@@ -300,6 +299,12 @@ A resposta **não decide** — pede detalhamento das opções, do estilo Keycloa
 
 Ficamos com opção 1.
 
+#### Q3 - Conclusão
+
+A resposta **atende**. Decisão: **Opção A** — token de ação transitório (`Purpose=ChangeExpiredPassword`, de uso único) + **re-login** após a troca. Sem sessão parcial/resume-in-flow neste plano; o `RequiredAction` (Q4) fica como **ponto de evolução** para B no futuro, sem retrabalho.
+
+Aplicar ao plano: Fases 4/5 já refletem (token de ação + re-login); marcar Q3 como decidido (Opção A).
+
 ### Q4 — Forma do "required action" na borda de autenticação (pré-plano §4)
 **Bloqueia:** Fases 1 e 4 (emenda à ADR-014 + core).
 Hoje `AuthenticationResult` (core) e `LocalAuthenticationResult` (módulo) só têm sucesso/falha+motivo. Decidir:
@@ -366,6 +371,16 @@ Proposta para este plano:
 aposentar a `AccountAccessRestriction`.
 Podemos deixar o bloqueio `Geo/Time/Client` para depois, mas isso deve ir para um plano futuro ou backlog para não se perder.
 
+
+#### Q5 - Conclusão
+
+A resposta **atende**. Decisão:
+- `UserAccountBlockState` ganha janela **`StartsAt`/`EndsAt`** (ex.: bloquear conta em férias) — AdminBlock pessoal com **prazo opcional** (null = indefinido).
+- **Aposentar** a tabela `AccountAccessRestriction` per-account (sai do modelo).
+- `Geo`/`Time`/`Client` ficam para **plano futuro** e são **registrados no backlog** ("para não se perder").
+- **Unlock administrativo** por troca de senha **ou** por admin; futuras funções admin gated por motor de permissões (fora de escopo).
+
+Aplicar ao plano: modelo → remover `AccountAccessRestriction`, adicionar `StartsAt`/`EndsAt` ao BlockState; Fase 7 → AdminBlock com janela + unlock; Arquitetura → remover o tipo do slice; **adicionar item no backlog** (Geo/Time/Client como restrições por realm/grupo + motor de permissões).
 
 ### Q6 — `SecurityStamp`: local, gatilhos limítrofes e ponto de comparação (pré-plano §7)
 **Bloqueia:** Fases 2 e 8.
@@ -457,6 +472,21 @@ Talvez isso pode ser resolvido com um marcador separado de invalidação, por ex
 
 Assim, admin MustChangePassword pode incrementar SecurityStamp sem derrubar sessão; reset de senha incrementa SecurityStamp e também move SessionsValidAfter. Essa pequena peça evita uma gambiarra futura.
 
+#### Q7 - Conclusão
+
+A resposta **atende** e **refina** com uma peça-chave (que adoto). Decisões:
+
+1. **Formato: flags + presets** (opção `a`).
+2. **Modelo incrementar-sempre / enforçar-gated**, operacionalizado pelo refinamento do autor com **dois campos** (resolve a tensão Q4/Q6 sem "o stamp não sabe por quê mudou"):
+   - **`SecurityStamp`** (VO): versão geral do estado sensível; muda em **todos** os gatilhos (Q6). Usado para revalidação de cookie/claims e bookkeeping.
+   - **`SessionsValidAfter`** (timestamp) **ou** `SecurityEpoch` (contador): **marcador de invalidação**; move **só** nos gatilhos que devem derrubar sessões/tokens. **É este** que a emissão de token/`IsSessionValidAsync` comparam (sessão válida sse `session.StartedAt >= conta.SessionsValidAfter`, ou `session.Epoch == conta.Epoch`).
+   - Efeito: admin-`MustChangePassword` incrementa `SecurityStamp` **sem** derrubar sessão (não move `SessionsValidAfter`); troca/reset/admin-set-senha movem **ambos**; email/telefone/roles movem `SecurityStamp` e movem `SessionsValidAfter` **só se a policy do realm exigir** (opt-in). Isto **substitui** o "enforçar o próprio stamp" do Q7-2 — o enforcement passa a ser via `SessionsValidAfter`.
+3. **Tabela de defaults por gatilho: aprovada.**
+
+Recomendação de representação: **`SessionsValidAfter` (timestamp)** (simples; alinha com o "notBefore"/revocation-por-usuário do Keycloak); `SecurityEpoch` é equivalente — confirmável na implementação.
+
+Aplicar ao plano: §`SecurityStamp` do modelo (+ `SessionsValidAfter`); Fase 2 cria o VO **e** `SessionsValidAfter`; Fase 8 compara `SessionsValidAfter`; bloco de options de invalidação (flags+presets + classificação por gatilho).
+
 ### Q8 — Eventos/auditoria/outbox: escopo neste plano (pré-plano §9)
 **Bloqueia:** Fase 9.
 - Confirmar **Opção B** (auditoria durável + outbox seletivo). Mas: **a auditoria durável e o outbox são construídos
@@ -499,6 +529,16 @@ Poderia ser por categorias de auditoria, não lista fixa de eventos: Credential,
 Para histórico por idade + quantidade, eu colocaria um limite máximo de comparações/retenção para evitar custo exagerado em contas que trocam senha muitas vezes.
 
 Para recuperação/verificação, vale explicitar que o token bruto só sai como “delivery payload” uma vez e nunca entra em evento/auditoria/log.
+
+#### Q8 - Conclusão
+
+A resposta **atende**. Decisões:
+- **Design de auditoria aprovado**: `ISecurityAuditSink` + `SecurityAuditOptions` por realm; **store durável diferido** ao `plan-data-persistence` (§2); sink de log por ora.
+- Auditoria **por categorias** (não lista fixa de eventos): `Credential`, `Recovery`, `Verification`, `Lockout`, `AdminSecurity`, `SessionRevocation`, `AuthenticationFailure`. **Defaults: on** para as categorias de segurança; **off** para o resto.
+- **Sem outbox** (diferido inteiramente); eventos por **caso de uso** (sem catálogo grande antecipado).
+- Refinamentos absorvidos: (i) **limite máximo de comparações/retenção** no histórico de senha (Q2/Fase 3) — evita custo em contas que trocam senha muitas vezes; (ii) **token bruto** só sai como *delivery payload* **uma vez** e **nunca** entra em evento/auditoria/log (vira invariante).
+
+Aplicar ao plano: Fase 9 → categorias + defaults + sem catálogo; Fase 3/`PasswordOptions` → cap de comparações/retenção; **Invariantes** → token bruto nunca em evento/auditoria/log.
 
 ### Q9 — Telefone: entra no agregado neste plano? (pré-plano "Email/telefone" + §6 das emendas)
 **Bloqueia:** Fase 6.
@@ -604,6 +644,12 @@ A resposta **aprova** criar novos métodos/APIs, mas **pede** uma avaliação de
 
 Confirmado.
 
+#### Q13 - Conclusão
+
+A resposta **atende**. Decisão: porta core-owned **`ISessionRevocationService`** (síncrona agora pela `.Integration`; aberta a disparo por evento `SecurityInvalidationRequested` no futuro), em vez de espalhar métodos pelos contratos existentes.
+
+Aplicar ao plano: contratos de borda / Fase 8 / Arquitetura referenciam `ISessionRevocationService`.
+
 ### Q14 — `UserSession.ExpiresAt` × cookie lifetime × `UserSsoLifetime` × expiração de senha/lockout (roadmap §3; `UserSession.cs:38`)
 **Bloqueia:** Fase 8.
 Hoje `UserSession.ExpiresAt` é **reservado, sem comportamento** (o próprio XML doc diz "a future phase may define its
@@ -649,6 +695,12 @@ A resposta **pede** a avaliação das duas opções (Realm-only vs Realm+Client)
 #### Q14 - Resposta 2
 
 Confirma.
+
+#### Q14 - Conclusão
+
+A resposta **atende**. Decisão: **Realm-only** para `UserSession.ExpiresAt` (SSO session max + idle por realm — `ExpiresAt` ganha comportamento); **`UserSsoLifetime` por client inalterado** (segue forçando interação no `PromptLoginDecorator`, ortogonal); expiração por client **diferida**. `IsSessionValidAsync = ativo && não-expirado(ExpiresAt) && (policy ? SessionsValidAfter-ok : true)`. **Expiração de senha não derruba sessão**; bloqueio é opcional/configurável.
+
+Aplicar ao plano: bloco de options por realm (SSO session max/idle); Fase 8; contratos (`UserSession.ExpiresAt` ganha comportamento, Realm-only).
 
 ### Q15 — Seam core-owned para capturar e validar `SecurityStamp` (módulo → IdP sem dependência inversa)
 **Bloqueia:** Fases 2 e 8.
@@ -705,20 +757,32 @@ Confirmo `Q15.2`.
 
 Para o Q15.3, se o Realm exige a política, deve existir `IUserSecurityStateProvider`, então o melhor é erro de configuração.
 
+#### Q15 - Conclusão
+
+A resposta **atende**. Decisões:
+- Porta de capacidade **opcional** `IUserSecurityStateProvider` (core-owned, realm-bound via `IUserDirectory`, primitivos/BCL apenas); **captura do stamp no sign-in** via `LoginFlowService`.
+- **Degradação graciosa** quando a capacidade está ausente — **exceto** que, se a policy do realm **exigir** enforcement por `SecurityStamp`/`SessionsValidAfter` e o provider **não** expuser a porta, é **erro de configuração** (Q15.3 = opção a; evita policy de segurança silenciosamente inoperante).
+- Múltiplos provedores de usuário podem coexistir, cada um expondo só as capacidades que tem (pluggabilidade).
+
+Aplicar ao plano: contratos de borda (porta opcional `IUserSecurityStateProvider`); Fase 1 → **validação de options/composição**: realm com policy de stamp **exige** a capacidade (senão, erro de configuração); Fases 2/8 e Arquitetura.
+
 ---
 
 ## Modelo relacional proposto (sujeito às Questões)
 
-> **Proposta inicial**, não decisão fechada. A forma final depende de Q1 (credencial), Q2 (histórico), Q5 (lockout/
-> restrições), Q6 (security stamp), Q9 (telefone). Tabelas realm-scoped (`RealmId` estrutural — ADR-015 §2.3); FKs por
-> `UserAccount.Id` físico; eventos chaveiam por `(RealmId, SubjectId)`.
+> **Atualizado após a 2ª rodada** — Q1/Q2/Q5/Q6/Q7/Q9 estão **decididas** (ver `#### QN - Conclusão`); os blocos abaixo
+> refletem as decisões. Tabelas realm-scoped (`RealmId` estrutural — ADR-015 §2.3); FKs por `UserAccount.Id` físico;
+> eventos chaveiam por `(RealmId, SubjectId)`.
 
-### `SecurityStamp` (Q6 — decidido) — value object, coluna em `UserAccount`
+### `SecurityStamp` + `SessionsValidAfter` (Q6/Q7 — decidido) — VO + marcador de invalidação em `UserAccount`
 
 ```text
-UserAccount.SecurityStamp      string not null   -- VO (encapsula o valor); regenerado nos gatilhos (enforcement gated por Q7-2)
--- (UserSession ganha cópia capturada na criação via seam Q15; ver emenda ADR-014)
-UserSession.SecurityStamp      string null       -- comparado na emissão de token via seam Q15 quando a policy exigir
+UserAccount.SecurityStamp       string not null    -- VO; versão geral do estado sensível; muda em TODOS os gatilhos (Q6)
+UserAccount.SessionsValidAfter  timestamp not null -- marcador de invalidação; move só em gatilhos que devem derrubar sessões/tokens (Q7)
+-- UserSession captura o stamp no sign-in via seam Q15 (ver emenda ADR-014):
+UserSession.SecurityStamp       string null        -- usado p/ revalidação de cookie/claims
+-- Enforcement (emissão de token / IsSessionValid): sessão válida sse session.StartedAt >= conta.SessionsValidAfter
+--   (via seam Q15, quando a policy do realm exigir). SecurityEpoch (contador) é representação equivalente a SessionsValidAfter.
 ```
 
 ### `PasswordHistory` (Q2) — tabela própria proposta
@@ -755,13 +819,17 @@ UserAccountActionToken
   unique (RealmId, TokenHash)            -- backstop p/ consumo idempotente
 ```
 
-### Bloqueio administrativo pessoal (Q5) — `UserAccountBlockState`
+### Bloqueio administrativo pessoal (Q5 — decidido) — `UserAccountBlockState` com janela
 
-Q5 decidiu que o bloqueio administrativo pessoal permanece no `UserAccountBlockState` existente do agregado
-`UserAccount`, separado do `PasswordLockout` da credencial. Q5.2 ainda decide se esse estado ganha janela temporal
-(`StartsAt`/`EndsAt`). A proposta anterior de `AccountAccessRestriction` per-account fica **suspensa/removida** deste
-modelo, salvo se Q5.2 reabrir o desenho. `GeoBlock`/`TimeWindow`/`ClientRestriction` ficam como políticas futuras por
-realm/grupo, não como restrições por conta neste plano.
+```text
+UserAccountBlockState (owned em UserAccount; já existe IsBlocked/BlockedReason/BlockedAt)
+  + StartsAt, EndsAt    timestamp null   -- bloqueio com prazo (ex.: férias); null = indefinido
+```
+
+O bloqueio administrativo pessoal permanece no `UserAccountBlockState`, separado do `PasswordLockout` da credencial, e
+**ganha janela temporal** `StartsAt`/`EndsAt`. A `AccountAccessRestriction` per-account foi **aposentada**.
+`GeoBlock`/`TimeWindow`/`ClientRestriction` viram políticas futuras por realm/grupo (registradas no backlog), não
+restrições por conta neste plano.
 
 ### `UserAccountPhone` (Q9 — decidido) — modelado como o email, opcional por realm
 
@@ -796,18 +864,16 @@ where realm_id = @realmId and token_hash = @tokenHash and purpose = @purpose
 
 ## Contratos de borda alvo (emendas à ADR-014, aditivas)
 
-> Dependem de Q4 (required action), Q6 (security stamp em sessão), Q13 (revogação por subject) e Q15 (seam de leitura/
-> validação do stamp atual). Forma exata fechada na Fase 1.
+> **Decididos** (Q4/Q6/Q7/Q13/Q14/Q15); forma exata fechada na Fase 1 (ADR-017).
 
-| Porta / tipo | Hoje | Emenda proposta |
+| Porta / tipo | Hoje | Emenda |
 |---|---|---|
-| `AuthenticationResult` / `AuthenticationFailureReason` (core) | sucesso/falha+motivo | + estrutura `RequiredAction` (Q4 — decidido) |
-| `LocalAuthenticationResult` (módulo) | sucesso/falha+motivo+lockout | espelhar required action — Q4 |
-| `UserSession` (core) | `SubjectId`,`sid`,`amr`,`idp`,`auth_time`,`clients`,`IsActive`,`ExpiresAt`(reservado) | + `SecurityStamp` capturado na criação — Q6/Q15 |
-| `IUserSessionStore` (core, puro) | `Create`/`FindById`/`RecordClient`/`End` (por `sid`) | operações de revogação por subject conforme Q13.2 (diretas ou por serviço dedicado) |
-| `IUserSessionService` (core) | `GetCurrent`/`IsSessionValid`/`Start`/`End`/`RecordClient` | `IsSessionValid` compara `SecurityStamp` via seam core-owned quando policy exigir — Q6/Q15 |
-| novo porto de estado de segurança (core-owned) | — | leitura/validação do stamp atual para captura e revalidação de sessão — Q15 |
-| novo porto de revogação (core) | — | costura que a `.Integration` chama p/ executar invalidação (sessões+refresh) — Q13 |
+| `AuthenticationResult` / `AuthenticationFailureReason` (core) | sucesso/falha+motivo | + estrutura `RequiredAction` (Q4) |
+| `LocalAuthenticationResult` (módulo) | sucesso/falha+motivo+lockout | espelhar `RequiredAction` (Q4) |
+| `UserSession` (core) | `…`,`IsActive`,`ExpiresAt`(reservado) | `ExpiresAt` ganha comportamento (Realm-only — Q14) + `SecurityStamp` capturado no sign-in (Q6/Q15) |
+| `IUserSessionService` (core) | `GetCurrent`/`IsSessionValid`/`Start`/`End`/`RecordClient` | `IsSessionValid = ativo && não-expirado && (policy ? StartedAt>=SessionsValidAfter : true)` (Q6/Q7/Q14/Q15) |
+| `ISessionRevocationService` (core-owned, **novo**) | — | revogação por subject de sessões+refresh; síncrona agora, evento depois (Q13); pode exigir consultas por subject no `IUserSessionStore`/`IRefreshTokenStore` |
+| `IUserSecurityStateProvider` (core-owned, **novo, opcional**) | — | lê `SecurityStamp`/`SessionsValidAfter` atuais p/ captura e validação; degradação graciosa; **obrigatória** se a policy de stamp do realm estiver ligada (Q15) |
 
 `IUserAccountPasswordHasher` (módulo) e `IPasswordProtector` (core) **permanecem** como o seam de hash já estabelecido
 no v2 (`PasswordProtectorAccountHasher`); o histórico (Q2) verifica candidatas reusando esse seam.
@@ -827,10 +893,10 @@ RoyalIdentity.UserAccounts/                  (módulo puro — sem core, sem ASP
         Events/  (novos eventos de segurança — Q8)
       Security/                              (NOVO slice de ciclo de segurança)
         Domain/
-          PasswordHistory                    (Q2)
+          PasswordHistory                    (Q2 — quantidade + idade, com cap de comparações/retenção)
           UserAccountActionToken             (recuperação/verificação/troca-expirada)
-          AdminBlock via UserAccountBlockState (Q5 — janela temporal a decidir em Q5.2)
-          SecurityStamp (VO em UserAccount)  (Q6 — decidido)
+          AdminBlock = UserAccountBlockState + janela StartsAt/EndsAt  (Q5 — decidido)
+          SecurityStamp (VO) + SessionsValidAfter em UserAccount  (Q6/Q7 — decidido)
         UseCases/  (SmartCommands)
           ChangePassword (user-facing, gated)  ResetPasswordWithToken
           RequestPasswordRecovery              IssueActionToken / ConsumeActionToken
@@ -845,13 +911,13 @@ RoyalIdentity.UserAccounts/                  (módulo puro — sem core, sem ASP
     Messaging/?  (só se Q8 trouxer outbox p/ este plano)
 
 RoyalIdentity.UserAccounts.Integration/      (única ponte com o IdP)
-  + adaptação do required action (Q4) p/ AuthenticationResult
-  + implementação do seam core-owned de estado de segurança para capturar/validar SecurityStamp (Q15)
-  + tradução da política de invalidação -> porto de revogação do core (Q13)
+  + adaptação do RequiredAction (Q4) p/ AuthenticationResult
+  + implementação de IUserSecurityStateProvider (opcional) p/ capturar/validar SecurityStamp+SessionsValidAfter (Q15)
+  + tradução da política de invalidação -> ISessionRevocationService do core (Q13)
   + IUserAccountActionNotifier? (envio de email/SMS — gateway; ver Q12/Fora de escopo)
 
 RoyalIdentity (core)                         (emendas aditivas atrás da ADR-014)
-  AuthenticationResult/UserSession/IUserSessionStore/IUserSessionService + porto de estado de segurança + porto de revogação
+  AuthenticationResult/UserSession/IUserSessionService + ISessionRevocationService + IUserSecurityStateProvider (opcional)
 (telas user-facing de troca/recuperação/verificação ficam para o plano de admin/UI — Q12 — fora deste plano)
 ```
 
@@ -889,7 +955,7 @@ dotnet test RoyalIdentity.sln --no-build --nologo
 
 ## Fase 1 - ADR-017, emendas e options de ciclo de segurança por realm
 
-**Depende de:** decidir Q1–Q15 (esta fase é onde as decisões são tomadas e registradas).
+**Depende de:** Q1–Q15 **decididas** (rodadas 1–2); a ADR-017 registra as decisões.
 
 **O que/como:** registrar as decisões antes de codar. Criar a **ADR-017** ("Ciclo de segurança da conta") como
 documento autoritativo; emendar **ADR-014** (required action no resultado de autenticação; `SecurityStamp` em
@@ -903,8 +969,11 @@ telefone Q9; bloco de options); criar o bloco `SecurityLifecycle`/invalidação 
 - [ ] Emendar `adrs/ADR-014.md`: required action na borda de autenticação; `SecurityStamp` em `UserSession`;
       seam core-owned para leitura/validação do stamp atual; revogação por subject no store/serviço de sessão (aditivo).
 - [ ] Emendar `adrs/ADR-015.md`: decisão de credencial (Q1); telefone no agregado (Q9); bloco de options de ciclo.
-- [ ] Modelar o bloco de options por realm em `UserAccountsRealmOptions` (invalidação Q7; expiração/histórico já em
-      `PasswordOptions`; consolidar sem duplicar dono).
+- [ ] Modelar o bloco de options por realm em `UserAccountsRealmOptions`: invalidação **flags + presets** (Q7), **SSO
+      session max/idle** por realm (Q14), **categorias de auditoria** com defaults segurança-on (Q8); expiração/histórico
+      (+ cap de comparações/retenção) já em `PasswordOptions`; consolidar sem duplicar dono.
+- [ ] **Validação de composição (Q15):** realm com policy de `SecurityStamp` ligada **exige** `IUserSecurityStateProvider`;
+      ausência ⇒ **erro de configuração** (não degrada silenciosamente).
 - [ ] Atualizar `plans-roadmap-01.md` (§3 aponta para este plano) e `CLAUDE.md` (mover este plano para "ativo").
 - [ ] Atualizar `.ai/foundation/*` se a emenda mudar contratos de borda documentados.
 
@@ -926,9 +995,9 @@ contradiz o plano; options têm dono único.
 
 - [ ] Preservar `UserAccountCredential` singular (Q1 — decidido: manter), com o seam `IUserAccountPasswordHasher` e o
       autenticador atuais; não genericizar.
-- [ ] Adicionar `SecurityStamp` como **value object**, coluna em `UserAccount` (Q6 — decidido), gerado por
-      `RoyalIdentity.Security.CryptoRandom`, com método de regeneração e os gatilhos da Decisão fechada §SecurityStamp
-      (enforcement gated por Q7-2).
+- [ ] Adicionar `SecurityStamp` (value object) **e** `SessionsValidAfter` em `UserAccount` (Q6/Q7 — decidido);
+      `SecurityStamp` gerado por `RoyalIdentity.Security.CryptoRandom`. `SecurityStamp` muda em **todos** os gatilhos;
+      `SessionsValidAfter` move **só** nos gatilhos que devem derrubar sessões/tokens (enforcement via `SessionsValidAfter`).
 - [ ] Garantir update atômico/optimistic dos contadores e do stamp (Q11), reusando `UserAccount.Version`.
 - [ ] Mapear/migrar o schema (PostgreSql/Sqlite) sem quebrar round-trip do v2.
 - [ ] Emenda no core: `UserSession` ganha `SecurityStamp` capturado na criação via seam decidido em Q15 (aditivo,
@@ -952,8 +1021,10 @@ verdade das options para fora do módulo.
 
 - [ ] Implementar `PasswordHistory` (tabela própria — Q2); ao `SetPassword`/`ChangePassword`, gravar o hash anterior,
       reter o conjunto necessário para **quantidade ∪ idade** e podar só o que estiver fora dos dois critérios
-      (novo campo em `PasswordOptions`, ex.: `PasswordReuseWindowDays`).
-- [ ] Validar senha candidata contra **senha atual + N hashes históricos** via `IUserAccountPasswordHasher.Verify`.
+      (novo campo em `PasswordOptions`, ex.: `PasswordReuseWindowDays`), com um **limite máximo** de comparações/retenção
+      (Q8) para conter custo em contas que trocam senha muitas vezes.
+- [ ] Validar senha candidata contra **senha atual + N hashes históricos** (N limitado pelo cap acima) via
+      `IUserAccountPasswordHasher.Verify`.
 - [ ] Implementar enforcement de **expiração** (`EnablePasswordExpiration`/`PasswordExpirationDays` × `PasswordChangedAt`):
       a verificação de expiração alimenta o required action da Fase 4 (não bloqueia silenciosamente).
 - [ ] Garantir que `EnforcePasswordHistory`/`EnablePasswordExpiration = false` desligam o enforcement.
@@ -1051,8 +1122,9 @@ implementando primeiro `PasswordLockout` + `AdminBlock`.
 
 **Tarefas:**
 
-- [ ] Implementar a decisão Q5: manter `IsBlocked`/`BlockState` como `AdminBlock` pessoal; se Q5.2 confirmar,
-      adicionar janela temporal (`StartsAt`/`EndsAt`). Lockout temporário permanece derivado da credencial.
+- [ ] Implementar Q5 (decidido): `UserAccountBlockState` como AdminBlock pessoal **com janela** `StartsAt`/`EndsAt`;
+      `AccountAccessRestriction` aposentada; `Geo/Time/Client` registrados no backlog. Lockout temporário permanece
+      derivado da credencial.
 - [ ] Caso de uso `UnlockPasswordCredential` (admin) que zera contador/`LockoutEndAt` e incrementa versão (Q11/§10);
       lockout indefinido (`AccountLockoutDurationMinutes = 0`) exige unlock administrativo.
 - [ ] Auditoria de falhas (eventos da Fase 9): `PasswordFailureRegistered`/`PasswordLockoutStarted`/`...Ended`/`...Reset`.
@@ -1076,17 +1148,15 @@ sessões/cookies/refresh tokens, com a execução no IdP (a costura é a emenda 
 
 **Tarefas:**
 
-- [ ] `IUserSessionService.IsSessionValidAsync` compara o `SecurityStamp` da sessão com o atual por meio do seam
-      decidido em Q15 **quando a policy do realm exigir** (intervalo/ponto conforme Q6); cookie `OnValidatePrincipal`
-      continua sendo a costura por request.
-- [ ] Emenda no core (Q13): executar revogação por subject via desenho confirmado em Q13.2 (recomendação atual:
-      `ISessionRevocationService` dedicado, implementado sobre store de sessão + `IRefreshTokenStore`), incluindo
-      revogação de refresh tokens por subject/sessão; implementar no fake in-memory.
-- [ ] `.Integration` traduz a política do módulo (Q7) em chamadas ao porto de revogação do core (idempotentes, pós-commit).
-- [ ] Aplicar os defaults por gatilho ratificados em Q7 (troca voluntária/reset/admin/import).
-- [ ] Resolver Q14: definir (ou manter reservado) o comportamento de `UserSession.ExpiresAt` e como `IsSessionValidAsync`
-      combina ativo + não-expirado + stamp, sem conflitar com a avaliação per-client de `UserSsoLifetime` no
-      `PromptLoginDecorator`; confirmar que expiração de senha não derruba sessão ativa por implícito.
+- [ ] `IUserSessionService.IsSessionValidAsync = ativo && não-expirado(ExpiresAt, Realm-only — Q14) && (policy ?
+      session.StartedAt >= conta.SessionsValidAfter : true)`, lendo o estado atual via `IUserSecurityStateProvider`
+      (Q15) quando a policy exigir; cookie `OnValidatePrincipal` segue a costura por request.
+- [ ] Emenda no core (Q13 — decidido): `ISessionRevocationService` dedicado, sobre o store de sessão + `IRefreshTokenStore`,
+      com revogação por subject de sessões e refresh tokens; implementar no fake in-memory.
+- [ ] `.Integration` traduz a política do módulo (Q7) em chamadas a `ISessionRevocationService` (idempotentes, pós-commit).
+- [ ] Aplicar os defaults por gatilho ratificados em Q7 (troca voluntária/reset/admin/import); enforcement via `SessionsValidAfter`.
+- [ ] `UserSession.ExpiresAt` ganha comportamento **Realm-only** (SSO session max/idle por realm — Q14); `UserSsoLifetime`
+      por client inalterado no `PromptLoginDecorator`; **expiração de senha não derruba sessão ativa**.
 
 **Critérios de aceite:** sessão com stamp antigo é inválida quando a policy exige; revogar outras/todas as sessões e
 refresh tokens funciona por subject; execução idempotente e pós-commit; sessões ativas seguem emitindo token quando a
@@ -1105,12 +1175,12 @@ infraestrutura de outbox além do que Q8 autorizar.
 
 **Tarefas:**
 
-- [ ] Adicionar os eventos de domínio de segurança (lista do pré-plano §9), chaveados por `(RealmId, SubjectId)`.
-- [ ] Classificar cada evento (auditoria obrigatória vs candidato a outbox) conforme Q8.
-- [ ] **Se Q8 mandar persistir auditoria/outbox neste plano:** implementar o store de auditoria durável e/ou outbox;
-      **senão:** despachar via `IEventDispatcher` do core e **diferir** persistência durável/outbox para
-      `plan-data-persistence` (§2), registrando o diferimento.
-- [ ] Garantir que eventos só são publicados **após o commit** (§10).
+- [ ] Emitir eventos de domínio **por caso de uso** (sem catálogo antecipado — Q8), chaveados por `(RealmId, SubjectId)`,
+      despachados via `IEventDispatcher` do core.
+- [ ] `ISecurityAuditSink` + `SecurityAuditOptions` por realm, auditoria **por categorias** (`Credential`, `Recovery`,
+      `Verification`, `Lockout`, `AdminSecurity`, `SessionRevocation`, `AuthenticationFailure`) com **defaults segurança-on / resto-off** (Q8).
+- [ ] **Sem outbox** neste plano; **store durável de auditoria diferido** ao `plan-data-persistence` (§2) — por ora, sink de log/in-memory.
+- [ ] Garantir que eventos só são publicados **após o commit** (§10); **token bruto nunca** entra em evento/auditoria/log.
 
 **Critérios de aceite:** eventos certos disparam nos pontos certos; classificação coerente; nenhuma máquina de outbox
 introduzida sem decisão Q8; sem ruído de outbox para login/falha.
@@ -1151,9 +1221,11 @@ verde com integração opt-in; fake permanece disponível; fronteiras de arquite
    só em auditoria.
 4. **`MustChangePassword`/senha expirada nunca emitem token** antes da troca; após a troca, exige-se novo login real.
 5. **Sessões ativas seguem emitindo tokens** salvo política de invalidação por realm.
-6. **Tokens de ação**: hash-only, TTL, uso único idempotente, revogados por nova emissão, vinculados ao `TargetValue`.
-7. **`SecurityStamp` versiona estado sensível de segurança**, não mudanças de perfil; comparado só quando a policy do
-   realm exigir.
+6. **Tokens de ação**: hash-only, TTL, uso único idempotente, revogados por nova emissão, vinculados ao `TargetValue`;
+   o token bruto só sai como *delivery payload* uma vez e **nunca** entra em evento/auditoria/log.
+7. **`SecurityStamp`** versiona estado sensível (muda em todos os gatilhos); a **invalidação** de sessões usa
+   **`SessionsValidAfter`** (marcador que move só nos gatilhos que devem derrubar sessão), enforçado quando a policy do
+   realm exigir — não mudanças de perfil.
 8. **Hashes de senha/token nunca** são logados, exportados ou expostos.
 9. Mutações de credencial/stamp e a invalidação correspondente são **transacionais** e a publicação de eventos é
    **pós-commit**; consumo de token e revogação são **idempotentes**.
