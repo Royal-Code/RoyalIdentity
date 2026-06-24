@@ -213,6 +213,19 @@ public class SecurityLifecycleOptions
 			{
 				errors.Add("SecurityLifecycle.IdleTouchIntervalMinutes cannot be negative.");
 			}
+
+			if (SsoSessionIdleMinutes > 0)
+			{
+				if (IdleTouchIntervalMinutes <= 0)
+				{
+					errors.Add("SecurityLifecycle.IdleTouchIntervalMinutes must be greater than zero when SsoSessionIdleMinutes is enabled.");
+				}
+
+				if (IdleTouchIntervalMinutes >= SsoSessionIdleMinutes)
+				{
+					errors.Add("SecurityLifecycle.IdleTouchIntervalMinutes must be less than SsoSessionIdleMinutes when idle timeout is enabled.");
+				}
+			}
 		}
 
 		return errors;

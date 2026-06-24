@@ -264,6 +264,9 @@ A resposta **atende**. Decisão: **tabela própria `PasswordHistory`**; polític
 Aplicar ao plano:
 - Adicionar a `PasswordOptions` um campo de **idade** (ex.: `PasswordHistoryMaxAgeDays` ou `PasswordReuseWindowDays`). O conjunto a comparar = (últimos `PasswordHistoryCount` itens) ∪ (itens dentro da janela de idade).
 - Fase 3: confirmar o limite de N verificações por troca (N = tamanho desse conjunto).
+- Guardas de configuração ficam em `UserAccountsRealmOptions.Validate()`: valores negativos são inválidos; histórico
+  ligado exige quantidade ou idade; se idade estiver ativa, `MaxPasswordHistoryComparisons` deve permitir ao menos uma
+  comparação. Os casos de uso podem assumir options coerentes.
 
 ### Q3 — Desafio de troca forçada: token de ação vs sessão parcial (pré-plano §3/§4)
 **Bloqueia:** Fases 4 e 5.
@@ -409,7 +412,7 @@ Aplicar ao plano: modelo §`SecurityStamp` → "VO, coluna em `UserAccount`"; Fa
 **Bloqueia:** Fases 1 e 8.
 - **Flags** (`None`/`CurrentSession`/`OtherInteractiveSessions`/`AllInteractiveSessions`/`RefreshTokens`/
   `AllSessionsAndRefreshTokens`) ou **enum de presets** (`KeepCurrentSessionOnly`/`RevokeOtherSessions`/…)?
-- Defaults por gatilho (proposta original; decisão final na conclusão da Q7): troca voluntária → manter atual + revogar outras
+- Defaults por gatilho (proposta original; decisão final na conclusão da Q7): troca voluntária → manter atual + revogar outras só se a policy pedir
   se a policy pedir; **reset por recuperação** → revogar sessões + refresh por default; **admin reset** → revogar
   sessões + refresh por default; **import/migração** → não invalidar.
 - Troca forçada por expiração deve **sempre** invalidar sessões antigas? O usuário pode escolher "sair de outros
@@ -684,7 +687,7 @@ A resposta **pede** a avaliação das duas opções (Realm-only vs Realm+Client)
 
 **Recomendação: Realm-only para o `ExpiresAt`** neste plano (um *SSO session max* e, opcionalmente, *idle* por realm), **mantendo `UserSsoLifetime` por client como está**. Diferir expiração de sessão por client para um plano futuro (sobrepõe ao `UserSsoLifetime` e adiciona complexidade de cookie para pouco ganho). Confirmado pelo autor: **expiração de senha não derruba a sessão**; bloqueio é opcional/configurável.
 
-**Idle touch recomendado:** usar atualização com **throttle** por janela mínima. A validação pode acontecer em cada request/ponto de protocolo, mas o store só atualiza `LastSeenAt`/`ExpiresAt` se `LastSeenAt <= now - IdleTouchInterval`. Isso evita escrita por request e mantém o idle timeout suficientemente fiel.
+**Idle touch recomendado:** usar atualização com **throttle** por janela mínima. A validação pode acontecer em cada request/ponto de protocolo, mas o store só atualiza `LastSeenAt`/`ExpiresAt` se `LastSeenAt <= now - IdleTouchInterval`. Isso evita escrita por request e mantém o idle timeout suficientemente fiel. Quando idle estiver ligado, `IdleTouchInterval` deve ser **maior que zero** e **menor que** `SsoSessionIdle`.
 
 **Questão 2 (Q14.2):** Confirmar **Realm-only** para `ExpiresAt` (session max + idle por realm), `UserSsoLifetime` por client inalterado, e a combinação de `IsSessionValidAsync` acima? Diferir a opção por client?
 
@@ -696,7 +699,7 @@ Confirma.
 
 A resposta **atende**. Decisão: **Realm-only** para `UserSession.ExpiresAt` (SSO session max + idle por realm — `ExpiresAt` ganha comportamento); **`UserSsoLifetime` por client inalterado** (segue forçando interação no `PromptLoginDecorator`, ortogonal); expiração por client **diferida**. `IsSessionValidAsync = ativo && não-expirado(ExpiresAt) && (policy ? SessionsValidAfter-ok : true)`. **Expiração de senha não derruba sessão**; bloqueio é opcional/configurável.
 
-Idle timeout usa **opção 3**: `LastSeenAt` + `IdleTouchInterval` por realm, com update condicional. Touch aceito atualiza `LastSeenAt = now` e `ExpiresAt = min(StartedAt + SsoSessionMax, now + SsoSessionIdle)`. Sem escrita em toda validação; o store só grava quando a janela mínima passou.
+Idle timeout usa **opção 3**: `LastSeenAt` + `IdleTouchInterval` por realm, com update condicional. Touch aceito atualiza `LastSeenAt = now` e `ExpiresAt = min(StartedAt + SsoSessionMax, now + SsoSessionIdle)`. Sem escrita em toda validação; o store só grava quando a janela mínima passou. Guardas de options impedem `IdleTouchInterval <= 0` ou `IdleTouchInterval >= SsoSessionIdle` quando o idle timeout estiver ativo.
 
 Aplicar ao plano: bloco de options por realm (SSO session max/idle + `IdleTouchInterval`); Fase 8; contratos (`UserSession.ExpiresAt` ganha comportamento, Realm-only; `LastSeenAt` alimenta idle).
 
@@ -978,6 +981,8 @@ telefone Q9; bloco de options); criar o bloco `SecurityLifecycle`/invalidação 
       ausência ⇒ **erro de configuração** (não degrada silenciosamente).
       → modelado o gate `SecurityLifecycleOptions.EnableSessionInvalidationByState` ⇒ `RequiresSecurityStateProvider`;
       a checagem da capacidade contra o porto core-owned fica na `.Integration` (Fase 8, onde o porto existe).
+      Nota de revisão: esta tarefa está concluída na Fase 1 como **modelagem do gate**; a validação real contra o provider
+      está listada explicitamente na Fase 8.
 - [x] Atualizar `plans-roadmap-01.md` (§3 aponta para este plano) e `CLAUDE.md` (mover este plano para "ativo").
 - [~] Atualizar `.ai/foundation/*` se a emenda mudar contratos de borda documentados.
       → **diferido**: os novos portos (`RequiredAction`, `IUserSecurityStateProvider`, `ISessionRevocationService`)
@@ -989,7 +994,7 @@ contradiz o plano; options têm dono único. ✔
 
 **Testes:** n/a (documentação) + testes de options (copy-on-create/validação) — **incluídos** em
 `Tests.UserAccounts/UserAccountsRealmOptionsTests.cs` (defaults decididos, copy-on-create independente, validação de
-SSO idle×max e do cap de histórico). 96/96 verdes.
+SSO idle×max/touch interval e do cap de histórico). 101/101 verdes.
 
 ### Resultado da Fase 1
 
@@ -1019,7 +1024,7 @@ options de ciclo de segurança modelado em `UserAccountsRealmOptions` (dono úni
 - `Tests.UserAccounts/UserAccountsRealmOptionsTests.cs` — copy-on-create independente, defaults decididos, validação.
 - `CLAUDE.md` — plano em "Active plans"; ADRs `..017`. `.ai/plans/plans-roadmap-01.md` — §3 aponta para a ADR-017.
 
-**Verificação:** `dotnet build RoyalIdentity.sln` — sucesso; `Tests.UserAccounts` **96/96** verdes.
+**Verificação:** `dotnet build RoyalIdentity.sln` — sucesso; `Tests.UserAccounts` **101/101** verdes.
 
 **Notas de ordenação:**
 - A checagem de composição Q15 (exigir `IUserSecurityStateProvider` quando a policy de invalidação por estado está
@@ -1078,6 +1083,8 @@ verdade das options para fora do módulo.
       reter o conjunto necessário para **quantidade ∪ idade** e podar só o que estiver fora dos dois critérios
       (novo campo em `PasswordOptions`, ex.: `PasswordReuseWindowDays`), com um **limite máximo** de comparações/retenção
       (Q8) para conter custo em contas que trocam senha muitas vezes.
+- [ ] Consumir options já validadas: `UserAccountsRealmOptions.Validate()` impede idade sem comparação possível
+      (`PasswordReuseWindowDays > 0` com cap zero), valores negativos e histórico ligado sem quantidade nem idade.
 - [ ] Validar senha candidata contra **senha atual + N hashes históricos** (N limitado pelo cap acima) via
       `IUserAccountPasswordHasher.Verify`.
 - [ ] Implementar enforcement de **expiração** (`EnablePasswordExpiration`/`PasswordExpirationDays` × `PasswordChangedAt`):
@@ -1226,6 +1233,8 @@ sessões/cookies/refresh tokens, mantendo `SecurityStamp` capturado para cookie/
 - [ ] `IUserSessionService.IsSessionValidAsync = ativo && não-expirado(ExpiresAt, Realm-only — Q14) && (policy ?
       session.StartedAt >= conta.SessionsValidAfter : true)`, lendo o estado atual via `IUserSecurityStateProvider`
       (Q15) quando a policy exigir; cookie `OnValidatePrincipal` segue a costura por request.
+- [ ] Validação de composição Q15 na `.Integration`: se `SecurityLifecycle.RequiresSecurityStateProvider` estiver `true`,
+      o realm deve ter `IUserSecurityStateProvider`; ausência é erro de configuração.
 - [ ] Normalizar precisão/clock de `StartedAt` e `SessionsValidAfter` entre PostgreSql/Sqlite (`TimeProvider`/server time)
       e cobrir o caso de fronteira `StartedAt == SessionsValidAfter`.
 - [ ] Emenda no core (Q13 — decidido): `ISessionRevocationService` dedicado, sobre o store de sessão + `IRefreshTokenStore`,
@@ -1236,6 +1245,7 @@ sessões/cookies/refresh tokens, mantendo `SecurityStamp` capturado para cookie/
       por client inalterado no `PromptLoginDecorator`; **expiração de senha não derruba sessão ativa**.
 - [ ] Idle touch com throttle (Q14): `LastSeenAt` só é atualizado se `LastSeenAt <= now - IdleTouchInterval`; quando tocar,
       recalcular `ExpiresAt = min(StartedAt + SsoSessionMax, now + SsoSessionIdle)` por update condicional/idempotente.
+      Options devem garantir `IdleTouchInterval > 0` e `< SsoSessionIdle` quando idle estiver ativo.
 
 **Critérios de aceite:** sessão iniciada antes de `SessionsValidAfter` é inválida quando a policy exige; idle touch não
 gera escrita por request e nunca estende além do SSO session max; revogar outras/todas as sessões e refresh tokens

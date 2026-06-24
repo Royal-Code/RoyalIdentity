@@ -132,6 +132,44 @@ public class UserAccountsRealmOptionsTests
 	}
 
 	[Fact]
+	public void Validate_Rejects_ZeroIdleTouchInterval_WhenIdleTimeoutEnabled()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			SecurityLifecycle =
+			{
+				EnableSsoSessionExpiration = true,
+				SsoSessionMaxMinutes = 60,
+				SsoSessionIdleMinutes = 10,
+				IdleTouchIntervalMinutes = 0
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("IdleTouchIntervalMinutes", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Rejects_IdleTouchIntervalAtOrAboveIdleTimeout()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			SecurityLifecycle =
+			{
+				EnableSsoSessionExpiration = true,
+				SsoSessionMaxMinutes = 60,
+				SsoSessionIdleMinutes = 10,
+				IdleTouchIntervalMinutes = 10
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("less than SsoSessionIdleMinutes", StringComparison.Ordinal));
+	}
+
+	[Fact]
 	public void Validate_Rejects_HistoryComparisonsCapBelowCount_WhenHistoryEnforced()
 	{
 		var options = new UserAccountsRealmOptions
@@ -147,6 +185,59 @@ public class UserAccountsRealmOptionsTests
 		var errors = options.Validate();
 
 		Assert.Contains(errors, e => e.Contains("MaxPasswordHistoryComparisons", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Rejects_NegativePasswordHistoryCount()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			PasswordOptions =
+			{
+				PasswordHistoryCount = -1
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("PasswordHistoryCount", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Rejects_HistoryAgeWithoutComparisonCap()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			PasswordOptions =
+			{
+				EnforcePasswordHistory = true,
+				PasswordHistoryCount = 0,
+				PasswordReuseWindowDays = 90,
+				MaxPasswordHistoryComparisons = 0
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("MaxPasswordHistoryComparisons", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Rejects_HistoryEnforcedWithoutCountOrAge()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			PasswordOptions =
+			{
+				EnforcePasswordHistory = true,
+				PasswordHistoryCount = 0,
+				PasswordReuseWindowDays = 0
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("PasswordHistoryCount or PasswordReuseWindowDays", StringComparison.Ordinal));
 	}
 
 	[Fact]

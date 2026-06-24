@@ -175,10 +175,34 @@ public class UserAccountsRealmOptions
 			errors.Add("PasswordOptions.PasswordReuseWindowDays cannot be negative.");
 		}
 
+		if (PasswordOptions.PasswordHistoryCount < 0)
+		{
+			errors.Add("PasswordOptions.PasswordHistoryCount cannot be negative.");
+		}
+
+		if (PasswordOptions.MaxPasswordHistoryComparisons < 0)
+		{
+			errors.Add("PasswordOptions.MaxPasswordHistoryComparisons cannot be negative.");
+		}
+
+		if (PasswordOptions.EnforcePasswordHistory &&
+			PasswordOptions.PasswordHistoryCount is 0 &&
+			PasswordOptions.PasswordReuseWindowDays is 0)
+		{
+			errors.Add("PasswordOptions must define PasswordHistoryCount or PasswordReuseWindowDays when password history is enforced.");
+		}
+
 		if (PasswordOptions.EnforcePasswordHistory &&
 			PasswordOptions.MaxPasswordHistoryComparisons < PasswordOptions.PasswordHistoryCount)
 		{
 			errors.Add("PasswordOptions.MaxPasswordHistoryComparisons cannot be less than PasswordHistoryCount when password history is enforced.");
+		}
+
+		if (PasswordOptions.EnforcePasswordHistory &&
+			PasswordOptions.PasswordReuseWindowDays > 0 &&
+			PasswordOptions.MaxPasswordHistoryComparisons is 0)
+		{
+			errors.Add("PasswordOptions.MaxPasswordHistoryComparisons must be greater than zero when PasswordReuseWindowDays is enabled.");
 		}
 
 		errors.AddRange(SecurityLifecycle.Validate());
