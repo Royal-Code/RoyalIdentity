@@ -447,6 +447,16 @@ A resposta **pede** opções, recomendação, consequências e implicações jus
 2. Gostei mais da opção enforçar-gated.
 3. Parace bom.
 
+Olhar com carinho a reconciliação SecurityStamp × “enforce gated”.
+Tem uma sutileza importante: se um único SecurityStamp sempre muda, uma sessão antiga só sabe “meu stamp é diferente do atual”; ela não sabe por que mudou.
+Então, se MustChangePassword incrementa o stamp mas não deve invalidar sessões por default, uma comparação simples sessionStamp != currentStamp quebraria a decisão.
+
+Talvez isso pode ser resolvido com um marcador separado de invalidação, por exemplo:
+- SecurityStamp: versão geral do estado sensível, pode mudar em todos os gatilhos.
+- SessionsValidAfter ou SecurityEpoch: muda só quando aquele gatilho deve invalidar sessões/tokens.
+
+Assim, admin MustChangePassword pode incrementar SecurityStamp sem derrubar sessão; reset de senha incrementa SecurityStamp e também move SessionsValidAfter. Essa pequena peça evita uma gambiarra futura.
+
 ### Q8 — Eventos/auditoria/outbox: escopo neste plano (pré-plano §9)
 **Bloqueia:** Fase 9.
 - Confirmar **Opção B** (auditoria durável + outbox seletivo). Mas: **a auditoria durável e o outbox são construídos
@@ -483,6 +493,12 @@ Aplicar ao plano: revisar Fase 9 → "sem catálogo; cada caso de uso emite seu 
 
 O Design é bom, podemos prossegir.
 Quanto aos eventos a auditar, por padrão nas opções devem vir marcados os eventos de segurança, outros não são padrão.
+
+Poderia ser por categorias de auditoria, não lista fixa de eventos: Credential, Recovery, Verification, Lockout, AdminSecurity, SessionRevocation, AuthenticationFailure. Defaults on para segurança, off para o resto.
+
+Para histórico por idade + quantidade, eu colocaria um limite máximo de comparações/retenção para evitar custo exagerado em contas que trocam senha muitas vezes.
+
+Para recuperação/verificação, vale explicitar que o token bruto só sai como “delivery payload” uma vez e nunca entra em evento/auditoria/log.
 
 ### Q9 — Telefone: entra no agregado neste plano? (pré-plano "Email/telefone" + §6 das emendas)
 **Bloqueia:** Fase 6.
