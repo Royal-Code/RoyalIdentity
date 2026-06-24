@@ -162,7 +162,7 @@ public class UserAccountCredential
 	/// <summary>
 	/// Resets failed password attempts and lockout state.
 	/// </summary>
-	public void ResetFailures()
+	internal void ResetFailures()
 	{
 		FailedPasswordAttempts = 0;
 		LastPasswordFailureAt = null;
