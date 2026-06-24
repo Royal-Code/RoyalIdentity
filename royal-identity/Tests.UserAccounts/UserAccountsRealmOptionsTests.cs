@@ -28,14 +28,22 @@ public class UserAccountsRealmOptionsTests
 			AllowProvidedSubjectId = true
 		};
 		source.PasswordOptions.MinimumLength = 14;
+		source.PasswordOptions.PasswordReuseWindowDays = 90;
+		source.PasswordOptions.MaxPasswordHistoryComparisons = 12;
 		source.PasswordOptions.DisallowedWordsInPassword.Add("source-word");
+		source.SecurityLifecycle.EnableSessionInvalidationByState = true;
+		source.SecurityLifecycle.OnVoluntaryPasswordChange = SessionInvalidationPresets.RevokeOtherSessions;
+		source.SecurityLifecycle.AuditCategories = SecurityAuditCategories.Credential;
 		source.FixedFieldClaimProjections[0].ClaimType = "source_username";
 
 		var copy = new UserAccountsRealmOptions(source);
 
 		source.AllowRegistration = false;
 		source.PasswordOptions.MinimumLength = 6;
+		source.PasswordOptions.PasswordReuseWindowDays = 0;
 		source.PasswordOptions.DisallowedWordsInPassword.Add("mutated-word");
+		source.SecurityLifecycle.EnableSessionInvalidationByState = false;
+		source.SecurityLifecycle.AuditCategories = SecurityAuditCategories.None;
 		source.FixedFieldClaimProjections[0].ClaimType = "mutated_username";
 
 		Assert.True(copy.AllowRegistration);
@@ -56,14 +64,100 @@ public class UserAccountsRealmOptionsTests
 		Assert.True(copy.FictitiousEmailIsVerifiedByDefault);
 		Assert.True(copy.AllowProvidedSubjectId);
 		Assert.Equal(14, copy.PasswordOptions.MinimumLength);
+		Assert.Equal(90, copy.PasswordOptions.PasswordReuseWindowDays);
+		Assert.Equal(12, copy.PasswordOptions.MaxPasswordHistoryComparisons);
 		Assert.Contains("source-word", copy.PasswordOptions.DisallowedWordsInPassword);
 		Assert.DoesNotContain("mutated-word", copy.PasswordOptions.DisallowedWordsInPassword);
+		Assert.True(copy.SecurityLifecycle.EnableSessionInvalidationByState);
+		Assert.Equal(SessionInvalidationPresets.RevokeOtherSessions, copy.SecurityLifecycle.OnVoluntaryPasswordChange);
+		Assert.Equal(SecurityAuditCategories.Credential, copy.SecurityLifecycle.AuditCategories);
 		Assert.Equal("source_username", copy.FixedFieldClaimProjections[0].ClaimType);
 
 		Assert.NotSame(source.PasswordOptions, copy.PasswordOptions);
 		Assert.NotSame(source.PasswordOptions.DisallowedWordsInPassword, copy.PasswordOptions.DisallowedWordsInPassword);
+		Assert.NotSame(source.SecurityLifecycle, copy.SecurityLifecycle);
 		Assert.NotSame(source.FixedFieldClaimProjections, copy.FixedFieldClaimProjections);
 		Assert.NotSame(source.FixedFieldClaimProjections[0], copy.FixedFieldClaimProjections[0]);
+	}
+
+	[Fact]
+	public void SecurityLifecycle_Defaults_MatchDecidedPolicy()
+	{
+		var options = new UserAccountsRealmOptions();
+		var lifecycle = options.SecurityLifecycle;
+
+		// Per-trigger invalidation defaults (ADR-017 §2.7).
+		Assert.Equal(SessionInvalidation.None, lifecycle.OnVoluntaryPasswordChange);
+		Assert.Equal(SessionInvalidationPresets.RevokeAllSessionsAndRefreshTokens, lifecycle.OnPasswordRecoveryReset);
+		Assert.Equal(SessionInvalidationPresets.RevokeAllSessionsAndRefreshTokens, lifecycle.OnAdminPasswordReset);
+		Assert.Equal(SessionInvalidation.None, lifecycle.OnAdminMustChangePassword);
+		Assert.Equal(SessionInvalidation.None, lifecycle.OnSensitiveProfileChange);
+
+		// Opt-in policies are off by default (preserve current behavior).
+		Assert.False(lifecycle.EnableSessionInvalidationByState);
+		Assert.False(lifecycle.EnableSsoSessionExpiration);
+		Assert.False(lifecycle.RequiresSecurityStateProvider);
+
+		// Security audit categories on by default.
+		Assert.Equal(SecurityAuditCategories.All, lifecycle.AuditCategories);
+	}
+
+	[Fact]
+	public void SecurityLifecycle_RequiresSecurityStateProvider_FollowsStateInvalidation()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			SecurityLifecycle = { EnableSessionInvalidationByState = true }
+		};
+
+		Assert.True(options.SecurityLifecycle.RequiresSecurityStateProvider);
+	}
+
+	[Fact]
+	public void Validate_Rejects_SsoIdleGreaterThanMax_WhenExpirationEnabled()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			SecurityLifecycle =
+			{
+				EnableSsoSessionExpiration = true,
+				SsoSessionMaxMinutes = 60,
+				SsoSessionIdleMinutes = 120
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("SsoSessionIdleMinutes", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Rejects_HistoryComparisonsCapBelowCount_WhenHistoryEnforced()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			PasswordOptions =
+			{
+				EnforcePasswordHistory = true,
+				PasswordHistoryCount = 5,
+				MaxPasswordHistoryComparisons = 3
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("MaxPasswordHistoryComparisons", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Allows_DefaultSecurityLifecycle()
+	{
+		var options = new UserAccountsRealmOptions();
+
+		var errors = options.Validate();
+
+		Assert.DoesNotContain(errors, e => e.Contains("SecurityLifecycle", StringComparison.Ordinal));
+		Assert.DoesNotContain(errors, e => e.Contains("MaxPasswordHistoryComparisons", StringComparison.Ordinal));
 	}
 
 	[Fact]

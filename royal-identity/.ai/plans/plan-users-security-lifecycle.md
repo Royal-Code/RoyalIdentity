@@ -1,14 +1,14 @@
 # Plan: Credenciais e Ciclo de Segurança da Conta (`plan-users-security-lifecycle`)
 
-## Status: PLANEJADO - 15 questões decididas (Q1–Q15); pronto para ADR-017 + Fase 1
+## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fase 1 concluída (ADR-017 + emendas + options)
 
 ## Progresso
 
-`----------` **0%** - 0 de 10 fases
+`#---------` **10%** - 1 de 10 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - ADR-017, emendas e options de ciclo de segurança por realm | Pendente |
+| Fase 1 - ADR-017, emendas e options de ciclo de segurança por realm | Concluida |
 | Fase 2 - Modelo de credencial, `SecurityStamp` e concorrência | Pendente |
 | Fase 3 - Política de senha: histórico e expiração com enforcement | Pendente |
 | Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada) | Pendente |
@@ -965,23 +965,72 @@ telefone Q9; bloco de options); criar o bloco `SecurityLifecycle`/invalidação 
 
 **Tarefas:**
 
-- [ ] Criar `adrs/ADR-017.md` decidindo Q1–Q15 (cada questão vira decisão registrada; seguir a regra de ADR do
+- [x] Criar `adrs/ADR-017.md` decidindo Q1–Q15 (cada questão vira decisão registrada; seguir a regra de ADR do
       CLAUDE.md — decisão, não design).
-- [ ] Emendar `adrs/ADR-014.md`: required action na borda de autenticação; `SecurityStamp` em `UserSession`;
+- [x] Emendar `adrs/ADR-014.md`: required action na borda de autenticação; `SecurityStamp` em `UserSession`;
       seam core-owned para leitura de `SecurityStamp`/`SessionsValidAfter`; revogação por subject no store/serviço de sessão (aditivo).
-- [ ] Emendar `adrs/ADR-015.md`: decisão de credencial (Q1); telefone no agregado (Q9); bloco de options de ciclo.
-- [ ] Modelar o bloco de options por realm em `UserAccountsRealmOptions`: invalidação **flags + presets** (Q7), **SSO
+- [x] Emendar `adrs/ADR-015.md`: decisão de credencial (Q1); telefone no agregado (Q9); bloco de options de ciclo.
+- [x] Modelar o bloco de options por realm em `UserAccountsRealmOptions`: invalidação **flags + presets** (Q7), **SSO
       session max/idle + `IdleTouchInterval`** por realm (Q14), **categorias de auditoria** com defaults segurança-on (Q8); expiração/histórico
       (+ cap de comparações/retenção) já em `PasswordOptions`; consolidar sem duplicar dono.
-- [ ] **Validação de composição (Q15):** realm com policy de invalidação por estado ligada **exige** `IUserSecurityStateProvider`;
+      → `SecurityLifecycleOptions` (novo) + `PasswordOptions.PasswordReuseWindowDays`/`MaxPasswordHistoryComparisons`.
+- [x] **Validação de composição (Q15):** realm com policy de invalidação por estado ligada **exige** `IUserSecurityStateProvider`;
       ausência ⇒ **erro de configuração** (não degrada silenciosamente).
-- [ ] Atualizar `plans-roadmap-01.md` (§3 aponta para este plano) e `CLAUDE.md` (mover este plano para "ativo").
-- [ ] Atualizar `.ai/foundation/*` se a emenda mudar contratos de borda documentados.
+      → modelado o gate `SecurityLifecycleOptions.EnableSessionInvalidationByState` ⇒ `RequiresSecurityStateProvider`;
+      a checagem da capacidade contra o porto core-owned fica na `.Integration` (Fase 8, onde o porto existe).
+- [x] Atualizar `plans-roadmap-01.md` (§3 aponta para este plano) e `CLAUDE.md` (mover este plano para "ativo").
+- [~] Atualizar `.ai/foundation/*` se a emenda mudar contratos de borda documentados.
+      → **diferido**: os novos portos (`RequiredAction`, `IUserSecurityStateProvider`, `ISessionRevocationService`)
+      ainda não existem no código; os foundation docs descrevem o estado implementado. Atualizar nas Fases 2/8
+      (mesmo precedente da nota `IUserClaimsProvider` "until Fase 2" em `product.md`).
 
 **Critérios de aceite:** ADR-017 existe e decide todas as questões; ADR-014/015 registram as emendas; documentação não
-contradiz o plano; options têm dono único.
+contradiz o plano; options têm dono único. ✔
 
-**Testes:** n/a (documentação) + testes de options (copy-on-create/validação) se o bloco entrar nesta fase.
+**Testes:** n/a (documentação) + testes de options (copy-on-create/validação) — **incluídos** em
+`Tests.UserAccounts/UserAccountsRealmOptionsTests.cs` (defaults decididos, copy-on-create independente, validação de
+SSO idle×max e do cap de histórico). 96/96 verdes.
+
+### Resultado da Fase 1
+
+**Concluída (2026-06-23).** Governança registrada antes de codar: ADR-017 criada, ADR-014/015 emendadas, bloco de
+options de ciclo de segurança modelado em `UserAccountsRealmOptions` (dono único), roadmap/CLAUDE.md atualizados.
+
+**Arquivos novos:**
+- `adrs/ADR-017.md` — decide Q1–Q15 (estilo decisão, não design; Contexto/Decisão/Consequências): credencial singular
+  não-genérica, histórico+expiração com enforcement, `RequiredAction` + troca forçada por token de ação, tokens de
+  ação, lockout×bloqueio com janela, `SecurityStamp` + `SessionsValidAfter` (dois campos), invalidação flags+presets,
+  verificação email/telefone, concorrência optimistic+retry, seams de borda, auditoria por categorias, expiração de
+  sessão Realm-only, fronteira de escopo/options.
+- `RoyalIdentity.UserAccounts/Options/SecurityLifecycleOptions.cs` — `[Flags] SessionInvalidation` +
+  `SessionInvalidationPresets`, `[Flags] SecurityAuditCategories`, defaults por gatilho (Q7), SSO
+  max/idle/`IdleTouchInterval` Realm-only (Q14, off por default), gate
+  `EnableSessionInvalidationByState ⇒ RequiresSecurityStateProvider` (Q15) e `Validate()`.
+
+**Arquivos alterados:**
+- `adrs/ADR-014.md` — banner + §5 Emenda: `RequiredAction`, `SecurityStamp` em `UserSession` (desfaz a reserva do §3
+  via `SessionsValidAfter`), `IUserSecurityStateProvider` (opcional) e `ISessionRevocationService` (revogação por subject).
+- `adrs/ADR-015.md` — banner + §4 Emenda: credencial não genérica (evolui §2.8), histórico/expiração, telefone como
+  campo fixo (emenda §2.6), bloqueio com janela, bloco de options, eventos despachados (evolui §2.9).
+- `RoyalIdentity.UserAccounts/Options/PasswordOptions.cs` — `PasswordReuseWindowDays` (idade, Q2) e
+  `MaxPasswordHistoryComparisons` (cap, Q8) + copy-ctor.
+- `RoyalIdentity.UserAccounts/Options/UserAccountsRealmOptions.cs` — propriedade `SecurityLifecycle` (dono único),
+  copy-on-create e agregação na `Validate()` (idade ≥ 0; cap ≥ count quando histórico ligado; SSO idle×max).
+- `Tests.UserAccounts/UserAccountsRealmOptionsTests.cs` — copy-on-create independente, defaults decididos, validação.
+- `CLAUDE.md` — plano em "Active plans"; ADRs `..017`. `.ai/plans/plans-roadmap-01.md` — §3 aponta para a ADR-017.
+
+**Verificação:** `dotnet build RoyalIdentity.sln` — sucesso; `Tests.UserAccounts` **96/96** verdes.
+
+**Notas de ordenação:**
+- A checagem de composição Q15 (exigir `IUserSecurityStateProvider` quando a policy de invalidação por estado está
+  ligada) fica na `.Integration` na **Fase 8** — o porto core-owned ainda não existe; no módulo puro está modelado só
+  o gate `RequiresSecurityStateProvider`.
+- `.ai/foundation/*` **não** foi alterado: os novos portos (`RequiredAction`, `IUserSecurityStateProvider`,
+  `ISessionRevocationService`) ainda não existem no código; a atualização acompanha as Fases 2/8 (mesmo precedente da
+  nota `IUserClaimsProvider` "until Fase 2" em `product.md`).
+
+**Critérios de aceite:** atendidos — ADR-017 existe e decide Q1–Q15; ADR-014/015 registram as emendas; documentação
+não contradiz o plano; options têm dono único.
 
 ---
 
@@ -1010,6 +1059,10 @@ credencial, stamp e invalidação ocorrem na mesma transação quando aplicável
 
 **Testes:** unidade de domínio (gatilhos do stamp); persistência (round-trip/migrations); concorrência (Fase 10 amplia).
 
+### Resultado da Fase 2
+
+*a preencher*
+
 ---
 
 ## Fase 3 - Política de senha: histórico e expiração com enforcement
@@ -1036,6 +1089,10 @@ verdade das options para fora do módulo.
 
 **Testes:** unidade (histórico/poda/expiração); persistência de histórico; flags off.
 
+### Resultado da Fase 3
+
+*a preencher*
+
 ---
 
 ## Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada)
@@ -1060,6 +1117,10 @@ troca exige novo login; troca user-facing respeita `AllowChangePassword`; anti-e
 verde.
 
 **Testes:** unidade do caso de uso; integração do required action no login.
+
+### Resultado da Fase 4
+
+*a preencher*
 
 ---
 
@@ -1088,6 +1149,10 @@ expostos.
 
 **Testes:** unidade (emissão/consumo/revogação/anti-enumeração); concorrência de consumo (Fase 10 amplia).
 
+### Resultado da Fase 5
+
+*a preencher*
+
 ---
 
 ## Fase 6 - Verificação de email e telefone
@@ -1113,6 +1178,10 @@ com o primário; telefone conforme Q9; anti-enumeração preservada.
 **Testes:** unidade (verificação/target/troca gera novo objeto não-verificado); projeção de claims
 (`email_verified`/`phone_*`).
 
+### Resultado da Fase 6
+
+*a preencher*
+
 ---
 
 ## Fase 7 - Lockout, bloqueio administrativo e restrições de acesso
@@ -1137,6 +1206,10 @@ funciona; contadores corretos sob concorrência; reasons de borda corretos; rest
 registradas como design futuro por realm/grupo, sem tabela per-account neste plano.
 
 **Testes:** unidade (lockout/unlock/admin block); concorrência (Fase 10).
+
+### Resultado da Fase 7
+
+*a preencher*
 
 ---
 
@@ -1172,6 +1245,10 @@ invalidação (Decisão fechada §Senha).
 **Testes:** integração (`SessionsValidAfter` invalida sessão/cookie; idle touch com throttle e limite max; revogação por
 subject; refresh revogado não renova); regressão OIDC.
 
+### Resultado da Fase 8
+
+*a preencher*
+
 ---
 
 ## Fase 9 - Auditoria, eventos e (seletivo) outbox
@@ -1194,6 +1271,10 @@ infraestrutura de outbox além do que Q8 autorizar.
 introduzida sem decisão Q8; sem ruído de outbox para login/falha.
 
 **Testes:** unidade (emissão por caso de uso); (se aplicável) durabilidade/idempotência de auditoria/outbox.
+
+### Resultado da Fase 9
+
+*a preencher*
 
 ---
 
@@ -1218,6 +1299,10 @@ introduzida sem decisão Q8; sem ruído de outbox para login/falha.
 verde com integração opt-in; fake permanece disponível; fronteiras de arquitetura intactas.
 
 **Testes:** `dotnet test RoyalIdentity.sln` + suites do módulo/providers.
+
+### Resultado da Fase 10
+
+*a preencher*
 
 ---
 

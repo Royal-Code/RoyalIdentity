@@ -54,7 +54,7 @@ storage do IdP.
 
 ## 3. Credenciais e Ciclo de Segurança da Conta
 
-**Plano sugerido:** `plan-users-security-lifecycle.md`
+**Plano sugerido:** `plan-users-security-lifecycle.md` (ver também `adrs/ADR-017.md`)
 
 Evolução das regras de segurança do módulo de contas.
 

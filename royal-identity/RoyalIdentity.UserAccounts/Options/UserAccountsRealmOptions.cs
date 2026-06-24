@@ -36,6 +36,7 @@ public class UserAccountsRealmOptions
 		FictitiousEmailIsVerifiedByDefault = other.FictitiousEmailIsVerifiedByDefault;
 		AllowProvidedSubjectId = other.AllowProvidedSubjectId;
 		PasswordOptions = new PasswordOptions(other.PasswordOptions);
+		SecurityLifecycle = new SecurityLifecycleOptions(other.SecurityLifecycle);
 		FixedFieldClaimProjections = other.FixedFieldClaimProjections
 			.Select(p => new FixedFieldClaimProjection(p))
 			.ToList();
@@ -132,6 +133,11 @@ public class UserAccountsRealmOptions
 	public PasswordOptions PasswordOptions { get; set; } = new();
 
 	/// <summary>
+	/// Gets or sets account security lifecycle policies (session invalidation, SSO session lifetime, audit).
+	/// </summary>
+	public SecurityLifecycleOptions SecurityLifecycle { get; set; } = new();
+
+	/// <summary>
 	/// Gets fixed account field projections for identity-scope claims.
 	/// </summary>
 	public List<FixedFieldClaimProjection> FixedFieldClaimProjections { get; set; }
@@ -163,6 +169,19 @@ public class UserAccountsRealmOptions
 		{
 			errors.Add("PasswordOptions.MinimumLength cannot be greater than PasswordOptions.MaximumLength.");
 		}
+
+		if (PasswordOptions.PasswordReuseWindowDays < 0)
+		{
+			errors.Add("PasswordOptions.PasswordReuseWindowDays cannot be negative.");
+		}
+
+		if (PasswordOptions.EnforcePasswordHistory &&
+			PasswordOptions.MaxPasswordHistoryComparisons < PasswordOptions.PasswordHistoryCount)
+		{
+			errors.Add("PasswordOptions.MaxPasswordHistoryComparisons cannot be less than PasswordHistoryCount when password history is enforced.");
+		}
+
+		errors.AddRange(SecurityLifecycle.Validate());
 
 		foreach (var projection in FixedFieldClaimProjections.Where(p => p.Include))
 		{

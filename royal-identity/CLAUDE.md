@@ -25,10 +25,11 @@ Completed refactoring plans (useful as historical record and for understanding d
 Active plans (check status before modifying affected areas):
 
 - [.ai/plans/plan-users-accounts-module-v2.md](.ai/plans/plan-users-accounts-module-v2.md) — PLANNED (camada B: `RoyalIdentity.UserAccounts` module — rich accounts, own persistence, properties-by-scope, `.Integration` adapter; ADR-015. Fase 1 done)
+- [.ai/plans/plan-users-security-lifecycle.md](.ai/plans/plan-users-security-lifecycle.md) — PLANNED (account credentials & security lifecycle: password history/expiration enforcement, action tokens, `SecurityStamp` + `SessionsValidAfter` invalidation, lockout/admin block window, email/phone verification, session/refresh revocation; ADR-017 amends ADR-014/015. Fase 1 done)
 
 Architectural Decision Records (accepted decisions; read before changing the affected area):
 
-- [adrs/](adrs/) — ADR-001..016 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**, **ADR-016 shared technical library `RoyalIdentity.Security` (leaf technical lib in the product namespace — not the external `RoyalCode.*` ecosystem); amends ADR-013**)
+- [adrs/](adrs/) — ADR-001..017 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**, **ADR-016 shared technical library `RoyalIdentity.Security` (leaf technical lib in the product namespace — not the external `RoyalCode.*` ecosystem); amends ADR-013**, **ADR-017 account security lifecycle — `RequiredAction`, `SecurityStamp` + `SessionsValidAfter`, `IUserSecurityStateProvider`/`ISessionRevocationService` seams, per-realm `SecurityLifecycleOptions`; amends ADR-014/015**)
 
 Backlog (deferred items with design notes):
 

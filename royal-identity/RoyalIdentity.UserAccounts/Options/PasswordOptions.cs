@@ -23,6 +23,8 @@ public class PasswordOptions
 		PasswordExpirationDays = other.PasswordExpirationDays;
 		EnforcePasswordHistory = other.EnforcePasswordHistory;
 		PasswordHistoryCount = other.PasswordHistoryCount;
+		PasswordReuseWindowDays = other.PasswordReuseWindowDays;
+		MaxPasswordHistoryComparisons = other.MaxPasswordHistoryComparisons;
 		MinimumLength = other.MinimumLength;
 		MaximumLength = other.MaximumLength;
 		RequireSpecialCharacters = other.RequireSpecialCharacters;
@@ -64,6 +66,19 @@ public class PasswordOptions
 	/// Gets or sets the number of previous password hashes to retain.
 	/// </summary>
 	public int PasswordHistoryCount { get; set; } = 3;
+
+	/// <summary>
+	/// Gets or sets the reuse window, in days, for password history checks. Zero disables the age criterion
+	/// (only <see cref="PasswordHistoryCount"/> applies). When greater than zero, a candidate password is also
+	/// rejected if it matches any hash changed within the window, even beyond the retained count.
+	/// </summary>
+	public int PasswordReuseWindowDays { get; set; } = 0;
+
+	/// <summary>
+	/// Gets or sets the safety cap on how many historical hashes are compared/retained per password change.
+	/// Bounds the cost of the quantity-union-age set for accounts that change passwords very often.
+	/// </summary>
+	public int MaxPasswordHistoryComparisons { get; set; } = 24;
 
 	/// <summary>
 	/// Gets or sets the minimum password length.
