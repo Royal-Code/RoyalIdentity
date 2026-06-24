@@ -133,6 +133,65 @@ public class UserAccountsIntegrationTests
 	}
 
 	[Fact]
+	public async Task LocalAuthenticator_SurfacesRequiredAction_WhenPasswordExpired()
+	{
+		var options = Options();
+		options.PasswordOptions.EnablePasswordExpiration = true;
+		options.PasswordOptions.PasswordExpirationDays = 10;
+		await using var provider = BuildProvider(options);
+		await CreateAsync(provider, "r1", "alice", options, subjectId: "alice", displayName: "Alice Liddell", password: "secret");
+
+		var clock = (FakeClock)provider.GetRequiredService<TimeProvider>();
+		clock.Now = Start.AddDays(11);
+
+		var result = await AuthAsync(provider, "r1", "alice", "secret");
+
+		// Valid credential gated by a required action: subject carried, no failure reason, not a success.
+		Assert.False(result.Success);
+		Assert.Null(result.Reason);
+		Assert.NotNull(result.RequiredAction);
+		Assert.Equal(RequiredActionType.ChangePassword, result.RequiredAction!.Type);
+		Assert.NotNull(result.Subject);
+		Assert.Equal("alice", result.Subject!.SubjectId);
+		Assert.Equal("Alice Liddell", result.Subject.DisplayName);
+	}
+
+	[Fact]
+	public async Task LoginFlow_RoutesRequiredPasswordChange_WithoutStartingSession()
+	{
+		var options = Options();
+		options.PasswordOptions.EnablePasswordExpiration = true;
+		options.PasswordOptions.PasswordExpirationDays = 10;
+		await using var provider = BuildProvider(options);
+		await CreateAsync(provider, "r1", "alice", options, subjectId: "alice", password: "secret");
+
+		var clock = (FakeClock)provider.GetRequiredService<TimeProvider>();
+		clock.Now = Start.AddDays(11);
+
+		var realm = Realm("r1");
+		var events = new CapturingEventDispatcher();
+
+		using var scope = provider.CreateScope();
+		// The throwing session/principal services prove the borda issues no session/cookie before the action.
+		var flow = new LoginFlowService(
+			scope.ServiceProvider.GetRequiredService<IUserDirectory>(),
+			new ThrowingUserSessionService(),
+			new ThrowingSubjectPrincipalFactory(),
+			new ThrowingConsentService(),
+			new NullAuthorizationContextResolver(),
+			new FixedCurrentRealmAccessor(realm),
+			events,
+			new HttpContextAccessor(),
+			NullLogger<LoginFlowService>.Instance);
+
+		var result = await flow.LoginAsync(new LoginRequest("alice", "secret", ReturnUrl: null, RememberLogin: false), default);
+
+		Assert.Equal(LoginFlowOutcome.RequiresPasswordChange, result.Outcome);
+		// A required action is neither a login success nor a login failure: no event is dispatched.
+		Assert.Empty(events.Events);
+	}
+
+	[Fact]
 	public async Task LocalAuthenticator_FailedResult_NeverCarriesSubject()
 	{
 		var options = Options();

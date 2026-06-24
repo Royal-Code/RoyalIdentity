@@ -15,6 +15,13 @@ public enum LoginFlowOutcome
     /// <summary>Authentication failed (generic message for the UI; specific reason goes to the event).</summary>
     Error,
 
+    /// <summary>
+    /// The credential was valid but a required action gates completion (ADR-017 §2.3): the user must change the
+    /// password (admin-forced <c>MustChangePassword</c> or expired) before any session/token is issued. No cookie
+    /// is written. The UI/admin plan maps this to the change-password challenge; the token + flow land in Fase 5.
+    /// </summary>
+    RequiresPasswordChange,
+
     /// <summary>Signed in, but the client/request needs consent.</summary>
     RequiresConsent,
 

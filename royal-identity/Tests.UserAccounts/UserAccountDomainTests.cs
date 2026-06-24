@@ -266,6 +266,76 @@ public class UserAccountDomainTests
 	}
 
 	[Fact]
+	public void AuthenticateLocal_RequiresPasswordChange_WhenMustChangePasswordIsSet()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, options, mustChangePassword: true).IsSuccess);
+
+		var result = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(1));
+
+		// Valid credential, but completion is gated: not a success, no failure reason, subject carried.
+		Assert.False(result.Success);
+		Assert.Null(result.Reason);
+		Assert.Equal(LocalRequiredAction.ChangePasswordMustChange, result.RequiredAction);
+		Assert.Equal("subject-1", result.SubjectId);
+	}
+
+	[Fact]
+	public void AuthenticateLocal_RequiresPasswordChange_WhenPasswordExpired()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		options.EnablePasswordExpiration = true;
+		options.PasswordExpirationDays = 10;
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, options).IsSuccess);
+
+		var withinWindow = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddDays(9));
+		var afterExpiration = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddDays(11));
+
+		Assert.True(withinWindow.Success);
+		Assert.Null(withinWindow.RequiredAction);
+
+		Assert.False(afterExpiration.Success);
+		Assert.Null(afterExpiration.Reason);
+		Assert.Equal(LocalRequiredAction.ChangePasswordExpired, afterExpiration.RequiredAction);
+		Assert.Equal("subject-1", afterExpiration.SubjectId);
+	}
+
+	[Fact]
+	public void AuthenticateLocal_DoesNotSurfaceRequiredAction_OnInvalidPassword()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, options, mustChangePassword: true).IsSuccess);
+
+		var result = account.AuthenticateLocal("wrong", options, PasswordHasher, Now.AddMinutes(1));
+
+		// A wrong password is a plain failure; the required action only gates an otherwise valid credential.
+		Assert.False(result.Success);
+		Assert.Null(result.RequiredAction);
+		Assert.Equal(LocalAuthenticationFailureReason.InvalidCredentials, result.Reason);
+	}
+
+	[Fact]
+	public void AuthenticateLocal_ResetsFailures_WhenValidButRequiresAction()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		options.MaxFailedAccessAttempts = 5;
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, options, mustChangePassword: true).IsSuccess);
+
+		account.AuthenticateLocal("wrong", options, PasswordHasher, Now.AddMinutes(1));
+		Assert.Equal(1, account.LocalCredential.FailedPasswordAttempts);
+
+		var required = account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddMinutes(2));
+
+		Assert.False(required.Success);
+		Assert.Equal(LocalRequiredAction.ChangePasswordMustChange, required.RequiredAction);
+		Assert.Equal(0, account.LocalCredential.FailedPasswordAttempts);
+	}
+
+	[Fact]
 	public void BlockAndUnblock_KeepAdministrativeBlockStateTogether()
 	{
 		var account = CreateAccount();

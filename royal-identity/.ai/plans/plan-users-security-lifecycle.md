@@ -1,17 +1,17 @@
 # Plan: Credenciais e Ciclo de Segurança da Conta (`plan-users-security-lifecycle`)
 
-## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–3 concluídas
+## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–4 concluídas
 
 ## Progresso
 
-`###-------` **30%** - 3 de 10 fases
+`####------` **40%** - 4 de 10 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - ADR-017, emendas e options de ciclo de segurança por realm | Concluida |
 | Fase 2 - Modelo de credencial, `SecurityStamp` e concorrência | Concluida |
 | Fase 3 - Política de senha: histórico e expiração com enforcement | Concluida |
-| Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada) | Pendente |
+| Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada) | Concluida |
 | Fase 5 - Recuperação de senha e tokens de ação | Pendente |
 | Fase 6 - Verificação de email e telefone | Pendente |
 | Fase 7 - Lockout, bloqueio administrativo e restrições de acesso | Pendente |
@@ -1153,13 +1153,14 @@ de login para `MustChangePassword`/senha expirada, sem criar sessão real durant
 
 **Tarefas:**
 
-- [ ] Caso de uso de troca user-facing (gated por `AllowChangePassword`), distinto do `ChangeUserAccountPassword` de
+- [x] Caso de uso de troca user-facing (gated por `AllowChangePassword`), distinto do `ChangeUserAccountPassword` de
       seed/admin do v2 (que **não** é gated, por intenção).
-- [ ] Introduzir o required action na borda (Q4): senha válida + (`MustChangePassword` **ou** expirada) ⇒ resultado de
+- [x] Introduzir o required action na borda (Q4): senha válida + (`MustChangePassword` **ou** expirada) ⇒ resultado de
       required action; **sem** sessão SSO/code/token; desafio curto (Q3) leva à troca; depois, **login real** com a nova
-      senha (Decisão fechada §Senha).
-- [ ] Integrar no `LoginFlowService`/`.Integration` o roteamento do required action (sem reescrever a borda).
-- [ ] Sem telas/endpoints user-facing (Q12 — decidido: ficam para o plano de admin/UI); entregar só a costura + casos de uso.
+      senha (Decisão fechada §Senha). (O **token transitório** `Purpose=ChangeExpiredPassword` da Q3/Q5 é entregue na
+      Fase 5; a Fase 4 estabelece o **sinal** e o **roteamento** que levam à troca.)
+- [x] Integrar no `LoginFlowService`/`.Integration` o roteamento do required action (sem reescrever a borda).
+- [x] Sem telas/endpoints user-facing (Q12 — decidido: ficam para o plano de admin/UI); entregar só a costura + casos de uso.
 
 **Critérios de aceite:** `MustChangePassword`/expirada **nunca** emitem token antes da troca; o desafio é uso único; pós
 troca exige novo login; troca user-facing respeita `AllowChangePassword`; anti-enumeração preservada; regressão OIDC
@@ -1169,7 +1170,56 @@ verde.
 
 ### Resultado da Fase 4
 
-*a preencher*
+**Concluída (2026-06-24).** A borda de autenticação ganhou o conceito de **required action** (Q4) de forma aditiva, e a
+troca de senha **user-facing** (gated por `AllowChangePassword`) virou um caso de uso próprio, distinto do de seed/admin.
+O modelo segue o split do módulo: o **domínio** decide quando uma credencial válida é gated; a **`.Integration`** mapeia
+para a borda; o **`LoginFlowService`** roteia sem criar sessão/cookie/token; a **validação** de troca fica em features
+(`PasswordPolicy` + `PasswordHistoryPolicy`). Nenhuma tela/endpoint (Q12).
+
+**Arquivos novos:**
+- `RoyalIdentity/Users/RequiredAction.cs` (core) — `enum RequiredActionType { ChangePassword }` + record `RequiredAction`
+  (estrutura tipada, não um novo *reason*; extensível para verificações futuras — Q4/ADR-017 §2.3).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/LocalRequiredAction.cs` (módulo) — enum espelho
+  (`ChangePasswordMustChange`/`ChangePasswordExpired`); mantém o motivo (admin vs expirada) para eventos/diagnóstico do
+  módulo, mesmo que a borda colapse ambos em "trocar senha".
+- `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/ChangeOwnPassword.cs` (módulo) — caso de uso user-facing gated
+  por `AllowChangePassword`; aplica complexidade + histórico (Fase 3) antes de `UserAccount.ChangePassword`.
+
+**Arquivos alterados:**
+- `RoyalIdentity/Users/AuthenticationResult.cs` — terceiro estado `RequiresAction(subject, requiredAction)`: credencial
+  válida mas gated (`Success=false`, `Reason=null`, `RequiredAction` setado, `Subject` carregado para o desafio).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/LocalAuthenticationResult.cs` — espelha `RequiredAction` +
+  factory `RequiresAction(account, action)`.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccount.cs` — `AuthenticateLocal`, após verificar a senha,
+  retorna required action quando `MustChangePassword` (precedência) **ou** `IsPasswordExpired` (Fase 3); o reset de
+  falhas/`Touch` continua persistido.
+- `RoyalIdentity.UserAccounts.Integration/LocalUserAuthenticator.cs` — mapeia `LocalRequiredAction` →
+  `AuthenticationResult.RequiresAction(subject, RequiredAction.ChangePassword)` (ambos os motivos colapsam).
+- `RoyalIdentity/Users/LoginFlowResult.cs` — novo outcome `LoginFlowOutcome.RequiresPasswordChange`.
+- `RoyalIdentity/Users/Defaults/LoginFlowService.cs` — roteia o required action **antes** do ramo de falha/sucesso, sem
+  criar sessão/cookie/token e sem despachar evento de login.
+
+**Decisões de design:**
+- `RequiredAction` é **estrutura tipada** (não um `reason` novo) — ADR-017 §2.3; o motivo (must-change vs expirada) é
+  preservado no enum do módulo e **colapsado** na borda (ambos ⇒ "trocar senha"), porque o roteamento é idêntico.
+- O required action é um **terceiro estado** do `AuthenticationResult` (`Success=false` **sem** `Reason`); o
+  `LoginFlowService` o trata **antes** de `!Success`, então uma conta gated nunca cai no ramo de falha (anti-enumeração
+  preservada: a UI recebe um outcome genérico, sem motivo).
+- **`MustChangePassword` tem precedência** sobre expiração na detecção (sinal administrativo > política).
+- **Senha errada não vira required action**: o gate só se aplica a uma credencial **válida** (a falha continua
+  `InvalidCredentials`/lockout).
+- O caso de uso user-facing (`ChangeOwnPassword`) **respeita `AllowChangePassword`** (gate em `Execute`, como o
+  `AllowProvidedSubjectId` do `CreateUserAccount`); o de seed/admin (`ChangeUserAccountPassword`) permanece **não** gated.
+- A UI e o **token transitório** `Purpose=ChangeExpiredPassword` (Q3/Q5) ficam para fora desta fase: a Fase 5 entrega o
+  `UserAccountActionToken`; a Fase 4 entrega o **sinal** (required action) e o **roteamento** que levam à troca + re-login.
+
+**Verificação:** `dotnet build RoyalIdentity.sln` — sucesso. Testes: **Tests.UserAccounts 127/127** (8 novos),
+Tests.Integration 203/203, Tests.Security 116/116, Tests.Identity 13/13, Tests.Pipelines 3/3, Tests.Architecture 15/15 —
+todos verdes. Novos testes: domínio (`AuthenticateLocal` required action por must-change/expirada, precedência, senha
+errada não gera ação, reset de falhas no caminho gated), use case (`ChangeOwnPassword` honra `AllowChangePassword`;
+`AuthenticateLocalCredential` expõe o required action), integração (`LocalUserAuthenticator` mapeia para
+`RequiresAction` com subject; `LoginFlowService` roteia `RequiresPasswordChange` **sem** iniciar sessão — provado por
+`ThrowingUserSessionService`/`ThrowingSubjectPrincipalFactory` — e sem despachar evento).
 
 ---
 

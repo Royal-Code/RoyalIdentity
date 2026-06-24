@@ -353,6 +353,45 @@ public class UserAccountUseCasesTests
 		Assert.True((await ChangeAsync(provider, options, "alice", "renewed", "fresh-one")).IsSuccess);
 	}
 
+	[Fact]
+	public async Task ChangeOwnPassword_HonorsAllowChangePassword_Toggle()
+	{
+		await using var provider = BuildProvider();
+		var allowed = Options();
+		allowed.AllowProvidedSubjectId = true;
+		allowed.AllowChangePassword = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", allowed, subjectId: "alice", password: "secret"));
+
+		// allowed -> the user-facing change succeeds and the new password authenticates
+		Assert.True((await ChangeOwnAsync(provider, allowed, "alice", "secret", "renewed")).IsSuccess);
+		Assert.True((await AuthenticateAsync(provider, allowed, "alice", "renewed")).HasValue(out var ok) && ok!.Success);
+
+		// disabled -> rejected before any mutation; the current password is unchanged
+		var disabled = Options();
+		disabled.AllowChangePassword = false;
+		Assert.True((await ChangeOwnAsync(provider, disabled, "alice", "renewed", "another")).IsFailure);
+		Assert.True((await AuthenticateAsync(provider, disabled, "alice", "renewed")).HasValue(out var still) && still!.Success);
+	}
+
+	[Fact]
+	public async Task Authenticate_SurfacesRequiredAction_WhenMustChangePassword()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+		await MutateAccountAsync(provider, "r1", "alice",
+			a => a.SetPassword("hashed:secret", Start, options.PasswordOptions, mustChangePassword: true));
+
+		var result = await AuthenticateAsync(provider, options, "alice", "secret");
+
+		Assert.True(result.HasValue(out var outcome));
+		Assert.False(outcome!.Success);
+		Assert.Null(outcome.Reason);
+		Assert.Equal(LocalRequiredAction.ChangePasswordMustChange, outcome.RequiredAction);
+		Assert.Equal("alice", outcome.SubjectId);
+	}
+
 	// ---- Scope properties + claims ----
 
 	[Fact]
@@ -545,6 +584,21 @@ public class UserAccountUseCasesTests
 		using var scope = provider.CreateScope();
 		var handler = scope.ServiceProvider.GetRequiredService<IChangeUserAccountPasswordHandler>();
 		return await handler.HandleAsync(new ChangeUserAccountPassword
+		{
+			RealmId = "r1",
+			Options = options,
+			SubjectId = subjectId,
+			CurrentPassword = currentPassword,
+			NewPassword = newPassword
+		}, default);
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> ChangeOwnAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string currentPassword, string newPassword)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IChangeOwnPasswordHandler>();
+		return await handler.HandleAsync(new ChangeOwnPassword
 		{
 			RealmId = "r1",
 			Options = options,

@@ -483,6 +483,20 @@ public class UserAccount : AggregateRoot<long>
 
 		LocalCredential.ResetFailures();
 		Touch(attemptedAt);
+
+		// Credential is valid, but completion may be gated by a required action (ADR-017 §2.3): an admin-forced
+		// change takes precedence over a policy expiration. No session/token is issued by the caller until the
+		// action is satisfied; the reset of failed-attempt state above is still persisted.
+		if (LocalCredential.MustChangePassword)
+		{
+			return LocalAuthenticationResult.RequiresAction(this, LocalRequiredAction.ChangePasswordMustChange);
+		}
+
+		if (LocalCredential.IsPasswordExpired(options, attemptedAt))
+		{
+			return LocalAuthenticationResult.RequiresAction(this, LocalRequiredAction.ChangePasswordExpired);
+		}
+
 		return LocalAuthenticationResult.Succeeded(this);
 	}
 

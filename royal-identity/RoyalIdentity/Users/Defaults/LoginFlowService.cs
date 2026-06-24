@@ -44,6 +44,23 @@ public sealed class LoginFlowService(
         var authenticator = userDirectory.GetLocalAuthenticator(realm);
         var authResult = await authenticator.AuthenticateLocalAsync(request.Login, request.Password, ct);
 
+        // The credential is valid but a required action gates completion (ADR-017 §2.3): issue no SSO session,
+        // cookie or token until it is satisfied. The challenge token (Fase 5) and the UI live elsewhere (Q12).
+        if (authResult.RequiredAction is { } requiredAction)
+        {
+            logger.LogInformation(
+                "Login for {Login} requires action {Action} before completing",
+                request.Login, requiredAction.Type);
+
+            var outcome = requiredAction.Type switch
+            {
+                RequiredActionType.ChangePassword => LoginFlowOutcome.RequiresPasswordChange,
+                _ => LoginFlowOutcome.RequiresPasswordChange,
+            };
+
+            return new LoginFlowResult(outcome, request.ReturnUrl);
+        }
+
         if (!authResult.Success)
         {
             var message = ErrorMessageFor(realm, authResult.Reason);

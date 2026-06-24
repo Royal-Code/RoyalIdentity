@@ -18,6 +18,11 @@ namespace RoyalIdentity.UserAccounts.Integration;
 /// surface as <c>Blocked</c>); <see cref="LocalAuthenticationFailureReason.PasswordNotSet"/> maps to
 /// <see cref="AuthenticationFailureReason.InvalidCredentials"/> (no password ⇒ password auth unavailable).
 /// </para>
+/// <para>
+/// A valid credential gated by a required action (ADR-017 §2.3 — <c>MustChangePassword</c> or an expired
+/// password) maps to <see cref="AuthenticationResult.RequiresAction"/>: the subject is carried, but the borda
+/// issues no session/token until the action is satisfied.
+/// </para>
 /// </summary>
 public sealed class LocalUserAuthenticator(
     IAuthenticateLocalCredentialHandler authenticate,
@@ -45,6 +50,14 @@ public sealed class LocalUserAuthenticator(
             return AuthenticationResult.Failed(AuthenticationFailureReason.InvalidCredentials);
         }
 
+        // A valid credential gated by a required action (ADR-017 §2.3): the module collapses must-change and
+        // expiration to a single edge "change password" action; the subject is carried for the challenge.
+        if (outcome.RequiredAction is { } requiredAction)
+        {
+            var subject = new Subject(outcome.SubjectId!, outcome.DisplayName!, IsActive: true);
+            return AuthenticationResult.RequiresAction(subject, MapRequiredAction(requiredAction));
+        }
+
         if (outcome.Success)
         {
             // Success only ever occurs for an active account, so IsActive is true here.
@@ -54,6 +67,13 @@ public sealed class LocalUserAuthenticator(
 
         return AuthenticationResult.Failed(MapReason(outcome.Reason!.Value));
     }
+
+    private static RequiredAction MapRequiredAction(LocalRequiredAction action) => action switch
+    {
+        LocalRequiredAction.ChangePasswordMustChange => RequiredAction.ChangePassword,
+        LocalRequiredAction.ChangePasswordExpired => RequiredAction.ChangePassword,
+        _ => RequiredAction.ChangePassword,
+    };
 
     private static AuthenticationFailureReason MapReason(LocalAuthenticationFailureReason reason) => reason switch
     {
