@@ -23,6 +23,7 @@ public static class UserAccountsServiceCollectionExtensions
 		services.TryAddSingleton<IUserAccountNormalizer, DefaultUserAccountNormalizer>();
 		services.TryAddSingleton<ISubjectIdGenerator, DefaultSubjectIdGenerator>();
 		services.TryAddSingleton<PasswordPolicy>();
+		services.TryAddSingleton<PasswordHistoryPolicy>();
 
 		services.TryAddScoped<UserAccountReader>();
 		services.TryAddScoped<UserAccountClaimProjector>();

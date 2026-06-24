@@ -13,6 +13,7 @@ public class UserAccount : AggregateRoot<long>
 	private List<UserAccountEmail> emails = [];
 	private List<UserAccountPropertyValue> propertyValues = [];
 	private List<UserAccountRole> roles = [];
+	private List<PasswordHistoryEntry> passwordHistory = [];
 
 #nullable disable
 	/// <summary>
@@ -161,6 +162,11 @@ public class UserAccount : AggregateRoot<long>
 	public IReadOnlyCollection<UserAccountPropertyValue> PropertyValues => propertyValues;
 
 	/// <summary>
+	/// Gets the archived password hashes kept for reuse enforcement.
+	/// </summary>
+	public IReadOnlyCollection<PasswordHistoryEntry> PasswordHistory => passwordHistory;
+
+	/// <summary>
 	/// Gets the current primary email, when one exists.
 	/// </summary>
 	public UserAccountEmail? PrimaryEmail => EmailItems.FirstOrDefault(e => e.IsPrimary);
@@ -190,6 +196,15 @@ public class UserAccount : AggregateRoot<long>
 	{
 		get => propertyValues;
 		set => propertyValues = value;
+	}
+
+	/// <summary>
+	/// Collection navigation used by EF Core mapping while public access remains read-only.
+	/// </summary>
+	protected virtual List<PasswordHistoryEntry> PasswordHistoryItems
+	{
+		get => passwordHistory;
+		set => passwordHistory = value;
 	}
 
 	/// <summary>
@@ -342,18 +357,36 @@ public class UserAccount : AggregateRoot<long>
 	}
 
 	/// <summary>
-	/// Sets or replaces the local password credential.
+	/// Sets or replaces the local password credential. When the realm enforces password history, the previous
+	/// hash is archived and the history is pruned to the retained set (quantity ∪ age, bounded by the cap).
 	/// </summary>
 	/// <param name="passwordHash">The new password hash.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
+	/// <param name="options">The realm password and history policy.</param>
+	/// <param name="reason">Why the password is being set, recorded on the archived entry.</param>
+	/// <param name="changedBySubjectId">The actor who set the password, or <c>null</c> for self-service/system.</param>
 	/// <param name="mustChangePassword">Whether the user must change the password later.</param>
 	/// <returns>A result describing whether the password was stored.</returns>
 	public Result SetPassword(
 		string passwordHash,
 		DateTimeOffset changedAt,
+		PasswordOptions options,
+		PasswordChangeReason reason = PasswordChangeReason.Change,
+		string? changedBySubjectId = null,
 		bool mustChangePassword = false)
 	{
+		var previousHash = LocalCredential.PasswordHash;
+
 		LocalCredential.SetPassword(passwordHash, changedAt, mustChangePassword);
+
+		if (options.EnforcePasswordHistory && !string.IsNullOrWhiteSpace(previousHash))
+		{
+			var entry = new PasswordHistoryEntry(RealmId, previousHash!, changedAt, reason, changedBySubjectId);
+			entry.AttachTo(this);
+			PasswordHistoryItems.Add(entry);
+			PrunePasswordHistory(options, changedAt);
+		}
+
 		TouchSecurityState(changedAt, invalidateSessions: true);
 		AddEvent(new UserAccountPasswordChanged(RealmId, SubjectId));
 		return Result.Ok();
@@ -375,12 +408,14 @@ public class UserAccount : AggregateRoot<long>
 	/// <param name="currentPassword">The current plain password.</param>
 	/// <param name="newPasswordHash">The new password hash.</param>
 	/// <param name="passwordHasher">The password hasher.</param>
+	/// <param name="options">The realm password and history policy.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	/// <returns>A result describing whether the password was changed.</returns>
 	public Result ChangePassword(
 		string currentPassword,
 		string newPasswordHash,
 		IUserAccountPasswordHasher passwordHasher,
+		PasswordOptions options,
 		DateTimeOffset changedAt)
 	{
 		if (!LocalCredential.HasPassword)
@@ -393,7 +428,7 @@ public class UserAccount : AggregateRoot<long>
 			return Problems.InvalidParameter("Current password is invalid.", nameof(LocalCredential), "user_account.current_password_invalid");
 		}
 
-		return SetPassword(newPasswordHash, changedAt);
+		return SetPassword(newPasswordHash, changedAt, options, PasswordChangeReason.Change);
 	}
 
 	/// <summary>
@@ -582,5 +617,43 @@ public class UserAccount : AggregateRoot<long>
 		}
 
 		Touch(changedAt);
+	}
+
+	/// <summary>
+	/// Keeps the password history entries that are still relevant (within the retained quantity or the reuse age
+	/// window) and drops the rest, never retaining more than the comparison/retention cap.
+	/// </summary>
+	private void PrunePasswordHistory(PasswordOptions options, DateTimeOffset now)
+	{
+		var ordered = PasswordHistoryItems
+			.OrderByDescending(h => h.CreatedAt)
+			.ThenByDescending(h => h.Id)
+			.ToList();
+
+		DateTimeOffset? windowStart = options.PasswordReuseWindowDays > 0
+			? now - TimeSpan.FromDays(options.PasswordReuseWindowDays)
+			: null;
+
+		var retained = new List<PasswordHistoryEntry>(ordered.Count);
+		for (var index = 0; index < ordered.Count; index++)
+		{
+			if (retained.Count >= options.MaxPasswordHistoryComparisons)
+			{
+				break;
+			}
+
+			var entry = ordered[index];
+			var withinCount = index < options.PasswordHistoryCount;
+			var withinAge = windowStart is not null && entry.CreatedAt >= windowStart;
+			if (withinCount || withinAge)
+			{
+				retained.Add(entry);
+			}
+		}
+
+		foreach (var entry in ordered.Where(e => !retained.Contains(e)))
+		{
+			PasswordHistoryItems.Remove(entry);
+		}
 	}
 }

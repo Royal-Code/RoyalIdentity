@@ -1,16 +1,16 @@
 # Plan: Credenciais e Ciclo de Segurança da Conta (`plan-users-security-lifecycle`)
 
-## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–2 concluídas
+## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–3 concluídas
 
 ## Progresso
 
-`##--------` **20%** - 2 de 10 fases
+`###-------` **30%** - 3 de 10 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - ADR-017, emendas e options de ciclo de segurança por realm | Concluida |
 | Fase 2 - Modelo de credencial, `SecurityStamp` e concorrência | Concluida |
-| Fase 3 - Política de senha: histórico e expiração com enforcement | Pendente |
+| Fase 3 - Política de senha: histórico e expiração com enforcement | Concluida |
 | Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada) | Pendente |
 | Fase 5 - Recuperação de senha e tokens de ação | Pendente |
 | Fase 6 - Verificação de email e telefone | Pendente |
@@ -1088,17 +1088,17 @@ verdade das options para fora do módulo.
 
 **Tarefas:**
 
-- [ ] Implementar `PasswordHistory` (tabela própria — Q2); ao `SetPassword`/`ChangePassword`, gravar o hash anterior,
+- [x] Implementar `PasswordHistory` (tabela própria — Q2); ao `SetPassword`/`ChangePassword`, gravar o hash anterior,
       reter o conjunto necessário para **quantidade ∪ idade** e podar só o que estiver fora dos dois critérios
       (novo campo em `PasswordOptions`, ex.: `PasswordReuseWindowDays`), com um **limite máximo** de comparações/retenção
       (Q8) para conter custo em contas que trocam senha muitas vezes.
-- [ ] Consumir options já validadas: `UserAccountsRealmOptions.Validate()` impede idade sem comparação possível
+- [x] Consumir options já validadas: `UserAccountsRealmOptions.Validate()` impede idade sem comparação possível
       (`PasswordReuseWindowDays > 0` com cap zero), valores negativos e histórico ligado sem quantidade nem idade.
-- [ ] Validar senha candidata contra **senha atual + N hashes históricos** (N limitado pelo cap acima) via
+- [x] Validar senha candidata contra **senha atual + N hashes históricos** (N limitado pelo cap acima) via
       `IUserAccountPasswordHasher.Verify`.
-- [ ] Implementar enforcement de **expiração** (`EnablePasswordExpiration`/`PasswordExpirationDays` × `PasswordChangedAt`):
+- [x] Implementar enforcement de **expiração** (`EnablePasswordExpiration`/`PasswordExpirationDays` × `PasswordChangedAt`):
       a verificação de expiração alimenta o required action da Fase 4 (não bloqueia silenciosamente).
-- [ ] Garantir que `EnforcePasswordHistory`/`EnablePasswordExpiration = false` desligam o enforcement.
+- [x] Garantir que `EnforcePasswordHistory`/`EnablePasswordExpiration = false` desligam o enforcement.
 
 **Critérios de aceite:** reuso de senha recente é rejeitado quando habilitado; poda respeita a política; senha expirada
 é detectada e roteada para troca (Fase 4); flags desligam o comportamento; hashes nunca aparecem em log/export.
@@ -1107,7 +1107,40 @@ verdade das options para fora do módulo.
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluída (2026-06-24).** Histórico e expiração de senha ganharam enforcement no módulo, sem mover a fonte de
+verdade das options para fora dele. Recording+poda ficam no agregado (mutação); a validação de reuso é um serviço de
+feature (espelha `PasswordPolicy`); a detecção de expiração é uma query pura na credencial (ao lado de `IsLockedOut`).
+
+**Arquivos novos:**
+- `Features/Accounts/Domain/PasswordChangeReason.cs` — enum `Create/Change/Reset/AdminSet/Import` gravado na entrada arquivada.
+- `Features/Accounts/Domain/PasswordHistoryEntry.cs` — entidade filha (`Entity<long>`), só hash forte versionado; sem senha plana.
+- `Features/Accounts/Domain/PasswordHistoryPolicy.cs` — serviço de feature que rejeita reuso (senha atual + N históricos,
+  por **quantidade ∪ idade**, limitado pelo cap), comparando candidata via `IUserAccountPasswordHasher.Verify`; gated por `EnforcePasswordHistory`.
+- `Infrastructure/Data/Mappings/PasswordHistoryEntryMap.cs` — tabela `UserAccountPasswordHistory` + índice `(RealmId, UserAccountId, CreatedAt)`.
+
+**Arquivos alterados:**
+- `Features/Accounts/Domain/UserAccount.cs` — coleção `PasswordHistory` (+ nav protegida `PasswordHistoryItems`); `SetPassword`
+  agora recebe `PasswordOptions`/`PasswordChangeReason`/`changedBySubjectId`, **arquiva o hash anterior** e **poda** (quantidade ∪
+  idade, bounded pelo cap; só quando `EnforcePasswordHistory`); `ChangePassword` recebe `options`. `CreatedAt` do histórico = momento do arquivamento.
+- `Features/Accounts/Domain/UserAccountCredential.cs` — `IsPasswordExpired(options, now)` (detecção; alimenta o required action da Fase 4).
+- `Features/Accounts/Commons/UserAccountReader.cs` — `AccountGraph` inclui `PasswordHistoryItems`.
+- `Features/Accounts/Commons/UserAccountsServiceCollectionExtensions.cs` — registra `PasswordHistoryPolicy`.
+- `Features/Accounts/UseCases/ChangeUserAccountPassword.cs` — injeta `PasswordHistoryPolicy`, roda o check de reuso e passa `options`.
+- `Features/Accounts/UseCases/CreateUserAccount.cs` — `SetPassword(..., Options.PasswordOptions, PasswordChangeReason.Create)`.
+- `Infrastructure/Data/Mappings/UserAccountMap.cs` — `HasMany(PasswordHistoryItems)` + `Ignore(PasswordHistory)`.
+- `Options/UserAccountsRealmOptions.cs` (Validate) — rejeita negativos, histórico ligado sem quantidade nem idade, e idade com cap zero.
+
+**Decisões de design:**
+- Validação em **feature** (reuso) vs mutação no **agregado** (arquivar+podar), espelhando o split já usado por `PasswordPolicy`.
+- Comparação por **hash da candidata** contra cada hash armazenado (hashes `$RIPWD$` são salgados — não se compara hash com hash).
+- Schema por `EnsureCreated`/model (sem migrations, como o resto do módulo); tabela nomeada `UserAccountPasswordHistory` (convenção do módulo) — o modelo do plano cita `PasswordHistory`.
+- Expiração é só **detecção** nesta fase; o roteamento para o desafio de troca (required action) é a Fase 4.
+
+**Verificação:** `dotnet build RoyalIdentity.sln` — sucesso. Testes: **Tests.UserAccounts 119/119**, Tests.Integration 203/203,
+Tests.Security 116/116, Tests.Identity 13/13, Tests.Pipelines 3/3, Tests.Architecture 15/15 — todos verdes. Novos testes:
+`PasswordLifecycleTests` (arquivamento/poda por quantidade e idade/cap, reuso atual+histórico+pruned, flags off, expiração),
+`UserAccountsPersistenceTests.PasswordHistory_RoundTrips_AndIsPrunedToRetainedQuantity`,
+`UserAccountUseCasesTests.ChangePassword_RejectsReuse_OfCurrentAndRecentPasswords_WhenHistoryEnforced`, e os de `Validate`.
 
 ---
 

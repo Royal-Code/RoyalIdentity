@@ -142,6 +142,26 @@ public class UserAccountCredential
 	}
 
 	/// <summary>
+	/// Gets whether the password has expired according to the realm expiration policy. Detection only — the
+	/// caller routes an expired password to the change flow (it does not block authentication silently).
+	/// </summary>
+	/// <param name="options">Password and lockout policy.</param>
+	/// <param name="now">The timestamp used to evaluate expiration.</param>
+	/// <returns><c>true</c> when the password is expired.</returns>
+	public bool IsPasswordExpired(PasswordOptions options, DateTimeOffset now)
+	{
+		if (!options.EnablePasswordExpiration ||
+			options.PasswordExpirationDays <= 0 ||
+			!HasPassword ||
+			PasswordChangedAt is null)
+		{
+			return false;
+		}
+
+		return PasswordChangedAt.Value.AddDays(options.PasswordExpirationDays) <= now;
+	}
+
+	/// <summary>
 	/// Clears an expired temporary lockout.
 	/// </summary>
 	/// <param name="options">Password and lockout policy.</param>

@@ -52,6 +52,7 @@ public sealed class UserAccountMap : IEntityTypeConfiguration<UserAccount>
 		builder.Ignore(a => a.Emails);
 		builder.Ignore(a => a.Roles);
 		builder.Ignore(a => a.PropertyValues);
+		builder.Ignore(a => a.PasswordHistory);
 		builder.Ignore(a => a.DomainEvents);
 
 		builder.HasIndex(a => new { a.RealmId, a.SubjectId }).IsUnique();
@@ -71,6 +72,11 @@ public sealed class UserAccountMap : IEntityTypeConfiguration<UserAccount>
 		builder.HasMany<UserAccountPropertyValue>("PropertyValueItems")
 			.WithOne(v => v.UserAccount!)
 			.HasForeignKey(v => v.UserAccountId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.HasMany<PasswordHistoryEntry>("PasswordHistoryItems")
+			.WithOne(h => h.UserAccount!)
+			.HasForeignKey(h => h.UserAccountId)
 			.OnDelete(DeleteBehavior.Cascade);
 
 		builder.HasOne(a => a.LocalCredential)

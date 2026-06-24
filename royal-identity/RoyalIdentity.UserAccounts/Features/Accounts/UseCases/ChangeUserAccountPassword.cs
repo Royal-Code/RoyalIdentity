@@ -67,6 +67,7 @@ public partial class ChangeUserAccountPassword
 		UserAccountReader reader,
 		IUserAccountPasswordHasher passwordHasher,
 		PasswordPolicy passwordPolicy,
+		PasswordHistoryPolicy passwordHistoryPolicy,
 		TimeProvider clock,
 		CancellationToken ct)
 	{
@@ -76,12 +77,25 @@ public partial class ChangeUserAccountPassword
 			return Problems.NotFound("Account was not found in the realm.", nameof(SubjectId), "user_account.not_found");
 		}
 
+		var now = clock.GetUtcNow();
+
 		var policyResult = passwordPolicy.Validate(NewPassword, Options.PasswordOptions, account.Username);
 		if (policyResult.HasProblems(out var passwordProblems))
 		{
 			return passwordProblems;
 		}
 
-		return account.ChangePassword(CurrentPassword, passwordHasher.Hash(NewPassword), passwordHasher, clock.GetUtcNow());
+		var historyResult = passwordHistoryPolicy.Validate(NewPassword, account, Options.PasswordOptions, passwordHasher, now);
+		if (historyResult.HasProblems(out var historyProblems))
+		{
+			return historyProblems;
+		}
+
+		return account.ChangePassword(
+			CurrentPassword,
+			passwordHasher.Hash(NewPassword),
+			passwordHasher,
+			Options.PasswordOptions,
+			now);
 	}
 }

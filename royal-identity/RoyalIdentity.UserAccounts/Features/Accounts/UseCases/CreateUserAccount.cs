@@ -165,7 +165,7 @@ public partial class CreateUserAccount
 
 		if (passwordHash is not null)
 		{
-			account.SetPassword(passwordHash, now);
+			account.SetPassword(passwordHash, now, Options.PasswordOptions, PasswordChangeReason.Create);
 		}
 
 		db.UserAccounts.Add(account);

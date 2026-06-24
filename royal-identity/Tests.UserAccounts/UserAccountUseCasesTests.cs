@@ -331,6 +331,28 @@ public class UserAccountUseCasesTests
 		Assert.Equal(LocalAuthenticationFailureReason.InvalidCredentials, await AuthReason(provider, options, "alice", "secret"));
 	}
 
+	[Fact]
+	public async Task ChangePassword_RejectsReuse_OfCurrentAndRecentPasswords_WhenHistoryEnforced()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.PasswordOptions.EnforcePasswordHistory = true;
+		options.PasswordOptions.PasswordHistoryCount = 3;
+		options.PasswordOptions.MaxPasswordHistoryComparisons = 24;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		// reusing the current password is rejected
+		Assert.True((await ChangeAsync(provider, options, "alice", "secret", "secret")).IsFailure);
+
+		// move to a new password, then try to go back to the previous one (now in history)
+		Assert.True((await ChangeAsync(provider, options, "alice", "secret", "renewed")).IsSuccess);
+		Assert.True((await ChangeAsync(provider, options, "alice", "renewed", "secret")).IsFailure);
+
+		// a brand-new password is accepted
+		Assert.True((await ChangeAsync(provider, options, "alice", "renewed", "fresh-one")).IsSuccess);
+	}
+
 	// ---- Scope properties + claims ----
 
 	[Fact]
@@ -515,6 +537,21 @@ public class UserAccountUseCasesTests
 		Assert.False(outcome!.Success);
 		Assert.NotNull(outcome.Reason);
 		return outcome.Reason!.Value;
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> ChangeAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string currentPassword, string newPassword)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IChangeUserAccountPasswordHandler>();
+		return await handler.HandleAsync(new ChangeUserAccountPassword
+		{
+			RealmId = "r1",
+			Options = options,
+			SubjectId = subjectId,
+			CurrentPassword = currentPassword,
+			NewPassword = newPassword
+		}, default);
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> SetPropertyAsync(

@@ -105,7 +105,7 @@ public class UserAccountDomainTests
 		Assert.True(tooShort.IsFailure);
 		Assert.True(withoutDigit.IsFailure);
 		Assert.True(valid.IsSuccess);
-		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, RelaxedPasswordOptions()).IsSuccess);
 		Assert.True(account.LocalCredential.HasPassword);
 	}
 
@@ -116,7 +116,7 @@ public class UserAccountDomainTests
 		var initialStamp = account.SecurityStamp;
 		var changedAt = Now.AddMinutes(1);
 
-		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), changedAt).IsSuccess);
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), changedAt, RelaxedPasswordOptions()).IsSuccess);
 
 		Assert.NotEqual(initialStamp, account.SecurityStamp);
 		Assert.Equal(changedAt, account.SessionsValidAfter);
@@ -161,7 +161,7 @@ public class UserAccountDomainTests
 	{
 		var account = CreateAccount();
 		var options = RelaxedPasswordOptions();
-		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, RelaxedPasswordOptions()).IsSuccess);
 		var stampAfterPassword = account.SecurityStamp;
 		var validAfterPassword = account.SessionsValidAfter;
 
@@ -211,7 +211,7 @@ public class UserAccountDomainTests
 		var options = RelaxedPasswordOptions();
 		options.MaxFailedAccessAttempts = 2;
 		options.AccountLockoutDurationMinutes = 10;
-		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, RelaxedPasswordOptions()).IsSuccess);
 
 		var firstFailure = account.AuthenticateLocal("wrong", options, PasswordHasher, Now.AddMinutes(1));
 
@@ -245,8 +245,8 @@ public class UserAccountDomainTests
 		var inactive = CreateAccount();
 		var blocked = CreateAccount();
 		var options = RelaxedPasswordOptions();
-		Assert.True(inactive.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
-		Assert.True(blocked.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now).IsSuccess);
+		Assert.True(inactive.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, RelaxedPasswordOptions()).IsSuccess);
+		Assert.True(blocked.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, RelaxedPasswordOptions()).IsSuccess);
 
 		inactive.Deactivate(Now.AddMinutes(1));
 		blocked.Block("administrative", Now.AddMinutes(1));

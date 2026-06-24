@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RoyalCode.WorkContext;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
+using RoyalIdentity.UserAccounts.Options;
 using RoyalIdentity.UserAccounts.Sqlite;
 
 namespace Tests.UserAccounts;
@@ -26,7 +27,7 @@ public class UserAccountsPersistenceTests
 			Assert.True(account.AddEmail(
 				new UserAccountEmail("realm-a", "alice.alt@example.com", "ALICE.ALT@EXAMPLE.COM", false, false, false), Now).IsSuccess);
 			Assert.True(account.AddRole(new UserAccountRole("realm-a", "admin", "ADMIN"), Now).IsSuccess);
-			account.SetPassword("hashed-secret", Now);
+			account.SetPassword("hashed-secret", Now, new PasswordOptions());
 			account.Block("fraud", Now.AddMinutes(1));
 
 			write.UserAccounts.Add(account);
@@ -56,6 +57,50 @@ public class UserAccountsPersistenceTests
 		Assert.Equal(2, loaded.Emails.Count);
 		Assert.Equal("alice@example.com", loaded.PrimaryEmail?.Address);
 		Assert.Single(loaded.Roles, r => r.NormalizedName == "ADMIN");
+	}
+
+	[Fact]
+	public async Task PasswordHistory_RoundTrips_AndIsPrunedToRetainedQuantity()
+	{
+		await using var provider = BuildProvider();
+		var options = new PasswordOptions
+		{
+			EnforcePasswordHistory = true,
+			PasswordHistoryCount = 2,
+			PasswordReuseWindowDays = 0,
+			MaxPasswordHistoryComparisons = 24
+		};
+		long accountId;
+
+		await using (var write = NewContext(provider))
+		{
+			var account = NewAccount();
+			for (var i = 1; i <= 5; i++)
+			{
+				Assert.True(account.SetPassword($"hashed:p{i}", Now.AddDays(i), options).IsSuccess);
+			}
+
+			write.UserAccounts.Add(account);
+			await write.SaveChangesAsync();
+			accountId = account.Id;
+		}
+
+		await using var read = NewContext(provider);
+		var loaded = await read.UserAccounts
+			.Include(a => a.LocalCredential)
+			.Include("PasswordHistoryItems")
+			.SingleAsync(a => a.Id == accountId);
+
+		Assert.Equal("hashed:p5", loaded.LocalCredential.PasswordHash);
+		var hashes = loaded.PasswordHistory.Select(h => h.PasswordHash).ToHashSet();
+		Assert.Equal(2, hashes.Count);
+		Assert.Contains("hashed:p3", hashes);
+		Assert.Contains("hashed:p4", hashes);
+		Assert.All(loaded.PasswordHistory, h =>
+		{
+			Assert.Equal("realm-a", h.RealmId);
+			Assert.Equal(accountId, h.UserAccountId);
+		});
 	}
 
 	[Fact]

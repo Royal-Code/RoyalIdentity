@@ -121,7 +121,8 @@ public sealed class UserAccountReader(UserAccountsDbContext db, IUserAccountNorm
 			.Include(a => a.LocalCredential)
 			.Include("EmailItems")
 			.Include("RoleItems")
-			.Include("PropertyValueItems");
+			.Include("PropertyValueItems")
+			.Include("PasswordHistoryItems");
 	}
 
 	private IQueryable<PropertyScope> ScopeGraph()
