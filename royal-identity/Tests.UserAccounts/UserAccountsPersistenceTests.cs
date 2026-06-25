@@ -101,6 +101,18 @@ public class UserAccountsPersistenceTests
 			Assert.Equal("realm-a", h.RealmId);
 			Assert.Equal(accountId, h.UserAccountId);
 		});
+
+		var rawReasons = await read.Database
+			.SqlQueryRaw<string>(
+				"""
+				SELECT "Reason" AS "Value"
+				FROM "UserAccountPasswordHistory"
+				WHERE "UserAccountId" = {0}
+				""",
+				accountId)
+			.ToListAsync();
+
+		Assert.All(rawReasons, reason => Assert.Equal(nameof(PasswordChangeReason.Change), reason));
 	}
 
 	[Fact]

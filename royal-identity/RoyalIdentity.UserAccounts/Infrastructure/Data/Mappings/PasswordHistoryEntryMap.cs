@@ -21,7 +21,7 @@ public sealed class PasswordHistoryEntryMap : IEntityTypeConfiguration<PasswordH
 		builder.Property(h => h.UserAccountId).IsRequired();
 		builder.Property(h => h.PasswordHash).IsRequired();
 		builder.Property(h => h.CreatedAt).IsRequired();
-		builder.Property(h => h.Reason).IsRequired();
+		builder.Property(h => h.Reason).HasConversion<string>().IsRequired();
 		builder.Property(h => h.CreatedBySubjectId);
 
 		builder.HasIndex(h => new { h.RealmId, h.UserAccountId, h.CreatedAt });

@@ -177,6 +177,11 @@ public class UserAccountsRealmOptions
 			errors.Add("PasswordOptions.MinimumLength cannot be greater than PasswordOptions.MaximumLength.");
 		}
 
+		if (PasswordOptions.EnablePasswordExpiration && PasswordOptions.PasswordExpirationDays <= 0)
+		{
+			errors.Add("PasswordOptions.PasswordExpirationDays must be greater than zero when password expiration is enabled.");
+		}
+
 		if (PasswordOptions.PasswordReuseWindowDays < 0)
 		{
 			errors.Add("PasswordOptions.PasswordReuseWindowDays cannot be negative.");

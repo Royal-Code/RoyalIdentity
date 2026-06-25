@@ -522,6 +522,23 @@ public class UserAccount : AggregateRoot<long>
 		PasswordOptions options,
 		DateTimeOffset changedAt)
 	{
+		var verifyResult = VerifyCurrentPassword(currentPassword, passwordHasher);
+		if (verifyResult.IsFailure)
+		{
+			return verifyResult;
+		}
+
+		return SetPassword(newPasswordHash, changedAt, options, PasswordChangeReason.Change);
+	}
+
+	/// <summary>
+	/// Verifies the current local password without mutating the account.
+	/// </summary>
+	/// <param name="currentPassword">The current plain password.</param>
+	/// <param name="passwordHasher">The password hasher.</param>
+	/// <returns>A result describing whether the current password is valid for a password change.</returns>
+	public Result VerifyCurrentPassword(string currentPassword, IUserAccountPasswordHasher passwordHasher)
+	{
 		if (!LocalCredential.HasPassword)
 		{
 			return Problems.InvalidState("Account does not have a local password.", nameof(LocalCredential), "user_account.password_not_set");
@@ -532,7 +549,7 @@ public class UserAccount : AggregateRoot<long>
 			return Problems.InvalidParameter("Current password is invalid.", nameof(LocalCredential), "user_account.current_password_invalid");
 		}
 
-		return SetPassword(newPasswordHash, changedAt, options, PasswordChangeReason.Change);
+		return Result.Ok();
 	}
 
 	/// <summary>

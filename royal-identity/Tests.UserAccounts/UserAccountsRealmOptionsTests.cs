@@ -203,6 +203,25 @@ public class UserAccountsRealmOptionsTests
 		Assert.Contains(errors, e => e.Contains("PasswordHistoryCount", StringComparison.Ordinal));
 	}
 
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-1)]
+	public void Validate_Rejects_NonPositivePasswordExpirationDays_WhenExpirationEnabled(int expirationDays)
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			PasswordOptions =
+			{
+				EnablePasswordExpiration = true,
+				PasswordExpirationDays = expirationDays
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("PasswordExpirationDays", StringComparison.Ordinal));
+	}
+
 	[Fact]
 	public void Validate_Rejects_HistoryAgeWithoutComparisonCap()
 	{

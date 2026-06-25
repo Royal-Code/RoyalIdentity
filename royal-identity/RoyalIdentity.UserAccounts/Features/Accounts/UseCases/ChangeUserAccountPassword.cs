@@ -85,17 +85,22 @@ public partial class ChangeUserAccountPassword
 			return passwordProblems;
 		}
 
+		var currentPasswordResult = account.VerifyCurrentPassword(CurrentPassword, passwordHasher);
+		if (currentPasswordResult.HasProblems(out var currentPasswordProblems))
+		{
+			return currentPasswordProblems;
+		}
+
 		var historyResult = passwordHistoryPolicy.Validate(NewPassword, account, Options.PasswordOptions, passwordHasher, now);
 		if (historyResult.HasProblems(out var historyProblems))
 		{
 			return historyProblems;
 		}
 
-		return account.ChangePassword(
-			CurrentPassword,
+		return account.SetPassword(
 			passwordHasher.Hash(NewPassword),
-			passwordHasher,
+			now,
 			Options.PasswordOptions,
-			now);
+			PasswordChangeReason.Change);
 	}
 }

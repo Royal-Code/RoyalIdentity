@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RoyalCode.SmartProblems;
 using RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
@@ -352,6 +353,39 @@ public class UserAccountUseCasesTests
 
 		// a brand-new password is accepted
 		Assert.True((await ChangeAsync(provider, options, "alice", "renewed", "fresh-one")).IsSuccess);
+	}
+
+	[Fact]
+	public async Task ChangePassword_VerifiesCurrentPassword_BeforeHistoryCheck()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.PasswordOptions.EnforcePasswordHistory = true;
+		options.PasswordOptions.PasswordHistoryCount = 3;
+		options.PasswordOptions.MaxPasswordHistoryComparisons = 24;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		var result = await ChangeAsync(provider, options, "alice", "wrong-current", "secret");
+
+		AssertProblem(result, "user_account.current_password_invalid");
+	}
+
+	[Fact]
+	public async Task ChangeOwnPassword_VerifiesCurrentPassword_BeforeHistoryCheck()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.AllowChangePassword = true;
+		options.PasswordOptions.EnforcePasswordHistory = true;
+		options.PasswordOptions.PasswordHistoryCount = 3;
+		options.PasswordOptions.MaxPasswordHistoryComparisons = 24;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		var result = await ChangeOwnAsync(provider, options, "alice", "wrong-current", "secret");
+
+		AssertProblem(result, "user_account.current_password_invalid");
 	}
 
 	[Fact]
@@ -833,6 +867,12 @@ public class UserAccountUseCasesTests
 			CurrentPassword = currentPassword,
 			NewPassword = newPassword
 		}, default);
+	}
+
+	private static void AssertProblem(Result result, string typeId)
+	{
+		Assert.True(result.IsFailure);
+		Assert.Equal(typeId, result[0].TypeId);
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> RequestRecoveryAsync(
