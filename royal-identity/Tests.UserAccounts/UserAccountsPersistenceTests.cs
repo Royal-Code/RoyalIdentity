@@ -116,6 +116,56 @@ public class UserAccountsPersistenceTests
 	}
 
 	[Fact]
+	public async Task UserAccountActionToken_StoresPurposeAndRevocationReason_AsStrings()
+	{
+		await using var provider = BuildProvider();
+		long accountId;
+
+		await using (var write = NewContext(provider))
+		{
+			var account = NewAccount();
+			write.UserAccounts.Add(account);
+			await write.SaveChangesAsync();
+			accountId = account.Id;
+
+			var token = UserAccountActionToken.Issue(
+				account,
+				ActionTokenPurpose.ChangeExpiredPassword,
+				"token-hash",
+				account.SecurityStamp.Value,
+				Now,
+				Now.AddMinutes(10));
+			token.Revoke(ActionTokenRevocationReason.Superseded, Now.AddMinutes(1));
+
+			write.UserAccountActionTokens.Add(token);
+			await write.SaveChangesAsync();
+		}
+
+		await using var read = NewContext(provider);
+		var rawPurpose = await read.Database
+			.SqlQueryRaw<string>(
+				"""
+				SELECT "Purpose" AS "Value"
+				FROM "UserAccountActionTokens"
+				WHERE "UserAccountId" = {0}
+				""",
+				accountId)
+			.SingleAsync();
+		var rawRevokedReason = await read.Database
+			.SqlQueryRaw<string>(
+				"""
+				SELECT "RevokedReason" AS "Value"
+				FROM "UserAccountActionTokens"
+				WHERE "UserAccountId" = {0}
+				""",
+				accountId)
+			.SingleAsync();
+
+		Assert.Equal(nameof(ActionTokenPurpose.ChangeExpiredPassword), rawPurpose);
+		Assert.Equal(nameof(ActionTokenRevocationReason.Superseded), rawRevokedReason);
+	}
+
+	[Fact]
 	public async Task PropertyScope_RoundTrips_WithVersionsDefinitionsAndActiveVersion()
 	{
 		await using var provider = BuildProvider();

@@ -21,7 +21,9 @@ public sealed class UserAccountActionTokenMap : IEntityTypeConfiguration<UserAcc
 
 		builder.Property(t => t.RealmId).IsRequired();
 		builder.Property(t => t.UserAccountId).IsRequired();
-		builder.Property(t => t.Purpose).IsRequired();
+		builder.Property(t => t.Purpose)
+			.HasConversion<string>()
+			.IsRequired();
 		builder.Property(t => t.TokenHash).IsRequired();
 		builder.Property(t => t.TargetValue);
 
@@ -35,7 +37,8 @@ public sealed class UserAccountActionTokenMap : IEntityTypeConfiguration<UserAcc
 			.IsRequired();
 		builder.Property(t => t.ConsumedAt);
 		builder.Property(t => t.RevokedAt);
-		builder.Property(t => t.RevokedReason);
+		builder.Property(t => t.RevokedReason)
+			.HasConversion<string>();
 		builder.Property(t => t.CreatedIpHash);
 		builder.Property(t => t.ConsumedIpHash);
 		builder.Property(t => t.UserAgentHash);

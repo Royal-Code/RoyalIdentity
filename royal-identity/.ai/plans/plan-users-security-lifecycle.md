@@ -1234,8 +1234,8 @@ idempotente.
 **Tarefas:**
 
 - [x] Implementar `UserAccountActionToken` (hash, TTL, uso único, revogação por nova emissão, `TargetValue`). O enum
-      `ActionTokenPurpose` já inclui `ChangeExpiredPassword`/`EmailVerification`/`PhoneVerification` (modelo reusado pelas
-      Fases 4/6); a Fase 5 exercita só `PasswordRecovery`.
+      `ActionTokenPurpose` inclui `PasswordRecovery`/`ChangeExpiredPassword`/`EmailVerification`/`PhoneVerification`;
+      a Fase 5 exercita `PasswordRecovery` e `ChangeExpiredPassword`.
 - [x] `RequestPasswordRecovery` (gated por `AllowForgotPassword`): resposta pública **sempre igual**; só emite token se a
       conta existir e a policy permitir; sem revelar existência/estado. **Rate limit:** entregue como **cooldown por
       realm/conta** (`PasswordRecoveryResendCooldownSeconds`, default 0 = off); o limite por **IP/identificador** é
@@ -1244,6 +1244,9 @@ idempotente.
       (Fase 3) **antes** de consumir (senha rejeitada não queima o token); move `SessionsValidAfter` (marcador de
       invalidação) via `UserAccount.ResetPassword`. A execução ativa sobre stores de sessão/refresh (Q7/Q13) é concluída
       na Fase 8.
+- [x] `IssueChangeExpiredPasswordToken` + `ChangeExpiredPasswordWithToken`: token curto
+      `Purpose=ChangeExpiredPassword`, vinculado ao `SecurityStamp`, uso único, validação de complexidade/histórico antes
+      de consumir e re-login com a nova senha.
 - [x] Gateway de notificação (`INotificationGateway`/no-op) para entregar o link/código (ver Arquitetura alvo); o token
       bruto trafega **uma vez** no `PasswordRecoveryNotification` e nunca é persistido/logado/auditado.
 - [x] Sem telas/endpoints user-facing (Q12 — decidido: ficam para o plano de admin/UI); entregue só a costura + casos de uso.
@@ -1264,7 +1267,7 @@ nenhuma referência do módulo ao core/ASP.NET.
 
 **Arquivos novos:**
 - `RoyalIdentity.UserAccounts/Features/Accounts/Domain/ActionTokenPurpose.cs` — `PasswordRecovery`/`EmailVerification`/
-  `PhoneVerification`/`ChangeExpiredPassword` (modelo único reusado pelas Fases 4/6; só `PasswordRecovery` é exercitado aqui).
+  `PhoneVerification`/`ChangeExpiredPassword` (modelo único; `PasswordRecovery` e `ChangeExpiredPassword` são exercitados aqui).
 - `RoyalIdentity.UserAccounts/Features/Accounts/Domain/ActionTokenRevocationReason.cs` — `Superseded` (revogação por nova emissão).
 - `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountActionToken.cs` — entidade EF-first: só o **hash** do
   token é guardado; TTL obrigatório; `TargetValue` (email/phone normalizado); `IsConsumable(now)`; `Revoke(reason, now)`
@@ -1281,10 +1284,13 @@ nenhuma referência do módulo ao core/ASP.NET.
   `PasswordRecoveryNotification.cs` + `NoopNotificationGateway.cs` — seam de entrega (email/SMS) definido no módulo puro,
   com no-op default (`TryAdd`); o token bruto trafega **uma única vez** no payload e nunca é persistido/logado/auditado.
 - `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/RequestPasswordRecovery.cs` — gated por `AllowForgotPassword`;
-  resposta pública **idêntica** para conta inexistente/inelegível; emite + entrega só para conta ativa, com senha e email
-  primário; cooldown por realm opcional.
+  resposta pública **idêntica** para conta inexistente/inelegível; emite token só para conta ativa, com senha e email
+  primário; retorna payload de entrega para a borda enviar após o commit; cooldown por realm opcional.
 - `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/ResetPasswordWithToken.cs` — valida complexidade/histórico
   **antes** de consumir; consome (uso único); `account.ResetPassword(...)`.
+- `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/IssueChangeExpiredPasswordToken.cs` e
+  `ChangeExpiredPasswordWithToken.cs` — emitem/consomem o token transitório de troca forçada/expirada
+  (`Purpose=ChangeExpiredPassword`) e exigem re-login com a nova senha.
 
 **Arquivos alterados:**
 - `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccount.cs` — novo `ResetPassword(newHash, options, changedAt)`
@@ -1293,8 +1299,9 @@ nenhuma referência do módulo ao core/ASP.NET.
 - `RoyalIdentity.UserAccounts/Features/Accounts/Commons/UserAccountReader.cs` — `FindByIdAsync(realmId, accountId)`
   (carrega a conta a partir do FK físico resolvido pelo token).
 - `RoyalIdentity.UserAccounts/Infrastructure/Data/UserAccountsDbContext.cs` — `DbSet<UserAccountActionToken>`.
-- `RoyalIdentity.UserAccounts/Options/SecurityLifecycleOptions.cs` — `PasswordRecoveryTokenLifetimeMinutes` (TTL
-  obrigatório, default 60, validado > 0) e `PasswordRecoveryResendCooldownSeconds` (throttle por realm, default 0, ≥ 0).
+- `RoyalIdentity.UserAccounts/Options/SecurityLifecycleOptions.cs` — `PasswordRecoveryTokenLifetimeMinutes` (default 60),
+  `ChangeExpiredPasswordTokenLifetimeMinutes` (default 10) e `PasswordRecoveryResendCooldownSeconds` (throttle por realm,
+  default 0).
 - `RoyalIdentity.UserAccounts/Features/Accounts/Commons/UserAccountsServiceCollectionExtensions.cs` — registra
   `UserAccountActionTokenService` (scoped) e `INotificationGateway` → `NoopNotificationGateway` (`TryAdd`).
 
@@ -1303,8 +1310,8 @@ nenhuma referência do módulo ao core/ASP.NET.
   concorrentes veem no máximo 1 linha afetada (ADR-017 §2.9 — token usa update condicional, **não** optimistic-retry).
 - **Validar-antes-de-consumir**: uma senha rejeitada (complexidade/histórico) **não** queima o token; o consumo só
   acontece após a validação passar, deixando o token reutilizável para nova tentativa.
-- **Anti-enumeração**: `RequestPasswordRecovery` devolve o **mesmo** `Result.Ok()` para conta inexistente/inativa/
-  bloqueada/sem-senha/sem-email; só emite/entrega no caminho elegível. O reset usa erro genérico para token
+- **Anti-enumeração**: `RequestPasswordRecovery` devolve sucesso sem payload para conta inexistente/inativa/
+  bloqueada/sem-senha/sem-email; só emite e retorna payload no caminho elegível. O reset usa erro genérico para token
   inválido/expirado/consumido (o token é o segredo, não revela estado da conta).
 - **Token = hash + ticks UTC**: handles opacos de alta entropia (`CryptoRandom`) guardados como SHA-256; timestamps de
   comparação em ticks para traduzir o predicado em SQL em todos os providers (limitação do SQLite com `DateTimeOffset`).
@@ -1313,8 +1320,8 @@ nenhuma referência do módulo ao core/ASP.NET.
   borda e fecha na Fase 8.
 - **Rate limit**: o módulo puro entrega o **cooldown por realm/conta**; o limite por **IP/identificador** depende do
   contexto HTTP e fica na borda (Q12). Os campos `*IpHash`/`UserAgentHash` do token são colunas prontas para a borda preencher.
-- **Notificação dentro do `Execute`** (antes do commit do unit of work): mover a entrega para **pós-commit** (hook/evento)
-  é refinamento da Fase 9 (eventos/auditoria); registrado, sem impacto nos testes atuais.
+- **Entrega pós-commit**: `RequestPasswordRecovery` retorna o payload de entrega no resultado do handler, após o unit of
+  work gerado completar. A borda envia a notificação fora do `Execute`.
 
 **Verificação:** `dotnet build RoyalIdentity.sln` — sucesso, 0 erros. Testes: **Tests.UserAccounts 136/136** (9 novos),
 Tests.Integration 203/203, Tests.Security 116/116, Tests.Identity 13/13, Tests.Pipelines 3/3, Tests.Architecture 15/15 —

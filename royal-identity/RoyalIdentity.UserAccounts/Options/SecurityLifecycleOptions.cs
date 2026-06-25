@@ -108,6 +108,7 @@ public class SecurityLifecycleOptions
 		IdleTouchIntervalMinutes = other.IdleTouchIntervalMinutes;
 		PasswordRecoveryTokenLifetimeMinutes = other.PasswordRecoveryTokenLifetimeMinutes;
 		PasswordRecoveryResendCooldownSeconds = other.PasswordRecoveryResendCooldownSeconds;
+		ChangeExpiredPasswordTokenLifetimeMinutes = other.ChangeExpiredPasswordTokenLifetimeMinutes;
 		EmailVerificationTokenLifetimeMinutes = other.EmailVerificationTokenLifetimeMinutes;
 		PhoneVerificationTokenLifetimeMinutes = other.PhoneVerificationTokenLifetimeMinutes;
 		AuditCategories = other.AuditCategories;
@@ -190,6 +191,12 @@ public class SecurityLifecycleOptions
 	public int PasswordRecoveryResendCooldownSeconds { get; set; } = 0;
 
 	/// <summary>
+	/// Gets or sets the lifetime, in minutes, of a forced/expired password-change action token. Must be greater
+	/// than zero.
+	/// </summary>
+	public int ChangeExpiredPasswordTokenLifetimeMinutes { get; set; } = 10;
+
+	/// <summary>
 	/// Gets or sets the lifetime, in minutes, of an email verification action token (TTL — ADR-017 §2.4/§2.8).
 	/// Must be greater than zero.
 	/// </summary>
@@ -229,6 +236,11 @@ public class SecurityLifecycleOptions
 		if (PasswordRecoveryResendCooldownSeconds < 0)
 		{
 			errors.Add("SecurityLifecycle.PasswordRecoveryResendCooldownSeconds cannot be negative.");
+		}
+
+		if (ChangeExpiredPasswordTokenLifetimeMinutes <= 0)
+		{
+			errors.Add("SecurityLifecycle.ChangeExpiredPasswordTokenLifetimeMinutes must be greater than zero.");
 		}
 
 		if (EmailVerificationTokenLifetimeMinutes <= 0)

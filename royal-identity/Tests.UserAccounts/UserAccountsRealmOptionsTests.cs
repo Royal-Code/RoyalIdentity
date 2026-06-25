@@ -33,6 +33,7 @@ public class UserAccountsRealmOptionsTests
 		source.PasswordOptions.DisallowedWordsInPassword.Add("source-word");
 		source.SecurityLifecycle.EnableSessionInvalidationByState = true;
 		source.SecurityLifecycle.OnVoluntaryPasswordChange = SessionInvalidationPresets.RevokeOtherSessions;
+		source.SecurityLifecycle.ChangeExpiredPasswordTokenLifetimeMinutes = 7;
 		source.SecurityLifecycle.AuditCategories = SecurityAuditCategories.Credential;
 		source.FixedFieldClaimProjections[0].ClaimType = "source_username";
 
@@ -70,6 +71,7 @@ public class UserAccountsRealmOptionsTests
 		Assert.DoesNotContain("mutated-word", copy.PasswordOptions.DisallowedWordsInPassword);
 		Assert.True(copy.SecurityLifecycle.EnableSessionInvalidationByState);
 		Assert.Equal(SessionInvalidationPresets.RevokeOtherSessions, copy.SecurityLifecycle.OnVoluntaryPasswordChange);
+		Assert.Equal(7, copy.SecurityLifecycle.ChangeExpiredPasswordTokenLifetimeMinutes);
 		Assert.Equal(SecurityAuditCategories.Credential, copy.SecurityLifecycle.AuditCategories);
 		Assert.Equal("source_username", copy.FixedFieldClaimProjections[0].ClaimType);
 
@@ -97,6 +99,7 @@ public class UserAccountsRealmOptionsTests
 		Assert.False(lifecycle.EnableSessionInvalidationByState);
 		Assert.False(lifecycle.EnableSsoSessionExpiration);
 		Assert.False(lifecycle.RequiresSecurityStateProvider);
+		Assert.Equal(10, lifecycle.ChangeExpiredPasswordTokenLifetimeMinutes);
 
 		// Security audit categories on by default.
 		Assert.Equal(SecurityAuditCategories.All, lifecycle.AuditCategories);
@@ -148,6 +151,22 @@ public class UserAccountsRealmOptionsTests
 		var errors = options.Validate();
 
 		Assert.Contains(errors, e => e.Contains("IdleTouchIntervalMinutes", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public void Validate_Rejects_NonPositiveChangeExpiredPasswordTokenLifetime()
+	{
+		var options = new UserAccountsRealmOptions
+		{
+			SecurityLifecycle =
+			{
+				ChangeExpiredPasswordTokenLifetimeMinutes = 0
+			}
+		};
+
+		var errors = options.Validate();
+
+		Assert.Contains(errors, e => e.Contains("ChangeExpiredPasswordTokenLifetimeMinutes", StringComparison.Ordinal));
 	}
 
 	[Fact]

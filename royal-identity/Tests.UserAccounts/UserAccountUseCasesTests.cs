@@ -427,6 +427,97 @@ public class UserAccountUseCasesTests
 		Assert.Equal("alice", outcome.SubjectId);
 	}
 
+	// ---- Forced/expired password change ----
+
+	[Fact]
+	public async Task IssueChangeExpiredPasswordToken_IssuesChallenge_WhenPasswordExpired()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.PasswordOptions.EnablePasswordExpiration = true;
+		options.PasswordOptions.PasswordExpirationDays = 1;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+		Clock(provider).Now = Start.AddDays(2);
+
+		var result = await IssueChangeExpiredPasswordAsync(provider, options, "alice", "secret");
+
+		Assert.True(result.HasValue(out var challenge));
+		Assert.Equal("alice", challenge!.SubjectId);
+		Assert.Equal(LocalRequiredAction.ChangePasswordExpired, challenge.RequiredAction);
+		Assert.Equal(Start.AddDays(2).AddMinutes(options.SecurityLifecycle.ChangeExpiredPasswordTokenLifetimeMinutes), challenge.ExpiresAt);
+		Assert.False(string.IsNullOrWhiteSpace(challenge.Token));
+	}
+
+	[Fact]
+	public async Task ChangeExpiredPasswordWithToken_CompletesRequiredAction_AndRequiresRelogin()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.AllowChangePassword = false;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+		await MutateAccountAsync(provider, "r1", "alice",
+			a => a.SetPassword("hashed:secret", Start, options.PasswordOptions, mustChangePassword: true));
+
+		var issue = await IssueChangeExpiredPasswordAsync(provider, options, "alice", "secret");
+		Assert.True(issue.HasValue(out var challenge));
+
+		Assert.True((await ChangeExpiredPasswordWithTokenAsync(provider, options, challenge!.Token, "renewed")).IsSuccess);
+		Assert.True((await ChangeExpiredPasswordWithTokenAsync(provider, options, challenge.Token, "another")).IsFailure);
+
+		Assert.True((await AuthenticateAsync(provider, options, "alice", "renewed")).HasValue(out var ok) && ok!.Success);
+		Assert.Equal(LocalAuthenticationFailureReason.InvalidCredentials, await AuthReason(provider, options, "alice", "secret"));
+	}
+
+	[Fact]
+	public async Task IssueChangeExpiredPasswordToken_Rejects_WhenNoRequiredActionExists()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		var result = await IssueChangeExpiredPasswordAsync(provider, options, "alice", "secret");
+
+		AssertProblem(result, "user_account.change_password_challenge_invalid");
+	}
+
+	[Fact]
+	public async Task ChangeExpiredPasswordWithToken_RejectsWeakPassword_WithoutConsumingToken()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.PasswordOptions.MinimumLength = 8;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "longsecret"));
+		await MutateAccountAsync(provider, "r1", "alice",
+			a => a.SetPassword("hashed:longsecret", Start, options.PasswordOptions, mustChangePassword: true));
+		var issue = await IssueChangeExpiredPasswordAsync(provider, options, "alice", "longsecret");
+		Assert.True(issue.HasValue(out var challenge));
+		var token = challenge!.Token;
+
+		Assert.True((await ChangeExpiredPasswordWithTokenAsync(provider, options, token, "short")).IsFailure);
+		Assert.True((await ChangeExpiredPasswordWithTokenAsync(provider, options, token, "longenough")).IsSuccess);
+	}
+
+	[Fact]
+	public async Task ChangeExpiredPasswordWithToken_Rejects_WhenSecurityStampChanged()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+		await MutateAccountAsync(provider, "r1", "alice",
+			a => a.SetPassword("hashed:secret", Start, options.PasswordOptions, mustChangePassword: true));
+		var issue = await IssueChangeExpiredPasswordAsync(provider, options, "alice", "secret");
+		Assert.True(issue.HasValue(out var challenge));
+		var token = challenge!.Token;
+		await MutateAccountAsync(provider, "r1", "alice", a => a.RegenerateSecurityStamp(Start.AddMinutes(1)));
+
+		Assert.True((await ChangeExpiredPasswordWithTokenAsync(provider, options, token, "renewed")).IsFailure);
+	}
+
 	// ---- Password recovery ----
 
 	[Fact]
@@ -438,12 +529,15 @@ public class UserAccountUseCasesTests
 		await CreateAsync(provider, NewCreate(
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", emailVerified: true, password: "secret"));
 
-		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+		var request = await RequestRecoveryAsync(provider, options, "alice");
 
-		var sent = Assert.Single(Gateway(provider).Sent);
+		Assert.True(request.HasValue(out var recovery));
+		Assert.NotNull(recovery!.Notification);
+		var sent = recovery.Notification!;
 		Assert.False(string.IsNullOrWhiteSpace(sent.Token));
 		Assert.Equal("alice@example.com", sent.Address);
 		Assert.Equal("alice", sent.SubjectId);
+		Assert.Empty(Gateway(provider).Sent);
 
 		Assert.True((await ResetWithTokenAsync(provider, options, sent.Token, "renewed")).IsSuccess);
 
@@ -458,7 +552,9 @@ public class UserAccountUseCasesTests
 		var options = Options();
 
 		// Same public success as an eligible request, but no token is issued or delivered.
-		Assert.True((await RequestRecoveryAsync(provider, options, "ghost")).IsSuccess);
+		var request = await RequestRecoveryAsync(provider, options, "ghost");
+		Assert.True(request.HasValue(out var recovery));
+		Assert.Null(recovery!.Notification);
 		Assert.Empty(Gateway(provider).Sent);
 	}
 
@@ -484,8 +580,7 @@ public class UserAccountUseCasesTests
 		options.AllowProvidedSubjectId = true;
 		await CreateAsync(provider, NewCreate(
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
-		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
-		var token = Assert.Single(Gateway(provider).Sent).Token;
+		var token = (await RecoveryNotificationAsync(provider, options, "alice")).Token;
 
 		Assert.True((await ResetWithTokenAsync(provider, options, token, "renewed")).IsSuccess);
 		// The same token cannot be consumed twice.
@@ -501,15 +596,12 @@ public class UserAccountUseCasesTests
 		await CreateAsync(provider, NewCreate(
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
 
-		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
-		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
-
-		var sent = Gateway(provider).Sent;
-		Assert.Equal(2, sent.Count);
+		var first = await RecoveryNotificationAsync(provider, options, "alice");
+		var second = await RecoveryNotificationAsync(provider, options, "alice");
 
 		// The first (superseded) token no longer works; the latest one does.
-		Assert.True((await ResetWithTokenAsync(provider, options, sent[0].Token, "renewed")).IsFailure);
-		Assert.True((await ResetWithTokenAsync(provider, options, sent[1].Token, "renewed")).IsSuccess);
+		Assert.True((await ResetWithTokenAsync(provider, options, first.Token, "renewed")).IsFailure);
+		Assert.True((await ResetWithTokenAsync(provider, options, second.Token, "renewed")).IsSuccess);
 	}
 
 	[Fact]
@@ -522,11 +614,15 @@ public class UserAccountUseCasesTests
 		await CreateAsync(provider, NewCreate(
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
 
-		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+		var first = await RequestRecoveryAsync(provider, options, "alice");
 		// A second request within the cooldown returns the same success but does not deliver a new token.
-		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+		var second = await RequestRecoveryAsync(provider, options, "alice");
 
-		Assert.Single(Gateway(provider).Sent);
+		Assert.True(first.HasValue(out var delivered));
+		Assert.NotNull(delivered!.Notification);
+		Assert.True(second.HasValue(out var throttled));
+		Assert.Null(throttled!.Notification);
+		Assert.Empty(Gateway(provider).Sent);
 	}
 
 	[Fact]
@@ -538,8 +634,7 @@ public class UserAccountUseCasesTests
 		options.PasswordOptions.MinimumLength = 8;
 		await CreateAsync(provider, NewCreate(
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "longsecret"));
-		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
-		var token = Assert.Single(Gateway(provider).Sent).Token;
+		var token = (await RecoveryNotificationAsync(provider, options, "alice")).Token;
 
 		// A rejected new password must not burn the token.
 		Assert.True((await ResetWithTokenAsync(provider, options, token, "short")).IsFailure);
@@ -780,6 +875,9 @@ public class UserAccountUseCasesTests
 	private static RecordingNotificationGateway Gateway(ServiceProvider provider)
 		=> (RecordingNotificationGateway)provider.GetRequiredService<INotificationGateway>();
 
+	private static FakeClock Clock(ServiceProvider provider)
+		=> (FakeClock)provider.GetRequiredService<TimeProvider>();
+
 	private static UserAccountsRealmOptions Options() => UserAccountsTestOptions.Relaxed();
 
 	private static CreateUserAccount NewCreate(
@@ -875,7 +973,41 @@ public class UserAccountUseCasesTests
 		Assert.Equal(typeId, result[0].TypeId);
 	}
 
-	private static async Task<RoyalCode.SmartProblems.Result> RequestRecoveryAsync(
+	private static void AssertProblem<T>(Result<T> result, string typeId)
+	{
+		Assert.True(result.IsFailure);
+		Assert.Equal(typeId, result[0].TypeId);
+	}
+
+	private static async Task<Result<ChangeExpiredPasswordToken>> IssueChangeExpiredPasswordAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string login, string password)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IIssueChangeExpiredPasswordTokenHandler>();
+		return await handler.HandleAsync(new IssueChangeExpiredPasswordToken
+		{
+			RealmId = "r1",
+			Options = options,
+			Login = login,
+			Password = password
+		}, default);
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> ChangeExpiredPasswordWithTokenAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string token, string newPassword)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IChangeExpiredPasswordWithTokenHandler>();
+		return await handler.HandleAsync(new ChangeExpiredPasswordWithToken
+		{
+			RealmId = "r1",
+			Options = options,
+			Token = token,
+			NewPassword = newPassword
+		}, default);
+	}
+
+	private static async Task<Result<PasswordRecoveryRequestResult>> RequestRecoveryAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string login)
 	{
 		using var scope = provider.CreateScope();
@@ -886,6 +1018,15 @@ public class UserAccountUseCasesTests
 			Options = options,
 			Login = login
 		}, default);
+	}
+
+	private static async Task<PasswordRecoveryNotification> RecoveryNotificationAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string login)
+	{
+		var request = await RequestRecoveryAsync(provider, options, login);
+		Assert.True(request.HasValue(out var recovery));
+		Assert.NotNull(recovery!.Notification);
+		return recovery.Notification!;
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> ResetWithTokenAsync(

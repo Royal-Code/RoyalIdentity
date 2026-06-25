@@ -11,9 +11,10 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 /// <summary>
 /// User-facing "forgot my password" flow (gated by <see cref="UserAccountsRealmOptions.AllowForgotPassword"/>).
 /// The public outcome is <em>always the same</em> regardless of whether the account exists or is eligible: a token
-/// is issued and delivered only for an active account with a password and a destination address, and a new issuance
-/// revokes the account's previous recovery tokens (ADR-017 §2.4). The response never reveals account existence or
-/// state (anti-enumeration). IP/identifier-scoped rate limiting is an edge concern; this module applies the
+/// is issued only for an active account with a password and a destination address, and a new issuance revokes the
+/// account's previous recovery tokens (ADR-017 §2.4). Delivery is returned to the trusted edge as a payload so it
+/// can happen after the generated handler completes the unit of work. The response never reveals account existence
+/// or state (anti-enumeration). IP/identifier-scoped rate limiting is an edge concern; this module applies the
 /// per-realm resend throttle.
 /// <para>
 /// This plan delivers the use case + costura only; the HTTP/UI that drives it belongs to the admin/UI plan (Q12).
@@ -54,10 +55,9 @@ public partial class RequestPasswordRecovery
 	/// Executes the password recovery request use case.
 	/// </summary>
 	[Command, WithValidateModel, WithWorkContext]
-	public async Task<Result> Execute(
+	public async Task<Result<PasswordRecoveryRequestResult>> Execute(
 		UserAccountReader reader,
 		UserAccountActionTokenService tokens,
-		INotificationGateway notifications,
 		TimeProvider clock,
 		CancellationToken ct)
 	{
@@ -75,13 +75,13 @@ public partial class RequestPasswordRecovery
 		// active account that holds a password and has somewhere to deliver the token proceeds.
 		if (account is null || !account.IsActive || account.IsBlocked || !account.LocalCredential.HasPassword)
 		{
-			return Result.Ok();
+			return PasswordRecoveryRequestResult.NoDelivery;
 		}
 
 		var destination = account.PrimaryEmail;
 		if (destination is null)
 		{
-			return Result.Ok();
+			return PasswordRecoveryRequestResult.NoDelivery;
 		}
 
 		var now = clock.GetUtcNow();
@@ -94,7 +94,7 @@ public partial class RequestPasswordRecovery
 				RealmId, account.Id, ActionTokenPurpose.PasswordRecovery, threshold, now, ct))
 			{
 				// A recent token is still valid; do not flood the user. The response is identical to a fresh issuance.
-				return Result.Ok();
+				return PasswordRecoveryRequestResult.NoDelivery;
 			}
 		}
 
@@ -107,16 +107,13 @@ public partial class RequestPasswordRecovery
 			expiresAt,
 			ct);
 
-		await notifications.SendPasswordRecoveryAsync(
+		return PasswordRecoveryRequestResult.Deliver(
 			new PasswordRecoveryNotification(
 				RealmId,
 				account.SubjectId,
 				account.DisplayName,
 				destination.Address,
 				rawToken,
-				expiresAt),
-			ct);
-
-		return Result.Ok();
+				expiresAt));
 	}
 }
