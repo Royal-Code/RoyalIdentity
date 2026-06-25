@@ -409,4 +409,20 @@ public class UserAccountsRealmOptionsTests
 
 		Assert.Contains(errors, e => e.Contains("'email'", StringComparison.Ordinal));
 	}
+
+	[Fact]
+	public void Validate_IgnoresPhoneClaimProjectionCollisions_WhenPhoneNumberDisabled()
+	{
+		var options = new UserAccountsRealmOptions();
+		options.FixedFieldClaimProjections.Single(p => p.Field == FixedAccountField.PrimaryPhone).Include = true;
+
+		var errorsWhenDisabled = options.Validate(["phone_number"]);
+
+		Assert.DoesNotContain(errorsWhenDisabled, e => e.Contains("'phone_number'", StringComparison.Ordinal));
+
+		options.EnablePhoneNumber = true;
+		var errorsWhenEnabled = options.Validate(["phone_number"]);
+
+		Assert.Contains(errorsWhenEnabled, e => e.Contains("'phone_number'", StringComparison.Ordinal));
+	}
 }

@@ -219,7 +219,11 @@ public class UserAccountsRealmOptions
 
 		errors.AddRange(SecurityLifecycle.Validate());
 
-		foreach (var projection in FixedFieldClaimProjections.Where(p => p.Include))
+		var activeFixedFieldProjections = FixedFieldClaimProjections
+			.Where(p => p.Include && IsProjectionActive(p))
+			.ToArray();
+
+		foreach (var projection in activeFixedFieldProjections)
 		{
 			if (string.IsNullOrWhiteSpace(projection.ScopeName))
 			{
@@ -232,8 +236,8 @@ public class UserAccountsRealmOptions
 			}
 		}
 
-		var claimTypes = FixedFieldClaimProjections
-			.Where(p => p.Include && !string.IsNullOrWhiteSpace(p.ClaimType))
+		var claimTypes = activeFixedFieldProjections
+			.Where(p => !string.IsNullOrWhiteSpace(p.ClaimType))
 			.Select(p => p.ClaimType);
 
 		if (dynamicClaimTypes is not null)
@@ -253,6 +257,12 @@ public class UserAccountsRealmOptions
 		}
 
 		return errors;
+	}
+
+	private bool IsProjectionActive(FixedFieldClaimProjection projection)
+	{
+		return EnablePhoneNumber ||
+			projection.Field is not (FixedAccountField.PrimaryPhone or FixedAccountField.PhoneVerified);
 	}
 
 	/// <summary>

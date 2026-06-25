@@ -49,6 +49,12 @@ public class UserAccountClaimProjector
 	{
 		foreach (var projection in options.FixedFieldClaimProjections.Where(p => p.Include))
 		{
+			if (!options.EnablePhoneNumber &&
+				projection.Field is FixedAccountField.PrimaryPhone or FixedAccountField.PhoneVerified)
+			{
+				continue;
+			}
+
 			if (!requestedScopes.Contains(projection.ScopeName) ||
 				!requestedClaimTypes.Contains(projection.ClaimType))
 			{

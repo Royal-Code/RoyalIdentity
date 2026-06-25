@@ -37,6 +37,13 @@ public static class UserAccountsPostgreSqlModelBuilderExtensions
 			.HasFilter("\"IsPrimary\"")
 			.HasDatabaseName("UX_UserAccountEmails_PrimaryPerAccount");
 
+		// At most one primary phone per account, enforced at the database level.
+		modelBuilder.Entity<UserAccountPhone>()
+			.HasIndex(p => new { p.RealmId, p.UserAccountId })
+			.IsUnique()
+			.HasFilter("\"IsPrimary\"")
+			.HasDatabaseName("UX_UserAccountPhones_PrimaryPerAccount");
+
 		return modelBuilder;
 	}
 }

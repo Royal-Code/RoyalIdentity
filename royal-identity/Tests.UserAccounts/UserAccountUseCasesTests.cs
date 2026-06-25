@@ -654,8 +654,9 @@ public class UserAccountUseCasesTests
 
 		Assert.Equal("false", await EmailVerifiedClaim(provider, options, "alice"));
 
-		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "alice@example.com")).IsSuccess);
-		var token = Assert.Single(Gateway(provider).EmailVerifications).Token;
+		var notification = await EmailVerificationNotificationAsync(provider, options, "alice", "alice@example.com");
+		Assert.Empty(Gateway(provider).EmailVerifications);
+		var token = notification.Token;
 		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
 
 		Assert.Equal("true", await EmailVerifiedClaim(provider, options, "alice"));
@@ -672,8 +673,9 @@ public class UserAccountUseCasesTests
 		await MutateAccountGraphAsync(provider, "r1", "alice",
 			a => a.AddEmail(new UserAccountEmail("r1", "b@example.com", "B@EXAMPLE.COM", false, false, false), Start));
 
-		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "a@example.com")).IsSuccess);
-		var token = Assert.Single(Gateway(provider).EmailVerifications).Token;
+		var notification = await EmailVerificationNotificationAsync(provider, options, "alice", "a@example.com");
+		Assert.Empty(Gateway(provider).EmailVerifications);
+		var token = notification.Token;
 		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
 
 		using var scope = provider.CreateScope();
@@ -694,12 +696,17 @@ public class UserAccountUseCasesTests
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", emailVerified: false));
 
 		// Unknown account / unknown email: same generic success, no token issued.
-		Assert.True((await RequestEmailVerificationAsync(provider, options, "ghost", "alice@example.com")).IsSuccess);
-		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "unknown@example.com")).IsSuccess);
+		var unknownAccount = await RequestEmailVerificationAsync(provider, options, "ghost", "alice@example.com");
+		Assert.True(unknownAccount.HasValue(out var unknownAccountResult));
+		Assert.Null(unknownAccountResult!.Notification);
+		var unknownEmail = await RequestEmailVerificationAsync(provider, options, "alice", "unknown@example.com");
+		Assert.True(unknownEmail.HasValue(out var unknownEmailResult));
+		Assert.Null(unknownEmailResult!.Notification);
 		Assert.Empty(Gateway(provider).EmailVerifications);
 
-		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "alice@example.com")).IsSuccess);
-		var token = Assert.Single(Gateway(provider).EmailVerifications).Token;
+		var notification = await EmailVerificationNotificationAsync(provider, options, "alice", "alice@example.com");
+		Assert.Empty(Gateway(provider).EmailVerifications);
+		var token = notification.Token;
 		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
 		// The token cannot be replayed.
 		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsFailure);
@@ -717,8 +724,9 @@ public class UserAccountUseCasesTests
 		await MutateAccountGraphAsync(provider, "r1", "alice",
 			a => a.AddPhone(new UserAccountPhone("r1", "+55 11 99999-0000", "+5511999990000", true, false), Start));
 
-		Assert.True((await RequestPhoneVerificationAsync(provider, options, "alice", "+55 11 99999-0000")).IsSuccess);
-		var token = Assert.Single(Gateway(provider).PhoneVerifications).Token;
+		var notification = await PhoneVerificationNotificationAsync(provider, options, "alice", "+55 11 99999-0000");
+		Assert.Empty(Gateway(provider).PhoneVerifications);
+		var token = notification.Token;
 		Assert.True((await ConfirmPhoneVerificationAsync(provider, options, token)).IsSuccess);
 
 		using var scope = provider.CreateScope();
@@ -741,6 +749,25 @@ public class UserAccountUseCasesTests
 		// EnablePhoneNumber is off by default.
 		Assert.True((await RequestPhoneVerificationAsync(provider, options, "alice", "+5511999990000")).IsFailure);
 		Assert.Empty(Gateway(provider).PhoneVerifications);
+	}
+
+	[Fact]
+	public async Task PhoneClaims_AreInert_WhenPhoneNumberIsDisabled()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		EnablePhoneProjections(options);
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+		await MutateAccountGraphAsync(provider, "r1", "alice",
+			a => a.AddPhone(new UserAccountPhone("r1", "+55 11 99999-0000", "+5511999990000", true, true), Start));
+
+		using var scope = provider.CreateScope();
+		var claimsReader = scope.ServiceProvider.GetRequiredService<UserAccountClaimsReader>();
+		var claims = await claimsReader.GetClaimsAsync(
+			"r1", "alice", options, ["phone"], ["phone_number", "phone_number_verified"]);
+
+		Assert.Empty(claims);
 	}
 
 	// ---- Scope properties + claims ----
@@ -1043,7 +1070,7 @@ public class UserAccountUseCasesTests
 		}, default);
 	}
 
-	private static async Task<RoyalCode.SmartProblems.Result> RequestEmailVerificationAsync(
+	private static async Task<Result<EmailVerificationRequestResult>> RequestEmailVerificationAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string email)
 	{
 		using var scope = provider.CreateScope();
@@ -1055,6 +1082,15 @@ public class UserAccountUseCasesTests
 			SubjectId = subjectId,
 			Email = email
 		}, default);
+	}
+
+	private static async Task<EmailVerificationNotification> EmailVerificationNotificationAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string email)
+	{
+		var request = await RequestEmailVerificationAsync(provider, options, subjectId, email);
+		Assert.True(request.HasValue(out var result));
+		Assert.NotNull(result!.Notification);
+		return result.Notification!;
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> ConfirmEmailVerificationAsync(
@@ -1070,7 +1106,7 @@ public class UserAccountUseCasesTests
 		}, default);
 	}
 
-	private static async Task<RoyalCode.SmartProblems.Result> RequestPhoneVerificationAsync(
+	private static async Task<Result<PhoneVerificationRequestResult>> RequestPhoneVerificationAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string phoneNumber)
 	{
 		using var scope = provider.CreateScope();
@@ -1082,6 +1118,15 @@ public class UserAccountUseCasesTests
 			SubjectId = subjectId,
 			PhoneNumber = phoneNumber
 		}, default);
+	}
+
+	private static async Task<PhoneVerificationNotification> PhoneVerificationNotificationAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string phoneNumber)
+	{
+		var request = await RequestPhoneVerificationAsync(provider, options, subjectId, phoneNumber);
+		Assert.True(request.HasValue(out var result));
+		Assert.NotNull(result!.Notification);
+		return result.Notification!;
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> ConfirmPhoneVerificationAsync(

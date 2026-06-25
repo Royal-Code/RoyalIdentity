@@ -457,6 +457,49 @@ public class UserAccountsPersistenceTests
 	}
 
 	[Fact]
+	public async Task DuplicatePrimaryPhone_ForSameAccount_ViolatesSqliteProviderIndex()
+	{
+		await using var provider = BuildProvider();
+		long accountId;
+
+		await using (var write = NewContext(provider))
+		{
+			var account = NewAccount();
+			write.UserAccounts.Add(account);
+			await write.SaveChangesAsync();
+			accountId = account.Id;
+		}
+
+		await using var ctx = NewContext(provider);
+		await ctx.Database.ExecuteSqlRawAsync(
+			"""
+			INSERT INTO "UserAccountPhones"
+				("RealmId", "UserAccountId", "Number", "NormalizedNumber", "IsPrimary", "IsVerified")
+			VALUES
+				({0}, {1}, {2}, {3}, 1, 1)
+			""",
+			"realm-a",
+			accountId,
+			"+55 11 99999-0000",
+			"+5511999990000");
+
+		var exception = await Assert.ThrowsAsync<SqliteException>(() =>
+			ctx.Database.ExecuteSqlRawAsync(
+				"""
+				INSERT INTO "UserAccountPhones"
+					("RealmId", "UserAccountId", "Number", "NormalizedNumber", "IsPrimary", "IsVerified")
+				VALUES
+					({0}, {1}, {2}, {3}, 1, 1)
+				""",
+				"realm-a",
+				accountId,
+				"+55 11 98888-0000",
+				"+5511988880000"));
+
+		Assert.Equal(19, exception.SqliteErrorCode);
+	}
+
+	[Fact]
 	public async Task DuplicatePropertyScopeName_InSameRealm_ViolatesUniqueIndex()
 	{
 		await using var provider = BuildProvider();

@@ -11,8 +11,9 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 /// <summary>
 /// Issues a phone verification token bound to a specific account phone (ADR-017 §2.8), gated by the realm phone
 /// feature (<see cref="UserAccountsRealmOptions.EnablePhoneNumber"/>). Like email verification, the public outcome
-/// is the same whether or not a token was issued, and the token's <c>TargetValue</c> binds it to the normalized
-/// number so a value replaced later can never be verified with it.
+/// is the same whether or not a token was issued. Delivery is returned to the trusted edge as a payload so it can
+/// happen after the generated handler completes the unit of work, and the token's <c>TargetValue</c> binds it to
+/// the normalized number so a value replaced later can never be verified with it.
 /// <para>
 /// This plan delivers the use case + costura only; the HTTP/UI that drives it belongs to the admin/UI plan (Q12).
 /// </para>
@@ -58,11 +59,10 @@ public partial class RequestPhoneVerification
 	/// Executes the phone verification request use case.
 	/// </summary>
 	[Command, WithValidateModel, WithWorkContext]
-	public async Task<Result> Execute(
+	public async Task<Result<PhoneVerificationRequestResult>> Execute(
 		UserAccountReader reader,
 		UserAccountActionTokenService tokens,
 		IUserAccountNormalizer normalizer,
-		INotificationGateway notifications,
 		TimeProvider clock,
 		CancellationToken ct)
 	{
@@ -77,14 +77,14 @@ public partial class RequestPhoneVerification
 		var account = await reader.FindBySubjectIdAsync(RealmId, SubjectId, ct);
 		if (account is null || !account.IsActive)
 		{
-			return Result.Ok();
+			return PhoneVerificationRequestResult.NoDelivery;
 		}
 
 		var normalizedNumber = normalizer.NormalizePhoneNumber(PhoneNumber);
 		var phone = account.Phones.FirstOrDefault(p => p.NormalizedNumber == normalizedNumber);
 		if (phone is null || phone.IsVerified)
 		{
-			return Result.Ok();
+			return PhoneVerificationRequestResult.NoDelivery;
 		}
 
 		var now = clock.GetUtcNow();
@@ -97,16 +97,13 @@ public partial class RequestPhoneVerification
 			expiresAt,
 			ct);
 
-		await notifications.SendPhoneVerificationAsync(
+		return PhoneVerificationRequestResult.Deliver(
 			new PhoneVerificationNotification(
 				RealmId,
 				account.SubjectId,
 				account.DisplayName,
 				phone.Number,
 				rawToken,
-				expiresAt),
-			ct);
-
-		return Result.Ok();
+				expiresAt));
 	}
 }
