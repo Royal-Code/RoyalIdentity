@@ -6,6 +6,7 @@ using RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Commons;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.UseCases;
+using RoyalIdentity.UserAccounts.Infrastructure.Gateways;
 using RoyalIdentity.UserAccounts.Options;
 using RoyalIdentity.UserAccounts.Sqlite;
 
@@ -392,6 +393,227 @@ public class UserAccountUseCasesTests
 		Assert.Equal("alice", outcome.SubjectId);
 	}
 
+	// ---- Password recovery ----
+
+	[Fact]
+	public async Task RequestPasswordRecovery_IssuesToken_AndResetEnablesLoginWithNewPassword()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", emailVerified: true, password: "secret"));
+
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+
+		var sent = Assert.Single(Gateway(provider).Sent);
+		Assert.False(string.IsNullOrWhiteSpace(sent.Token));
+		Assert.Equal("alice@example.com", sent.Address);
+		Assert.Equal("alice", sent.SubjectId);
+
+		Assert.True((await ResetWithTokenAsync(provider, options, sent.Token, "renewed")).IsSuccess);
+
+		Assert.True((await AuthenticateAsync(provider, options, "alice", "renewed")).HasValue(out var ok) && ok!.Success);
+		Assert.Equal(LocalAuthenticationFailureReason.InvalidCredentials, await AuthReason(provider, options, "alice", "secret"));
+	}
+
+	[Fact]
+	public async Task RequestPasswordRecovery_IsAntiEnumeration_ForUnknownLogin()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+
+		// Same public success as an eligible request, but no token is issued or delivered.
+		Assert.True((await RequestRecoveryAsync(provider, options, "ghost")).IsSuccess);
+		Assert.Empty(Gateway(provider).Sent);
+	}
+
+	[Fact]
+	public async Task RequestPasswordRecovery_HonorsAllowForgotPassword_Toggle()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.AllowForgotPassword = false;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
+
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsFailure);
+		Assert.Empty(Gateway(provider).Sent);
+	}
+
+	[Fact]
+	public async Task ResetPasswordWithToken_IsSingleUse()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+		var token = Assert.Single(Gateway(provider).Sent).Token;
+
+		Assert.True((await ResetWithTokenAsync(provider, options, token, "renewed")).IsSuccess);
+		// The same token cannot be consumed twice.
+		Assert.True((await ResetWithTokenAsync(provider, options, token, "another")).IsFailure);
+	}
+
+	[Fact]
+	public async Task RequestPasswordRecovery_RevokesPreviousToken_OnReissue()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
+
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+
+		var sent = Gateway(provider).Sent;
+		Assert.Equal(2, sent.Count);
+
+		// The first (superseded) token no longer works; the latest one does.
+		Assert.True((await ResetWithTokenAsync(provider, options, sent[0].Token, "renewed")).IsFailure);
+		Assert.True((await ResetWithTokenAsync(provider, options, sent[1].Token, "renewed")).IsSuccess);
+	}
+
+	[Fact]
+	public async Task RequestPasswordRecovery_Throttles_WhenResendCooldownConfigured()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.SecurityLifecycle.PasswordRecoveryResendCooldownSeconds = 60;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
+
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+		// A second request within the cooldown returns the same success but does not deliver a new token.
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+
+		Assert.Single(Gateway(provider).Sent);
+	}
+
+	[Fact]
+	public async Task ResetPasswordWithToken_RejectsWeakPassword_WithoutConsumingToken()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.PasswordOptions.MinimumLength = 8;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "longsecret"));
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
+		var token = Assert.Single(Gateway(provider).Sent).Token;
+
+		// A rejected new password must not burn the token.
+		Assert.True((await ResetWithTokenAsync(provider, options, token, "short")).IsFailure);
+		Assert.True((await ResetWithTokenAsync(provider, options, token, "longenough")).IsSuccess);
+	}
+
+	// ---- Email & phone verification ----
+
+	[Fact]
+	public async Task EmailVerification_RequestAndConfirm_MarksPrimaryVerified_AndProjectsEmailVerified()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", emailVerified: false, password: "secret"));
+
+		Assert.Equal("false", await EmailVerifiedClaim(provider, options, "alice"));
+
+		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "alice@example.com")).IsSuccess);
+		var token = Assert.Single(Gateway(provider).EmailVerifications).Token;
+		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
+
+		Assert.Equal("true", await EmailVerifiedClaim(provider, options, "alice"));
+	}
+
+	[Fact]
+	public async Task EmailVerification_TokenVerifiesOnlyItsTarget()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "a@example.com", emailVerified: false));
+		await MutateAccountGraphAsync(provider, "r1", "alice",
+			a => a.AddEmail(new UserAccountEmail("r1", "b@example.com", "B@EXAMPLE.COM", false, false, false), Start));
+
+		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "a@example.com")).IsSuccess);
+		var token = Assert.Single(Gateway(provider).EmailVerifications).Token;
+		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
+
+		using var scope = provider.CreateScope();
+		var reader = scope.ServiceProvider.GetRequiredService<UserAccountReader>();
+		var account = await reader.FindBySubjectIdAsync("r1", "alice");
+
+		Assert.True(account!.Emails.Single(e => e.NormalizedAddress == "A@EXAMPLE.COM").IsVerified);
+		Assert.False(account.Emails.Single(e => e.NormalizedAddress == "B@EXAMPLE.COM").IsVerified);
+	}
+
+	[Fact]
+	public async Task EmailVerification_IsAntiEnumeration_AndSingleUse()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate(
+			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", emailVerified: false));
+
+		// Unknown account / unknown email: same generic success, no token issued.
+		Assert.True((await RequestEmailVerificationAsync(provider, options, "ghost", "alice@example.com")).IsSuccess);
+		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "unknown@example.com")).IsSuccess);
+		Assert.Empty(Gateway(provider).EmailVerifications);
+
+		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "alice@example.com")).IsSuccess);
+		var token = Assert.Single(Gateway(provider).EmailVerifications).Token;
+		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
+		// The token cannot be replayed.
+		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsFailure);
+	}
+
+	[Fact]
+	public async Task PhoneVerification_RequestAndConfirm_MarksVerified_AndProjectsPhoneClaims()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.EnablePhoneNumber = true;
+		EnablePhoneProjections(options);
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+		await MutateAccountGraphAsync(provider, "r1", "alice",
+			a => a.AddPhone(new UserAccountPhone("r1", "+55 11 99999-0000", "+5511999990000", true, false), Start));
+
+		Assert.True((await RequestPhoneVerificationAsync(provider, options, "alice", "+55 11 99999-0000")).IsSuccess);
+		var token = Assert.Single(Gateway(provider).PhoneVerifications).Token;
+		Assert.True((await ConfirmPhoneVerificationAsync(provider, options, token)).IsSuccess);
+
+		using var scope = provider.CreateScope();
+		var claimsReader = scope.ServiceProvider.GetRequiredService<UserAccountClaimsReader>();
+		var claims = await claimsReader.GetClaimsAsync(
+			"r1", "alice", options, ["phone"], ["phone_number", "phone_number_verified"]);
+
+		Assert.Contains(claims, c => c is { ScopeName: "phone", ClaimType: "phone_number", Value: "+55 11 99999-0000" });
+		Assert.Contains(claims, c => c is { ScopeName: "phone", ClaimType: "phone_number_verified", Value: "true" });
+	}
+
+	[Fact]
+	public async Task PhoneVerification_IsGated_ByEnablePhoneNumber()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		// EnablePhoneNumber is off by default.
+		Assert.True((await RequestPhoneVerificationAsync(provider, options, "alice", "+5511999990000")).IsFailure);
+		Assert.Empty(Gateway(provider).PhoneVerifications);
+	}
+
 	// ---- Scope properties + claims ----
 
 	[Fact]
@@ -515,9 +737,14 @@ public class UserAccountUseCasesTests
 		var services = new ServiceCollection();
 		services.AddSingleton<TimeProvider>(new FakeClock(Start));
 		services.AddSingleton<IUserAccountPasswordHasher, FakeHasher>();
+		// Registered before the module so its TryAdd default (no-op) does not win; lets tests capture the raw token.
+		services.AddSingleton<INotificationGateway>(new RecordingNotificationGateway());
 		services.AddUserAccountsSqliteInMemory();
 		return services.BuildServiceProvider();
 	}
+
+	private static RecordingNotificationGateway Gateway(ServiceProvider provider)
+		=> (RecordingNotificationGateway)provider.GetRequiredService<INotificationGateway>();
 
 	private static UserAccountsRealmOptions Options() => UserAccountsTestOptions.Relaxed();
 
@@ -608,6 +835,105 @@ public class UserAccountUseCasesTests
 		}, default);
 	}
 
+	private static async Task<RoyalCode.SmartProblems.Result> RequestRecoveryAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string login)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IRequestPasswordRecoveryHandler>();
+		return await handler.HandleAsync(new RequestPasswordRecovery
+		{
+			RealmId = "r1",
+			Options = options,
+			Login = login
+		}, default);
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> ResetWithTokenAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string token, string newPassword)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IResetPasswordWithTokenHandler>();
+		return await handler.HandleAsync(new ResetPasswordWithToken
+		{
+			RealmId = "r1",
+			Options = options,
+			Token = token,
+			NewPassword = newPassword
+		}, default);
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> RequestEmailVerificationAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string email)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IRequestEmailVerificationHandler>();
+		return await handler.HandleAsync(new RequestEmailVerification
+		{
+			RealmId = "r1",
+			Options = options,
+			SubjectId = subjectId,
+			Email = email
+		}, default);
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> ConfirmEmailVerificationAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string token)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IConfirmEmailVerificationHandler>();
+		return await handler.HandleAsync(new ConfirmEmailVerification
+		{
+			RealmId = "r1",
+			Options = options,
+			Token = token
+		}, default);
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> RequestPhoneVerificationAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string phoneNumber)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IRequestPhoneVerificationHandler>();
+		return await handler.HandleAsync(new RequestPhoneVerification
+		{
+			RealmId = "r1",
+			Options = options,
+			SubjectId = subjectId,
+			PhoneNumber = phoneNumber
+		}, default);
+	}
+
+	private static async Task<RoyalCode.SmartProblems.Result> ConfirmPhoneVerificationAsync(
+		ServiceProvider provider, UserAccountsRealmOptions options, string token)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IConfirmPhoneVerificationHandler>();
+		return await handler.HandleAsync(new ConfirmPhoneVerification
+		{
+			RealmId = "r1",
+			Options = options,
+			Token = token
+		}, default);
+	}
+
+	private static async Task<string?> EmailVerifiedClaim(
+		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId)
+	{
+		using var scope = provider.CreateScope();
+		var claimsReader = scope.ServiceProvider.GetRequiredService<UserAccountClaimsReader>();
+		var claims = await claimsReader.GetClaimsAsync("r1", subjectId, options, ["email"], ["email_verified"]);
+		return claims.FirstOrDefault(c => c.ClaimType == "email_verified")?.Value;
+	}
+
+	private static void EnablePhoneProjections(UserAccountsRealmOptions options)
+	{
+		foreach (var projection in options.FixedFieldClaimProjections
+			.Where(p => p.Field is FixedAccountField.PrimaryPhone or FixedAccountField.PhoneVerified))
+		{
+			projection.Include = true;
+		}
+	}
+
 	private static async Task<RoyalCode.SmartProblems.Result> SetPropertyAsync(
 		ServiceProvider provider, string realmId, string subjectId, string scopeName, string claimType, IReadOnlyList<string> values)
 	{
@@ -658,6 +984,17 @@ public class UserAccountUseCasesTests
 		await db.SaveChangesAsync();
 	}
 
+	private static async Task MutateAccountGraphAsync(
+		ServiceProvider provider, string realmId, string subjectId, Action<UserAccount> mutate)
+	{
+		using var scope = provider.CreateScope();
+		var db = scope.ServiceProvider.GetRequiredService<UserAccountsSqliteDbContext>();
+		var reader = scope.ServiceProvider.GetRequiredService<UserAccountReader>();
+		var account = await reader.FindBySubjectIdAsync(realmId, subjectId);
+		mutate(account!);
+		await db.SaveChangesAsync();
+	}
+
 	private sealed class FakeClock(DateTimeOffset start) : TimeProvider
 	{
 		public DateTimeOffset Now { get; set; } = start;
@@ -670,5 +1007,32 @@ public class UserAccountUseCasesTests
 		public string Hash(string password) => $"hashed:{password}";
 
 		public bool Verify(string password, string passwordHash) => passwordHash == Hash(password);
+	}
+
+	private sealed class RecordingNotificationGateway : INotificationGateway
+	{
+		public List<PasswordRecoveryNotification> Sent { get; } = [];
+
+		public List<EmailVerificationNotification> EmailVerifications { get; } = [];
+
+		public List<PhoneVerificationNotification> PhoneVerifications { get; } = [];
+
+		public Task SendPasswordRecoveryAsync(PasswordRecoveryNotification notification, CancellationToken ct = default)
+		{
+			Sent.Add(notification);
+			return Task.CompletedTask;
+		}
+
+		public Task SendEmailVerificationAsync(EmailVerificationNotification notification, CancellationToken ct = default)
+		{
+			EmailVerifications.Add(notification);
+			return Task.CompletedTask;
+		}
+
+		public Task SendPhoneVerificationAsync(PhoneVerificationNotification notification, CancellationToken ct = default)
+		{
+			PhoneVerifications.Add(notification);
+			return Task.CompletedTask;
+		}
 	}
 }

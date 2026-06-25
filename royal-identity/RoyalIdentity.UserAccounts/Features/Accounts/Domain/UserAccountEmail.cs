@@ -100,4 +100,12 @@ public class UserAccountEmail : Entity<long>
 	{
 		IsPrimary = primary;
 	}
+
+	/// <summary>
+	/// Marks this email as verified.
+	/// </summary>
+	internal void MarkVerified()
+	{
+		IsVerified = true;
+	}
 }

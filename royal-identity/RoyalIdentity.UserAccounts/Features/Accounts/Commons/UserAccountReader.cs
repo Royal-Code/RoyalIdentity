@@ -27,6 +27,20 @@ public sealed class UserAccountReader(UserAccountsDbContext db, IUserAccountNorm
 	}
 
 	/// <summary>
+	/// Finds a tracked account by its physical identifier within a realm. Used by flows that resolve the account
+	/// from a stored foreign key (for example, after looking up an action token by its hash).
+	/// </summary>
+	/// <param name="realmId">The owning realm.</param>
+	/// <param name="accountId">The physical account identifier.</param>
+	/// <param name="ct">A cancellation token.</param>
+	/// <returns>The account with its graph loaded, or <c>null</c> when not found.</returns>
+	public Task<UserAccount?> FindByIdAsync(string realmId, long accountId, CancellationToken ct = default)
+	{
+		return AccountGraph()
+			.FirstOrDefaultAsync(a => a.RealmId == realmId && a.Id == accountId, ct);
+	}
+
+	/// <summary>
 	/// Finds a tracked account by login, honoring the realm's username/email login policies.
 	/// </summary>
 	/// <param name="realmId">The owning realm.</param>
@@ -120,6 +134,7 @@ public sealed class UserAccountReader(UserAccountsDbContext db, IUserAccountNorm
 		return db.UserAccounts
 			.Include(a => a.LocalCredential)
 			.Include("EmailItems")
+			.Include("PhoneItems")
 			.Include("RoleItems")
 			.Include("PropertyValueItems")
 			.Include("PasswordHistoryItems");

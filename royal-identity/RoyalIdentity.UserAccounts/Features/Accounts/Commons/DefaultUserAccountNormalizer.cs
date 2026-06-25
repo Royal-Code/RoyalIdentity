@@ -14,4 +14,14 @@ public sealed class DefaultUserAccountNormalizer : IUserAccountNormalizer
 
 	/// <inheritdoc />
 	public string NormalizeRoleName(string roleName) => roleName.Trim().ToUpperInvariant();
+
+	/// <inheritdoc />
+	public string NormalizePhoneNumber(string phoneNumber)
+	{
+		var trimmed = phoneNumber.Trim();
+		var hasLeadingPlus = trimmed.StartsWith('+');
+		var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+
+		return hasLeadingPlus ? "+" + digits : digits;
+	}
 }

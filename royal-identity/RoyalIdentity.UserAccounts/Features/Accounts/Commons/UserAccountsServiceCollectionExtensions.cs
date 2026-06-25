@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Commons;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
+using RoyalIdentity.UserAccounts.Infrastructure.Gateways;
 
 namespace RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 
@@ -25,7 +26,10 @@ public static class UserAccountsServiceCollectionExtensions
 		services.TryAddSingleton<PasswordPolicy>();
 		services.TryAddSingleton<PasswordHistoryPolicy>();
 
+		services.TryAddSingleton<INotificationGateway, NoopNotificationGateway>();
+
 		services.TryAddScoped<UserAccountReader>();
+		services.TryAddScoped<UserAccountActionTokenService>();
 		services.TryAddScoped<UserAccountClaimProjector>();
 		services.TryAddScoped<UserAccountClaimsReader>();
 		services.TryAddScoped<UserAccountPropertyValueService>();

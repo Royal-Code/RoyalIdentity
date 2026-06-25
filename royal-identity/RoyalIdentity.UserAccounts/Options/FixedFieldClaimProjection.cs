@@ -17,6 +17,12 @@ public enum FixedAccountField
 	/// <summary>Whether the primary email address is verified.</summary>
 	EmailVerified,
 
+	/// <summary>The primary phone number.</summary>
+	PrimaryPhone,
+
+	/// <summary>Whether the primary phone number is verified.</summary>
+	PhoneVerified,
+
 	/// <summary>The account roles.</summary>
 	Roles,
 

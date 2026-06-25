@@ -336,6 +336,106 @@ public class UserAccountDomainTests
 	}
 
 	[Fact]
+	public void ResetPassword_ClearsForcedChangeAndLockout_AndMovesSessionsValidAfter()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		options.MaxFailedAccessAttempts = 2;
+		Assert.True(account.SetPassword(PasswordHasher.Hash("old-pass"), Now, options, mustChangePassword: true).IsSuccess);
+
+		// A failed attempt before the reset leaves failure state that the reset must clear.
+		account.AuthenticateLocal("wrong", options, PasswordHasher, Now.AddMinutes(1));
+		Assert.Equal(1, account.LocalCredential.FailedPasswordAttempts);
+		var stampBefore = account.SecurityStamp;
+		var resetAt = Now.AddMinutes(2);
+
+		Assert.True(account.ResetPassword(PasswordHasher.Hash("new-pass"), options, resetAt).IsSuccess);
+
+		Assert.False(account.LocalCredential.MustChangePassword);
+		Assert.Equal(0, account.LocalCredential.FailedPasswordAttempts);
+		Assert.NotEqual(stampBefore, account.SecurityStamp);
+		Assert.Equal(resetAt, account.SessionsValidAfter);
+
+		// The new password authenticates without the required action.
+		var auth = account.AuthenticateLocal("new-pass", options, PasswordHasher, Now.AddMinutes(3));
+		Assert.True(auth.Success);
+		Assert.Null(auth.RequiredAction);
+	}
+
+	[Fact]
+	public void ActionToken_IsConsumable_RespectsExpiryRevocation_AndRevokeIsIdempotent()
+	{
+		var account = CreateAccount();
+		var expiresAt = Now.AddMinutes(30);
+		var token = UserAccountActionToken.Issue(
+			account, ActionTokenPurpose.PasswordRecovery, "token-hash", "alice@example.com", Now, expiresAt);
+
+		Assert.True(token.IsConsumable(Now.AddMinutes(10)));
+		Assert.False(token.IsConsumable(Now.AddMinutes(31)));
+
+		token.Revoke(ActionTokenRevocationReason.Superseded, Now.AddMinutes(5));
+		Assert.False(token.IsConsumable(Now.AddMinutes(10)));
+		Assert.Equal(Now.AddMinutes(5), token.RevokedAt);
+		Assert.Equal(ActionTokenRevocationReason.Superseded, token.RevokedReason);
+
+		// Revoking again does not move the recorded revocation.
+		token.Revoke(ActionTokenRevocationReason.Superseded, Now.AddMinutes(9));
+		Assert.Equal(Now.AddMinutes(5), token.RevokedAt);
+	}
+
+	[Fact]
+	public void VerifyEmail_MarksTargetVerified_IsIdempotent_AndFailsForMissing()
+	{
+		var account = CreateAccount();
+		Assert.True(account.AddEmail(CreateEmail("a@example.com", isPrimary: true), Now).IsSuccess);
+		Assert.True(account.AddEmail(CreateEmail("b@example.com"), Now.AddMinutes(1)).IsSuccess);
+
+		Assert.True(account.VerifyEmail("A@EXAMPLE.COM", Now.AddMinutes(2)).IsSuccess);
+
+		// Only the target is verified — a token issued for one value never verifies another.
+		Assert.True(account.Emails.Single(e => e.NormalizedAddress == "A@EXAMPLE.COM").IsVerified);
+		Assert.False(account.Emails.Single(e => e.NormalizedAddress == "B@EXAMPLE.COM").IsVerified);
+
+		// Idempotent and fails for an unknown target.
+		Assert.True(account.VerifyEmail("A@EXAMPLE.COM", Now.AddMinutes(3)).IsSuccess);
+		Assert.True(account.VerifyEmail("Z@EXAMPLE.COM", Now.AddMinutes(4)).IsFailure);
+	}
+
+	[Fact]
+	public void AddPhone_MaintainsSinglePrimary_AndRejectsDuplicatesAndRealmMismatch()
+	{
+		var account = CreateAccount();
+
+		Assert.True(account.AddPhone(CreatePhone("+5511999990000", isPrimary: true), Now).IsSuccess);
+		Assert.True(account.AddPhone(CreatePhone("+5511888880000"), Now.AddMinutes(1)).IsSuccess);
+
+		Assert.Single(account.Phones, p => p.IsPrimary);
+		Assert.Equal("+5511999990000", account.PrimaryPhone?.Number);
+
+		var duplicate = account.AddPhone(CreatePhone("+5511999990000"), Now.AddMinutes(2));
+		var realmMismatch = account.AddPhone(
+			new UserAccountPhone("realm-b", "+100", "+100", false, false), Now.AddMinutes(3));
+
+		Assert.True(duplicate.IsFailure);
+		Assert.True(realmMismatch.IsFailure);
+	}
+
+	[Fact]
+	public void VerifyPhone_MarksTargetVerified_AndMovesStampWithoutInvalidatingSessions()
+	{
+		var account = CreateAccount();
+		Assert.True(account.AddPhone(CreatePhone("+5511999990000", isPrimary: true), Now).IsSuccess);
+		var stampBefore = account.SecurityStamp;
+		var validAfterBefore = account.SessionsValidAfter;
+
+		Assert.True(account.VerifyPhone("+5511999990000", Now.AddMinutes(1)).IsSuccess);
+
+		Assert.True(account.PrimaryPhone!.IsVerified);
+		Assert.NotEqual(stampBefore, account.SecurityStamp);
+		Assert.Equal(validAfterBefore, account.SessionsValidAfter);
+	}
+
+	[Fact]
 	public void BlockAndUnblock_KeepAdministrativeBlockStateTogether()
 	{
 		var account = CreateAccount();
@@ -408,6 +508,12 @@ public class UserAccountDomainTests
 	private static UserAccountRole CreateRole(string name)
 	{
 		return new UserAccountRole("realm-a", name, name.ToUpperInvariant());
+	}
+
+	private static UserAccountPhone CreatePhone(string number, bool isPrimary = false)
+	{
+		// The domain compares by normalized number; the use case is the single normalization home.
+		return new UserAccountPhone("realm-a", number, number, isPrimary, false);
 	}
 
 	private static PasswordOptions RelaxedPasswordOptions()

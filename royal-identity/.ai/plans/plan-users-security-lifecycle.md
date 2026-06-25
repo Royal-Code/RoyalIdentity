@@ -1,10 +1,10 @@
 # Plan: Credenciais e Ciclo de Segurança da Conta (`plan-users-security-lifecycle`)
 
-## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–4 concluídas
+## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–6 concluídas
 
 ## Progresso
 
-`####------` **40%** - 4 de 10 fases
+`######----` **60%** - 6 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,8 +12,8 @@
 | Fase 2 - Modelo de credencial, `SecurityStamp` e concorrência | Concluida |
 | Fase 3 - Política de senha: histórico e expiração com enforcement | Concluida |
 | Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada) | Concluida |
-| Fase 5 - Recuperação de senha e tokens de ação | Pendente |
-| Fase 6 - Verificação de email e telefone | Pendente |
+| Fase 5 - Recuperação de senha e tokens de ação | Concluida |
+| Fase 6 - Verificação de email e telefone | Concluida |
 | Fase 7 - Lockout, bloqueio administrativo e restrições de acesso | Pendente |
 | Fase 8 - Invalidação de sessões/cookies/refresh tokens | Pendente |
 | Fase 9 - Auditoria, eventos e (seletivo) outbox | Pendente |
@@ -1233,14 +1233,20 @@ idempotente.
 
 **Tarefas:**
 
-- [ ] Implementar `UserAccountActionToken` (hash, TTL, uso único, revogação por nova emissão, `TargetValue`).
-- [ ] `RequestPasswordRecovery` (gated por `AllowForgotPassword`): resposta pública **sempre igual**; só emite token se a
-      conta existir e a policy permitir; rate limit por IP/realm/identificador normalizado; sem revelar existência/estado.
-- [ ] `ResetPasswordWithToken`: consumo idempotente (update condicional); aplica complexidade/histórico (Fase 3);
-      registra/publica a solicitação de invalidação conforme Q7/Q13 (reset costuma revogar sessões/refresh por default
-      conforme decidido). A execução efetiva sobre stores de sessão/refresh é concluída na Fase 8.
-- [ ] Gateway de notificação (`INotificationGateway`/no-op) para entregar o link/código (ver Arquitetura alvo).
-- [ ] Sem telas/endpoints user-facing (Q12 — decidido: ficam para o plano de admin/UI).
+- [x] Implementar `UserAccountActionToken` (hash, TTL, uso único, revogação por nova emissão, `TargetValue`). O enum
+      `ActionTokenPurpose` já inclui `ChangeExpiredPassword`/`EmailVerification`/`PhoneVerification` (modelo reusado pelas
+      Fases 4/6); a Fase 5 exercita só `PasswordRecovery`.
+- [x] `RequestPasswordRecovery` (gated por `AllowForgotPassword`): resposta pública **sempre igual**; só emite token se a
+      conta existir e a policy permitir; sem revelar existência/estado. **Rate limit:** entregue como **cooldown por
+      realm/conta** (`PasswordRecoveryResendCooldownSeconds`, default 0 = off); o limite por **IP/identificador** é
+      concern de borda (camada HTTP, Q12) — registrado como nota.
+- [x] `ResetPasswordWithToken`: consumo idempotente (update condicional via `ExecuteUpdate`); aplica complexidade/histórico
+      (Fase 3) **antes** de consumir (senha rejeitada não queima o token); move `SessionsValidAfter` (marcador de
+      invalidação) via `UserAccount.ResetPassword`. A execução ativa sobre stores de sessão/refresh (Q7/Q13) é concluída
+      na Fase 8.
+- [x] Gateway de notificação (`INotificationGateway`/no-op) para entregar o link/código (ver Arquitetura alvo); o token
+      bruto trafega **uma vez** no `PasswordRecoveryNotification` e nunca é persistido/logado/auditado.
+- [x] Sem telas/endpoints user-facing (Q12 — decidido: ficam para o plano de admin/UI); entregue só a costura + casos de uso.
 
 **Critérios de aceite:** token só verificável uma vez; nova emissão revoga anteriores; conta inexistente não cria token
 nem revela; reset aplica políticas de senha; solicitação de invalidação segue a policy decidida; hashes de token nunca
@@ -1250,7 +1256,71 @@ expostos.
 
 ### Resultado da Fase 5
 
-*a preencher*
+**Concluída (2026-06-24).** O modelo de **token de ação** (`UserAccountActionToken`) e o fluxo de **recuperação de
+senha** com anti-enumeração e uso único idempotente entraram no módulo puro, seguindo o split de sempre: domínio (token
++ `ResetPassword`), persistência própria (mapeamento + DbSet), serviço de feature (emissão/consumo) e casos de uso
+SmartCommands; a entrega externa fica atrás de um **gateway abstrato** com no-op default. Nenhuma tela/endpoint (Q12);
+nenhuma referência do módulo ao core/ASP.NET.
+
+**Arquivos novos:**
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/ActionTokenPurpose.cs` — `PasswordRecovery`/`EmailVerification`/
+  `PhoneVerification`/`ChangeExpiredPassword` (modelo único reusado pelas Fases 4/6; só `PasswordRecovery` é exercitado aqui).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/ActionTokenRevocationReason.cs` — `Superseded` (revogação por nova emissão).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountActionToken.cs` — entidade EF-first: só o **hash** do
+  token é guardado; TTL obrigatório; `TargetValue` (email/phone normalizado); `IsConsumable(now)`; `Revoke(reason, now)`
+  idempotente; colunas de auditoria `CreatedIpHash`/`ConsumedIpHash`/`UserAgentHash` (preenchidas pela borda depois).
+- `RoyalIdentity.UserAccounts/Infrastructure/Data/Mappings/UserAccountActionTokenMap.cs` — tabela
+  `UserAccountActionTokens`; índices `(RealmId, UserAccountId, Purpose)` e único `(RealmId, TokenHash)`; FK para a conta
+  **sem navegação** (ciclo independente do grafo do agregado); `CreatedAt`/`ExpiresAt` convertidos para **ticks UTC**
+  (a comparação de TTL/throttle não traduz para SQL com `DateTimeOffset` no provider SQLite).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Commons/UserAccountActionTokenService.cs` — gera o token bruto
+  (`CryptoRandom`) + hash (`Hashing.Sha256Base64Url` do `RoyalIdentity.Security`); `IssueAsync` revoga os ativos
+  anteriores do mesmo `Purpose` e insere o novo; `FindConsumableAsync`/`TryConsumeAsync` fazem o **consumo idempotente
+  via `ExecuteUpdate` condicional** (`ConsumedAt is null AND RevokedAt is null AND ExpiresAt > now`).
+- `RoyalIdentity.UserAccounts/Infrastructure/Gateways/INotificationGateway.cs` +
+  `PasswordRecoveryNotification.cs` + `NoopNotificationGateway.cs` — seam de entrega (email/SMS) definido no módulo puro,
+  com no-op default (`TryAdd`); o token bruto trafega **uma única vez** no payload e nunca é persistido/logado/auditado.
+- `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/RequestPasswordRecovery.cs` — gated por `AllowForgotPassword`;
+  resposta pública **idêntica** para conta inexistente/inelegível; emite + entrega só para conta ativa, com senha e email
+  primário; cooldown por realm opcional.
+- `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/ResetPasswordWithToken.cs` — valida complexidade/histórico
+  **antes** de consumir; consome (uso único); `account.ResetPassword(...)`.
+
+**Arquivos alterados:**
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccount.cs` — novo `ResetPassword(newHash, options, changedAt)`
+  (não verifica senha atual — o token já provou controle; reason=`Reset`; limpa `MustChangePassword`/lockout, arquiva
+  histórico e move `SecurityStamp` **e** `SessionsValidAfter`).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Commons/UserAccountReader.cs` — `FindByIdAsync(realmId, accountId)`
+  (carrega a conta a partir do FK físico resolvido pelo token).
+- `RoyalIdentity.UserAccounts/Infrastructure/Data/UserAccountsDbContext.cs` — `DbSet<UserAccountActionToken>`.
+- `RoyalIdentity.UserAccounts/Options/SecurityLifecycleOptions.cs` — `PasswordRecoveryTokenLifetimeMinutes` (TTL
+  obrigatório, default 60, validado > 0) e `PasswordRecoveryResendCooldownSeconds` (throttle por realm, default 0, ≥ 0).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Commons/UserAccountsServiceCollectionExtensions.cs` — registra
+  `UserAccountActionTokenService` (scoped) e `INotificationGateway` → `NoopNotificationGateway` (`TryAdd`).
+
+**Decisões de design:**
+- **Consumo idempotente é a fonte única de uso-único**: `TryConsumeAsync` é um `ExecuteUpdate` condicional; tentativas
+  concorrentes veem no máximo 1 linha afetada (ADR-017 §2.9 — token usa update condicional, **não** optimistic-retry).
+- **Validar-antes-de-consumir**: uma senha rejeitada (complexidade/histórico) **não** queima o token; o consumo só
+  acontece após a validação passar, deixando o token reutilizável para nova tentativa.
+- **Anti-enumeração**: `RequestPasswordRecovery` devolve o **mesmo** `Result.Ok()` para conta inexistente/inativa/
+  bloqueada/sem-senha/sem-email; só emite/entrega no caminho elegível. O reset usa erro genérico para token
+  inválido/expirado/consumido (o token é o segredo, não revela estado da conta).
+- **Token = hash + ticks UTC**: handles opacos de alta entropia (`CryptoRandom`) guardados como SHA-256; timestamps de
+  comparação em ticks para traduzir o predicado em SQL em todos os providers (limitação do SQLite com `DateTimeOffset`).
+- **Invalidação (Q7/Q13) no reset**: o módulo move `SessionsValidAfter` (marcador passivo) via `ResetPassword`; a
+  **execução ativa** de revogação de sessões/refresh (`ISessionRevocationService`, flags `OnPasswordRecoveryReset`) é da
+  borda e fecha na Fase 8.
+- **Rate limit**: o módulo puro entrega o **cooldown por realm/conta**; o limite por **IP/identificador** depende do
+  contexto HTTP e fica na borda (Q12). Os campos `*IpHash`/`UserAgentHash` do token são colunas prontas para a borda preencher.
+- **Notificação dentro do `Execute`** (antes do commit do unit of work): mover a entrega para **pós-commit** (hook/evento)
+  é refinamento da Fase 9 (eventos/auditoria); registrado, sem impacto nos testes atuais.
+
+**Verificação:** `dotnet build RoyalIdentity.sln` — sucesso, 0 erros. Testes: **Tests.UserAccounts 136/136** (9 novos),
+Tests.Integration 203/203, Tests.Security 116/116, Tests.Identity 13/13, Tests.Pipelines 3/3, Tests.Architecture 15/15 —
+todos verdes. Novos testes: domínio (`ResetPassword` limpa forced-change/lockout e move `SessionsValidAfter`; token
+`IsConsumable`/`Revoke` idempotente), use case (emissão→reset→login com a nova senha; anti-enumeração; uso único; nova
+emissão revoga a anterior; cooldown de reenvio; senha fraca não consome o token; gate `AllowForgotPassword`).
 
 ---
 
@@ -1263,13 +1333,16 @@ claims existente.
 
 **Tarefas:**
 
-- [ ] `EmailVerification` (token com `Purpose=EmailVerification`, vinculado ao `TargetValue`): ao consumir, marca
+- [x] `EmailVerification` (token com `Purpose=EmailVerification`, vinculado ao `TargetValue`): ao consumir, marca
       `IsVerified` do email **alvo** (Q10 — sem `VerifiedAt`); **trocar** o email gera novo objeto não-verificado (não reset).
-- [ ] Confirmar/registrar que `email_verified` deriva do **email primário verificado** (projeção fixa já existe).
-- [ ] Modelar `UserAccountPhone` + `PhoneVerification` + projeções `phone_number`/`phone_number_verified`
-      (Q9 — decidido: telefone entra, como o email, **opcional por realm**; emenda à ADR-015 §2.6). Por ser secundário,
-      é a última entrega da fase.
-- [ ] Sem telas/endpoints user-facing (Q12 — decidido: ficam para o plano de admin/UI).
+      Entregue como `RequestEmailVerification` (emite/entrega) + `ConfirmEmailVerification` (consome + `UserAccount.VerifyEmail`).
+- [x] Confirmar/registrar que `email_verified` deriva do **email primário verificado** (projeção fixa já existe). Coberto por
+      teste de projeção (antes da verificação = `false`; depois = `true`).
+- [x] Modelar `UserAccountPhone` + verificação + projeções `phone_number`/`phone_number_verified`
+      (Q9 — decidido: telefone entra, como o email, **opcional por realm**; realiza a emenda da ADR-017 §2.8 à ADR-015 §2.6).
+      Gated por `EnablePhoneNumber` (default off); projeções fixas default `Include=false`. Entregue como
+      `RequestPhoneVerification`/`ConfirmPhoneVerification` + `UserAccount.AddPhone`/`VerifyPhone` + normalização de telefone.
+- [x] Sem telas/endpoints user-facing (Q12 — decidido: ficam para o plano de admin/UI); entregue só a costura + casos de uso.
 
 **Critérios de aceite:** verificação confirma só o valor alvo (não um valor trocado depois); `email_verified` coerente
 com o primário; telefone conforme Q9; anti-enumeração preservada.
@@ -1279,7 +1352,67 @@ com o primário; telefone conforme Q9; anti-enumeração preservada.
 
 ### Resultado da Fase 6
 
-*a preencher*
+**Concluída (2026-06-24).** A verificação de **email** e **telefone** reusou o modelo de token de ação da Fase 5
+(`UserAccountActionToken` com `Purpose=EmailVerification`/`PhoneVerification`, vinculado ao `TargetValue`), amarrada à
+projeção de claims fixos. O telefone entrou como o email, porém **opcional por realm** (`EnablePhoneNumber`, default off;
+projeções `phone_*` default `Include=false`), realizando a emenda da ADR-017 §2.8 à ADR-015 §2.6 — sem editar a ADR-015
+(o amendment vive na ADR-017). Nenhuma tela/endpoint (Q12); módulo puro sem core/ASP.NET.
+
+**Arquivos novos:**
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountPhone.cs` — entidade espelho do email
+  (`Number`/`NormalizedNumber`/`IsPrimary`/`IsVerified`; **sem** `VerifiedAt`, Q10).
+- `RoyalIdentity.UserAccounts/Infrastructure/Data/Mappings/UserAccountPhoneMap.cs` — tabela `UserAccountPhones`; único
+  `(RealmId, UserAccountId, NormalizedNumber)`.
+- `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/RequestEmailVerification.cs` +
+  `ConfirmEmailVerification.cs` — emite token vinculado ao email normalizado / consome e marca `IsVerified` do **alvo**.
+- `RoyalIdentity.UserAccounts/Features/Accounts/UseCases/RequestPhoneVerification.cs` +
+  `ConfirmPhoneVerification.cs` — idem para telefone, gated por `EnablePhoneNumber`.
+- `RoyalIdentity.UserAccounts/Infrastructure/Gateways/EmailVerificationNotification.cs` +
+  `PhoneVerificationNotification.cs` — payloads de entrega (token bruto trafega uma vez, nunca persistido/logado).
+
+**Arquivos alterados:**
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccount.cs` — coleção `Phones`/`PhoneItems`/`PrimaryPhone`;
+  `VerifyEmail(normalizedAddress, changedAt)` (idempotente; alvo específico); `AddPhone`/`VerifyPhone` (espelham
+  email; movem `SecurityStamp` sem invalidar sessões — gatilho sensível não-comprometimento, Q7).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountEmail.cs` — `MarkVerified()` interno.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Domain/UserAccountEvents.cs` — `UserAccountEmailVerified`,
+  `UserAccountPhoneAdded`, `UserAccountPhoneVerified`.
+- `RoyalIdentity.UserAccounts/Features/Accounts/Commons/IUserAccountNormalizer.cs` +
+  `DefaultUserAccountNormalizer.cs` — `NormalizePhoneNumber` (mantém dígitos + `+` líder).
+- `RoyalIdentity.UserAccounts/Features/Accounts/Commons/UserAccountReader.cs` — grafo inclui `PhoneItems`.
+- `RoyalIdentity.UserAccounts/Infrastructure/Data/Mappings/UserAccountMap.cs` — `HasMany PhoneItems` + `Ignore` de
+  `Phones`/`PrimaryPhone`.
+- `RoyalIdentity.UserAccounts/Options/FixedFieldClaimProjection.cs` — campos `PrimaryPhone`/`PhoneVerified`.
+- `RoyalIdentity.UserAccounts/Features/ScopeProperties/Commons/UserAccountClaimProjector.cs` — projeta `phone_number`/
+  `phone_number_verified` do **telefone primário**.
+- `RoyalIdentity.UserAccounts/Options/UserAccountsRealmOptions.cs` — `EnablePhoneNumber` (copy-on-create) + projeções
+  default de telefone (`Include=false`).
+- `RoyalIdentity.UserAccounts/Options/SecurityLifecycleOptions.cs` — TTLs
+  `EmailVerificationTokenLifetimeMinutes` (1440) e `PhoneVerificationTokenLifetimeMinutes` (15) + validação.
+- `RoyalIdentity.UserAccounts/Infrastructure/Gateways/INotificationGateway.cs` + `NoopNotificationGateway.cs` —
+  `SendEmailVerificationAsync`/`SendPhoneVerificationAsync`.
+
+**Decisões de design:**
+- **Verificação amarrada ao alvo (`TargetValue`)**: `Confirm*` verifica exatamente o valor para o qual o token foi
+  emitido; um valor trocado/adicionado depois **não** é verificado pelo token antigo (atende o critério de aceite).
+- **Trocar gera novo objeto, sem `VerifiedAt`** (Q10): `email_verified`/`phone_number_verified` derivam do primário
+  verificado; um novo email/telefone entra não-verificado, sem reset do existente.
+- **Telefone é opt-in** (Q9): `EnablePhoneNumber` gateia os casos de uso de telefone; as projeções `phone_*` são fixas
+  mas default desligadas (`Include=false`), então realms que não usam telefone não emitem essas claims e a validação de
+  duplicidade não é afetada.
+- **Verificação move só o `SecurityStamp`** (não `SessionsValidAfter`): é gatilho sensível **não-comprometimento**
+  (Q6/Q7) — bookkeeping de claims, não derruba sessão.
+- **Consumo idempotente reusado**: `Confirm*` usa o mesmo `FindConsumableAsync`/`TryConsumeAsync` (update condicional)
+  da Fase 5; falha genérica para token inválido/expirado/consumido (anti-enumeração; o token é o segredo).
+- **Eventos por caso de uso** (Q8): a verificação emite `UserAccountEmailVerified`/`UserAccountPhoneVerified`
+  (despacho/auditoria fecham na Fase 9, como os demais eventos do agregado).
+
+**Verificação:** `dotnet build RoyalIdentity.sln` — sucesso, 0 erros. Testes: **Tests.UserAccounts 144/144** (8 novos),
+Tests.Integration 203/203, Tests.Security 116/116, Tests.Identity 13/13, Tests.Pipelines 3/3, Tests.Architecture 15/15 —
+todos verdes. Novos testes: domínio (`VerifyEmail` alvo/idempotência/ausente; `AddPhone` primário único/duplicado/realm;
+`VerifyPhone` move stamp sem invalidar), use case (email request→confirm→`email_verified=true`; token verifica só o alvo;
+anti-enumeração + uso único; phone request→confirm→projeções `phone_number`/`phone_number_verified`; phone gated por
+`EnablePhoneNumber`).
 
 ---
 

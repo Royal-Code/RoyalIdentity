@@ -26,4 +26,11 @@ public interface IUserAccountNormalizer
 	/// <param name="roleName">The raw role name.</param>
 	/// <returns>The normalized role name.</returns>
 	string NormalizeRoleName(string roleName);
+
+	/// <summary>
+	/// Normalizes a phone number for comparison and uniqueness (formatting stripped to digits and a leading plus).
+	/// </summary>
+	/// <param name="phoneNumber">The raw phone number.</param>
+	/// <returns>The normalized phone number.</returns>
+	string NormalizePhoneNumber(string phoneNumber);
 }

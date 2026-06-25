@@ -92,6 +92,74 @@ public class UserAccountPrimaryEmailChanged(string realmId, string subjectId, st
 }
 
 /// <summary>
+/// Event raised when an account email is verified.
+/// </summary>
+public class UserAccountEmailVerified(string realmId, string subjectId, string address) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
+
+	/// <summary>
+	/// Gets the verified email address.
+	/// </summary>
+	public string Address { get; } = address;
+}
+
+/// <summary>
+/// Event raised when a phone is added.
+/// </summary>
+public class UserAccountPhoneAdded(string realmId, string subjectId, string number, bool isPrimary) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
+
+	/// <summary>
+	/// Gets the phone number.
+	/// </summary>
+	public string Number { get; } = number;
+
+	/// <summary>
+	/// Gets whether the phone became primary.
+	/// </summary>
+	public bool IsPrimary { get; } = isPrimary;
+}
+
+/// <summary>
+/// Event raised when an account phone is verified.
+/// </summary>
+public class UserAccountPhoneVerified(string realmId, string subjectId, string number) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
+
+	/// <summary>
+	/// Gets the verified phone number.
+	/// </summary>
+	public string Number { get; } = number;
+}
+
+/// <summary>
 /// Event raised when a role is added.
 /// </summary>
 public class UserAccountRoleAdded(string realmId, string subjectId, string role) : DomainEventBase

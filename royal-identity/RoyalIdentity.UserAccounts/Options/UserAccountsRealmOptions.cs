@@ -24,6 +24,7 @@ public class UserAccountsRealmOptions
 		AllowUpdateProfile = other.AllowUpdateProfile;
 		AllowChangeEmail = other.AllowChangeEmail;
 		AllowChangeUsername = other.AllowChangeUsername;
+		EnablePhoneNumber = other.EnablePhoneNumber;
 		AllowChangePhoneNumber = other.AllowChangePhoneNumber;
 		AllowDeleteAccount = other.AllowDeleteAccount;
 		EmailAsUsername = other.EmailAsUsername;
@@ -71,6 +72,12 @@ public class UserAccountsRealmOptions
 	/// Gets or sets whether users can change their username.
 	/// </summary>
 	public bool AllowChangeUsername { get; set; } = false;
+
+	/// <summary>
+	/// Gets or sets whether the realm models account phone numbers at all (ADR-017 §2.8). Phone is more optional
+	/// than email: when off, the phone verification flows and the phone claim projections are inert.
+	/// </summary>
+	public bool EnablePhoneNumber { get; set; } = false;
 
 	/// <summary>
 	/// Gets or sets whether users can change their phone number.
@@ -282,6 +289,20 @@ public class UserAccountsRealmOptions
 				Field = FixedAccountField.EmailVerified,
 				ScopeName = "email",
 				ClaimType = "email_verified"
+			},
+			new()
+			{
+				Field = FixedAccountField.PrimaryPhone,
+				ScopeName = "phone",
+				ClaimType = "phone_number",
+				Include = false
+			},
+			new()
+			{
+				Field = FixedAccountField.PhoneVerified,
+				ScopeName = "phone",
+				ClaimType = "phone_number_verified",
+				Include = false
 			},
 			new()
 			{

@@ -49,7 +49,9 @@ public sealed class UserAccountMap : IEntityTypeConfiguration<UserAccount>
 		builder.Ignore(a => a.BlockedReason);
 		builder.Ignore(a => a.BlockedAt);
 		builder.Ignore(a => a.PrimaryEmail);
+		builder.Ignore(a => a.PrimaryPhone);
 		builder.Ignore(a => a.Emails);
+		builder.Ignore(a => a.Phones);
 		builder.Ignore(a => a.Roles);
 		builder.Ignore(a => a.PropertyValues);
 		builder.Ignore(a => a.PasswordHistory);
@@ -62,6 +64,11 @@ public sealed class UserAccountMap : IEntityTypeConfiguration<UserAccount>
 		builder.HasMany<UserAccountEmail>("EmailItems")
 			.WithOne(e => e.UserAccount!)
 			.HasForeignKey(e => e.UserAccountId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.HasMany<UserAccountPhone>("PhoneItems")
+			.WithOne(p => p.UserAccount!)
+			.HasForeignKey(p => p.UserAccountId)
 			.OnDelete(DeleteBehavior.Cascade);
 
 		builder.HasMany<UserAccountRole>("RoleItems")

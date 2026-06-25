@@ -11,6 +11,7 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 public class UserAccount : AggregateRoot<long>
 {
 	private List<UserAccountEmail> emails = [];
+	private List<UserAccountPhone> phones = [];
 	private List<UserAccountPropertyValue> propertyValues = [];
 	private List<UserAccountRole> roles = [];
 	private List<PasswordHistoryEntry> passwordHistory = [];
@@ -152,6 +153,11 @@ public class UserAccount : AggregateRoot<long>
 	public IReadOnlyCollection<UserAccountEmail> Emails => emails;
 
 	/// <summary>
+	/// Gets account phone numbers.
+	/// </summary>
+	public IReadOnlyCollection<UserAccountPhone> Phones => phones;
+
+	/// <summary>
 	/// Gets account roles.
 	/// </summary>
 	public IReadOnlyCollection<UserAccountRole> Roles => roles;
@@ -172,12 +178,26 @@ public class UserAccount : AggregateRoot<long>
 	public UserAccountEmail? PrimaryEmail => EmailItems.FirstOrDefault(e => e.IsPrimary);
 
 	/// <summary>
+	/// Gets the current primary phone, when one exists.
+	/// </summary>
+	public UserAccountPhone? PrimaryPhone => PhoneItems.FirstOrDefault(p => p.IsPrimary);
+
+	/// <summary>
 	/// Collection navigation used by EF Core mapping while public access remains read-only.
 	/// </summary>
 	protected virtual List<UserAccountEmail> EmailItems
 	{
 		get => emails;
 		set => emails = value;
+	}
+
+	/// <summary>
+	/// Collection navigation used by EF Core mapping while public access remains read-only.
+	/// </summary>
+	protected virtual List<UserAccountPhone> PhoneItems
+	{
+		get => phones;
+		set => phones = value;
 	}
 
 	/// <summary>
@@ -312,6 +332,90 @@ public class UserAccount : AggregateRoot<long>
 	}
 
 	/// <summary>
+	/// Marks an account email as verified. Verification targets a specific normalized address: a token issued for
+	/// one value never verifies a value replaced later (ADR-017 §2.8). Idempotent when already verified.
+	/// </summary>
+	/// <param name="normalizedAddress">The normalized email address to verify.</param>
+	/// <param name="changedAt">The mutation timestamp.</param>
+	/// <returns>A result describing whether the email was verified.</returns>
+	public Result VerifyEmail(string normalizedAddress, DateTimeOffset changedAt)
+	{
+		var email = EmailItems.FirstOrDefault(e => e.NormalizedAddress == normalizedAddress);
+		if (email is null)
+		{
+			return Problems.InvalidState("Email does not exist in this account.", nameof(Emails), "user_account.email_missing");
+		}
+
+		if (email.IsVerified)
+		{
+			return Result.Ok();
+		}
+
+		email.MarkVerified();
+		TouchSecurityState(changedAt, invalidateSessions: false);
+		AddEvent(new UserAccountEmailVerified(RealmId, SubjectId, email.Address));
+		return Result.Ok();
+	}
+
+	/// <summary>
+	/// Adds a phone number to the account.
+	/// </summary>
+	/// <param name="phone">The phone entity to attach.</param>
+	/// <param name="changedAt">The mutation timestamp.</param>
+	/// <returns>A result describing whether the phone was added.</returns>
+	public Result AddPhone(UserAccountPhone phone, DateTimeOffset changedAt)
+	{
+		if (phone.RealmId != RealmId)
+		{
+			return Problems.InvalidState("Phone realm does not match account realm.", nameof(RealmId), "user_account.phone_realm_mismatch");
+		}
+
+		if (PhoneItems.Any(p => p.NormalizedNumber == phone.NormalizedNumber))
+		{
+			return Problems.InvalidState("Phone already exists in this account.", nameof(Phones), "user_account.phone_duplicate");
+		}
+
+		var shouldBePrimary = phone.IsPrimary || PhoneItems.Count is 0;
+		if (shouldBePrimary)
+		{
+			ClearPrimaryPhone();
+		}
+
+		phone.AttachTo(this);
+		phone.MarkPrimary(shouldBePrimary);
+		PhoneItems.Add(phone);
+		TouchSecurityState(changedAt, invalidateSessions: false);
+		AddEvent(new UserAccountPhoneAdded(RealmId, SubjectId, phone.Number, phone.IsPrimary));
+		return Result.Ok();
+	}
+
+	/// <summary>
+	/// Marks an account phone as verified. Like <see cref="VerifyEmail"/>, verification targets a specific
+	/// normalized number (ADR-017 §2.8). Idempotent when already verified.
+	/// </summary>
+	/// <param name="normalizedNumber">The normalized phone number to verify.</param>
+	/// <param name="changedAt">The mutation timestamp.</param>
+	/// <returns>A result describing whether the phone was verified.</returns>
+	public Result VerifyPhone(string normalizedNumber, DateTimeOffset changedAt)
+	{
+		var phone = PhoneItems.FirstOrDefault(p => p.NormalizedNumber == normalizedNumber);
+		if (phone is null)
+		{
+			return Problems.InvalidState("Phone does not exist in this account.", nameof(Phones), "user_account.phone_missing");
+		}
+
+		if (phone.IsVerified)
+		{
+			return Result.Ok();
+		}
+
+		phone.MarkVerified();
+		TouchSecurityState(changedAt, invalidateSessions: false);
+		AddEvent(new UserAccountPhoneVerified(RealmId, SubjectId, phone.Number));
+		return Result.Ok();
+	}
+
+	/// <summary>
 	/// Adds a role directly to the account.
 	/// </summary>
 	/// <param name="role">The role entity to attach.</param>
@@ -429,6 +533,22 @@ public class UserAccount : AggregateRoot<long>
 		}
 
 		return SetPassword(newPasswordHash, changedAt, options, PasswordChangeReason.Change);
+	}
+
+	/// <summary>
+	/// Resets the local password from a recovery flow. Unlike <see cref="ChangePassword"/> this does not verify a
+	/// current password — the recovery token already proved control of the account. The reset clears any forced
+	/// change/lockout (via <see cref="SetPassword"/>), archives the previous hash and moves both the
+	/// <see cref="SecurityStamp"/> and <see cref="SessionsValidAfter"/> (a reset is a credential-compromise trigger,
+	/// ADR-017 §2.6/§2.7). The active revocation of existing sessions/refresh tokens is executed at the edge (Fase 8).
+	/// </summary>
+	/// <param name="newPasswordHash">The new password hash.</param>
+	/// <param name="options">The realm password and history policy.</param>
+	/// <param name="changedAt">The mutation timestamp.</param>
+	/// <returns>A result describing whether the password was reset.</returns>
+	public Result ResetPassword(string newPasswordHash, PasswordOptions options, DateTimeOffset changedAt)
+	{
+		return SetPassword(newPasswordHash, changedAt, options, PasswordChangeReason.Reset);
 	}
 
 	/// <summary>
@@ -612,6 +732,14 @@ public class UserAccount : AggregateRoot<long>
 		foreach (var email in EmailItems.Where(e => e.IsPrimary))
 		{
 			email.MarkPrimary(false);
+		}
+	}
+
+	private void ClearPrimaryPhone()
+	{
+		foreach (var phone in PhoneItems.Where(p => p.IsPrimary))
+		{
+			phone.MarkPrimary(false);
 		}
 	}
 

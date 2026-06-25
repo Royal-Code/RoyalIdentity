@@ -81,6 +81,22 @@ public class UserAccountClaimProjector
 
 					break;
 
+				case FixedAccountField.PrimaryPhone:
+					if (account.PrimaryPhone is not null)
+					{
+						Add(values, projection.ScopeName, projection.ClaimType, account.PrimaryPhone.Number);
+					}
+
+					break;
+
+				case FixedAccountField.PhoneVerified:
+					if (account.PrimaryPhone is not null)
+					{
+						Add(values, projection.ScopeName, projection.ClaimType, account.PrimaryPhone.IsVerified ? "true" : "false");
+					}
+
+					break;
+
 				case FixedAccountField.Roles:
 					foreach (var role in account.Roles)
 					{

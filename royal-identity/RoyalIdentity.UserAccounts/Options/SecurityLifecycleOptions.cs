@@ -106,6 +106,10 @@ public class SecurityLifecycleOptions
 		SsoSessionMaxMinutes = other.SsoSessionMaxMinutes;
 		SsoSessionIdleMinutes = other.SsoSessionIdleMinutes;
 		IdleTouchIntervalMinutes = other.IdleTouchIntervalMinutes;
+		PasswordRecoveryTokenLifetimeMinutes = other.PasswordRecoveryTokenLifetimeMinutes;
+		PasswordRecoveryResendCooldownSeconds = other.PasswordRecoveryResendCooldownSeconds;
+		EmailVerificationTokenLifetimeMinutes = other.EmailVerificationTokenLifetimeMinutes;
+		PhoneVerificationTokenLifetimeMinutes = other.PhoneVerificationTokenLifetimeMinutes;
 		AuditCategories = other.AuditCategories;
 	}
 
@@ -173,6 +177,31 @@ public class SecurityLifecycleOptions
 	public int IdleTouchIntervalMinutes { get; set; } = 5;
 
 	/// <summary>
+	/// Gets or sets the lifetime, in minutes, of a password recovery action token (the mandatory TTL — ADR-017
+	/// §2.4). Must be greater than zero.
+	/// </summary>
+	public int PasswordRecoveryTokenLifetimeMinutes { get; set; } = 60;
+
+	/// <summary>
+	/// Gets or sets the minimum interval, in seconds, between password recovery emissions for the same account
+	/// (a per-realm resend throttle). Zero disables the throttle (each request re-issues and revokes the previous
+	/// token). IP/identifier-scoped rate limiting is an edge concern handled by the HTTP layer.
+	/// </summary>
+	public int PasswordRecoveryResendCooldownSeconds { get; set; } = 0;
+
+	/// <summary>
+	/// Gets or sets the lifetime, in minutes, of an email verification action token (TTL — ADR-017 §2.4/§2.8).
+	/// Must be greater than zero.
+	/// </summary>
+	public int EmailVerificationTokenLifetimeMinutes { get; set; } = 1440;
+
+	/// <summary>
+	/// Gets or sets the lifetime, in minutes, of a phone verification action token (TTL — ADR-017 §2.4/§2.8).
+	/// Must be greater than zero.
+	/// </summary>
+	public int PhoneVerificationTokenLifetimeMinutes { get; set; } = 15;
+
+	/// <summary>
 	/// Gets or sets the audit categories enabled for this realm. Default: all security categories on.
 	/// </summary>
 	public SecurityAuditCategories AuditCategories { get; set; } = SecurityAuditCategories.All;
@@ -191,6 +220,26 @@ public class SecurityLifecycleOptions
 	public IReadOnlyList<string> Validate()
 	{
 		List<string> errors = [];
+
+		if (PasswordRecoveryTokenLifetimeMinutes <= 0)
+		{
+			errors.Add("SecurityLifecycle.PasswordRecoveryTokenLifetimeMinutes must be greater than zero.");
+		}
+
+		if (PasswordRecoveryResendCooldownSeconds < 0)
+		{
+			errors.Add("SecurityLifecycle.PasswordRecoveryResendCooldownSeconds cannot be negative.");
+		}
+
+		if (EmailVerificationTokenLifetimeMinutes <= 0)
+		{
+			errors.Add("SecurityLifecycle.EmailVerificationTokenLifetimeMinutes must be greater than zero.");
+		}
+
+		if (PhoneVerificationTokenLifetimeMinutes <= 0)
+		{
+			errors.Add("SecurityLifecycle.PhoneVerificationTokenLifetimeMinutes must be greater than zero.");
+		}
 
 		if (EnableSsoSessionExpiration)
 		{

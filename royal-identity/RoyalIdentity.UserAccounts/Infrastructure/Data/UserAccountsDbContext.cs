@@ -38,6 +38,11 @@ public class UserAccountsDbContext : DbContext
 	/// </summary>
 	public DbSet<PropertyScope> PropertyScopes => Set<PropertyScope>();
 
+	/// <summary>
+	/// Gets the account action token set (password recovery / email-phone verification / forced change).
+	/// </summary>
+	public DbSet<UserAccountActionToken> UserAccountActionTokens => Set<UserAccountActionToken>();
+
 	/// <inheritdoc />
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{
