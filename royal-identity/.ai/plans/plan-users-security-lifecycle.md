@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`######----` **60%** - 6 de 10 fases
+`#######---` **70%** - 7 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - Troca de senha e required action (`MustChangePassword`/expirada) | Concluida |
 | Fase 5 - Recuperação de senha e tokens de ação | Concluida |
 | Fase 6 - Verificação de email e telefone | Concluida |
-| Fase 7 - Lockout, bloqueio administrativo e restrições de acesso | Pendente |
+| Fase 7 - Lockout, bloqueio administrativo e restrições de acesso | Concluida |
 | Fase 8 - Invalidação de sessões/cookies/refresh tokens | Pendente |
 | Fase 9 - Auditoria, eventos e (seletivo) outbox | Pendente |
 | Fase 10 - Concorrência, contract tests e regressão OIDC | Pendente |
@@ -1458,13 +1458,17 @@ implementando primeiro `PasswordLockout` + `AdminBlock`.
 
 **Tarefas:**
 
-- [ ] Implementar Q5 (decidido): `UserAccountBlockState` como AdminBlock pessoal **com janela** `StartsAt`/`EndsAt`;
+- [x] Implementar Q5 (decidido): `UserAccountBlockState` como AdminBlock pessoal **com janela** `StartsAt`/`EndsAt`;
       `AccountAccessRestriction` aposentada; `Geo/Time/Client` registrados no backlog. Lockout temporário permanece
       derivado da credencial.
-- [ ] Caso de uso `UnlockPasswordCredential` (admin) que zera contador/`LockoutEndAt` e incrementa versão (Q11/§10);
+- [x] Caso de uso `UnlockPasswordCredential` (admin) que zera contador/`LockoutEndAt` e incrementa versão (Q11/§10);
       lockout indefinido (`AccountLockoutDurationMinutes = 0`) exige unlock administrativo.
-- [ ] Auditoria de falhas (eventos da Fase 9): `PasswordFailureRegistered`/`PasswordLockoutStarted`/`...Ended`/`...Reset`.
-- [ ] Mapear cada estado ao reason de borda existente (`Inactive`/`Blocked`) sem conflar lockout com admin block.
+- [~] Auditoria de falhas (eventos da Fase 9): lock já emite `UserAccountLocalCredentialLocked`; adicionado o simétrico
+      `UserAccountLocalCredentialUnlocked` (emitido por intenção de negócio, condicional). O catálogo restante de
+      falhas/lockout e o **sink de auditoria/classificação** ficam na Fase 9 (Q8: evento por caso de uso, sem catálogo
+      antecipado).
+- [x] Mapear cada estado ao reason de borda existente (`Inactive`/`Blocked`) sem conflar lockout com admin block
+      (lockout e admin block → `Blocked`; o bloqueio agora é avaliado pela **janela** em `AuthenticateLocal`).
 
 **Critérios de aceite:** lockout temporário e bloqueio administrativo são estados distintos; unlock administrativo
 funciona; contadores corretos sob concorrência; reasons de borda corretos; restrições futuras (`Geo`/`Time`/`Client`)
@@ -1474,7 +1478,27 @@ registradas como design futuro por realm/grupo, sem tabela per-account neste pla
 
 ### Resultado da Fase 7
 
-*a preencher*
+**Concluida (2026-06-25).** Lockout temporário (derivado da credencial) e bloqueio administrativo pessoal são estados
+distintos, sem conflação.
+
+- **Janela de bloqueio (Q5):** `UserAccountBlockState` ganhou `StartsAt`/`EndsAt` (ambos `null` = imediato e
+  indefinido). `IsBlocked` permanece como o *flag configurado*; a efetividade é avaliada por `IsActiveAt(now)` /
+  `UserAccount.IsBlockedAt(now)` no intervalo `[StartsAt, EndsAt)`. `UserAccount.Block` recebe a janela opcional;
+  `AuthenticateLocal` passou a usar `IsBlockedAt(attemptedAt)` (um bloqueio agendado/expirado não rejeita login fora da
+  janela). As comparações de janela rodam **em memória** (grafo já carregado), sem tradução LINQ→SQL — colunas
+  `BlockStartsAt`/`BlockEndsAt` mapeadas como `DateTimeOffset?` simples (sem value converter). `RequestPasswordRecovery`
+  passou a consultar `IsBlockedAt(now)` em vez do flag bruto.
+- **Casos de uso (admin):** `BlockUserAccount` (valida a janela **na feature**, não no agregado: fim posterior ao
+  início efetivo, senão `user_account.block_window_invalid`), `UnblockUserAccount`, e `UnlockPasswordCredential` (zera
+  contador/`LockoutEndAt` + incrementa `Version`; cobre o lockout **indefinido** que só o admin/troca-de-senha limpa).
+  Todos `[Command, WithValidateModel, WithWorkContext]`, retornam `Result`, `NotFound` para subject inexistente.
+- **Evento:** `UserAccountLocalCredentialUnlocked` (simétrico ao `...Locked`), emitido por `UnlockLocalCredential`
+  apenas quando havia lockout a limpar. Catálogo de falhas restante + sink de auditoria ficam na Fase 9.
+- **Restrições `Geo/Time/Client`:** permanecem registradas no backlog (`backlog-001.md`), sem tabela per-account.
+- **Testes:** domínio (janela efetiva só no intervalo; `AuthenticateLocal` honra a janela; unlock de lockout indefinido
+  + evento condicional) e casos de uso (block imediato + unblock; janela futura bloqueando só no intervalo; janela
+  inválida e subject inexistente; unlock de lockout indefinido só por ação admin). Concorrência dos contadores fica na
+  Fase 10.
 
 ---
 

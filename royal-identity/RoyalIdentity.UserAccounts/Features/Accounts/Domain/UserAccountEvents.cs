@@ -239,6 +239,22 @@ public class UserAccountLocalCredentialLocked(string realmId, string subjectId, 
 }
 
 /// <summary>
+/// Event raised when the local credential lockout is cleared by an administrative unlock.
+/// </summary>
+public class UserAccountLocalCredentialUnlocked(string realmId, string subjectId) : DomainEventBase
+{
+	/// <summary>
+	/// Gets the account realm.
+	/// </summary>
+	public string RealmId { get; } = realmId;
+
+	/// <summary>
+	/// Gets the immutable subject identifier.
+	/// </summary>
+	public string SubjectId { get; } = subjectId;
+}
+
+/// <summary>
 /// Event raised when the account is activated.
 /// </summary>
 public class UserAccountActivated(string realmId, string subjectId) : DomainEventBase

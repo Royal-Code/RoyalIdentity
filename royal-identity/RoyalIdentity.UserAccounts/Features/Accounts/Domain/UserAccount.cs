@@ -108,7 +108,9 @@ public class UserAccount : AggregateRoot<long>
 	public DateTimeOffset? BlockedAt => BlockState.BlockedAt;
 
 	/// <summary>
-	/// Gets the administrative block state.
+	/// Gets the administrative block state. <see cref="IsBlocked"/> reflects whether a block is configured; use
+	/// <see cref="IsBlockedAt"/> to evaluate whether it is in effect at a point in time (the block may carry a
+	/// scheduled or expired window).
 	/// </summary>
 	public UserAccountBlockState BlockState { get; private set; } = UserAccountBlockState.Unblocked();
 
@@ -587,7 +589,7 @@ public class UserAccount : AggregateRoot<long>
 			return LocalAuthenticationResult.Failed(LocalAuthenticationFailureReason.Inactive);
 		}
 
-		if (IsBlocked)
+		if (IsBlockedAt(attemptedAt))
 		{
 			return LocalAuthenticationResult.Failed(LocalAuthenticationFailureReason.Blocked);
 		}
@@ -670,15 +672,34 @@ public class UserAccount : AggregateRoot<long>
 	}
 
 	/// <summary>
-	/// Blocks the account.
+	/// Blocks the account, optionally scheduled to a time window (ADR-017 §2.5). With both bounds <c>null</c> the
+	/// block is effective immediately and indefinitely. The window is enforced at authentication time via
+	/// <see cref="IsBlockedAt"/>; window validity is checked by the feature that issues the block.
 	/// </summary>
 	/// <param name="reason">Optional block reason.</param>
 	/// <param name="changedAt">The mutation timestamp.</param>
-	public void Block(string? reason, DateTimeOffset changedAt)
+	/// <param name="startsAt">When the block becomes effective, or <c>null</c> for immediately.</param>
+	/// <param name="endsAt">When the block expires, or <c>null</c> for indefinite.</param>
+	public void Block(
+		string? reason,
+		DateTimeOffset changedAt,
+		DateTimeOffset? startsAt = null,
+		DateTimeOffset? endsAt = null)
 	{
-		BlockState = UserAccountBlockState.Blocked(reason, changedAt);
+		BlockState = UserAccountBlockState.Blocked(reason, changedAt, startsAt, endsAt);
 		Touch(changedAt);
 		AddEvent(new UserAccountBlocked(RealmId, SubjectId, reason));
+	}
+
+	/// <summary>
+	/// Gets whether the account is administratively blocked in effect at <paramref name="now"/>, honoring the
+	/// optional block window. This is distinct from credential lockout (failed-attempt throttling).
+	/// </summary>
+	/// <param name="now">The instant to evaluate.</param>
+	/// <returns><c>true</c> when an administrative block is in effect.</returns>
+	public bool IsBlockedAt(DateTimeOffset now)
+	{
+		return BlockState.IsActiveAt(now);
 	}
 
 	/// <summary>
@@ -698,13 +719,23 @@ public class UserAccount : AggregateRoot<long>
 	}
 
 	/// <summary>
-	/// Clears local credential lockout counters.
+	/// Clears local credential lockout counters (administrative unlock — ADR-017 §2.5). Resets the failed-attempt
+	/// counter and any active lockout, including an indefinite lockout (when the realm sets no lockout duration),
+	/// and bumps the version. Raises <see cref="UserAccountLocalCredentialUnlocked"/> only when there was lockout
+	/// state to clear, so a no-op unlock stays silent.
 	/// </summary>
 	/// <param name="changedAt">The mutation timestamp.</param>
 	public void UnlockLocalCredential(DateTimeOffset changedAt)
 	{
+		var hadLockoutState = LocalCredential.FailedPasswordAttempts > 0 || LocalCredential.LockoutEndAt is not null;
+
 		LocalCredential.ResetFailures();
 		Touch(changedAt);
+
+		if (hadLockoutState)
+		{
+			AddEvent(new UserAccountLocalCredentialUnlocked(RealmId, SubjectId));
+		}
 	}
 
 	internal Result ReplacePropertyValues(

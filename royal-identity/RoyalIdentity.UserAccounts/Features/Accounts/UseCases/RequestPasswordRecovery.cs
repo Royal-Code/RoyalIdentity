@@ -74,10 +74,12 @@ public partial class RequestPasswordRecovery
 		}
 
 		var account = await reader.FindByLoginAsync(RealmId, Login, Options, ct);
+		var now = clock.GetUtcNow();
 
 		// Anti-enumeration: an ineligible request returns the same generic success without issuing a token. Only an
-		// active account that holds a password and has somewhere to deliver the token proceeds.
-		if (account is null || !account.IsActive || account.IsBlocked || !account.LocalCredential.HasPassword)
+		// active account that holds a password and has somewhere to deliver the token proceeds. The administrative
+		// block is evaluated against its window (a scheduled/expired block is not in effect).
+		if (account is null || !account.IsActive || account.IsBlockedAt(now) || !account.LocalCredential.HasPassword)
 		{
 			return Result.Ok();
 		}
@@ -87,8 +89,6 @@ public partial class RequestPasswordRecovery
 		{
 			return Result.Ok();
 		}
-
-		var now = clock.GetUtcNow();
 
 		var cooldown = Options.SecurityLifecycle.PasswordRecoveryResendCooldownSeconds;
 		if (cooldown > 0)

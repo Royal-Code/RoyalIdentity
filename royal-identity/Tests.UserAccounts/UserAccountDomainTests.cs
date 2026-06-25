@@ -460,6 +460,79 @@ public class UserAccountDomainTests
 	}
 
 	[Fact]
+	public void Block_WithWindow_IsEffectiveOnlyWithinWindow_ButStaysConfigured()
+	{
+		var account = CreateAccount();
+		var startsAt = Now.AddDays(2);
+		var endsAt = Now.AddDays(9);
+
+		account.Block("vacation", Now, startsAt, endsAt);
+
+		// The block is configured for the whole time, but only in effect inside [startsAt, endsAt).
+		Assert.True(account.IsBlocked);
+		Assert.Equal(startsAt, account.BlockState.StartsAt);
+		Assert.Equal(endsAt, account.BlockState.EndsAt);
+		Assert.False(account.IsBlockedAt(Now.AddDays(1)));
+		Assert.True(account.IsBlockedAt(startsAt));
+		Assert.True(account.IsBlockedAt(Now.AddDays(5)));
+		Assert.False(account.IsBlockedAt(endsAt));
+		Assert.False(account.IsBlockedAt(Now.AddDays(10)));
+	}
+
+	[Fact]
+	public void Block_WithoutWindow_IsEffectiveImmediatelyAndIndefinitely()
+	{
+		var account = CreateAccount();
+
+		account.Block("administrative", Now);
+
+		Assert.True(account.IsBlockedAt(Now));
+		Assert.True(account.IsBlockedAt(Now.AddYears(5)));
+	}
+
+	[Fact]
+	public void AuthenticateLocal_HonorsBlockWindow()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, options).IsSuccess);
+
+		account.Block("vacation", Now, Now.AddDays(2), Now.AddDays(9));
+
+		// Before the window the credential authenticates; inside it is blocked; after it authenticates again.
+		Assert.True(account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddDays(1)).Success);
+		Assert.Equal(
+			LocalAuthenticationFailureReason.Blocked,
+			account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddDays(5)).Reason);
+		Assert.True(account.AuthenticateLocal("Valid-pass1", options, PasswordHasher, Now.AddDays(10)).Success);
+	}
+
+	[Fact]
+	public void UnlockLocalCredential_ClearsIndefiniteLockout_AndRaisesEventOnlyWhenLocked()
+	{
+		var account = CreateAccount();
+		var options = RelaxedPasswordOptions();
+		options.MaxFailedAccessAttempts = 1;
+		options.AccountLockoutDurationMinutes = 0; // indefinite lockout: only an admin unlock clears it
+		Assert.True(account.SetPassword(PasswordHasher.Hash("Valid-pass1"), Now, options).IsSuccess);
+
+		// One failure trips the indefinite lockout.
+		account.AuthenticateLocal("wrong", options, PasswordHasher, Now.AddMinutes(1));
+		Assert.True(account.LocalCredential.IsLockedOut(options, Now.AddMinutes(2)));
+
+		account.UnlockLocalCredential(Now.AddMinutes(3));
+
+		Assert.Equal(0, account.LocalCredential.FailedPasswordAttempts);
+		Assert.Null(account.LocalCredential.LockoutEndAt);
+		Assert.False(account.LocalCredential.IsLockedOut(options, Now.AddMinutes(4)));
+		Assert.Single(account.DomainEvents.OfType<UserAccountLocalCredentialUnlocked>());
+
+		// A second unlock with nothing to clear stays silent.
+		account.UnlockLocalCredential(Now.AddMinutes(5));
+		Assert.Single(account.DomainEvents.OfType<UserAccountLocalCredentialUnlocked>());
+	}
+
+	[Fact]
 	public void EntitySurface_IsEfFriendly_AndKeepsCollectionsProtected()
 	{
 		AssertProtectedParameterlessConstructor(typeof(UserAccount));

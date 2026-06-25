@@ -41,6 +41,8 @@ public sealed class UserAccountMap : IEntityTypeConfiguration<UserAccount>
 			block.Property(b => b.IsBlocked).HasColumnName("IsBlocked").IsRequired();
 			block.Property(b => b.BlockedReason).HasColumnName("BlockedReason");
 			block.Property(b => b.BlockedAt).HasColumnName("BlockedAt");
+			block.Property(b => b.StartsAt).HasColumnName("BlockStartsAt");
+			block.Property(b => b.EndsAt).HasColumnName("BlockEndsAt");
 		});
 		builder.Navigation(a => a.BlockState).IsRequired();
 

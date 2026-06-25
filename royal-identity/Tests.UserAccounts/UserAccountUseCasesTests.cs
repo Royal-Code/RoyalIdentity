@@ -878,6 +878,89 @@ public class UserAccountUseCasesTests
 		Assert.True((await guard.EnsureValueTypeChangeAllowedAsync(definitionId, PropertyValueType.Integer)).IsSuccess);
 	}
 
+	// ---- block / unlock (admin) ----
+
+	[Fact]
+	public async Task BlockUserAccount_BlocksImmediately_AndUnblockRestoresAuthentication()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		Assert.True((await BlockAsync(provider, "alice")).IsSuccess);
+		Assert.Equal(LocalAuthenticationFailureReason.Blocked, await AuthReason(provider, options, "alice", "secret"));
+
+		Assert.True((await UnblockAsync(provider, "alice")).IsSuccess);
+		Assert.True((await AuthenticateAsync(provider, options, "alice", "secret")).HasValue(out var ok) && ok!.Success);
+	}
+
+	[Fact]
+	public async Task BlockUserAccount_WithFutureWindow_OnlyBlocksDuringWindow()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		Assert.True((await BlockAsync(provider, "alice", "vacation", Start.AddDays(2), Start.AddDays(9))).IsSuccess);
+
+		// Before the window the credential still authenticates (clock is at Start).
+		Assert.True((await AuthenticateAsync(provider, options, "alice", "secret")).HasValue(out var before) && before!.Success);
+
+		// Inside the window the account is blocked.
+		Clock(provider).Now = Start.AddDays(5);
+		Assert.Equal(LocalAuthenticationFailureReason.Blocked, await AuthReason(provider, options, "alice", "secret"));
+
+		// After the window it authenticates again, without an explicit unblock.
+		Clock(provider).Now = Start.AddDays(10);
+		Assert.True((await AuthenticateAsync(provider, options, "alice", "secret")).HasValue(out var after) && after!.Success);
+	}
+
+	[Fact]
+	public async Task BlockUserAccount_RejectsInvalidWindow_AndUnknownSubject()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		AssertProblem(
+			await BlockAsync(provider, "alice", "x", Start.AddDays(5), Start.AddDays(2)),
+			"user_account.block_window_invalid");
+		AssertProblem(await BlockAsync(provider, "ghost"), "user_account.not_found");
+	}
+
+	[Fact]
+	public async Task UnlockPasswordCredential_ClearsIndefiniteLockout_OnlyByAdminAction()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		options.PasswordOptions.MaxFailedAccessAttempts = 1;
+		options.PasswordOptions.AccountLockoutDurationMinutes = 0; // indefinite: only an admin unlock clears it
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		// One failure trips the indefinite lockout.
+		Assert.Equal(LocalAuthenticationFailureReason.InvalidCredentials, await AuthReason(provider, options, "alice", "wrong"));
+		Assert.Equal(LocalAuthenticationFailureReason.LockedOut, await AuthReason(provider, options, "alice", "secret"));
+
+		// Time does not clear an indefinite lockout.
+		Clock(provider).Now = Start.AddDays(30);
+		Assert.Equal(LocalAuthenticationFailureReason.LockedOut, await AuthReason(provider, options, "alice", "secret"));
+
+		Assert.True((await UnlockCredentialAsync(provider, "alice")).IsSuccess);
+		Assert.True((await AuthenticateAsync(provider, options, "alice", "secret")).HasValue(out var ok) && ok!.Success);
+	}
+
+	[Fact]
+	public async Task UnlockPasswordCredential_FailsForUnknownSubject()
+	{
+		await using var provider = BuildProvider();
+
+		AssertProblem(await UnlockCredentialAsync(provider, "ghost"), "user_account.not_found");
+	}
+
 	// ---- harness ----
 
 	private static ServiceProvider BuildProvider()
@@ -984,6 +1067,39 @@ public class UserAccountUseCasesTests
 			CurrentPassword = currentPassword,
 			NewPassword = newPassword
 		}, default);
+	}
+
+	private static async Task<Result> BlockAsync(
+		ServiceProvider provider,
+		string subjectId,
+		string? reason = "administrative",
+		DateTimeOffset? startsAt = null,
+		DateTimeOffset? endsAt = null)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IBlockUserAccountHandler>();
+		return await handler.HandleAsync(new BlockUserAccount
+		{
+			RealmId = "r1",
+			SubjectId = subjectId,
+			Reason = reason,
+			StartsAt = startsAt,
+			EndsAt = endsAt
+		}, default);
+	}
+
+	private static async Task<Result> UnblockAsync(ServiceProvider provider, string subjectId)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IUnblockUserAccountHandler>();
+		return await handler.HandleAsync(new UnblockUserAccount { RealmId = "r1", SubjectId = subjectId }, default);
+	}
+
+	private static async Task<Result> UnlockCredentialAsync(ServiceProvider provider, string subjectId)
+	{
+		using var scope = provider.CreateScope();
+		var handler = scope.ServiceProvider.GetRequiredService<IUnlockPasswordCredentialHandler>();
+		return await handler.HandleAsync(new UnlockPasswordCredential { RealmId = "r1", SubjectId = subjectId }, default);
 	}
 
 	private static void AssertProblem(Result result, string typeId)
