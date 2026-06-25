@@ -1,6 +1,7 @@
 using RoyalCode.SmartCommands;
 using RoyalCode.SmartProblems;
 using RoyalCode.SmartValidations;
+using RoyalCode.WorkContext;
 using RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Infrastructure.Gateways;
@@ -10,12 +11,12 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 
 /// <summary>
 /// Issues an email verification token bound to a specific account email (ADR-017 §2.8). The public outcome is the
-/// same whether or not a token was issued: a token is only created for an existing, non-fictitious, still-unverified
-/// address of an active account. Delivery is returned to the trusted edge as a payload so it can happen after the
-/// generated handler completes the unit of work. The token's <c>TargetValue</c> is the normalized address, so a
-/// value replaced later can never be verified with it.
+/// same whether or not a token was issued: a token is only created and delivered for an existing, non-fictitious,
+/// still-unverified address of an active account. The token's <c>TargetValue</c> is the normalized address, so a
+/// value replaced later can never be verified with it. The raw token never leaves the command boundary.
 /// <para>
-/// This plan delivers the use case + costura only; the HTTP/UI that drives it belongs to the admin/UI plan (Q12).
+/// The unit of work is committed explicitly (<c>SaveAsync</c>) <em>before</em> the notification is dispatched
+/// (ADR-017 §2.9). Delivery is best-effort: a transport failure leaves the persisted token usable for a retry.
 /// </para>
 /// </summary>
 public partial class RequestEmailVerification
@@ -56,20 +57,23 @@ public partial class RequestEmailVerification
 	}
 
 	/// <summary>
-	/// Executes the email verification request use case.
+	/// Executes the email verification request use case. The unit of work is committed here (not by the generated
+	/// handler) so the notification can be dispatched after the token is durably persisted.
 	/// </summary>
-	[Command, WithValidateModel, WithWorkContext]
-	public async Task<Result<EmailVerificationRequestResult>> Execute(
+	[Command, WithValidateModel]
+	public async Task<Result> Execute(
+		IWorkContext work,
 		UserAccountReader reader,
 		UserAccountActionTokenService tokens,
 		IUserAccountNormalizer normalizer,
+		INotificationGateway notifications,
 		TimeProvider clock,
 		CancellationToken ct)
 	{
 		var account = await reader.FindBySubjectIdAsync(RealmId, SubjectId, ct);
 		if (account is null || !account.IsActive)
 		{
-			return EmailVerificationRequestResult.NoDelivery;
+			return Result.Ok();
 		}
 
 		var normalizedAddress = normalizer.NormalizeEmail(Email);
@@ -78,7 +82,7 @@ public partial class RequestEmailVerification
 		// Nothing to verify: missing, fictitious or already verified addresses produce the same generic success.
 		if (email is null || email.IsFictitious || email.IsVerified)
 		{
-			return EmailVerificationRequestResult.NoDelivery;
+			return Result.Ok();
 		}
 
 		var now = clock.GetUtcNow();
@@ -91,13 +95,25 @@ public partial class RequestEmailVerification
 			expiresAt,
 			ct);
 
-		return EmailVerificationRequestResult.Deliver(
-			new EmailVerificationNotification(
-				RealmId,
-				account.SubjectId,
-				account.DisplayName,
-				email.Address,
-				rawToken,
-				expiresAt));
+		await work.SaveAsync(ct);
+
+		var notification = new EmailVerificationNotification(
+			RealmId,
+			account.SubjectId,
+			account.DisplayName,
+			email.Address,
+			rawToken,
+			expiresAt);
+
+		try
+		{
+			await notifications.SendEmailVerificationAsync(notification, ct);
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			// Best-effort delivery: the token is already persisted, so a transport failure can be retried.
+		}
+
+		return Result.Ok();
 	}
 }

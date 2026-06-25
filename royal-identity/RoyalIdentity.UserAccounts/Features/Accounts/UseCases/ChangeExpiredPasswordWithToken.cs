@@ -72,7 +72,7 @@ public partial class ChangeExpiredPasswordWithToken
 		}
 
 		var account = await reader.FindByIdAsync(RealmId, candidate.UserAccountId, ct);
-		if (account is null || candidate.TargetValue != account.SecurityStamp.Value || !StillRequiresPasswordChange(account, now))
+		if (account is null || !StillRequiresPasswordChange(account, now))
 		{
 			return InvalidToken();
 		}

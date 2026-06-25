@@ -1,6 +1,7 @@
 using RoyalCode.SmartCommands;
 using RoyalCode.SmartProblems;
 using RoyalCode.SmartValidations;
+using RoyalCode.WorkContext;
 using RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Infrastructure.Gateways;
@@ -11,13 +12,13 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 /// <summary>
 /// User-facing "forgot my password" flow (gated by <see cref="UserAccountsRealmOptions.AllowForgotPassword"/>).
 /// The public outcome is <em>always the same</em> regardless of whether the account exists or is eligible: a token
-/// is issued only for an active account with a password and a destination address, and a new issuance revokes the
-/// account's previous recovery tokens (ADR-017 §2.4). Delivery is returned to the trusted edge as a payload so it
-/// can happen after the generated handler completes the unit of work. The response never reveals account existence
-/// or state (anti-enumeration). IP/identifier-scoped rate limiting is an edge concern; this module applies the
-/// per-realm resend throttle.
+/// is issued and delivered only for an active account with a password and a destination address, and a new issuance
+/// revokes the account's previous recovery tokens (ADR-017 §2.4). The raw token never leaves the command boundary:
+/// it goes straight to the notification gateway and never into the result or the HTTP response (anti-enumeration).
 /// <para>
-/// This plan delivers the use case + costura only; the HTTP/UI that drives it belongs to the admin/UI plan (Q12).
+/// The unit of work is committed explicitly (<c>SaveAsync</c>) <em>before</em> the notification is dispatched, so a
+/// delivery never references a token that failed to persist (ADR-017 §2.9). Delivery is best-effort: a transport
+/// failure leaves the persisted token usable for a retry and does not fail the request.
 /// </para>
 /// </summary>
 public partial class RequestPasswordRecovery
@@ -52,12 +53,15 @@ public partial class RequestPasswordRecovery
 	}
 
 	/// <summary>
-	/// Executes the password recovery request use case.
+	/// Executes the password recovery request use case. The unit of work is committed here (not by the generated
+	/// handler) so the notification can be dispatched after the token is durably persisted.
 	/// </summary>
-	[Command, WithValidateModel, WithWorkContext]
-	public async Task<Result<PasswordRecoveryRequestResult>> Execute(
+	[Command, WithValidateModel]
+	public async Task<Result> Execute(
+		IWorkContext work,
 		UserAccountReader reader,
 		UserAccountActionTokenService tokens,
+		INotificationGateway notifications,
 		TimeProvider clock,
 		CancellationToken ct)
 	{
@@ -75,13 +79,13 @@ public partial class RequestPasswordRecovery
 		// active account that holds a password and has somewhere to deliver the token proceeds.
 		if (account is null || !account.IsActive || account.IsBlocked || !account.LocalCredential.HasPassword)
 		{
-			return PasswordRecoveryRequestResult.NoDelivery;
+			return Result.Ok();
 		}
 
 		var destination = account.PrimaryEmail;
 		if (destination is null)
 		{
-			return PasswordRecoveryRequestResult.NoDelivery;
+			return Result.Ok();
 		}
 
 		var now = clock.GetUtcNow();
@@ -94,7 +98,7 @@ public partial class RequestPasswordRecovery
 				RealmId, account.Id, ActionTokenPurpose.PasswordRecovery, threshold, now, ct))
 			{
 				// A recent token is still valid; do not flood the user. The response is identical to a fresh issuance.
-				return PasswordRecoveryRequestResult.NoDelivery;
+				return Result.Ok();
 			}
 		}
 
@@ -107,13 +111,28 @@ public partial class RequestPasswordRecovery
 			expiresAt,
 			ct);
 
-		return PasswordRecoveryRequestResult.Deliver(
-			new PasswordRecoveryNotification(
-				RealmId,
-				account.SubjectId,
-				account.DisplayName,
-				destination.Address,
-				rawToken,
-				expiresAt));
+		// Persist the token (and the revocation of any previous one) before delivering, so the link is always backed
+		// by a stored hash.
+		await work.SaveAsync(ct);
+
+		var notification = new PasswordRecoveryNotification(
+			RealmId,
+			account.SubjectId,
+			account.DisplayName,
+			destination.Address,
+			rawToken,
+			expiresAt);
+
+		try
+		{
+			await notifications.SendPasswordRecoveryAsync(notification, ct);
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			// Best-effort delivery: the token is already persisted, so a transport failure can be retried by the
+			// user. Surfacing it as a request error would be misleading (the recovery was registered).
+		}
+
+		return Result.Ok();
 	}
 }

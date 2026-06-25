@@ -502,7 +502,7 @@ public class UserAccountUseCasesTests
 	}
 
 	[Fact]
-	public async Task ChangeExpiredPasswordWithToken_Rejects_WhenSecurityStampChanged()
+	public async Task ChangeExpiredPasswordWithToken_Rejects_WhenChangeNoLongerRequired()
 	{
 		await using var provider = BuildProvider();
 		var options = Options();
@@ -513,7 +513,11 @@ public class UserAccountUseCasesTests
 		var issue = await IssueChangeExpiredPasswordAsync(provider, options, "alice", "secret");
 		Assert.True(issue.HasValue(out var challenge));
 		var token = challenge!.Token;
-		await MutateAccountAsync(provider, "r1", "alice", a => a.RegenerateSecurityStamp(Start.AddMinutes(1)));
+
+		// The required change is satisfied through another path; the pending challenge is no longer valid even though
+		// the token itself has not been consumed (validity is bound to the requirement, not to the SecurityStamp).
+		await MutateAccountAsync(provider, "r1", "alice",
+			a => a.SetPassword("hashed:other", Start.AddMinutes(1), options.PasswordOptions));
 
 		Assert.True((await ChangeExpiredPasswordWithTokenAsync(provider, options, token, "renewed")).IsFailure);
 	}
@@ -529,15 +533,12 @@ public class UserAccountUseCasesTests
 		await CreateAsync(provider, NewCreate(
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", emailVerified: true, password: "secret"));
 
-		var request = await RequestRecoveryAsync(provider, options, "alice");
+		var sent = await RecoveryNotificationAsync(provider, options, "alice");
 
-		Assert.True(request.HasValue(out var recovery));
-		Assert.NotNull(recovery!.Notification);
-		var sent = recovery.Notification!;
 		Assert.False(string.IsNullOrWhiteSpace(sent.Token));
 		Assert.Equal("alice@example.com", sent.Address);
 		Assert.Equal("alice", sent.SubjectId);
-		Assert.Empty(Gateway(provider).Sent);
+		Assert.Single(Gateway(provider).Sent);
 
 		Assert.True((await ResetWithTokenAsync(provider, options, sent.Token, "renewed")).IsSuccess);
 
@@ -552,9 +553,7 @@ public class UserAccountUseCasesTests
 		var options = Options();
 
 		// Same public success as an eligible request, but no token is issued or delivered.
-		var request = await RequestRecoveryAsync(provider, options, "ghost");
-		Assert.True(request.HasValue(out var recovery));
-		Assert.Null(recovery!.Notification);
+		Assert.True((await RequestRecoveryAsync(provider, options, "ghost")).IsSuccess);
 		Assert.Empty(Gateway(provider).Sent);
 	}
 
@@ -614,15 +613,12 @@ public class UserAccountUseCasesTests
 		await CreateAsync(provider, NewCreate(
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", password: "secret"));
 
-		var first = await RequestRecoveryAsync(provider, options, "alice");
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
 		// A second request within the cooldown returns the same success but does not deliver a new token.
-		var second = await RequestRecoveryAsync(provider, options, "alice");
+		Assert.True((await RequestRecoveryAsync(provider, options, "alice")).IsSuccess);
 
-		Assert.True(first.HasValue(out var delivered));
-		Assert.NotNull(delivered!.Notification);
-		Assert.True(second.HasValue(out var throttled));
-		Assert.Null(throttled!.Notification);
-		Assert.Empty(Gateway(provider).Sent);
+		// Exactly one delivery: the first issued and sent, the throttled second sent nothing.
+		Assert.Single(Gateway(provider).Sent);
 	}
 
 	[Fact]
@@ -655,7 +651,7 @@ public class UserAccountUseCasesTests
 		Assert.Equal("false", await EmailVerifiedClaim(provider, options, "alice"));
 
 		var notification = await EmailVerificationNotificationAsync(provider, options, "alice", "alice@example.com");
-		Assert.Empty(Gateway(provider).EmailVerifications);
+		Assert.Single(Gateway(provider).EmailVerifications);
 		var token = notification.Token;
 		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
 
@@ -674,7 +670,7 @@ public class UserAccountUseCasesTests
 			a => a.AddEmail(new UserAccountEmail("r1", "b@example.com", "B@EXAMPLE.COM", false, false, false), Start));
 
 		var notification = await EmailVerificationNotificationAsync(provider, options, "alice", "a@example.com");
-		Assert.Empty(Gateway(provider).EmailVerifications);
+		Assert.Single(Gateway(provider).EmailVerifications);
 		var token = notification.Token;
 		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
 
@@ -696,16 +692,12 @@ public class UserAccountUseCasesTests
 			"r1", "alice", options, subjectId: "alice", email: "alice@example.com", emailVerified: false));
 
 		// Unknown account / unknown email: same generic success, no token issued.
-		var unknownAccount = await RequestEmailVerificationAsync(provider, options, "ghost", "alice@example.com");
-		Assert.True(unknownAccount.HasValue(out var unknownAccountResult));
-		Assert.Null(unknownAccountResult!.Notification);
-		var unknownEmail = await RequestEmailVerificationAsync(provider, options, "alice", "unknown@example.com");
-		Assert.True(unknownEmail.HasValue(out var unknownEmailResult));
-		Assert.Null(unknownEmailResult!.Notification);
+		Assert.True((await RequestEmailVerificationAsync(provider, options, "ghost", "alice@example.com")).IsSuccess);
+		Assert.True((await RequestEmailVerificationAsync(provider, options, "alice", "unknown@example.com")).IsSuccess);
 		Assert.Empty(Gateway(provider).EmailVerifications);
 
 		var notification = await EmailVerificationNotificationAsync(provider, options, "alice", "alice@example.com");
-		Assert.Empty(Gateway(provider).EmailVerifications);
+		Assert.Single(Gateway(provider).EmailVerifications);
 		var token = notification.Token;
 		Assert.True((await ConfirmEmailVerificationAsync(provider, options, token)).IsSuccess);
 		// The token cannot be replayed.
@@ -725,7 +717,7 @@ public class UserAccountUseCasesTests
 			a => a.AddPhone(new UserAccountPhone("r1", "+55 11 99999-0000", "+5511999990000", true, false), Start));
 
 		var notification = await PhoneVerificationNotificationAsync(provider, options, "alice", "+55 11 99999-0000");
-		Assert.Empty(Gateway(provider).PhoneVerifications);
+		Assert.Single(Gateway(provider).PhoneVerifications);
 		var token = notification.Token;
 		Assert.True((await ConfirmPhoneVerificationAsync(provider, options, token)).IsSuccess);
 
@@ -1034,7 +1026,7 @@ public class UserAccountUseCasesTests
 		}, default);
 	}
 
-	private static async Task<Result<PasswordRecoveryRequestResult>> RequestRecoveryAsync(
+	private static async Task<RoyalCode.SmartProblems.Result> RequestRecoveryAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string login)
 	{
 		using var scope = provider.CreateScope();
@@ -1050,10 +1042,11 @@ public class UserAccountUseCasesTests
 	private static async Task<PasswordRecoveryNotification> RecoveryNotificationAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string login)
 	{
-		var request = await RequestRecoveryAsync(provider, options, login);
-		Assert.True(request.HasValue(out var recovery));
-		Assert.NotNull(recovery!.Notification);
-		return recovery.Notification!;
+		var gateway = Gateway(provider);
+		var before = gateway.Sent.Count;
+		Assert.True((await RequestRecoveryAsync(provider, options, login)).IsSuccess);
+		Assert.Equal(before + 1, gateway.Sent.Count);
+		return gateway.Sent[^1];
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> ResetWithTokenAsync(
@@ -1070,7 +1063,7 @@ public class UserAccountUseCasesTests
 		}, default);
 	}
 
-	private static async Task<Result<EmailVerificationRequestResult>> RequestEmailVerificationAsync(
+	private static async Task<RoyalCode.SmartProblems.Result> RequestEmailVerificationAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string email)
 	{
 		using var scope = provider.CreateScope();
@@ -1087,10 +1080,11 @@ public class UserAccountUseCasesTests
 	private static async Task<EmailVerificationNotification> EmailVerificationNotificationAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string email)
 	{
-		var request = await RequestEmailVerificationAsync(provider, options, subjectId, email);
-		Assert.True(request.HasValue(out var result));
-		Assert.NotNull(result!.Notification);
-		return result.Notification!;
+		var gateway = Gateway(provider);
+		var before = gateway.EmailVerifications.Count;
+		Assert.True((await RequestEmailVerificationAsync(provider, options, subjectId, email)).IsSuccess);
+		Assert.Equal(before + 1, gateway.EmailVerifications.Count);
+		return gateway.EmailVerifications[^1];
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> ConfirmEmailVerificationAsync(
@@ -1106,7 +1100,7 @@ public class UserAccountUseCasesTests
 		}, default);
 	}
 
-	private static async Task<Result<PhoneVerificationRequestResult>> RequestPhoneVerificationAsync(
+	private static async Task<RoyalCode.SmartProblems.Result> RequestPhoneVerificationAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string phoneNumber)
 	{
 		using var scope = provider.CreateScope();
@@ -1123,10 +1117,11 @@ public class UserAccountUseCasesTests
 	private static async Task<PhoneVerificationNotification> PhoneVerificationNotificationAsync(
 		ServiceProvider provider, UserAccountsRealmOptions options, string subjectId, string phoneNumber)
 	{
-		var request = await RequestPhoneVerificationAsync(provider, options, subjectId, phoneNumber);
-		Assert.True(request.HasValue(out var result));
-		Assert.NotNull(result!.Notification);
-		return result.Notification!;
+		var gateway = Gateway(provider);
+		var before = gateway.PhoneVerifications.Count;
+		Assert.True((await RequestPhoneVerificationAsync(provider, options, subjectId, phoneNumber)).IsSuccess);
+		Assert.Equal(before + 1, gateway.PhoneVerifications.Count);
+		return gateway.PhoneVerifications[^1];
 	}
 
 	private static async Task<RoyalCode.SmartProblems.Result> ConfirmPhoneVerificationAsync(

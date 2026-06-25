@@ -74,10 +74,15 @@ public partial class IssueChangeExpiredPasswordToken
 		}
 
 		var expiresAt = now.AddMinutes(Options.SecurityLifecycle.ChangeExpiredPasswordTokenLifetimeMinutes);
+
+		// No TargetValue binding: the token's validity at consumption is enforced by single-use + TTL +
+		// revoke-on-reissue and by re-checking that the account still requires a password change. Binding to the
+		// SecurityStamp would over-restrict (any unrelated sensitive change — e.g. an admin email/phone edit — moves
+		// the stamp and would needlessly invalidate a still-required challenge).
 		var rawToken = await tokens.IssueAsync(
 			account,
 			ActionTokenPurpose.ChangeExpiredPassword,
-			account.SecurityStamp.Value,
+			targetValue: null,
 			now,
 			expiresAt,
 			ct);
