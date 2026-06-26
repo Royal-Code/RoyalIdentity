@@ -67,10 +67,10 @@ public partial class BlockUserAccount
 		if (EndsAt is not null)
 		{
 			var effectiveStart = StartsAt ?? now;
-			if (EndsAt.Value <= effectiveStart)
+			if (EndsAt.Value <= effectiveStart || EndsAt.Value <= now)
 			{
 				return Problems.InvalidParameter(
-					"The block window end must be after its start.",
+					"The block window end must be after its start and still be in the future.",
 					nameof(EndsAt),
 					"user_account.block_window_invalid");
 			}

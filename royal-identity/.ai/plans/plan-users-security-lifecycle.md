@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`#######---` **70%** - 7 de 10 fases
+`#########-` **90%** - 9 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -15,8 +15,8 @@
 | Fase 5 - Recuperação de senha e tokens de ação | Concluida |
 | Fase 6 - Verificação de email e telefone | Concluida |
 | Fase 7 - Lockout, bloqueio administrativo e restrições de acesso | Concluida |
-| Fase 8 - Invalidação de sessões/cookies/refresh tokens | Pendente |
-| Fase 9 - Auditoria, eventos e (seletivo) outbox | Pendente |
+| Fase 8 - Invalidação de sessões/cookies/refresh tokens | Concluida |
+| Fase 9 - Auditoria, eventos e (seletivo) outbox | Concluida |
 | Fase 10 - Concorrência, contract tests e regressão OIDC | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -1510,36 +1510,70 @@ Q14 (`ExpiresAt`/`UserSsoLifetime`/cookie lifetime), Q15 (seam do stamp).
 **O que/como:** validar sessões por `SessionsValidAfter` e executar a política de invalidação por realm sobre
 sessões/cookies/refresh tokens, mantendo `SecurityStamp` capturado para cookie/claims e rastreabilidade.
 
+> **Refinamento de fronteira (decisão do autor, 2026-06-25):** o **ciclo de sessão é responsabilidade do IdP**, não do
+> módulo de usuários (a sessão é um conceito do core — `UserSession`). Por isso as options de sessão
+> (`EnableSsoSessionExpiration`, `SsoSessionMax/Idle`, `IdleTouchInterval` e o gate passivo
+> `EnableSessionInvalidationByState`) **saíram do módulo** (`SecurityLifecycleOptions`) e foram para o **core**
+> (`RealmOptions.Session` — novo `SessionOptions`). Isto **emenda a Fase 1 e a ADR-017 §2.12/§2.13**. Permanecem no
+> módulo: os flags `On*` de revogação **ativa** por gatilho de credencial (Q7), os token lifetimes e o audit.
+
 **Tarefas:**
 
-- [ ] `IUserSessionService.IsSessionValidAsync = ativo && não-expirado(ExpiresAt, Realm-only — Q14) && (policy ?
+- [x] `IUserSessionService.IsSessionValidAsync = ativo && não-expirado(ExpiresAt, Realm-only — Q14) && (policy ?
       session.StartedAt >= conta.SessionsValidAfter : true)`, lendo o estado atual via `IUserSecurityStateProvider`
       (Q15) quando a policy exigir; cookie `OnValidatePrincipal` segue a costura por request.
-- [ ] Validação de composição Q15 na `.Integration`: se `SecurityLifecycle.RequiresSecurityStateProvider` estiver `true`,
-      o realm deve ter `IUserSecurityStateProvider`; ausência é erro de configuração.
-- [ ] Normalizar precisão/clock de `StartedAt` e `SessionsValidAfter` entre PostgreSql/Sqlite (`TimeProvider`/server time)
-      e cobrir o caso de fronteira `StartedAt == SessionsValidAfter`.
-- [ ] Emenda no core (Q13 — decidido): `ISessionRevocationService` dedicado, sobre o store de sessão + `IRefreshTokenStore`,
-      com revogação por subject de sessões e refresh tokens; implementar no fake in-memory.
-- [ ] `.Integration` traduz a política do módulo (Q7) em chamadas a `ISessionRevocationService` (idempotentes, pós-commit).
-- [ ] Aplicar os defaults por gatilho ratificados em Q7 (troca voluntária/reset/admin/import); enforcement via `SessionsValidAfter`.
-- [ ] `UserSession.ExpiresAt` ganha comportamento **Realm-only** (SSO session max/idle por realm — Q14); `UserSsoLifetime`
-      por client inalterado no `PromptLoginDecorator`; **expiração de senha não derruba sessão ativa**.
-- [ ] Idle touch com throttle (Q14): `LastSeenAt` só é atualizado se `LastSeenAt <= now - IdleTouchInterval`; quando tocar,
-      recalcular `ExpiresAt = min(StartedAt + SsoSessionMax, now + SsoSessionIdle)` por update condicional/idempotente.
-      Options devem garantir `IdleTouchInterval > 0` e `< SsoSessionIdle` quando idle estiver ativo.
+- [x] Validação de composição Q15: se `Session.RequiresSecurityStateProvider` (core) estiver `true` e o provider de
+      usuários **não** expuser `IUserSecurityStateProvider`, é **erro de configuração** — aplicado por *fail-fast* em
+      `IsSessionValidAsync` (evita policy silenciosamente inoperante). O fake in-memory **não** expõe a capacidade
+      (degrada); o módulo **sempre** expõe.
+- [x] Caso de fronteira `StartedAt == SessionsValidAfter` coberto (sessão **válida**: `StartedAt >= marker`).
+      Precisão/clock entre providers fica para a persistência real (in-memory usa `TimeProvider`).
+- [x] Emenda no core (Q13 — decidido): `ISessionRevocationService` dedicado (`DefaultSessionRevocationService`), sobre
+      `IUserSessionStore` (+ `EndSessionsForSubjectAsync`) e `IRefreshTokenStore` (+ `RemoveBySubjectAsync`), revogação
+      por subject de sessões e refresh tokens; implementado no fake in-memory.
+- [x] `.Integration` traduz a política do módulo (Q7) em chamadas a `ISessionRevocationService` via
+      `SessionInvalidationExecutor` (idempotente, pós-commit). **O gatilho** que chama o executor (use case de
+      credencial / evento `SecurityInvalidationRequested`) é cabeado com os eventos de conta (**Fase 9**) / endpoints
+      (Q12) — não há orquestrador hoje, então a Fase 8 entrega o **mecanismo** pronto.
+- [x] Defaults por gatilho ratificados em Q7 permanecem no módulo (`On*`); enforcement passivo via `SessionsValidAfter`
+      no core; **expiração de senha não derruba sessão ativa** (apenas barra nova autenticação).
+- [x] `UserSession.ExpiresAt` ganhou comportamento **Realm-only** (definido no sign-in a partir de `RealmOptions.Session`);
+      `UserSsoLifetime` por client inalterado no `PromptLoginDecorator` (ortogonal); `UserSession.LastSeenAt` adicionado.
+- [x] Idle touch com throttle (Q14): a validação só persiste (`IUserSessionStore.TouchAsync`) quando
+      `now - LastSeenAt >= IdleTouchInterval`; ao tocar, `ExpiresAt = min(StartedAt + SsoSessionMax, now + SsoSessionIdle)`
+      (nunca passa do max). Guardas em `SessionOptions.Validate()` (`IdleTouchInterval > 0` e `< SsoSessionIdle`).
 
 **Critérios de aceite:** sessão iniciada antes de `SessionsValidAfter` é inválida quando a policy exige; idle touch não
 gera escrita por request e nunca estende além do SSO session max; revogar outras/todas as sessões e refresh tokens
 funciona por subject; execução idempotente e pós-commit; sessões ativas seguem emitindo token quando a policy não pede
 invalidação (Decisão fechada §Senha).
 
-**Testes:** integração (`SessionsValidAfter` invalida sessão/cookie; idle touch com throttle e limite max; revogação por
-subject; refresh revogado não renova); regressão OIDC.
+**Testes:** integração (`SessionsValidAfter` invalida sessão; idle touch com throttle e limite max; revogação por
+subject; refresh revogado por subject; composição = erro); regressão OIDC.
 
 ### Resultado da Fase 8
 
-*a preencher*
+**Concluida (2026-06-25).** Validação de sessão e invalidação por estado/expiração viraram comportamento do core,
+mantendo o módulo independente.
+
+- **Fronteira (decisão do autor):** options de **ciclo de sessão** movidas do módulo para o core
+  (`RoyalIdentity/Options/SessionOptions.cs` em `RealmOptions.Session`, com copy-on-create e `Validate()`). O módulo
+  `SecurityLifecycleOptions` ficou só com `On*` (revogação ativa por gatilho — Q7), token lifetimes e audit. Emenda a
+  Fase 1 / ADR-017 §2.12/§2.13.
+- **`UserSession`:** `LastSeenAt` adicionado; `ExpiresAt` ganhou comportamento (definido no sign-in a partir de
+  `RealmOptions.Session`, idle puxa para `min(StartedAt+Max, ref+Idle)`).
+- **`IsSessionValidAsync`** (`DefaultUserSessionService`): `ativo && não-expirado(ExpiresAt) && (policy ? StartedAt >=
+  SessionsValidAfter : true)` + idle touch com throttle via `IUserSessionStore.TouchAsync`. A capacidade
+  `IUserSecurityStateProvider` (core, opcional, realm-bound via `IUserDirectory.GetSecurityStateProvider`) lê
+  stamp/`SessionsValidAfter`; o módulo **gateia** `SessionsValidAfter` pela policy do realm (null = não enforça);
+  policy on + capacidade ausente = **erro de configuração** (fail-fast — Q15.3).
+- **Captura do stamp:** `LoginFlowService` lê `IUserSecurityStateProvider` no sign-in e grava `UserSession.SecurityStamp`.
+- **Revogação ativa (Q13):** `ISessionRevocationService` + `DefaultSessionRevocationService` sobre os stores (novos
+  `IUserSessionStore.EndSessionsForSubjectAsync` e `IRefreshTokenStore.RemoveBySubjectAsync`, implementados no fake).
+  A `.Integration` traduz `SessionInvalidation` (módulo) → `SessionRevocation` (core) via `SessionInvalidationExecutor`.
+  O **gatilho** (chamar o executor quando uma credencial muda) é cabeado na **Fase 9** (eventos) / endpoints (Q12).
+- **Suite completa verde:** Tests.Integration 221/221, Tests.UserAccounts 168/168, Tests.Security 116/116,
+  Tests.Architecture 15/15, Tests.Identity 13/13, Tests.Pipelines 3/3.
 
 ---
 
@@ -1550,14 +1584,27 @@ subject; refresh revogado não renova); regressão OIDC.
 **O que/como:** emitir e classificar os eventos de segurança nas três categorias (domínio/auditoria/outbox), sem criar
 infraestrutura de outbox além do que Q8 autorizar.
 
+> **Achado de mecânica (2026-06-25):** a stack RoyalCode em uso (WorkContext 0.8.9 / DomainEvents 0.8.1) **não
+> despacha** os eventos de domínio automaticamente (o v2 os deixou só acumulados no agregado), e os eventos do módulo
+> (`DomainEventBase`) são **incompatíveis** com o `Event` do `IEventDispatcher` do core. Decisão do autor: **despacho
+> próprio do módulo via override do `DbContext.SaveChangesAsync`** (coleta + dispatch pós-commit), mantendo o módulo
+> puro; a auditoria é um **observer** do módulo, com a policy de categorias por realm vinda da `.Integration`.
+
 **Tarefas:**
 
-- [ ] Emitir eventos de domínio **por caso de uso** (sem catálogo antecipado — Q8), chaveados por `(RealmId, SubjectId)`,
-      despachados via `IEventDispatcher` do core.
-- [ ] `ISecurityAuditSink` + `SecurityAuditOptions` por realm, auditoria **por categorias** (`Credential`, `Recovery`,
-      `Verification`, `Lockout`, `AdminSecurity`, `SessionRevocation`, `AuthenticationFailure`) com **defaults segurança-on / resto-off** (Q8).
-- [ ] **Sem outbox** neste plano; **store durável de auditoria diferido** ao `plan-data-persistence` (§2) — por ora, sink de log/in-memory.
-- [ ] Garantir que eventos só são publicados **após o commit** (§10); **token bruto nunca** entra em evento/auditoria/log.
+- [x] Emitir eventos de domínio **por caso de uso** (sem catálogo antecipado — Q8), chaveados por `(RealmId, SubjectId)`,
+      **despachados pós-commit** pelo override de `UserAccountsDbContext.SaveChangesAsync` → `IDomainEventDispatcher`
+      (módulo) → `IDomainEventObserver`s. (O bridge para o `IEventDispatcher` do core, se necessário p/ eventos de
+      integração, fica disponível pela mesma costura — não havia consumidor de core a alimentar nesta fase.)
+- [x] `ISecurityAuditSink` + auditoria **por categorias** (`Credential`, `Recovery`, `Verification`, `Lockout`,
+      `AdminSecurity`, `SessionRevocation`, `AuthenticationFailure`) com **defaults segurança-on / resto-off** (Q8). As
+      categorias por realm vivem em `SecurityLifecycleOptions.AuditCategories`; o `SecurityAuditObserver` mapeia evento →
+      entrada e gateia por `ISecurityAuditPolicyProvider` (default all-on; a `.Integration` resolve por realm via
+      `RealmSecurityAuditPolicyProvider`).
+- [x] **Sem outbox** neste plano; **store durável de auditoria diferido** ao `plan-data-persistence` (§2) — por ora,
+      `NoopSecurityAuditSink` (default) e um sink de gravação nos testes.
+- [x] Eventos publicados **após o commit** (coleta antes, dispatch depois de `base.SaveChangesAsync`); **token bruto
+      nunca** entra em evento/auditoria (a entrada carrega só `RealmId`/`SubjectId`/categoria/tipo/`OccurredAt`).
 
 **Critérios de aceite:** eventos certos disparam nos pontos certos; classificação coerente; nenhuma máquina de outbox
 introduzida sem decisão Q8; sem ruído de outbox para login/falha.
@@ -1566,7 +1613,26 @@ introduzida sem decisão Q8; sem ruído de outbox para login/falha.
 
 ### Resultado da Fase 9
 
-*a preencher*
+**Concluida (2026-06-25).** Eventos de domínio passam a ser **despachados** e os de segurança **auditados por
+categoria**, sem outbox e sem quebrar a pureza do módulo.
+
+- **Despacho (decisão do autor):** override de `UserAccountsDbContext.SaveChangesAsync` coleta os `DomainEvents` dos
+  agregados rastreados, limpa-os, commita e **despacha pós-commit** via `IDomainEventDispatcher` (módulo) →
+  `IDomainEventObserver`s. O dispatcher é injetado por DI no ctor do DbContext (validado: o WorkContext constrói o
+  context pelo SP do escopo). Resolve o achado de que a stack RoyalCode não auto-despacha.
+- **Auditoria (Q8):** `ISecurityAuditSink` + `SecurityAuditEntry` (sem segredos) + `NoopSecurityAuditSink` (default);
+  `SecurityAuditObserver` mapeia os eventos existentes para categorias (`UserAccountPasswordChanged`→Credential;
+  `...Locked`/`...Unlocked`→Lockout; `Blocked`/`Unblocked`→AdminSecurity; `EmailVerified`/`PhoneVerified`→Verification)
+  e gateia por `ISecurityAuditPolicyProvider`. A `.Integration` registra `RealmSecurityAuditPolicyProvider` (lê
+  `SecurityLifecycle.AuditCategories` do realm via resolver), substituindo o default all-on.
+- **Sem catálogo antecipado (Q8):** só os eventos que já existem são mapeados; novos nascem com novos casos de uso.
+  Categorias `Recovery`/`AuthenticationFailure` ainda não têm evento de agregado correspondente (a emissão de token de
+  recuperação e a falha genérica de senha não geram evento) — ficam para quando um evento de intenção surgir.
+- **Gatilho de revogação ativa (pendência da Fase 8):** continua diferido — depende de contexto de borda (o `sid`
+  atual a preservar) que só os endpoints (Q12) têm; a garantia de segurança já é dada **passivamente** por
+  `SessionsValidAfter` (Fase 8). O mecanismo (`SessionInvalidationExecutor`) está pronto para esse gatilho.
+- **Suite completa verde:** Tests.UserAccounts 173/173, Tests.Integration 222/222, Tests.Security 116/116,
+  Tests.Architecture 15/15, Tests.Identity 13/13, Tests.Pipelines 3/3.
 
 ---
 

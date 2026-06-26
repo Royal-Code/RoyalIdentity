@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
+using RoyalIdentity.UserAccounts.Infrastructure.Events;
 
 namespace RoyalIdentity.UserAccounts.Sqlite;
 
@@ -12,8 +13,10 @@ public class UserAccountsSqliteDbContext : UserAccountsDbContext
 	/// Creates the context.
 	/// </summary>
 	/// <param name="options">The context options.</param>
-	public UserAccountsSqliteDbContext(DbContextOptions<UserAccountsSqliteDbContext> options)
-		: base(options)
+	/// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
+	public UserAccountsSqliteDbContext(
+		DbContextOptions<UserAccountsSqliteDbContext> options, IDomainEventDispatcher dispatcher)
+		: base(options, dispatcher)
 	{
 	}
 

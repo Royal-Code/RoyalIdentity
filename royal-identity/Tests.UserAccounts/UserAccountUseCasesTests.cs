@@ -932,6 +932,23 @@ public class UserAccountUseCasesTests
 	}
 
 	[Fact]
+	public async Task BlockUserAccount_RejectsAlreadyExpiredWindow_WithoutPersistingBlock()
+	{
+		await using var provider = BuildProvider();
+		var options = Options();
+		options.AllowProvidedSubjectId = true;
+		await CreateAsync(provider, NewCreate("r1", "alice", options, subjectId: "alice", password: "secret"));
+
+		AssertProblem(
+			await BlockAsync(provider, "alice", "expired", Start.AddDays(-10), Start.AddDays(-1)),
+			"user_account.block_window_invalid");
+		AssertProblem(
+			await BlockAsync(provider, "alice", "expired", endsAt: Start.AddMinutes(-1)),
+			"user_account.block_window_invalid");
+		Assert.True((await AuthenticateAsync(provider, options, "alice", "secret")).HasValue(out var ok) && ok!.Success);
+	}
+
+	[Fact]
 	public async Task UnlockPasswordCredential_ClearsIndefiniteLockout_OnlyByAdminAction()
 	{
 		await using var provider = BuildProvider();

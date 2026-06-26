@@ -25,6 +25,18 @@ public class RefreshTokenStore : IRefreshTokenStore
         return Task.CompletedTask;
     }
 
+    public Task<int> RemoveBySubjectAsync(string subjectId, CancellationToken ct)
+    {
+        var count = 0;
+        foreach (var entry in refreshTokens)
+        {
+            if (entry.Value.SubjectId == subjectId && refreshTokens.TryRemove(entry.Key, out _))
+                count++;
+        }
+
+        return Task.FromResult(count);
+    }
+
     public Task StoreAsync(RefreshToken token, CancellationToken ct)
     {
         refreshTokens.TryAdd(token.Token, token);

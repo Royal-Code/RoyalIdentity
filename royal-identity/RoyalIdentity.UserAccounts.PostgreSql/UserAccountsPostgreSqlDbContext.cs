@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
+using RoyalIdentity.UserAccounts.Infrastructure.Events;
 
 namespace RoyalIdentity.UserAccounts.PostgreSql;
 
@@ -13,8 +14,10 @@ public class UserAccountsPostgreSqlDbContext : UserAccountsDbContext
 	/// Creates the context.
 	/// </summary>
 	/// <param name="options">The context options.</param>
-	public UserAccountsPostgreSqlDbContext(DbContextOptions<UserAccountsPostgreSqlDbContext> options)
-		: base(options)
+	/// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
+	public UserAccountsPostgreSqlDbContext(
+		DbContextOptions<UserAccountsPostgreSqlDbContext> options, IDomainEventDispatcher dispatcher)
+		: base(options, dispatcher)
 	{
 	}
 

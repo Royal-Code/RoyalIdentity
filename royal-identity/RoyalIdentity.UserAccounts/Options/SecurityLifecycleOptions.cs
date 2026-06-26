@@ -80,7 +80,9 @@ public enum SecurityAuditCategories
 
 /// <summary>
 /// Realm-scoped account security lifecycle policies owned by the UserAccounts module (ADR-017 §2.13).
-/// Invalidation, SSO session lifetime and audit categories live here as a single-owner block.
+/// Per-credential-trigger active revocation policy (Q7), action-token lifetimes and audit categories live here as a
+/// single-owner block. The <b>session lifecycle</b> (SSO expiration/idle and the passive <c>SessionsValidAfter</c>
+/// enforcement gate) is an IdP concern and lives in the core <c>RealmOptions.Session</c> (ADR-017 §2.12, amended).
 /// </summary>
 public class SecurityLifecycleOptions
 {
@@ -101,11 +103,6 @@ public class SecurityLifecycleOptions
 		OnAdminPasswordReset = other.OnAdminPasswordReset;
 		OnAdminMustChangePassword = other.OnAdminMustChangePassword;
 		OnSensitiveProfileChange = other.OnSensitiveProfileChange;
-		EnableSessionInvalidationByState = other.EnableSessionInvalidationByState;
-		EnableSsoSessionExpiration = other.EnableSsoSessionExpiration;
-		SsoSessionMaxMinutes = other.SsoSessionMaxMinutes;
-		SsoSessionIdleMinutes = other.SsoSessionIdleMinutes;
-		IdleTouchIntervalMinutes = other.IdleTouchIntervalMinutes;
 		PasswordRecoveryTokenLifetimeMinutes = other.PasswordRecoveryTokenLifetimeMinutes;
 		PasswordRecoveryResendCooldownSeconds = other.PasswordRecoveryResendCooldownSeconds;
 		ChangeExpiredPasswordTokenLifetimeMinutes = other.ChangeExpiredPasswordTokenLifetimeMinutes;
@@ -147,37 +144,6 @@ public class SecurityLifecycleOptions
 	public SessionInvalidation OnSensitiveProfileChange { get; set; } = SessionInvalidation.None;
 
 	/// <summary>
-	/// Gets or sets whether sessions are validated passively by <c>SessionsValidAfter</c> (a session started
-	/// before the marker is invalid). Default off preserves current behavior. When on, the user provider must
-	/// expose the security-state capability — see <see cref="RequiresSecurityStateProvider"/>.
-	/// </summary>
-	public bool EnableSessionInvalidationByState { get; set; } = false;
-
-	/// <summary>
-	/// Gets or sets whether the realm enforces an SSO session lifetime (gives behavior to
-	/// <c>UserSession.ExpiresAt</c>, Realm-only — ADR-017 §2.12). Default off preserves today's reserved field.
-	/// </summary>
-	public bool EnableSsoSessionExpiration { get; set; } = false;
-
-	/// <summary>
-	/// Gets or sets the SSO session maximum lifetime, in minutes, used when
-	/// <see cref="EnableSsoSessionExpiration"/> is on.
-	/// </summary>
-	public int SsoSessionMaxMinutes { get; set; } = 600;
-
-	/// <summary>
-	/// Gets or sets the SSO session idle timeout, in minutes, used when <see cref="EnableSsoSessionExpiration"/>
-	/// is on. Zero disables the idle timeout (only the max lifetime applies).
-	/// </summary>
-	public int SsoSessionIdleMinutes { get; set; } = 0;
-
-	/// <summary>
-	/// Gets or sets the minimum window, in minutes, between idle touches of <c>LastSeenAt</c>. Throttles writes:
-	/// the store only updates when the last touch is older than this window.
-	/// </summary>
-	public int IdleTouchIntervalMinutes { get; set; } = 5;
-
-	/// <summary>
 	/// Gets or sets the lifetime, in minutes, of a password recovery action token (the mandatory TTL — ADR-017
 	/// §2.4). Must be greater than zero.
 	/// </summary>
@@ -214,13 +180,6 @@ public class SecurityLifecycleOptions
 	public SecurityAuditCategories AuditCategories { get; set; } = SecurityAuditCategories.All;
 
 	/// <summary>
-	/// Gets whether this realm requires a security-state provider capability (ADR-017 §2.13 / Q15). When true and
-	/// the user provider does not expose <c>IUserSecurityStateProvider</c>, the composition is a configuration
-	/// error (enforced by the integration, where the core port is known).
-	/// </summary>
-	public bool RequiresSecurityStateProvider => EnableSessionInvalidationByState;
-
-	/// <summary>
 	/// Validates internal consistency of the lifecycle options.
 	/// </summary>
 	/// <returns>A list of configuration errors. Empty means valid.</returns>
@@ -251,42 +210,6 @@ public class SecurityLifecycleOptions
 		if (PhoneVerificationTokenLifetimeMinutes <= 0)
 		{
 			errors.Add("SecurityLifecycle.PhoneVerificationTokenLifetimeMinutes must be greater than zero.");
-		}
-
-		if (EnableSsoSessionExpiration)
-		{
-			if (SsoSessionMaxMinutes <= 0)
-			{
-				errors.Add("SecurityLifecycle.SsoSessionMaxMinutes must be greater than zero when SSO session expiration is enabled.");
-			}
-
-			if (SsoSessionIdleMinutes < 0)
-			{
-				errors.Add("SecurityLifecycle.SsoSessionIdleMinutes cannot be negative.");
-			}
-
-			if (SsoSessionIdleMinutes > 0 && SsoSessionMaxMinutes > 0 && SsoSessionIdleMinutes > SsoSessionMaxMinutes)
-			{
-				errors.Add("SecurityLifecycle.SsoSessionIdleMinutes cannot be greater than SsoSessionMaxMinutes.");
-			}
-
-			if (IdleTouchIntervalMinutes < 0)
-			{
-				errors.Add("SecurityLifecycle.IdleTouchIntervalMinutes cannot be negative.");
-			}
-
-			if (SsoSessionIdleMinutes > 0)
-			{
-				if (IdleTouchIntervalMinutes <= 0)
-				{
-					errors.Add("SecurityLifecycle.IdleTouchIntervalMinutes must be greater than zero when SsoSessionIdleMinutes is enabled.");
-				}
-
-				if (IdleTouchIntervalMinutes >= SsoSessionIdleMinutes)
-				{
-					errors.Add("SecurityLifecycle.IdleTouchIntervalMinutes must be less than SsoSessionIdleMinutes when idle timeout is enabled.");
-				}
-			}
 		}
 
 		return errors;

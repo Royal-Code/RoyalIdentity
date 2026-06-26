@@ -17,6 +17,8 @@ public class UserAccountsPersistenceTests
 	public async Task UserAccount_RoundTrips_WithCredentialEmailsRolesAndBlockState()
 	{
 		await using var provider = BuildProvider();
+		var blockStartsAt = Now.AddDays(2);
+		var blockEndsAt = Now.AddDays(9);
 		long accountId;
 
 		await using (var write = NewContext(provider))
@@ -28,7 +30,7 @@ public class UserAccountsPersistenceTests
 				new UserAccountEmail("realm-a", "alice.alt@example.com", "ALICE.ALT@EXAMPLE.COM", false, false, false), Now).IsSuccess);
 			Assert.True(account.AddRole(new UserAccountRole("realm-a", "admin", "ADMIN"), Now).IsSuccess);
 			account.SetPassword("hashed-secret", Now, new PasswordOptions());
-			account.Block("fraud", Now.AddMinutes(1));
+			account.Block("fraud", Now.AddMinutes(1), blockStartsAt, blockEndsAt);
 
 			write.UserAccounts.Add(account);
 			await write.SaveChangesAsync();
@@ -51,6 +53,11 @@ public class UserAccountsPersistenceTests
 		Assert.True(loaded.IsBlocked);
 		Assert.Equal("fraud", loaded.BlockedReason);
 		Assert.Equal(Now.AddMinutes(1), loaded.BlockedAt);
+		Assert.Equal(blockStartsAt, loaded.BlockState.StartsAt);
+		Assert.Equal(blockEndsAt, loaded.BlockState.EndsAt);
+		Assert.False(loaded.IsBlockedAt(Now.AddDays(1)));
+		Assert.True(loaded.IsBlockedAt(Now.AddDays(5)));
+		Assert.False(loaded.IsBlockedAt(Now.AddDays(10)));
 		Assert.NotEmpty(loaded.SecurityStamp.Value);
 		Assert.Equal(Now, loaded.SessionsValidAfter);
 		Assert.Equal("hashed-secret", loaded.LocalCredential.PasswordHash);

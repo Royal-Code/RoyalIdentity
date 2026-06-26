@@ -24,4 +24,13 @@ public interface IUserDirectory
     /// Gets the property→claims provider bound to the realm.
     /// </summary>
     IUserClaimsProvider GetClaimsProvider(Realm realm);
+
+    /// <summary>
+    /// Gets the optional security-state capability bound to the realm (Q15), or <c>null</c> when the user provider
+    /// has no such state. The IdP uses it to capture the security stamp at sign-in and enforce passive session
+    /// invalidation by <c>SessionsValidAfter</c>; when absent the IdP degrades gracefully — unless the realm requires
+    /// it (<c>RealmOptions.Session.RequiresSecurityStateProvider</c>), which is a composition error detected
+    /// fail-fast during session validation.
+    /// </summary>
+    IUserSecurityStateProvider? GetSecurityStateProvider(Realm realm);
 }

@@ -42,6 +42,17 @@ public class UserSessionStore(
         return Task.CompletedTask;
     }
 
+    public Task TouchAsync(string sessionId, DateTime lastSeenAt, DateTime? expiresAt, CancellationToken ct = default)
+    {
+        if (userSessions.TryGetValue(sessionId, out var session))
+        {
+            session.LastSeenAt = lastSeenAt;
+            session.ExpiresAt = expiresAt;
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<UserSession?> EndAsync(string sessionId, CancellationToken ct = default)
     {
         userSessions.TryGetValue(sessionId, out var session);
@@ -49,5 +60,23 @@ public class UserSessionStore(
             session.IsActive = false;
 
         return Task.FromResult(session);
+    }
+
+    public Task<int> EndSessionsForSubjectAsync(string subjectId, string? exceptSessionId, CancellationToken ct = default)
+    {
+        var count = 0;
+        foreach (var session in userSessions.Values)
+        {
+            if (session.SubjectId != subjectId || !session.IsActive)
+                continue;
+
+            if (exceptSessionId is not null && session.Id == exceptSessionId)
+                continue;
+
+            session.IsActive = false;
+            count++;
+        }
+
+        return Task.FromResult(count);
     }
 }

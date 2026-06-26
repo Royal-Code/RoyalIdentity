@@ -13,6 +13,7 @@ using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.UseCases;
+using RoyalIdentity.UserAccounts.Infrastructure.Audit;
 using RoyalIdentity.UserAccounts.Integration;
 using RoyalIdentity.UserAccounts.Options;
 using RoyalIdentity.UserAccounts.Sqlite;
@@ -338,6 +339,53 @@ public class UserAccountsIntegrationTests
 	}
 
 	// ---- harness ----
+
+	// ---- SecurityStateProvider (Q15) ----
+
+	[Fact]
+	public async Task SecurityStateProvider_ExposesStamp_AndGatesSessionsValidAfterByRealmPolicy()
+	{
+		var options = Options();
+		await using var provider = BuildProvider(options);
+		await CreateAsync(provider, "r1", "alice", options, subjectId: "alice");
+
+		using var scope = provider.CreateScope();
+		var directory = scope.ServiceProvider.GetRequiredService<IUserDirectory>();
+
+		// Policy off: the stamp is exposed for sign-in capture, but SessionsValidAfter is not enforced (null).
+		var realmOff = Realm("r1");
+		var stateProviderOff = directory.GetSecurityStateProvider(realmOff);
+		Assert.NotNull(stateProviderOff);
+		var stateOff = await stateProviderOff!.GetSecurityStateAsync("alice");
+		Assert.NotNull(stateOff);
+		Assert.False(string.IsNullOrEmpty(stateOff!.SecurityStamp));
+		Assert.Null(stateOff.SessionsValidAfter);
+
+		// Policy on: SessionsValidAfter is returned so the IdP enforces it.
+		var realmOn = Realm("r1");
+		realmOn.Options.Session.EnableSessionInvalidationByState = true;
+		var stateOn = await directory.GetSecurityStateProvider(realmOn)!.GetSecurityStateAsync("alice");
+		Assert.NotNull(stateOn);
+		Assert.NotNull(stateOn!.SessionsValidAfter);
+
+		// Unknown subject => null.
+		Assert.Null(await stateProviderOff.GetSecurityStateAsync("ghost"));
+	}
+
+	[Fact]
+	public void SecurityAuditPolicy_ReadsEnabledCategoriesFromRealmOptions()
+	{
+		var options = Options();
+		options.SecurityLifecycle.AuditCategories = SecurityAuditCategories.Credential | SecurityAuditCategories.Lockout;
+		using var provider = BuildProvider(options);
+
+		using var scope = provider.CreateScope();
+		var policy = scope.ServiceProvider.GetRequiredService<ISecurityAuditPolicyProvider>();
+
+		Assert.Equal(
+			SecurityAuditCategories.Credential | SecurityAuditCategories.Lockout,
+			policy.GetCategories("r1"));
+	}
 
 	private static ServiceProvider BuildProvider(UserAccountsRealmOptions resolverOptions)
 	{

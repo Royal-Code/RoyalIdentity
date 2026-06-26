@@ -42,4 +42,17 @@ public sealed class UserAccountsUserDirectory(
         var binding = bindingFactory.Create(realm);
         return new UserClaimsProvider(claimsReader, binding.RealmId, binding.Options);
     }
+
+    /// <inheritdoc />
+    public IUserSecurityStateProvider GetSecurityStateProvider(Realm realm)
+    {
+        // The module always has account security state (SecurityStamp/SessionsValidAfter), so the capability is always
+        // present here (a realm that requires it is satisfied — Q15). Whether SessionsValidAfter is enforced is gated
+        // by the IdP-owned realm session policy.
+        var binding = bindingFactory.Create(realm);
+        return new UserAccountsSecurityStateProvider(
+            reader,
+            binding.RealmId,
+            realm.Options.Session.EnableSessionInvalidationByState);
+    }
 }

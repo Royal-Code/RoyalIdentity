@@ -477,6 +477,11 @@ public class UserAccountDomainTests
 		Assert.True(account.IsBlockedAt(Now.AddDays(5)));
 		Assert.False(account.IsBlockedAt(endsAt));
 		Assert.False(account.IsBlockedAt(Now.AddDays(10)));
+
+		var blockedEvent = Assert.Single(account.DomainEvents!.OfType<UserAccountBlocked>());
+		Assert.Equal("vacation", blockedEvent.Reason);
+		Assert.Equal(startsAt, blockedEvent.StartsAt);
+		Assert.Equal(endsAt, blockedEvent.EndsAt);
 	}
 
 	[Fact]
@@ -525,11 +530,11 @@ public class UserAccountDomainTests
 		Assert.Equal(0, account.LocalCredential.FailedPasswordAttempts);
 		Assert.Null(account.LocalCredential.LockoutEndAt);
 		Assert.False(account.LocalCredential.IsLockedOut(options, Now.AddMinutes(4)));
-		Assert.Single(account.DomainEvents.OfType<UserAccountLocalCredentialUnlocked>());
+		Assert.Single(account.DomainEvents!.OfType<UserAccountLocalCredentialUnlocked>());
 
 		// A second unlock with nothing to clear stays silent.
 		account.UnlockLocalCredential(Now.AddMinutes(5));
-		Assert.Single(account.DomainEvents.OfType<UserAccountLocalCredentialUnlocked>());
+		Assert.Single(account.DomainEvents!.OfType<UserAccountLocalCredentialUnlocked>());
 	}
 
 	[Fact]

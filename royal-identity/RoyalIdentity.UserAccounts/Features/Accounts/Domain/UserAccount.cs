@@ -688,7 +688,7 @@ public class UserAccount : AggregateRoot<long>
 	{
 		BlockState = UserAccountBlockState.Blocked(reason, changedAt, startsAt, endsAt);
 		Touch(changedAt);
-		AddEvent(new UserAccountBlocked(RealmId, SubjectId, reason));
+		AddEvent(new UserAccountBlocked(RealmId, SubjectId, reason, startsAt, endsAt));
 	}
 
 	/// <summary>

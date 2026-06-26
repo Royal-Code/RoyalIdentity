@@ -36,4 +36,12 @@ public sealed class MemoryUserDirectory(
 
     public IUserClaimsProvider GetClaimsProvider(Realm realm)
         => new MemoryUserClaimsProvider(storage.GetRealmMemoryStore(realm).UserAccounts);
+
+    /// <summary>
+    /// The in-memory fake has no account security-state (no SecurityStamp / SessionsValidAfter), so it exposes no
+    /// security-state capability (Q15): the IdP degrades gracefully (no stamp capture, no passive enforcement). A
+    /// realm that turns on <c>Session.EnableSessionInvalidationByState</c> must use a provider that has the state
+    /// (the module integration), otherwise composition validation fails.
+    /// </summary>
+    public IUserSecurityStateProvider? GetSecurityStateProvider(Realm realm) => null;
 }

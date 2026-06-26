@@ -22,6 +22,12 @@ public sealed class UserSession
     /// <summary>When the session started (drives the <c>auth_time</c> claim).</summary>
     public required DateTime StartedAt { get; init; }
 
+    /// <summary>
+    /// When the session was last seen. Drives the realm idle timeout with a write throttle (ADR-017 §2.12): the
+    /// store only updates it once per <c>Session.IdleTouchIntervalMinutes</c> window.
+    /// </summary>
+    public DateTime LastSeenAt { get; set; }
+
     /// <summary>Security stamp captured when the session starts, when the user provider exposes one.</summary>
     public string? SecurityStamp { get; init; }
 
@@ -35,8 +41,11 @@ public sealed class UserSession
     public HashSet<UserSessionClient> Clients { get; init; } = [];
 
     /// <summary>
-    /// Reserved — no behavior in this plan (pontos1 §6). A future phase may define its interaction with
-    /// cookie lifetime / <c>UserSsoLifetime</c> / session expiry. Do not branch on it yet.
+    /// When the SSO session expires (Realm-only — ADR-017 §2.12). Set at sign-in to
+    /// <c>StartedAt + Session.SsoSessionMaxMinutes</c> when the realm enables SSO session expiration; the idle
+    /// timeout may pull it earlier on touch (never past the max). <c>null</c> means no SSO session lifetime is
+    /// enforced (the per-client <c>UserSsoLifetime</c> still forces re-interaction in the <c>PromptLoginDecorator</c>,
+    /// orthogonally). The session-validity rule reads this field directly; it does not re-read realm policy for the cap.
     /// </summary>
     public DateTime? ExpiresAt { get; set; }
 }

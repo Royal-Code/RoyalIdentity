@@ -1,31 +1,44 @@
 using Microsoft.EntityFrameworkCore;
+using RoyalCode.DomainEvents;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
+using RoyalIdentity.UserAccounts.Infrastructure.Events;
 
 namespace RoyalIdentity.UserAccounts.Infrastructure.Data;
 
 /// <summary>
 /// The UserAccounts module owns its persistence. This is the provider-agnostic context; providers
 /// (<c>.PostgreSql</c>/<c>.Sqlite</c>) wire the connection and refine provider-specific storage.
+/// <para>
+/// On a successful save it collects the tracked aggregates' domain events and dispatches them <b>after the commit</b>
+/// (ADR-017 §2.11 / Q8) through the module's <see cref="IDomainEventDispatcher"/>. The dispatcher is resolved by DI
+/// (the WorkContext builds the context from the scoped service provider).
+/// </para>
 /// </summary>
 public class UserAccountsDbContext : DbContext
 {
+	private readonly IDomainEventDispatcher dispatcher;
+
 	/// <summary>
 	/// Creates the context.
 	/// </summary>
 	/// <param name="options">The context options.</param>
-	public UserAccountsDbContext(DbContextOptions<UserAccountsDbContext> options)
+	/// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
+	public UserAccountsDbContext(DbContextOptions<UserAccountsDbContext> options, IDomainEventDispatcher dispatcher)
 		: base(options)
 	{
+		this.dispatcher = dispatcher;
 	}
 
 	/// <summary>
 	/// Constructor for derived provider contexts.
 	/// </summary>
 	/// <param name="options">The context options.</param>
-	protected UserAccountsDbContext(DbContextOptions options)
+	/// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
+	protected UserAccountsDbContext(DbContextOptions options, IDomainEventDispatcher dispatcher)
 		: base(options)
 	{
+		this.dispatcher = dispatcher;
 	}
 
 	/// <summary>
@@ -64,10 +77,44 @@ public class UserAccountsDbContext : DbContext
 		bool acceptAllChangesOnSuccess,
 		CancellationToken cancellationToken = default)
 	{
+		// Collect (and clear) the aggregates' events before the commit, then dispatch them after it succeeds so an
+		// observer never reacts to a change that did not persist (ADR-017 §2.11 / §10).
+		var domainEvents = CollectAndClearDomainEvents();
+
 		var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-		return ReconcileActiveVersionIds()
-			? result + await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken)
-			: result;
+		if (ReconcileActiveVersionIds())
+		{
+			result += await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+		}
+
+		await dispatcher.DispatchAsync(domainEvents, cancellationToken);
+
+		return result;
+	}
+
+	/// <summary>
+	/// Collects every tracked aggregate's domain events and clears the collections so a later save does not
+	/// re-dispatch them. Returns the events in tracking order.
+	/// </summary>
+	private List<IDomainEvent> CollectAndClearDomainEvents()
+	{
+		var entries = ChangeTracker.Entries<IHasEvents>()
+			.Where(e => e.Entity.DomainEvents is { Count: > 0 })
+			.ToList();
+
+		if (entries.Count is 0)
+		{
+			return [];
+		}
+
+		var domainEvents = new List<IDomainEvent>();
+		foreach (var entry in entries)
+		{
+			domainEvents.AddRange(entry.Entity.DomainEvents!);
+			entry.Entity.DomainEvents!.Clear();
+		}
+
+		return domainEvents;
 	}
 
 	/// <summary>

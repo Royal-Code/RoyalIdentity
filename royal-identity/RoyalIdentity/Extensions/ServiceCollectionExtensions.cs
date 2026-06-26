@@ -71,6 +71,7 @@ public static class ServiceCollectionExtensions
         // Default Users Services
         services.AddScoped<ISignOutManager, DefaultSignOutManager>();
         services.AddScoped<IUserSessionService, DefaultUserSessionService>();
+        services.AddScoped<ISessionRevocationService, DefaultSessionRevocationService>();
         services.AddScoped<ISubjectPrincipalFactory, DefaultSubjectPrincipalFactory>();
         services.AddScoped<IAuthorizationContextResolver, DefaultAuthorizationContextResolver>();
         services.AddScoped<LoginFlowService>();

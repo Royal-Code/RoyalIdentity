@@ -289,7 +289,12 @@ public class UserAccountDeactivated(string realmId, string subjectId) : DomainEv
 /// <summary>
 /// Event raised when the account is administratively blocked.
 /// </summary>
-public class UserAccountBlocked(string realmId, string subjectId, string? reason) : DomainEventBase
+public class UserAccountBlocked(
+	string realmId,
+	string subjectId,
+	string? reason,
+	DateTimeOffset? startsAt,
+	DateTimeOffset? endsAt) : DomainEventBase
 {
 	/// <summary>
 	/// Gets the account realm.
@@ -305,6 +310,16 @@ public class UserAccountBlocked(string realmId, string subjectId, string? reason
 	/// Gets the block reason.
 	/// </summary>
 	public string? Reason { get; } = reason;
+
+	/// <summary>
+	/// Gets when the block becomes effective, or <c>null</c> for immediately.
+	/// </summary>
+	public DateTimeOffset? StartsAt { get; } = startsAt;
+
+	/// <summary>
+	/// Gets when the block expires, or <c>null</c> for indefinite.
+	/// </summary>
+	public DateTimeOffset? EndsAt { get; } = endsAt;
 }
 
 /// <summary>

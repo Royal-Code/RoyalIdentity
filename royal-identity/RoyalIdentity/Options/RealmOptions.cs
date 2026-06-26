@@ -47,6 +47,7 @@ public class RealmOptions
         Keys = new KeyOptions(other.Keys);
         Caching = new CacheOptions(other.Caching);
         Account = new AccountOptions(other.Account);
+        Session = new SessionOptions(other.Session);
         Branding = new RealmBrandingOptions(other.Branding);
         IssuerUri = other.IssuerUri;
         LowerCaseIssuerUri = other.LowerCaseIssuerUri;
@@ -124,6 +125,11 @@ public class RealmOptions
     /// Gets or sets the account options.
     /// </summary>
     public AccountOptions Account { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the SSO session lifetime and passive-invalidation policy (Realm-only — ADR-017 §2.12).
+    /// </summary>
+    public SessionOptions Session { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the visual branding options for this realm.

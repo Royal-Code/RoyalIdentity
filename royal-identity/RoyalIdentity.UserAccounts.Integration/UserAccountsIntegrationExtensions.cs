@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
+using RoyalIdentity.UserAccounts.Infrastructure.Audit;
 using RoyalIdentity.UserAccounts.Integration;
 using RoyalIdentity.Users.Contracts;
 
@@ -33,6 +34,13 @@ public static class UserAccountsIntegrationExtensions
         // Opt-in swap: replace the in-memory fake gateway with the module-backed one. Scoped, because it consumes
         // the module's scoped collaborators from the request scope.
         services.Replace(ServiceDescriptor.Scoped<IUserDirectory, UserAccountsUserDirectory>());
+
+        // Bridge from the module's per-trigger invalidation policy (Q7) to the IdP's active revocation (Q13).
+        services.TryAddScoped<SessionInvalidationExecutor>();
+
+        // Make security auditing realm-aware: read the enabled categories from the realm's account options (Q8),
+        // replacing the module default (all-on for every realm).
+        services.Replace(ServiceDescriptor.Singleton<ISecurityAuditPolicyProvider, RealmSecurityAuditPolicyProvider>());
 
         return services;
     }

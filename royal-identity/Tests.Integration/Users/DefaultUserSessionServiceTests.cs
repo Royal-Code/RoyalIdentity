@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Users;
+using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
 using Tests.Integration.Prepare;
 
@@ -25,12 +26,27 @@ public class DefaultUserSessionServiceTests
         }
     }
 
+    /// <summary>
+    /// Minimal <see cref="IUserDirectory"/> for these baseline tests: the security-state capability is absent (the
+    /// DemoRealm does not enable state invalidation), and the other ports are not exercised.
+    /// </summary>
+    private sealed class StubUserDirectory : IUserDirectory
+    {
+        public ISubjectStore GetSubjectStore(RoyalIdentity.Models.Realm realm) => throw new NotSupportedException();
+
+        public ILocalUserAuthenticator GetLocalAuthenticator(RoyalIdentity.Models.Realm realm) => throw new NotSupportedException();
+
+        public IUserClaimsProvider GetClaimsProvider(RoyalIdentity.Models.Realm realm) => throw new NotSupportedException();
+
+        public IUserSecurityStateProvider? GetSecurityStateProvider(RoyalIdentity.Models.Realm realm) => null;
+    }
+
     private static (DefaultUserSessionService service, ControlledTimeProvider clock) Build()
     {
         var clock = new ControlledTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var storage = new MemoryStorage(clock);
         var accessor = new FakeRealmAccessor(MemoryStorage.DemoRealm);
-        return (new DefaultUserSessionService(storage, accessor, clock), clock);
+        return (new DefaultUserSessionService(storage, accessor, new StubUserDirectory(), clock), clock);
     }
 
     private static ClaimsPrincipal PrincipalWithSid(string? sid)

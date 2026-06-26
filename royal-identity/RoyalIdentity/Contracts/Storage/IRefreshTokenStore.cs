@@ -35,4 +35,11 @@ public interface IRefreshTokenStore
     /// <param name="ct">The cancellation token.</param>
     /// <returns></returns>
     Task RemoveAsync(string token, CancellationToken ct);
+
+    /// <summary>
+    /// Removes all refresh tokens of a subject (active-revocation seam — Q13). Idempotent. Returns the number removed.
+    /// </summary>
+    /// <param name="subjectId">The subject whose refresh tokens are removed.</param>
+    /// <param name="ct">The cancellation token.</param>
+    Task<int> RemoveBySubjectAsync(string subjectId, CancellationToken ct);
 }

@@ -72,9 +72,19 @@ public sealed class LoginFlowService(
 
         var subject = authResult.Subject!;
 
+        // Capture the account security stamp at sign-in (Q15), when the user provider exposes the capability. It is
+        // stored on the session for cookie/claims revalidation and traceability; absent capability degrades gracefully.
+        string? securityStamp = null;
+        var securityStateProvider = userDirectory.GetSecurityStateProvider(realm);
+        if (securityStateProvider is not null)
+        {
+            var securityState = await securityStateProvider.GetSecurityStateAsync(subject.SubjectId, ct);
+            securityStamp = securityState?.SecurityStamp;
+        }
+
         // session is created here (sign-in), not during credential verification.
         var session = await userSessionService.StartAsync(
-            subject, Oidc.AuthMethods.Password, Server.LocalIdentityProvider, ct);
+            subject, Oidc.AuthMethods.Password, Server.LocalIdentityProvider, securityStamp, ct);
 
         var principal = subjectPrincipalFactory.Create(subject, session);
         await WriteCookieAsync(realm, principal, request.RememberLogin);
