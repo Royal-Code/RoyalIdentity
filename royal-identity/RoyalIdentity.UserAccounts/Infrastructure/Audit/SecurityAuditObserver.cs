@@ -35,8 +35,10 @@ public sealed class SecurityAuditObserver(
     {
         entry = domainEvent switch
         {
+            // Route the password change by reason: a recovery reset is a Recovery event and an administrative reset is
+            // an AdminSecurity event — collapsing both into Credential would misclassify them (ADR-017 §2.11).
             UserAccountPasswordChanged e =>
-                Build(e.RealmId, e.SubjectId, SecurityAuditCategories.Credential, nameof(UserAccountPasswordChanged), e),
+                Build(e.RealmId, e.SubjectId, CategoryFor(e.Reason), nameof(UserAccountPasswordChanged), e),
             UserAccountLocalCredentialLocked e =>
                 Build(e.RealmId, e.SubjectId, SecurityAuditCategories.Lockout, nameof(UserAccountLocalCredentialLocked), e),
             UserAccountLocalCredentialUnlocked e =>
@@ -45,6 +47,15 @@ public sealed class SecurityAuditObserver(
                 Build(e.RealmId, e.SubjectId, SecurityAuditCategories.AdminSecurity, nameof(UserAccountBlocked), e),
             UserAccountUnblocked e =>
                 Build(e.RealmId, e.SubjectId, SecurityAuditCategories.AdminSecurity, nameof(UserAccountUnblocked), e),
+            // Role grants/revocations and activation/deactivation are authorization-state changes (AdminSecurity).
+            UserAccountRoleAdded e =>
+                Build(e.RealmId, e.SubjectId, SecurityAuditCategories.AdminSecurity, nameof(UserAccountRoleAdded), e),
+            UserAccountRoleRemoved e =>
+                Build(e.RealmId, e.SubjectId, SecurityAuditCategories.AdminSecurity, nameof(UserAccountRoleRemoved), e),
+            UserAccountActivated e =>
+                Build(e.RealmId, e.SubjectId, SecurityAuditCategories.AdminSecurity, nameof(UserAccountActivated), e),
+            UserAccountDeactivated e =>
+                Build(e.RealmId, e.SubjectId, SecurityAuditCategories.AdminSecurity, nameof(UserAccountDeactivated), e),
             UserAccountEmailVerified e =>
                 Build(e.RealmId, e.SubjectId, SecurityAuditCategories.Verification, nameof(UserAccountEmailVerified), e),
             UserAccountPhoneVerified e =>
@@ -54,6 +65,17 @@ public sealed class SecurityAuditObserver(
 
         return entry is not null;
     }
+
+    /// <summary>
+    /// Maps a <see cref="PasswordChangeReason"/> to the most specific audit category. A single category per entry keeps
+    /// the policy gate (which requires every bit of the entry category to be enabled) unambiguous.
+    /// </summary>
+    private static SecurityAuditCategories CategoryFor(PasswordChangeReason reason) => reason switch
+    {
+        PasswordChangeReason.Reset => SecurityAuditCategories.Recovery,
+        PasswordChangeReason.AdminSet => SecurityAuditCategories.AdminSecurity,
+        _ => SecurityAuditCategories.Credential // Create, Change, Import
+    };
 
     private static SecurityAuditEntry Build(
         string realmId, string subjectId, SecurityAuditCategories category, string eventType, IDomainEvent domainEvent)

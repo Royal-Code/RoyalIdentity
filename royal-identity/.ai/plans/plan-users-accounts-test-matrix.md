@@ -132,14 +132,45 @@ risco que introduz.
 
 ## Fase 10/Contracts e Regressão
 
-- Contract tests compartilhados para `IUserDirectory`.
-- Mesmo contrato executado contra fake in-memory e contra `UserAccounts` real com SQLite in-memory.
-- Seeds Alice/Bob devem produzir os mesmos `sub`, claims, roles e resultado de autenticação esperados hoje.
-- Suite do IdP deve rodar contra fake atual.
-- Suite do IdP deve rodar contra módulo opt-in.
-- Regressão de realm isolation: dados criados em um realm não aparecem em outro.
-- Regressão de login/logout/session deve continuar verde com fake e com módulo opt-in.
-- Build completo da solution deve rodar antes de considerar a fase finalizada.
+- Contract tests compartilhados para `IUserDirectory`. **[OK]** `UserDirectoryContractTests` (base abstrata) roda contra
+  `InMemory` (fake) e `UserAccountsSqlite` (módulo real): subject store, autenticação local, lockout/reset de contador,
+  passwordless/inactive, realm isolation e claims de seed.
+- Mesmo contrato executado contra fake in-memory e contra `UserAccounts` real com SQLite in-memory. **[OK]**
+- Seeds Alice/Bob devem produzir os mesmos `sub`, claims, roles e resultado de autenticação esperados hoje. **[OK]**
+- Suite do IdP deve rodar contra fake atual. **[OK]** (default `Tests.Integration`).
+- Suite do IdP deve rodar contra módulo opt-in. **[Parcial]** Hoje a regressão opt-in é **representativa** —
+  `UserAccountsOptInRegressionTests` (5 testes HTTP) sobre `UserAccountsAppFactory`. Rodar a **suíte inteira** contra o
+  módulo depende da substituição do fake (ADR-018 / backlog), pois o restante da suíte e os seeds dinâmicos
+  (`CharacterizationSeed`) ainda escrevem no `MemoryStorage`.
+- Regressão de realm isolation: dados criados em um realm não aparecem em outro. **[OK]**
+- Regressão de login/logout/session deve continuar verde com fake e com módulo opt-in. **[OK]**
+- Build completo da solution deve rodar antes de considerar a fase finalizada. **[OK]**
+
+### Concorrência (pré-plano §10) — `ConcurrencyTests` (módulo + Sqlite)
+
+Provados via conexão Sqlite in-memory compartilhada entre escopos (interleaving real; o conflito é detectado, não
+simulado). Estratégia: optimistic concurrency + retry via `UserAccount.Version` (credencial/contador/stamp) e UPDATE
+condicional idempotente para tokens (Q11).
+
+1. **Duas falhas simultâneas** → o `Version` rejeita o writer obsoleto; nenhum incremento é perdido (após retry, 2).
+2. **Sucesso × falha** → a falha obsoleta não persiste sobre o login válido; a conta não fica bloqueada.
+3. **Consumo duplo de token** → o UPDATE condicional consome no máximo uma vez (um `true`, um `false`).
+4. **Nova emissão × token antigo** → reemitir revoga o anterior; o token antigo deixa de ser consumível.
+5. **Troca/reset de senha × login obsoleto** → conflito de `Version`; `SecurityStamp` e `SessionsValidAfter` movem.
+6. **Admin unlock × falha obsoleta** → o unlock vence; a falha obsoleta não re-bloqueia (conflito de `Version`).
+7. **Verificação de email × troca de email** → o token, ligado ao `TargetValue`, verifica só o valor vinculado (o novo
+   primário permanece não-verificado).
+
+### Comportamentos module-specific (cobertos fora do contrato compartilhado)
+
+`required action`, verificação de email/telefone e invalidação/`SessionsValidAfter` **não** entram no contrato
+fake×módulo: o fake (`MemoryLocalUserAuthenticator`) não modela esses fluxos (ex.: nunca retorna `RequiresAction`;
+`GetSecurityStateProvider` é `null`). Forçar paridade exigiria reimplementar o ciclo de segurança no fake — fora do
+escopo desta matriz (que pede o contrato de `IUserDirectory`, não a paridade de todo o ciclo). Cobertura module-side:
+`UserAccountUseCasesTests` (required action / expired / recovery / verificação / lockout / unlock / block),
+`UserAccountsIntegrationTests` (security-state Q15) e `Tests.Integration/SessionLifecycleTests` (invalidação por estado).
+**Decisão fechada ([ADR-018](../../adrs/ADR-018.md)):** o fake in-memory é transitório — **não** se investe em paridade;
+o alvo é substituí-lo pelo módulo + Sqlite in-memory, com um **seed reutilizável do módulo** como primeiro passo.
 
 ## Critério Mínimo Antes de Trocar o Fake
 

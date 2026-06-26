@@ -494,7 +494,7 @@ public class UserAccount : AggregateRoot<long>
 		}
 
 		TouchSecurityState(changedAt, invalidateSessions: true);
-		AddEvent(new UserAccountPasswordChanged(RealmId, SubjectId));
+		AddEvent(new UserAccountPasswordChanged(RealmId, SubjectId, reason));
 		return Result.Ok();
 	}
 

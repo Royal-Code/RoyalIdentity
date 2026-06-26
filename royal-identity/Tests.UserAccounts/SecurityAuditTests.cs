@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalCode.DomainEvents;
 using RoyalIdentity.UserAccounts.Features.Accounts.Commons;
@@ -86,6 +87,57 @@ public class SecurityAuditTests
         Assert.Contains(sink.Entries, e => e.Category == SecurityAuditCategories.AdminSecurity);
     }
 
+    [Fact]
+    public async Task PasswordReset_IsAudited_AsRecovery_NotCredential()
+    {
+        var sink = new RecordingSink();
+        await using var provider = BuildProvider(sink: sink);
+        var options = Options();
+
+        await CreateAsync(provider, "r1", "alice", options);
+        var before = sink.Entries.Count;
+
+        // A recovery reset routes by PasswordChangeReason.Reset to the Recovery category (P1).
+        await MutateAsync(provider, "r1", "alice",
+            a => a.ResetPassword("hashed:renewed", options.PasswordOptions, Start));
+
+        var added = sink.Entries.Skip(before).ToList();
+        Assert.Single(added, e =>
+            e.EventType == "UserAccountPasswordChanged" && e.Category == SecurityAuditCategories.Recovery);
+        Assert.DoesNotContain(added, e => e.Category == SecurityAuditCategories.Credential);
+    }
+
+    [Fact]
+    public async Task RoleGrant_IsAudited_AsAdminSecurity()
+    {
+        var sink = new RecordingSink();
+        await using var provider = BuildProvider(sink: sink);
+        var options = Options();
+
+        await CreateAsync(provider, "r1", "alice", options);
+
+        await MutateAsync(provider, "r1", "alice",
+            a => a.AddRole(new UserAccountRole("r1", "admin", "ADMIN"), Start));
+
+        Assert.Single(sink.Entries, e =>
+            e.EventType == "UserAccountRoleAdded" && e.Category == SecurityAuditCategories.AdminSecurity);
+    }
+
+    [Fact]
+    public async Task Deactivation_IsAudited_AsAdminSecurity()
+    {
+        var sink = new RecordingSink();
+        await using var provider = BuildProvider(sink: sink);
+        var options = Options();
+
+        await CreateAsync(provider, "r1", "alice", options);
+
+        await MutateAsync(provider, "r1", "alice", a => a.Deactivate(Start));
+
+        Assert.Single(sink.Entries, e =>
+            e.EventType == "UserAccountDeactivated" && e.Category == SecurityAuditCategories.AdminSecurity);
+    }
+
     // ---- harness ----
 
     private static ServiceProvider BuildProvider(
@@ -155,6 +207,18 @@ public class SecurityAuditTests
             Reason = "fraud"
         }, default);
         Assert.True(result.IsSuccess);
+    }
+
+    private static async Task MutateAsync(
+        ServiceProvider provider, string realmId, string subjectId, Action<UserAccount> mutate)
+    {
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UserAccountsSqliteDbContext>();
+        var account = await db.UserAccounts
+            .Include(a => a.LocalCredential)
+            .FirstAsync(a => a.RealmId == realmId && a.SubjectId == subjectId);
+        mutate(account);
+        await db.SaveChangesAsync();
     }
 
     private sealed class RecordingSink : ISecurityAuditSink

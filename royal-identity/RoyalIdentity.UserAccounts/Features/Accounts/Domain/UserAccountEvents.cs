@@ -202,9 +202,11 @@ public class UserAccountRoleRemoved(string realmId, string subjectId, string rol
 }
 
 /// <summary>
-/// Event raised when the password credential changes.
+/// Event raised when the password credential changes. Carries the <see cref="PasswordChangeReason"/> so auditing can
+/// route the change to the right category (voluntary change vs recovery reset vs administrative reset) instead of
+/// collapsing every password change into one category (ADR-017 §2.11).
 /// </summary>
-public class UserAccountPasswordChanged(string realmId, string subjectId) : DomainEventBase
+public class UserAccountPasswordChanged(string realmId, string subjectId, PasswordChangeReason reason) : DomainEventBase
 {
 	/// <summary>
 	/// Gets the account realm.
@@ -215,6 +217,11 @@ public class UserAccountPasswordChanged(string realmId, string subjectId) : Doma
 	/// Gets the immutable subject identifier.
 	/// </summary>
 	public string SubjectId { get; } = subjectId;
+
+	/// <summary>
+	/// Gets why the password was set, used to classify the audit category.
+	/// </summary>
+	public PasswordChangeReason Reason { get; } = reason;
 }
 
 /// <summary>

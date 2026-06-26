@@ -587,6 +587,19 @@ public class UserAccountsPersistenceTests
 		await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
 	}
 
+	[Fact]
+	public void SaveChanges_Sync_IsNotSupported_ToGuardEventDispatch()
+	{
+		// The sync save path is blocked so a caller cannot persist mutations while silently skipping the post-commit
+		// event dispatch (and the audit it drives). Callers must use SaveChangesAsync (P4).
+		using var provider = BuildProvider();
+		using var scope = provider.CreateScope();
+		var db = scope.ServiceProvider.GetRequiredService<UserAccountsSqliteDbContext>();
+		db.UserAccounts.Add(NewAccount());
+
+		Assert.Throws<NotSupportedException>(() => db.SaveChanges());
+	}
+
 	private static ServiceProvider BuildProvider()
 	{
 		var services = new ServiceCollection();

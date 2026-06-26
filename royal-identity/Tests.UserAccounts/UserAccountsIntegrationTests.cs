@@ -338,6 +338,23 @@ public class UserAccountsIntegrationTests
 		Assert.Equal("r1", binding.RealmId);
 	}
 
+	[Fact]
+	public void AddUserAccountsForRoyalIdentity_ResolvesAuditPolicy_WithScopedResolver()
+	{
+		// The realm-aware audit policy must stay resolvable when the host registers the options resolver as scoped:
+		// a singleton policy would capture the scoped resolver and fail under scope validation (P3).
+		var services = new ServiceCollection();
+		services.AddScoped<IUserAccountsRealmOptionsResolver, ScopedRealmOptionsResolver>();
+		services.AddUserAccountsForRoyalIdentity();
+
+		using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+		using var scope = provider.CreateScope();
+
+		var policy = scope.ServiceProvider.GetRequiredService<ISecurityAuditPolicyProvider>();
+
+		Assert.Equal(SecurityAuditCategories.All, policy.GetCategories("r1"));
+	}
+
 	// ---- harness ----
 
 	// ---- SecurityStateProvider (Q15) ----

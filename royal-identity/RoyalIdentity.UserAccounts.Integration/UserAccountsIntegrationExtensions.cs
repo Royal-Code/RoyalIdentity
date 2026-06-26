@@ -39,8 +39,10 @@ public static class UserAccountsIntegrationExtensions
         services.TryAddScoped<SessionInvalidationExecutor>();
 
         // Make security auditing realm-aware: read the enabled categories from the realm's account options (Q8),
-        // replacing the module default (all-on for every realm).
-        services.Replace(ServiceDescriptor.Singleton<ISecurityAuditPolicyProvider, RealmSecurityAuditPolicyProvider>());
+        // replacing the module default (all-on for every realm). Scoped (it is stateless) so it stays compatible with a
+        // host that registers IUserAccountsRealmOptionsResolver as scoped — a singleton here would capture a scoped
+        // resolver and fail under scope validation.
+        services.Replace(ServiceDescriptor.Scoped<ISecurityAuditPolicyProvider, RealmSecurityAuditPolicyProvider>());
 
         return services;
     }

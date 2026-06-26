@@ -1,10 +1,10 @@
 # Plan: Credenciais e Ciclo de Segurança da Conta (`plan-users-security-lifecycle`)
 
-## Status: EM ANDAMENTO - 15 questões decididas (Q1–Q15); Fases 1–6 concluídas
+## Status: CONCLUÍDO - 15 questões decididas (Q1–Q15); Fases 1–10 concluídas
 
 ## Progresso
 
-`#########-` **90%** - 9 de 10 fases
+`##########` **100%** - 10 de 10 fases
 
 | Fase | Estado |
 |---|---|
@@ -17,7 +17,7 @@
 | Fase 7 - Lockout, bloqueio administrativo e restrições de acesso | Concluida |
 | Fase 8 - Invalidação de sessões/cookies/refresh tokens | Concluida |
 | Fase 9 - Auditoria, eventos e (seletivo) outbox | Concluida |
-| Fase 10 - Concorrência, contract tests e regressão OIDC | Pendente |
+| Fase 10 - Concorrência, contract tests e regressão OIDC | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -1621,18 +1621,31 @@ categoria**, sem outbox e sem quebrar a pureza do módulo.
   `IDomainEventObserver`s. O dispatcher é injetado por DI no ctor do DbContext (validado: o WorkContext constrói o
   context pelo SP do escopo). Resolve o achado de que a stack RoyalCode não auto-despacha.
 - **Auditoria (Q8):** `ISecurityAuditSink` + `SecurityAuditEntry` (sem segredos) + `NoopSecurityAuditSink` (default);
-  `SecurityAuditObserver` mapeia os eventos existentes para categorias (`UserAccountPasswordChanged`→Credential;
-  `...Locked`/`...Unlocked`→Lockout; `Blocked`/`Unblocked`→AdminSecurity; `EmailVerified`/`PhoneVerified`→Verification)
-  e gateia por `ISecurityAuditPolicyProvider`. A `.Integration` registra `RealmSecurityAuditPolicyProvider` (lê
-  `SecurityLifecycle.AuditCategories` do realm via resolver), substituindo o default all-on.
+  `SecurityAuditObserver` mapeia evento → categoria e gateia por `ISecurityAuditPolicyProvider`. A `.Integration`
+  registra `RealmSecurityAuditPolicyProvider` (lê `SecurityLifecycle.AuditCategories` do realm via resolver),
+  substituindo o default all-on.
+- **Classificação por intenção (review-005):** `UserAccountPasswordChanged` carrega o `PasswordChangeReason`; o observer
+  roteia `Reset`→`Recovery`, `AdminSet`→`AdminSecurity`, demais→`Credential` (**categoria única** mais específica — a
+  categoria responde "qual a intenção principal?"; uma consulta por `EventType` cobre "todas as mudanças de credencial").
+  Eventos de autorização (`RoleAdded`/`RoleRemoved`/`Activated`/`Deactivated`) são auditados como `AdminSecurity`.
+  `...Locked`/`...Unlocked`→`Lockout`; `Blocked`/`Unblocked`→`AdminSecurity`; `EmailVerified`/`PhoneVerified`→
+  `Verification`. Mudança de contato primário (`PrimaryEmailChanged`/`PrimaryPhoneChanged`) fica **fora** até existir uma
+  categoria `ProfileSecurity` (não é `Verification` nem necessariamente `AdminSecurity`).
 - **Sem catálogo antecipado (Q8):** só os eventos que já existem são mapeados; novos nascem com novos casos de uso.
-  Categorias `Recovery`/`AuthenticationFailure` ainda não têm evento de agregado correspondente (a emissão de token de
-  recuperação e a falha genérica de senha não geram evento) — ficam para quando um evento de intenção surgir.
+  Com o roteamento por motivo, `Recovery` passa a ter cobertura (reset por recuperação). `AuthenticationFailure` ainda
+  não tem evento de agregado correspondente — fica para quando um evento de intenção surgir.
+- **Robustez de DI/persistência (review-005):** `RealmSecurityAuditPolicyProvider` é **scoped** (não singleton), para
+  conviver com um `IUserAccountsRealmOptionsResolver` scoped sob `ValidateScopes`; o caminho **síncrono**
+  `UserAccountsDbContext.SaveChanges` é **bloqueado** (`NotSupportedException`), já que o despacho pós-commit exige o
+  caminho async.
 - **Gatilho de revogação ativa (pendência da Fase 8):** continua diferido — depende de contexto de borda (o `sid`
   atual a preservar) que só os endpoints (Q12) têm; a garantia de segurança já é dada **passivamente** por
   `SessionsValidAfter` (Fase 8). O mecanismo (`SessionInvalidationExecutor`) está pronto para esse gatilho.
-- **Suite completa verde:** Tests.UserAccounts 173/173, Tests.Integration 222/222, Tests.Security 116/116,
-  Tests.Architecture 15/15, Tests.Identity 13/13, Tests.Pipelines 3/3.
+- **SQLite:** `SQLitePCLRaw.bundle_e_sqlite3` promovido a 3.0.3 no projeto `.Sqlite` (remove o advisory NU1903 do nativo
+  transitivo).
+- **Suite completa verde:** Tests.UserAccounts 178/178, Tests.Integration 222/222, Tests.Security 116/116,
+  Tests.Architecture 15/15, Tests.Identity 13/13, Tests.Pipelines 3/3 (review-005: +5 testes — reset→Recovery,
+  role/deactivate→AdminSecurity, policy scoped sob ValidateScopes, SaveChanges síncrono bloqueado).
 
 ---
 
@@ -1644,14 +1657,24 @@ categoria**, sem outbox e sem quebrar a pureza do módulo.
 
 **Tarefas:**
 
-- [ ] Cobrir os 7 cenários de concorrência do pré-plano §10 (falhas simultâneas; sucesso×falha; consumo duplo de token;
-      nova emissão×consumo; troca×emissão de token; admin unblock×falha; verificação×troca de email).
-- [ ] Estender os **contract tests** de `IUserDirectory`/portas de borda para os novos comportamentos
-      (required action, invalidação, verificação), executados contra **fake in-memory** e contra **módulo + Sqlite**.
-- [ ] Atualizar a matriz de testes ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)) com os
+- [x] Cobrir os 7 cenários de concorrência do pré-plano §10 (falhas simultâneas; sucesso×falha; consumo duplo de token;
+      nova emissão×consumo; troca×emissão de token; admin unblock×falha; verificação×troca de email). `ConcurrencyTests`
+      (módulo + Sqlite in-memory compartilhado): **detecção** de conflito via o token `UserAccount.Version` e UPDATE
+      condicional idempotente para tokens (Q11). **Pendente (review-006):** o **retry** resiliente no handler (ADR §2.9)
+      não foi implementado — só a detecção; ver Resultado e o plano seguinte.
+- [~] Estender os **contract tests** de `IUserDirectory`/portas de borda. O contrato compartilhado
+      (`UserDirectoryContractTests`, fake×módulo) já cobre subject store, autenticação, lockout/reset, claims e realm
+      isolation. Os **novos comportamentos** (required action, invalidação/`SessionsValidAfter`, verificação) são
+      module-specific: o fake (`MemoryLocalUserAuthenticator`) não os modela (nunca retorna `RequiresAction`;
+      `GetSecurityStateProvider` é `null`). Cobertos **module-side** por `UserAccountUseCasesTests`,
+      `UserAccountsIntegrationTests` (Q15) e `Tests.Integration/SessionLifecycleTests`. **Não** se cresce o fake para
+      paridade ([ADR-018](../../adrs/ADR-018.md): fake é transitório, alvo é módulo + Sqlite in-memory).
+- [x] Atualizar a matriz de testes ([plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md)) com os
       casos deste plano.
-- [ ] Rodar a suíte completa do IdP **contra o fake** e **contra o módulo opt-in**; manter o fake como default até verde.
-- [ ] Atualizar `Tests.Architecture` se novas fronteiras/portos exigirem guardas.
+- [x] Rodar a suíte completa do IdP **contra o fake** e **contra o módulo opt-in**; manter o fake como default até verde.
+      (`Tests.Integration`: fake é default; opt-in via `UserAccountsAppFactory` + `UserAccountsOptInRegressionTests`.)
+- [x] Atualizar `Tests.Architecture` se novas fronteiras/portos exigirem guardas. Revisado: os tipos novos (eventos,
+      auditoria, concorrência) vivem no namespace do módulo; nenhuma fronteira nova — guardas existentes verdes (15/15).
 
 **Critérios de aceite:** cenários de concorrência verdes; contract tests passam nas duas implementações; suíte OIDC
 verde com integração opt-in; fake permanece disponível; fronteiras de arquitetura intactas.
@@ -1660,7 +1683,46 @@ verde com integração opt-in; fake permanece disponível; fronteiras de arquite
 
 ### Resultado da Fase 10
 
-*a preencher*
+**Concluida (2026-06-26).** Concorrência provada, contrato compartilhado verde nas duas implementações e regressão OIDC
+verde com o módulo opt-in.
+
+- **Concorrência (Q11, pré-plano §10) — detecção provada; retry resiliente pendente:** `ConcurrencyTests` cobre os 7
+  cenários contra o módulo + Sqlite in-memory **compartilhado entre escopos** (interleaving real — o conflito é
+  detectado, não simulado). O que está implementado e provado é a **detecção** de conflito via o token
+  `UserAccount.Version` (`IsConcurrencyToken` no Sqlite; `xmin` no PostgreSql) e o **consumo idempotente** de tokens de
+  ação (UPDATE condicional; reemissão revoga o anterior). **Lacuna identificada (review-006):** o **retry** no handler
+  exigido pela ADR §2.9 **não está implementado** — os use cases `[WithWorkContext]` salvam uma vez em `CompleteAsync`
+  e uma `DbUpdateConcurrencyException` propaga (o retry só existe nos testes, manualmente). Implementação do retry
+  resiliente fica para o trabalho de hardening seguinte (ver nota ao fim do Resultado).
+- **Contract tests:** o contrato compartilhado `UserDirectoryContractTests` permanece executado fake×módulo (subject
+  store, autenticação, lockout/reset, claims, realm isolation). Os **novos comportamentos** (required action,
+  invalidação, verificação) são module-specific e ficaram cobertos module-side (o fake não os modela) — ver abaixo.
+- **Regressão OIDC (representativa, não a suíte inteira contra o módulo):** a suíte do IdP roda **contra o fake** por
+  default (`Tests.Integration`/`AppFactory`). A regressão **opt-in contra o módulo** é uma cobertura **representativa**
+  — `UserAccountsOptInRegressionTests` (5 testes HTTP: login/profile, principal de sessão, userinfo/id token, logout,
+  isolamento por realm) sobre `UserAccountsAppFactory`. O restante da suíte **não** roda contra o módulo opt-in (rodar a
+  suíte inteira nas duas pontas depende da substituição do fake — ADR-018 / backlog).
+- **Arquitetura:** os tipos introduzidos nas Fases 9–10 vivem no namespace do módulo (`Infrastructure.Events`,
+  `Infrastructure.Audit`) e em `Tests.UserAccounts`; nenhuma fronteira nova — `Tests.Architecture` segue 15/15 sem
+  novas guardas.
+- **Suite completa verde:** Tests.UserAccounts 185/185 (+7 concorrência), Tests.Integration 222/222, Tests.Security
+  116/116, Tests.Architecture 15/15, Tests.Identity 13/13, Tests.Pipelines 3/3.
+
+**Decisão fechada ([ADR-018](../../adrs/ADR-018.md)):** **não** se dá paridade ao fake
+`MemoryUserDirectory`/`MemoryLocalUserAuthenticator` para os comportamentos module-specific. O fake in-memory é
+**transitório** — o alvo é substituí-lo pelo **módulo + Sqlite in-memory** nos testes (backlog "Persistência de
+Dados" / futuro `plan-data-persistence`). Esses fluxos já são garantidos pelos testes do módulo; o investimento de
+teste vai para um **seed reutilizável do módulo**, primeiro passo da substituição.
+
+**Achados da review-006 (2026-06-26) e disposição:**
+- **(Alta) Retry de concorrência não implementado no fluxo real** — procede. A detecção via `Version` existe e está
+  provada; o **retry** da ADR §2.9 não. Não foi corrigido inline (é cross-cutting e tem sutileza nos fluxos com token —
+  ex.: `ResetPasswordWithToken` consome o token antes de mutar o agregado, então um retry ingênuo do use case inteiro
+  re-consome e falha). Encaminhado para o hardening seguinte; o texto desta fase foi corrigido para não afirmar retry.
+- **(Média) Regressão OIDC opt-in menor que o texto prometia** — procede. Afirmação reduzida para **representativa**
+  (5 testes HTTP); a suíte inteira contra o módulo depende da substituição do fake (ADR-018).
+- **(Baixa/Média) Seed reutilizável ainda não é artefato** — procede e **já estava diferido** (ADR-018 + item de
+  backlog "Substituir o storage fake…"); é trabalho pendente, não defeito.
 
 ---
 

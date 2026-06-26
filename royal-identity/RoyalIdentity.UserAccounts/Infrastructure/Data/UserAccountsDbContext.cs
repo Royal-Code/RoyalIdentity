@@ -63,14 +63,19 @@ public class UserAccountsDbContext : DbContext
 		modelBuilder.ApplyUserAccountsMappings();
 	}
 
-	/// <inheritdoc />
+	/// <summary>
+	/// The synchronous save path is not supported: domain events are dispatched post-commit through the async
+	/// <see cref="IDomainEventDispatcher"/>, and running that path synchronously would either silently drop the
+	/// dispatch (and the audit it drives) or force a sync-over-async dispatch. Callers must use
+	/// <see cref="SaveChangesAsync(bool, CancellationToken)"/>. This guards a programming error, not an expected flow.
+	/// </summary>
+	/// <param name="acceptAllChangesOnSuccess">Unused.</param>
+	/// <returns>Never returns; always throws.</returns>
+	/// <exception cref="NotSupportedException">Always thrown.</exception>
 	public override int SaveChanges(bool acceptAllChangesOnSuccess)
-	{
-		var result = base.SaveChanges(acceptAllChangesOnSuccess);
-		return ReconcileActiveVersionIds()
-			? result + base.SaveChanges(acceptAllChangesOnSuccess)
-			: result;
-	}
+		=> throw new NotSupportedException(
+			"UserAccountsDbContext dispatches domain events post-commit and requires the async save path. " +
+			"Use SaveChangesAsync.");
 
 	/// <inheritdoc />
 	public override async Task<int> SaveChangesAsync(
