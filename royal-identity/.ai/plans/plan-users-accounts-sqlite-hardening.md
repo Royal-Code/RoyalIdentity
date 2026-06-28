@@ -1,21 +1,21 @@
 # Plan: Endurecimento do backing `UserAccounts` — concorrência resiliente, migrations e seed (`plan-users-accounts-sqlite-hardening`)
 
-## Status: PLANEJADO - 9 questões decididas (Q1–Q9); pronto para execução (Fase 1)
+## Status: EM ANDAMENTO - Fase 1: primitiva + atributo/gerador concluídos nas libs (SmartCommands); aplicação no royal-identity pendente
 
 ## Progresso
 
-`---` **0%** - 0 de 3 fases
+`---` **0%** - 0 de 3 fases (Fase 1 em andamento: peças de biblioteca prontas)
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Concorrência resiliente (retry no handler) | Pendente |
+| Fase 1 - Concorrência resiliente (retry no handler) | Em andamento (libs OK; aplicação no royal-identity pendente) |
 | Fase 2 - Migrations dos providers (`.Sqlite`/`.PostgreSql`) | Pendente |
 | Fase 3 - Seed reutilizável e módulo como backing de testes | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
 > (um bloco `#` por fase concluida, `%` e `X de 3`). Ex.: 1 fase => `#--` **33%** - 1 de 3.
-> Antes de fechar uma fase, resolva (ou rebaixe) as **Questões em aberto** atadas a ela.
+> Antes de fechar uma fase, confirme que as decisões registradas para ela foram aplicadas.
 
 ---
 
@@ -102,9 +102,34 @@ pena de "consumir de novo" e falhar.
   do retry (DF/Q4 — best-effort). Fluxos com token usam retry **escopado** ao agregado (consumo fora do laço). Implica
   evolução **aditiva** de `RoyalCode.SmartCommands` e `RoyalCode.WorkContext`. Fonte: Q1–Q4.
 
-## Questões em aberto
+  - **DF5.1 — Esgotamento:** ao esgotar, a primitiva retorna `Problems.InvalidState` com **mensagem genérica fixa** de
+    conflito de concorrência (não a `ex.Message` crua, que vaza detalhe do EF). A primitiva aceita um parâmetro opcional
+    `Func<Problem>? onExhausted` para customizar o Problem; **o caminho gerado (atributo) sempre usa a mensagem genérica**
+    (atributo não passa delegate), e a customização fica disponível só no **caminho manual** (fluxos com token / chamada
+    direta). Customizar no caminho gerado fica como evolução futura (atributo apontando um membro da classe do comando).
+  - **DF5.2 — Quantidade:** `[WithRetryOnConcurrency]` **sem argumento** usa `MaxAttempts` das options (appsettings;
+    default **3**); `[WithRetryOnConcurrency(n)]` sobrescreve com o literal. O gerador distingue presença do argumento
+    pela sintaxe (`ArgumentList.Arguments.Count`) e injeta `IOptions<RetryOnConcurrencyOptions>` no handler quando o
+    argumento está ausente. **Caso de borda:** literal `<= 0` ⇒ **diagnostic** no gerador; em runtime a primitiva faz
+    **clamp** defensivo (`MaxAttempts < 1 ⇒ 1`, isto é, executa uma vez sem retry). `n = 1` é válido (sem retry).
+  - **DF5.3 — Transação:** entre tentativas, se houver transação corrente (`GetCurrentTransaction() != null`), a primitiva
+    faz **rollback** antes do `CleanUp()` e do retry — senão comandos já enviados na tentativa falha não são desfeitos
+    (duplicação/erro). Necessário porque o `CompleteAsync` só reverte quando o `SaveAsync` **retorna** Result falho; no
+    conflito o `SaveAsync` **lança** `ConcurrencyException` antes do bloco de rollback. Hoje o `UserAccounts` roda com
+    `BeginTransactions = false` (sem transação), então é correção **defensiva**, mas obrigatória na primitiva genérica.
+  - **DF5.4 — Lar da primitiva (decidido na implementação):** a primitiva mora em **`RoyalCode.SmartCommands.WorkContext`**
+    (o adapter WorkContext do SmartCommands), **não** em `RoyalCode.WorkContext.Abstractions` (EnterprisePatterns). Razão:
+    a abstração base do WorkContext **não** referencia `RoyalCode.SmartProblems` (`Result`/`Problem`); colocá-la lá acoplaria
+    a camada de aplicação à abstração de persistência. O `SmartCommands.WorkContext` já referencia `IWorkContext` +
+    `ConcurrencyException` + `SmartProblems` + `IOptions`. **Consequência:** a Fase 1 das libs toca **apenas o repo
+    `SmartCommands`** (primitiva + atributo + gerador juntos); o **`EnterprisePatterns` não é alterado**. A extensão é
+    `IUnitOfWork.RetryOnConcurrencyAsync(...)` no namespace `RoyalCode.WorkContext` (já importado pelo handler gerado), com
+    corpo `Func<Task<Result>>` (a lambda captura o `ct` externo para evitar `CS0136`).
 
-> Resolver antes de fechar a fase indicada. Não há recomendação embutida — são decisões do autor.
+## Histórico de decisões
+
+> Q1-Q9 já foram respondidas. Esta seção preserva o histórico das alternativas avaliadas e as decisões finais que
+> orientam as fases abaixo.
 
 **Fase 1 (retry):**
 
@@ -337,9 +362,9 @@ pena de "consumir de novo" e falhar.
 
 **Depende de:** Q1–Q4 (**todas decididas** — ver DF5).
 
-**Escopo cross-repo:** a Opção A evolui dois repos do autor (`..\..\SmartCommands` e `..\..\EnterprisePatterns`) de
-forma **aditiva/retrocompatível**, mais a aplicação no `royal-identity`. Os três avançam juntos via versão local dos
-pacotes até o release.
+**Escopo cross-repo:** a Opção A evolui de forma **aditiva/retrocompatível** o repo `..\..\SmartCommands` (primitiva +
+atributo + gerador, todos no projeto `RoyalCode.SmartCommands.WorkContext`/`.Generators` — ver DF5.4), mais a aplicação
+no `royal-identity`. O `EnterprisePatterns` **não** é tocado. Os repos avançam via versão local dos pacotes até o release.
 
 **O que/como:** cumprir a ADR-017 §2.9. No fluxo real a exceção é **`ConcurrencyException`** (o `UnitOfWork.SaveAsync` a
 converte da `DbUpdateConcurrencyException`); o retry recarrega o agregado na versão atual, reaplica a mutação e salva,
@@ -348,19 +373,29 @@ até a política. Mecanismo (DF5): **primitiva de laço no `WorkContext`** + **a
 
 **Tarefas:**
 
-*RoyalCode.WorkContext (EnterprisePatterns):*
+*RoyalCode.SmartCommands.WorkContext (primitiva) — CONCLUÍDO:*
 
-- [ ] Adicionar a **primitiva de retry** (laço: executa o corpo → captura `ConcurrencyException` → `CleanUp()` → re-tenta
-      até a política; ao esgotar, devolve o conflito como resultado/sinaliza). Política configurável (default **3**, sem
-      backoff). Cobrir com testes na própria lib.
+- [x] Adicionada a **primitiva de retry** `IUnitOfWork.RetryOnConcurrencyAsync(Func<Task<Result>> body,
+      RetryOnConcurrencyOptions options, Func<Problem>? onExhausted = null, CT ct)` em
+      `Extensions/ConcurrencyRetryExtensions.cs` (namespace `RoyalCode.WorkContext`; laço: executa o corpo → captura
+      `ConcurrencyException` → **rollback se houver transação** (DF5.3) → `CleanUp()` → re-tenta até a política). Ao
+      esgotar, retorna `onExhausted?.Invoke()` ou `Problems.InvalidState` genérico (DF5.1). `RetryOnConcurrencyOptions
+      { MaxAttempts = 3 }` em `Options/`, sem backoff, com **clamp** `< 1 ⇒ 1` (DF5.2). **8 testes** em
+      `Tests/Components/ConcurrencyRetryTests.cs` (sucesso direto; sucesso após N-1 falhas; esgotamento → InvalidState;
+      `onExhausted` honrado; rollback + `CleanUp` entre tentativas; bordas de `MaxAttempts` 0/1/negativo) — verdes.
 
-*RoyalCode.SmartCommands (gerador):*
+*RoyalCode.SmartCommands (atributo + gerador) — CONCLUÍDO:*
 
-- [ ] Criar o atributo **`[WithRetryOnConcurrency]`** (opt-in) e fazer o `CommandHandlerGenerator` **envolver**
-      `{Begin → finds → Execute → Complete}` com a primitiva do WorkContext quando presente (mantendo retrocompat: sem o
-      atributo, nada muda). Testes do gerador (snapshot do `.g.cs`).
+- [x] Criado o atributo **`[WithRetryOnConcurrency]` / `[WithRetryOnConcurrency(int maxAttempts)]`** (opt-in) e o
+      `CommandHandlerGenerator` **envolve** `{Begin → finds → Execute → Complete}` numa lambda `async () => {…}` passada à
+      primitiva (`this.accessor.Context.RetryOnConcurrencyAsync(…)`) — a **validação fica fora** do laço; os **finds
+      dentro**. Sem argumento ⇒ injeta `IOptions<RetryOnConcurrencyOptions>` e passa `this.retryOptions.Value`; com
+      argumento ⇒ `new RetryOnConcurrencyOptions { MaxAttempts = n }`; literal `<= 0` ⇒ **diagnostic `RCCMD025`**; sem
+      WorkContext ⇒ **diagnostic `RCCMD024`** (DF5.2/DF5.4). Retrocompat: sem o atributo, o `.g.cs` é idêntico. **4 testes**
+      em `Tests/Generators/RetryOnConcurrencyTests.cs` (snapshot com options, snapshot com valor, RCCMD024, RCCMD025) +
+      **suíte do SmartCommands verde (77 testes)** + **solução `SmartCommands.sln` compila (0 erros)**.
 
-*royal-identity (módulo):*
+*royal-identity (módulo) — PENDENTE (não solicitado nesta entrega):*
 
 - [ ] Aplicar `[WithRetryOnConcurrency]` aos use cases de **mutação pura** (`ChangeOwnPassword`,
       `ChangeUserAccountPassword`, `UnlockPasswordCredential`, `BlockUserAccount`, `UnblockUserAccount`).
@@ -381,7 +416,28 @@ compartilhado, agora sem retry manual); regressão completa da solução.
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Parcial — peças de biblioteca concluídas (2026-06-28); aplicação no `royal-identity` pendente.**
+
+Entregue no repo `SmartCommands` (aditivo/retrocompatível; `EnterprisePatterns` intocado — DF5.4):
+
+- **Primitiva** `RoyalCode.SmartCommands.WorkContext/Extensions/ConcurrencyRetryExtensions.cs` +
+  `Options/RetryOnConcurrencyOptions.cs`. Estende `IUnitOfWork` (namespace `RoyalCode.WorkContext`), corpo
+  `Func<Task<Result>>` (lambda captura o `ct` externo — evita `CS0136`). Laço: `body` → `ConcurrencyException` →
+  rollback (se transação) → `CleanUp()` → re-tenta; ao esgotar, `onExhausted` ou `Problems.InvalidState` genérico;
+  clamp `MaxAttempts < 1 ⇒ 1`.
+- **Atributo + gerador**: `WithRetryOnConcurrencyAttribute` (`RoyalCode.SmartCommands`) + leitura no `Transform`,
+  campos `HasRetryOnConcurrency`/`RetryMaxAttempts` na `CommandHandlerInformation`, novo nó
+  `Commands/RetryOnConcurrencyCommand.cs`, injeção condicional de `IOptions<RetryOnConcurrencyOptions>` e diagnostics
+  `RCCMD024`/`RCCMD025`. O corpo `{Begin → finds → Execute → Complete}` vai para um `bodyTarget` separado quando há
+  retry; a validação permanece no corpo do método.
+- **Testes**: 8 (primitiva) + 4 (gerador: 2 snapshots `.g.cs`, 2 diagnostics). **Suíte `SmartCommands` 77/77 verde**;
+  **`SmartCommands.sln` compila com 0 erros** (warning `CS8785` no `Tests.Models` é pré-existente — versão de analyzer no
+  ambiente, sem relação com esta entrega).
+
+**Falta** (grupo `royal-identity`, ainda não solicitado): consumir a nova versão dos pacotes; aplicar
+`[WithRetryOnConcurrency]` nos use cases de mutação pura; retry escopado nos fluxos com token; mapear esgotamento para o
+`typeId` `user_account.concurrency_conflict`; substituir o retry manual dos `ConcurrencyTests`. Enquanto a Fase 1 não
+fechar este grupo, a **tabela de progresso permanece em "Em andamento"** (não conta como fase concluída).
 
 ---
 
@@ -394,14 +450,16 @@ refletindo os mapeamentos atuais (incluindo índices parciais de primário únic
 
 **Tarefas:**
 
-- [ ] Resolver Q5–Q7 (escopo agora vs `plan-data-persistence`; testes com/sem migration; convenção + CI).
+- [ ] Aplicar as decisões Q5–Q7 (migrations agora; testes rápidos com `EnsureCreated`; testes dedicados com `Migrate()`;
+      Sqlite no CI e PostgreSql validado localmente por ora).
 - [ ] `IDesignTimeDbContextFactory` por provider (se necessário para o tooling de migrations).
 - [ ] Migration inicial `.Sqlite` refletindo o modelo atual; validar criação de schema file-based.
 - [ ] Migration inicial `.PostgreSql` (incluindo `xmin` como token e índices parciais com sintaxe PG).
 - [ ] Definir o caminho de testes (manter `EnsureCreated` in-memory vs aplicar migrations — Q6).
 
-**Critérios de aceite:** Q5–Q7 decididas; `AddUserAccountsSqlite` (file) cria/evolui schema via migration; migration PG
-gerada e (conforme Q7) validada; testes existentes seguem verdes.
+**Critérios de aceite:** decisões Q5–Q7 aplicadas; `AddUserAccountsSqlite` (file) cria/evolui schema via migration;
+migration PG gerada e validada localmente; validação automatizada via .NET Aspire registrada como futuro; testes
+existentes seguem verdes.
 
 **Testes:** round-trip de persistência sobre o schema migrado; suíte do módulo verde.
 
@@ -420,7 +478,7 @@ como backing de testes, executando o primeiro passo da ADR-018.
 
 **Tarefas:**
 
-- [ ] Resolver Q8 (forma/lar do seed) e Q9 (flip do default vs dual).
+- [ ] Aplicar as decisões Q8 (seed test-only compartilhado) e Q9 (dual mantido; regressão opt-in ampliada).
 - [ ] Criar o seed reutilizável; fazer `UserAccountsAppFactory` e o contract test `UserAccountsSqlite` consumirem o
       mesmo artefato (eliminando a duplicação).
 - [ ] Conforme Q9, ampliar a regressão OIDC contra o módulo (além dos 5 testes representativos) e/ou preparar o flip do
@@ -449,15 +507,16 @@ decisão; matriz/backlog atualizados; suíte verde.
 
 ## Critérios globais de conclusão
 
-- As três fases concluídas com suas Questões em aberto resolvidas e registradas.
+- As três fases concluídas com as decisões registradas aplicadas.
 - ADR-017 §2.9 cumprida no fluxo real (retry), não só na detecção.
 - Providers com schema versionado; seed único; regressão contra o módulo no nível decidido na Q9.
 - `dotnet test RoyalIdentity.sln` verde.
 
 ## Riscos
 
-- **Composição do retry com `[WithWorkContext]`** (Q1): se o WorkContext não oferecer gancho, abandonar o auto-save nos
-  use cases afetados muda a convenção — avaliar o impacto antes de propagar.
+- **Evolução cross-repo do retry** (Q1): a Opção A depende de mudanças aditivas em `RoyalCode.SmartCommands` e
+  `RoyalCode.WorkContext`; controlar versionamento local, release dos pacotes e consumo no `royal-identity` antes de
+  aplicar os atributos no módulo.
 - **Fluxos com token sob retry** (Q3): retry mal escopado re-consome token e quebra o fluxo; exige revisão caso a caso.
 - **Migration PG sem runner** (Q7): risco de a migration PG só ser validada localmente; registrar a limitação.
 - **Flip do default de testes** (Q9): trocar o backing default pode expor divergências fake×módulo de uma vez; preferir
