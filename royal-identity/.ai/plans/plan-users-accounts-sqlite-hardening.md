@@ -4,7 +4,7 @@
 
 ## Progresso
 
-`---` **0%** - 0 de 3 fases (Fase 1 em andamento: peças de biblioteca prontas)
+`░░░░░░░░░░░░` **0%** - 0 de 3 fases (Fase 1 em andamento: peças de biblioteca prontas)
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
-> (um bloco `#` por fase concluida, `%` e `X de 3`). Ex.: 1 fase => `#--` **33%** - 1 de 3.
+> (um bloco `█` por fase concluida, `%` e `X de 3`). Ex.: 1 fase => `████░░░░░░░░` **33%** - 1 de 3.
 > Antes de fechar uma fase, confirme que as decisões registradas para ela foram aplicadas.
 
 ---
