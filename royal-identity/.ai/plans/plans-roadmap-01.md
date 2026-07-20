@@ -1,5 +1,11 @@
 # Roadmap de planos futuros
 
+> **⛔ SUPERADO (2026-07-20) — não use este roadmap.** Foi substituído por
+> [plans-roadmap-02.md](plans-roadmap-02.md), que reflete a conclusão dos itens 1 e 3 abaixo (mais
+> `plan-royalidentity-security.md`, que nem constava aqui) e o refinamento do item 2 em
+> [plan-data-macro.md](plan-data-macro.md) (7 sub-planos). Este documento é mantido apenas como
+> **registro histórico** do planejamento original.
+
 Este roadmap organiza os planejamentos que ficam depois do plano ativo
 [plan-users-edge-session.md](plan-users-edge-session.md). O plano ativo ainda cobre a
 borda de usuários + sessão dentro do IdP; os itens abaixo são os próximos planos
