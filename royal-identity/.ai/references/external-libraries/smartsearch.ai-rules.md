@@ -45,6 +45,8 @@ Adicione `RoyalCode.SmartSearch.AspNetCore`, `RoyalCode.SmartSearch.EntityFramew
 11. Não use `IResultList.Projections` nem `GetProjection<T>()`; a implementação padrão ainda não é funcional.
 12. Configure defaults, specifiers, factories, sortings e selectors no startup, antes da primeira consulta; os pares modelo/filtro são cacheados.
 13. Propague `CancellationToken` para todos os terminais async.
+14. `Select<TDto>()` resolve a projeção nesta ordem: selector já resolvido; `ISelector<TEntity, TDto>` no DI (inclui `cfg.AddSelector`); propriedade `public static` do DTO do tipo `Expression<Func<TEntity, TDto>>`; geração por reflexão em runtime. Sem nenhuma delas, lança `SelectorNotFoundException` — erro de runtime, não de compilação.
+15. Com SmartSelector no projeto, um DTO `[AutoSelect<TEntity>]` já expõe essa propriedade estática e é encontrado sozinho: não registre selector para ele. As libs não dependem uma da outra; cada uma funciona sozinha.
 
 ## 3. Configuração canônica com EF Core
 

@@ -779,8 +779,21 @@ níveis, do mais explícito ao mais implícito. O primeiro que responder vence, 
 | 4 | Geração em runtime | expressão construída por reflexão a partir da forma dos tipos |
 
 O **nível 3** é um contrato por convenção, e é o que permite ao SmartSearch aproveitar uma expressão pronta sem
-precisar conhecer quem a escreveu. Serve tanto para uma expressão escrita à mão quanto para a expressão **gerada pelo
-SmartSelector** (ver 11.4).
+precisar conhecer quem a escreveu. Serve tanto para uma expressão escrita à mão:
+
+```csharp
+public class OrderDto
+{
+    // descoberta pelo nível 3 — o nome da propriedade não importa, só o tipo
+    public static Expression<Func<Order, OrderDto>> Selector { get; } = o => new OrderDto
+    {
+        Id = o.Id,
+        CustomerName = o.Customer.Name
+    };
+}
+```
+
+...quanto para a expressão **gerada pelo SmartSelector** (ver 11.4).
 
 O **nível 4** é o fallback: resolve DTOs de forma "plana", casando propriedades por nome (com flattening), e cobre
 nullables, enums, subobjetos e coleções. Exige que o DTO tenha construtor sem parâmetros. Quando não consegue montar a
@@ -808,11 +821,8 @@ var result = await criteria.FilterBy(filter).Select<OrderDetails>().ToListAsync(
 
 Vale a pena, porque a expressão gerada é verificada **em tempo de compilação**: o SmartSelector reporta projeções
 inseguras (nulabilidade, caminhos inválidos) como diagnósticos `RCSS*`, enquanto a geração em runtime (nível 4) apenas
-projeta com o que encontra.
-
-É por esse contrato que os endpoints gerados pelo SmartCommands (`MapFind`, `MapSearch`) projetam DTOs sem que o
-SmartCommands conheça o SmartSelector: ele apenas pede o `TDto` ao repositório ou à criteria, e a resolução acima faz o
-resto.
+projeta com o que encontra. Preferir o SmartSelector quando o DTO existe no código-fonte; deixar o nível 4 para os
+casos em que não há DTO anotado.
 
 ## 12. Terminais, tracking e resultados
 
