@@ -1,7 +1,7 @@
 # Documentação da API SmartValidations (RuleSet, IValidable)
 
 Esta documentação apresenta os conceitos, funcionalidades e exemplos práticos para usar a biblioteca SmartValidations em projetos .NET.
-Também serve de referência para ferramentas de IA (ex.: GitHub Copilot) gerarem código correto com base na API da biblioteca.
+Para instruções objetivas de uso por ferramentas de IA, consulte também `.docs/validations.ai-rules.md`.
 
 Projetos alvo: .NET 8, .NET 9 e .NET 10.
 
@@ -15,7 +15,7 @@ Sumário
 7. Referência da API
 8. Boas práticas
 9. Resumo
-10. Instruções para Ferramentas de IA (GitHub Copilot)
+10. Documentação para IA
 
 ## 1. Introdução
 
@@ -35,11 +35,12 @@ Benefícios principais:
     - `rule` (nome da regra), `current` (valor atual), `expected` (valor(es) esperado(s)), `pattern` (em regras de regex), `properties` e `values` (em regras com 2 operandos).
   - Integra com display names e prefixos de propriedades, removendo prefixos configurados ao encadear problemas.
   - Conversão implícita para `Problems?` e método `HasProblems(out Problems?)`.
+  - É um `readonly ref struct`: use localmente em métodos síncronos de validação, especialmente em `HasProblems(out Problems?)`.
 
 - `IValidable`
   - Contrato simples com `HasProblems(out Problems?)` para permitir validação de objetos e value objects (structs).
 
-- Predicados internos (`BuildInPredicates`)
+- Predicados públicos de apoio (`BuildInPredicates`)
   - Conjunto abrangente de verificações: vazios, igualdade, comparações, faixas, tamanhos, padrões de string, e utilitários de data/tempo.
   - Utilizados por `RuleSet` para implementar as regras fluentes.
 
@@ -53,7 +54,7 @@ Benefícios principais:
 
 - Utilidades
   - `WithPropertyPrefix(...)` para normalizar caminhos removendo prefixos conhecidos.
-  - Regras de e-mail e URL baseadas em `EmailAddressAttribute` e `UrlAttribute`.
+  - Regras de e-mail, URL, URL HTTPS, URL absoluta e URL relativa.
 
 ## 3. Exemplos de uso base
 
@@ -86,7 +87,7 @@ public static Problems? ValidateProduct(string sku, string? name, decimal price)
     return Rules.Set()
         .NotEmpty(sku)
         .NullOrLength(name, 3, 120)
-        .GreaterThanOrEqual(price, 0)
+        .Min(price, 0m)
         ; // conversão implícita para Problems?
 }
 ```
@@ -120,23 +121,26 @@ public readonly struct Money : IValidable
     public bool HasProblems(out Problems? problems)
     {
         return Rules.Set<Money>()
-            .GreaterThanOrEqual(Amount, 0)
+            .Min(Amount, 0m)
             .Length(Currency, 3, 3)
             .HasProblems(out problems);
     }
 }
 
 var prices = new[] { new Money(-1, ""), new Money(10, "USD") };
-var set = Rules.Set().Validate((IEnumerable<Money>)prices);
+var set = Rules.Set().Validate(prices);
 if (set.HasProblems(out var problems))
 {
-    // problems conterá caminhos com índices: [0], [1]
+    // apenas o item inválido gera problemas; o Property de cada problema
+    // será o nome do argumento com índice: "prices[0]"
 }
 ```
 
+Observação: `Validate` substitui o `Property` dos problemas internos pelo nome do argumento (com índice em coleções). No exemplo, tanto a falha de `Amount` quanto a de `Currency` do primeiro item terão `Property == "prices[0]"`; o campo específico permanece no texto da mensagem. Esse comportamento é pensado para value objects, onde o nome externo é mais significativo que o campo interno — para preservar o caminho completo (ex.: `Items[0].Quantity`), use `Nested` com classes.
+
 ## 5. Exemplos de uso aninhados (objetos e coleções)
 
-Validando objetos opcionais com `NotNullNested` e objetos sempre presentes com `Nested`:
+Validando objetos obrigatórios com `NotNullNested` e objetos opcionais com `Nested`:
 
 ```csharp
 public sealed class Address
@@ -157,10 +161,12 @@ public sealed class CheckoutRequest : IValidable
         return Rules.Set<CheckoutRequest>()
             .NotEmpty(CustomerId)
             .NotNullNested(Shipping, addr => Rules.Set<Address>()
+                .WithPropertyPrefix(nameof(addr))
                 .NotEmpty(addr.Street)
                 .NotEmpty(addr.City)
                 .NotEmpty(addr.ZipCode))
             .Nested(PastAddresses, addr => Rules.Set<Address>()
+                .WithPropertyPrefix(nameof(addr))
                 .NotEmpty(addr.Street)
                 .NotEmpty(addr.City)
                 .NotEmpty(addr.ZipCode))
@@ -172,20 +178,23 @@ public sealed class CheckoutRequest : IValidable
 Usando `WithPropertyPrefix` para normalizar nomes ao compor validadores reutilizáveis:
 
 ```csharp
-Problems? ValidateAddress(Address a)
+Problems? ValidateAddress(Address address)
     => Rules.Set<Address>()
-        .WithPropertyPrefix(nameof(a))
-        .NotEmpty(a.Street)
-        .NotEmpty(a.City)
-        .NotEmpty(a.ZipCode);
+        .WithPropertyPrefix(nameof(address))
+        .NotEmpty(address.Street)
+        .NotEmpty(address.City)
+        .NotEmpty(address.ZipCode);
 
-var set2 = Rules.Set()
-    .Nested(order.ShippingAddress, a => ValidateAddress(a));
+var order = new Order { ShippingAddress = new Address() };
+
+var set2 = Rules.Set<Order>()
+    .WithPropertyPrefix(nameof(order))
+    .Nested(order.ShippingAddress, address => ValidateAddress(address));
 ```
 
 No exemplo acima, se `Street` estiver vazio, o `Property` do `Problem` será `ShippingAddress.Street`.
 
-Caso não usasse `WithPropertyPrefix`, o `Property` seria `ShippingAddress.a.Street`, incluindo o nome do parâmetro como nome da propriedade.
+Sem o `WithPropertyPrefix` externo, o caminho manteria o nome da variável (`order.ShippingAddress.Street`). Sem o `WithPropertyPrefix` interno, o caminho incluiria o nome do parâmetro do validador (`ShippingAddress.address.Street`).
 
 ## 6. Exemplos de uso avançados
 
@@ -202,7 +211,19 @@ var set = Rules.Set()
 // Grupos alternativos: adiciona problemas de ambos se ambos falharem
 set = set.Unless(
     s => s.NotEmpty(promoCode),        // condição
-    s => s.Min(totalAmount, 100));     // alternativo
+    s => s.Min(totalAmount, 100m));    // alternativo
+```
+
+- URLs especializadas, sinais numéricos e datas:
+
+```csharp
+var set = Rules.Set()
+    .HttpsUrl(callbackUrl)
+    .RelativeUrl(returnPath)
+    .Positive(quantity)
+    .Min(price, 0m)
+    .InFuture(expiresAt)
+    .After(periodEnd, periodStart);
 ```
 
 - Regras personalizadas (`Must`/`BothMust`) com metadados de regra:
@@ -221,6 +242,7 @@ var strong = Rules.Set()
 
 - Internacionalização
   - As mensagens são formatadas por templates (ex.: `R.MinMessageTemplate`) e nomes de exibição via `DisplayNames`.
+  - Os templates são recursos localizáveis (`R.resx`); a biblioteca inclui inglês (padrão) e `pt-BR`, selecionados pela `CultureInfo.CurrentUICulture` da thread.
   - Configure seus display names (DataAnnotations ou provedor customizado) para mensagens amigáveis.
 
 ## 7. Referência da API
@@ -228,7 +250,13 @@ var strong = Rules.Set()
 Tipos principais:
 - `RuleSet` (fluent API de validação)
 - `IValidable` (contrato para validação)
-- `BuildInPredicates` (predicados usados pelas regras)
+- `BuildInPredicates` (predicados públicos de apoio usados pelas regras)
+
+Escopo de uso do `RuleSet`
+- `RuleSet` é `readonly ref struct`.
+- Use em escopo local e síncrono; não armazene em campos, não capture em lambdas assíncronas e não tente atravessar `await`.
+- O uso principal esperado é dentro de `HasProblems(out Problems?)` ou funções síncronas que retornam `Problems?`.
+- Use como uma única cadeia fluente: após a primeira falha, as cópias de um `RuleSet` compartilham a mesma coleção de `Problems` — não ramifique um `RuleSet` intermediário em cadeias independentes.
 
 Criação e inspeção
 - `Rules.Set()` / `Rules.Set<T>()` / `RuleSet.For<T>()`
@@ -241,6 +269,7 @@ Nulos e vazios
 - `NotEmpty` para: `string`, `INumber<T>`, `T? where T: struct, INumber<T>`, arrays, `ICollection<T>`, `IReadOnlyCollection<T>`, `IEnumerable<T>`, `DateTime(Offset)`, `DateOnly`, `Guid`
 - `NullOrNotEmpty` para: `string`, `INumber<T>`, `T? where T: struct, INumber<T>`
 - Duais: `BothNullOrNotEmpty(string?, string?)`
+- Semântica de "vazio": zero para números, `MinValue` para datas, `Guid.Empty` para GUIDs, nula/em branco para strings, sem itens para coleções.
 
 Igualdade/Desigualdade
 - `Equal` e `NotEqual` para `string` (com `StringComparison`) e tipos `IEquatable<T>` (inclui versões `Nullable<T>`)
@@ -250,20 +279,25 @@ Strings e padrões
 - `Matches` / `NotMatches` com `string pattern` ou `Regex`
 - `StartsWith` / `EndsWith` / `Contains` / `NotContain`
 - `OnlyLetters` / `OnlyDigits` / `OnlyLettersOrDigits` / `NoWhiteSpace`
+- As sobrecargas com `string pattern` aplicam `BuildInPredicates.RegexMatchTimeout` (1s) como proteção contra backtracking catastrófico.
 
 Numéricos e faixas
 - `Min` / `Max` / `MinMax` (e variantes `NullOrMin`, `NullOrMax`, `NullOrMinMax`)
+- `Positive` / `Negative` / `Zero` / `NotZero`
 - Tamanho de string: `MinLength` / `MaxLength` / `Length` (e `NullOrMinLength`, `NullOrMaxLength`, `NullOrLength`)
 
 Comparações relativas
 - `LessThan` / `LessThanOrEqual` / `GreaterThan` / `GreaterThanOrEqual` (para tipos `IComparable<T>` e suas variantes `Nullable`)
+- Nas variantes `Nullable`, `null` é tratado como o menor valor possível (mesma convenção de `Comparer<T>.Default`).
 
-Datas e horários (via `BuildInPredicates`)
+Datas e horários
 - `InPast` / `InFuture` / `Today` para `DateTime`, `DateTimeOffset`, `DateOnly`
 - `After` / `Before` / `Between` para os mesmos tipos
+- As regras relativas (`InPast`, `InFuture`, `Today`) usam `BuildInPredicates.Clock` (`TimeProvider`, padrão `TimeProvider.System`); substitua em testes para resultados determinísticos.
 
 E-mail e URL
 - `Email(string?)` e `Url(string?)`
+- `HttpsUrl(string?)`, `AbsoluteUrl(string?)` e `RelativeUrl(string?)`
 
 Customização
 - `Must<T>(value, predicate, messageFormatter[, ruleName])`
@@ -271,9 +305,9 @@ Customização
 - `BothMust<T1, T2>(...)` e `BothMust<T1, T2, TParam>(...)`
 
 Validação aninhada
-- Objetos: `Nested(value, Problems? validator)` / `Nested(value, Func<T, ValidateFunc>)` / `Nested(value) where T: IValidable`
-- Coleções: `Nested(IEnumerable<T>, ...)` com indexação automática
-- Garantindo não-nulo: `NotNullNested(...)` (mesmas variações)
+- Objetos opcionais: `Nested(value, Func<T, Problems?>)` / `Nested(value, Func<T, ValidateFunc>)` / `Nested(value) where T: IValidable`
+- Coleções opcionais: `Nested(IEnumerable<T>, ...)` com indexação automática; itens `null` são ignorados
+- Objetos e coleções obrigatórios: `NotNullNested(...)` com as mesmas variações; gera problema quando o valor/coleção é `null` e, em coleções, quando um item é `null` (com propriedade indexada, ex.: `Items[2]`).
 
 Structs com `IValidable`
 - `Validate<T>(value) where T: struct, IValidable`
@@ -295,66 +329,17 @@ Metadados em `Problem` (SmartProblems)
 - Use `WithPropertyPrefix` para normalizar caminhos ao reutilizar validadores.
 - Padronize mensagens com templates localizáveis e display names consistentes.
 - Garanta cobertura com regras `NullOr*` quando campos forem opcionais.
+- Para objetos aninhados opcionais, use `Nested`; para obrigatórios, use `NotNullNested`.
+- Para limites fixos, prefira `Min`, `Max`, `MinMax`, `Positive`, `Negative`, `Zero` e `NotZero`; deixe `LessThan`/`GreaterThan` para comparação entre valores.
+- Use `HttpsUrl`, `AbsoluteUrl`, `RelativeUrl` e regras de data diretamente no `RuleSet` antes de recorrer a `Must`.
+- Não armazene `RuleSet` fora do escopo local de validação; ele é um `ref struct`.
+- Trate o `RuleSet` como uma cadeia fluente única; não ramifique um set intermediário em cadeias independentes (as cópias compartilham os `Problems`).
 - Em coleções, valide cada item com `Nested`/`Validate` para obter caminhos com índice.
 
 ## 9. Resumo
 
 SmartValidations fornece uma maneira fluente, fortemente tipada e performática de validar modelos .NET. Ao invés de lançar exceções, as falhas são representadas por `Problems` ricos em contexto, integráveis com `ProblemDetails` em APIs. Suas APIs cobrem desde regras básicas de vazio/igualdade até validações aninhadas, condicionais e customizadas, com metadados para rastreabilidade e mensagens prontas para localização.
 
-## 10. Instruções para Ferramentas de IA (GitHub Copilot)
+## 10. Documentação para IA
 
-Objetivo: gerar validações seguindo o contrato da API (`RuleSet`, `IValidable`) e produzir `Problems` com metadados corretos.
-
-Princípios obrigatórios
-- Sempre valide com `Rules.Set<T>()` (quando dentro do tipo) ou `Rules.Set()` (fora), e finalize com `HasProblems(out Problems?)` ou conversão implícita para `Problems?`.
-- Use os métodos de regra do `RuleSet` (ex.: `NotEmpty`, `Min`, `Equal`, `Matches`, `Nested`, `Validate`) em vez de criar `Problem` manualmente.
-- Preserve o `Property` via `CallerArgumentExpression`: passe o próprio argumento observado à regra, não strings de nome manual.
-- Em objetos opcionais, primeiro `NotNullNested(...)`; em objetos obrigatórios, use `Nested(...)` diretamente.
-- Em coleções, use `Nested(IEnumerable<T>, ...)` ou `Validate(IEnumerable<struct>)` para indexar automaticamente (`Items[i].Prop`).
-
-Padrões de implementação
-- DTO/entrada
-  - Estrutura:
-    - Método `bool HasProblems(out Problems? problems)`.
-    - `return Rules.Set<ThisType>() ... .HasProblems(out problems);`
-  - Campos opcionais: `NullOr*` (ex.: `NullOrLength`) ou `NotNullNested` antes de regras internas.
-  - Campos obrigatórios: `NotEmpty`/`Min`/`Max`/`Length` conforme tipo.
-
-- Objetos aninhados
-  - `Nested(child, c => Rules.Set<Child>()...)` para validar filhos obrigatórios.
-  - `NotNullNested(child, c => Rules.Set<Child>()...)` para filhos opcionais.
-  - Para reuso, normalize com `WithPropertyPrefix(prefix)` no validador reutilizável.
-
-- Value objects (struct)
-  - Implementar `IValidable` com `HasProblems(out Problems?)` interno ao struct.
-  - Em agregados: `Rules.Set().Validate(collectionOfStructs)` para coletar e indexar problemas.
-
-- Condicionais
-  - `When(cond, builder)` para aplicar regras sob condição.
-  - `Unless(cond, builder)` para aplicar regras quando a condição não vale.
-  - Alternativas: `Unless(conditionRules, alternativeRules)` (se ambos falham, agregue ambos).
-
-- Regras customizadas
-  - `Must(value, predicate, messageFormatter[, ruleName])` e `BothMust(...)` quando não houver regra pronta.
-  - O `messageFormatter` deve usar o display name (`prop`) e indicar claramente o requisito violado.
-
-- URLs/e-mails e datas
-  - Use `Email(value)` e `Url(value)` para formatos; prefira `IsHttpsUrl`/`IsAbsoluteUrl` (via predicados) dentro de `Must` quando necessário.
-  - Datas: utilize comparações (`LessThan/GreaterThanOrEqual`) e predicados de tempo (`InPast/InFuture`) conforme o caso.
-
-Formato esperado de saída
-- Funções devem retornar `Problems?` ou `bool HasProblems(out Problems?)`.
-- Não lançar exceções para fluxo de validação.
-- Problemas conterão `rule/current/expected/pattern/properties/values` automaticamente via `RuleSet`.
-
-Exemplos de prompts corretos
-- "Gere `HasProblems(out Problems?)` para `RegisterUser` com `NotEmpty(Name)`, `Min(Age,18)`, e `NotNullNested(Address, addr => ... )`."
-- "Valide `Order.Items` com `Nested(items, item => Rules.Set<OrderItem>().NotEmpty(item.ProductId).GreaterThan(item.Quantity,0))`."
-- "Crie regra customizada com `Must(Password, predicate, formatter, ruleName:"password.policy")` e alternativa com `Unless(s => s.NotEmpty(PromoCode), s => s.Min(Total,100))`."
-- "Implemente `IValidable` em `struct Price` e valide uma lista com `Rules.Set().Validate(prices)` retornando `Problems?`."
-
-Antipadrões (evitar)
-- Construir `Problem` manualmente para validação de entrada (use `RuleSet`).
-- Passar nomes de propriedade como string (quebra refactors e `CallerArgumentExpression`).
-- Usar exceções para fluxo esperado de validação.
-- Usar Expression para a propriedade (x => x.Prop) (não funciona).
+Use `.docs/validations.ai-rules.md` como documento de instruções para ferramentas de IA em outros projetos e repositórios.
