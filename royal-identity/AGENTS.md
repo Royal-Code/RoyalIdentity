@@ -17,18 +17,37 @@ Before significant code changes, read:
 Before modifying an area touched by a plan, inspect `.ai/plans/` first. Deferred
 product/design notes live in `.ai/backlogs/backlog-001.md`.
 
-Completed redesign plans include `.ai/plans/plan-users-edge-session.md` for the
-users/session area. Treat it as the implemented target architecture before changing
-`RoyalIdentity/Users/`, account UI services, profile claims, login/logout, or
-session behavior.
+Completed plans, in order: `.ai/plans/plan-users-edge-session.md` (users/session
+edge redesign), `.ai/plans/plan-users-accounts-module-v2.md` (the `UserAccounts`
+module — rich accounts, own persistence, properties-by-scope, `.Integration`
+adapter; 10/10 phases done), `.ai/plans/plan-users-security-lifecycle.md` (password
+history/expiration, action tokens, `SecurityStamp`/`SessionsValidAfter`
+invalidation, lockout, email/phone verification), and
+`.ai/plans/plan-royalidentity-security.md` (shared `RoyalIdentity.Security`
+library for crypto/password hashing/key material). Treat each as the implemented
+target architecture before changing the area it covers.
 
-Accepted architectural decisions live in `adrs/` (ADR-001..015). Read the relevant
+Active plan: `.ai/plans/plan-users-accounts-sqlite-hardening.md` — hardens the
+`UserAccounts` backing toward replacing the in-memory fake (ADR-018): real
+concurrency retry on the credential use cases (library pieces already shipped
+in `RoyalCode.SmartCommands`/`.WorkContext` `0.1.0`), provider migrations, and a
+reusable seed. `.ai/plans/plans-roadmap-02.md` maps what comes after (supersedes
+`plans-roadmap-01.md`).
+
+Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:
 `ADR-013` (modular architecture & boundaries — storages as facades) and `ADR-014`
 (users edge + session redesign, which **refines** `ADR-005`), implemented by
-`.ai/plans/plan-users-edge-session.md`; and `ADR-015` (`RoyalIdentity.UserAccounts`
+`.ai/plans/plan-users-edge-session.md`; `ADR-015` (`RoyalIdentity.UserAccounts`
 module — rich accounts, own persistence, `.Integration` adapter, claims seam
-`IUserClaimsProvider`), which **amends** `ADR-013`/`ADR-014`.
+`IUserClaimsProvider`), which **amends** `ADR-013`/`ADR-014`; `ADR-016` (shared
+`RoyalIdentity.Security` library, in the product namespace, not the external
+`RoyalCode.*` ecosystem), which **amends** `ADR-013`; `ADR-017` (account security
+lifecycle — `RequiredAction`, `SecurityStamp`/`SessionsValidAfter`,
+`IUserSecurityStateProvider`/`ISessionRevocationService`), which **amends**
+`ADR-014`/`ADR-015`; and `ADR-018` (the in-memory storage fake is transitional —
+converge tests on the module + Sqlite, no further fake feature-parity), which
+**amends** `ADR-013`/`ADR-014`/`ADR-015`.
 
 ## Commands
 
@@ -78,6 +97,15 @@ Respect the dependency layers:
 Do not make `RoyalIdentity` depend on `RoyalIdentity.Storage.InMemory`,
 `RoyalIdentity.Server`, or UI projects. Do not make `RoyalIdentity.Pipelines`
 depend on domain code.
+
+Rich domain modules (`RoyalIdentity.UserAccounts`, and future `RoyalIdentity.KMS`)
+follow a separate Feature-Slice architecture — see `.ai/foundation/architecture.md`.
+Each ships as a family: the **pure module** (domain + features + own persistence;
+depends only on RoyalCode libraries + EF Core; **never** references the core), a
+separate **`.Integration`** adapter (references both core and module; implements
+the core-owned edge ports; the only bridge between them), and per-provider
+projects (`.PostgreSql`/`.Sqlite`). The core never references the module. Only
+`.Integration` knows both sides.
 
 ## Pipeline Rules
 
@@ -161,13 +189,26 @@ Known unstable areas include:
   `ILocalUserAuthenticator`, `IUserClaimsProvider`, pure `IUserSessionStore`,
   `IUserSessionService`, `ISubjectPrincipalFactory`, and `LoginFlowService`.
   (`IUserClaimsProvider` is the ADR-014-amended name for `IUserPropertyProvider`;
-  the code rename lands in `plan-users-accounts-module-v2.md` Fase 2.)
+  the rename landed in `plan-users-accounts-module-v2.md` Fase 2, now completed.)
   Do not reintroduce removed legacy types such as `IdentityUser`, `UserDetails`,
   `IUserStore`, `IUserDetailsStore`, `IdentitySession`, `ISignInManager`, or
   credentials-result structs.
 - Scope/resource hierarchy types such as `ResourceServer` and related models.
 - Realm-specific options and CORS, covered by
   `.ai/plans/plan-realm-options-redesign.md`.
+
+## External RoyalCode Libraries (`UserAccounts` module family only)
+
+Only `RoyalIdentity.UserAccounts` and its `.Integration`/`.PostgreSql`/`.Sqlite`
+family depend on the external `RoyalCode.*` ecosystem (the pure module is
+"RoyalCode libs + EF Core only" — see Project Boundaries above). The core
+`RoyalIdentity` IdP does not use these libraries; it has its own pipeline/
+`context.Response` conventions.
+
+See `.ai/references/external-libraries/instructions.md` for the index of
+per-library docs (SmartCommands, WorkContext, SmartSearch, SmartSelector,
+SmartProblems, SmartValidations, Domain), the `.md`/`.ai-rules.md` pairing
+convention, and precedence rules.
 
 ## Code Style
 
@@ -178,7 +219,7 @@ Known unstable areas include:
 - Primary constructors are preferred for simple cases.
 - Follow `.ai/rules/code-style.rules.md` for repository-specific style rules, including the preference for method-chain LINQ over query expression syntax.
 - Keep changes scoped to the task and follow nearby patterns.
-- Follow the instructions in `.ai\references\external-libraries\instructions.md` and the internal references for the design of specific components/classes/patterns documented in this file.
+- For the `UserAccounts` module family, follow "External RoyalCode Libraries" above for library-specific patterns.
 
 ## ADR
 
@@ -189,7 +230,7 @@ Rules for ADRs:
 - They are stored in the `adrs\` directory;
 - They follow the naming convention: `ADR-{NNN}.md`.
 
-ADRs with good structure are ADR-001 through ADR-009.
+ADRs with good structure are ADR-001 through ADR-009, and ADR-016.
 ADRs with acceptable structure: ADR-010 and ADR-011.
 ADRs with poor structure are ADR-012 through ADR-015; these contain a design rather than a decision.
 

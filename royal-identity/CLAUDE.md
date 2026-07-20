@@ -21,12 +21,15 @@ Completed refactoring plans (useful as historical record and for understanding d
 - [.ai/plans/plan-realm-options-redesign.md](.ai/plans/plan-realm-options-redesign.md) — COMPLETED (per-realm RealmOptions, copy-on-create, CORS)
 - [.ai/plans/plan-resources-redesign.md](.ai/plans/plan-resources-redesign.md) — COMPLETED (Resources/Scopes model: IdentityScope, ResourceServer, Scope; client AllowedResources; signing chain; Resource Indicators / Protected Resource Metadata)
 - [.ai/plans/plan-users-edge-session.md](.ai/plans/plan-users-edge-session.md) — COMPLETED (users edge + session redesign; ADR-013/014; `SubjectId`, `IUserDirectory`, `ICurrentRealmAccessor`, pure session store, `LoginFlowService`)
+- [.ai/plans/plan-users-accounts-module-v2.md](.ai/plans/plan-users-accounts-module-v2.md) — COMPLETED (10/10 fases; camada B: `RoyalIdentity.UserAccounts` module — rich accounts, own persistence, properties-by-scope, `.Integration` adapter; ADR-015)
 - [.ai/plans/plan-users-security-lifecycle.md](.ai/plans/plan-users-security-lifecycle.md) — COMPLETED (account credentials & security lifecycle: password history/expiration enforcement, action tokens, `SecurityStamp` + `SessionsValidAfter` invalidation, lockout/admin block window, email/phone verification, session/refresh revocation, events + audit; ADR-017. Review-006 noted a follow-up: concurrency **retry** decided but not implemented in the real flow — see plan-users-accounts-sqlite-hardening)
+- [.ai/plans/plan-royalidentity-security.md](.ai/plans/plan-royalidentity-security.md) — COMPLETED (8/8 fases; shared `RoyalIdentity.Security` library — crypto, password hashing, key material; ADR-016; removed duplication between the core and `UserAccounts`)
 
 Active plans (check status before modifying affected areas):
 
-- [.ai/plans/plan-users-accounts-module-v2.md](.ai/plans/plan-users-accounts-module-v2.md) — PLANNED (camada B: `RoyalIdentity.UserAccounts` module — rich accounts, own persistence, properties-by-scope, `.Integration` adapter; ADR-015. Fase 1 done)
-- [.ai/plans/plan-users-accounts-sqlite-hardening.md](.ai/plans/plan-users-accounts-sqlite-hardening.md) — PLANNED (backing hardening toward replacing the in-memory fake per ADR-018: Fase 1 concurrency **retry** in the real handler (ADR-017 §2.9, currently detection-only), Fase 2 provider migrations (`.Sqlite`/`.PostgreSql`, today only `EnsureCreated`), Fase 3 reusable module seed + module as test backing. Has open questions to decide first)
+- [.ai/plans/plan-users-accounts-sqlite-hardening.md](.ai/plans/plan-users-accounts-sqlite-hardening.md) — IN PROGRESS (backing hardening toward replacing the in-memory fake per ADR-018. All open questions decided. Fase 1 concurrency **retry**: library pieces done — `RoyalCode.SmartCommands`/`.WorkContext` `0.1.0` ship the `RetryOnConcurrencyAsync` primitive + `[WithRetryOnConcurrency]` + generator support, already consumed here — applying the attribute to the real credential use cases is pending; Fase 2 provider migrations (`.Sqlite`/`.PostgreSql`, today only `EnsureCreated`) pending; Fase 3 reusable module seed + module as test backing pending)
+
+Roadmap of the plans that come after the ones above: [.ai/plans/plans-roadmap-02.md](.ai/plans/plans-roadmap-02.md) (supersedes `plans-roadmap-01.md`) — includes `.ai/plans/plan-data-macro.md`, the sequencing map for the IdP's own data persistence work.
 
 Architectural Decision Records (accepted decisions; read before changing the affected area):
 
@@ -88,6 +91,12 @@ services.AddPipelines(builder =>
 
 **Constants** — use `Constants.*` for all protocol strings (`Constants.Oidc.*`, `Constants.Server.*`, `Constants.Jwt.*`). Use `JwtRegisteredClaimNames.*` for standard JWT claims. The legacy classes `OidcConstants`, `JwtClaimTypes`, `ServerConstants` were deleted — do not re-introduce them.
 
+## External RoyalCode Libraries (`UserAccounts` module family only)
+
+Only `RoyalIdentity.UserAccounts` and its `.Integration`/`.PostgreSql`/`.Sqlite` family depend on the external `RoyalCode.*` ecosystem (per [architecture.md](.ai/foundation/architecture.md) §9: the pure module is "RoyalCode libs + EFCore only", no reference to the core). The core `RoyalIdentity` IdP does **not** use these libraries — it has its own pipeline/`context.Response` conventions (see Architecture in Brief above).
+
+See [.ai/references/external-libraries/instructions.md](.ai/references/external-libraries/instructions.md) for the index of per-library docs (SmartCommands, WorkContext, SmartSearch, SmartSelector, SmartProblems, SmartValidations, Domain), the `.md`/`.ai-rules.md` pairing convention, and precedence rules.
+
 ## Code Style
 
 - Tabs, width 4 (`indent_size = 4` in `.editorconfig`)
@@ -95,7 +104,7 @@ services.AddPipelines(builder =>
 - File-scoped namespaces preferred (`csharp_style_namespace_declarations = block_scoped:silent`)
 - Primary constructors preferred for simple cases (`csharp_style_prefer_primary_constructors = true:suggestion`)
 - See [.ai/rules/code-style.rules.md](.ai/rules/code-style.rules.md) for repository-specific code smells such as LINQ query expression syntax.
-- Follow the instructions in `.ai\references\external-libraries\instructions.md` and the internal references for the design of specific components/classes/patterns documented in this file.
+- For the `UserAccounts` module family, follow "External RoyalCode Libraries" above for library-specific patterns.
 
 ## ADR
 
