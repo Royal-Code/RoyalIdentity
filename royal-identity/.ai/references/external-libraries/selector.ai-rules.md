@@ -59,7 +59,7 @@ Nunca referencie o projeto/pacote do generator como assembly de runtime.
 | gerar flattening de uma navegação raiz | `Flattening = [nameof(Entity.Address)]` |
 | gerar/completar tipo de detalhe aninhado | `[AutoDetails]` na propriedade |
 | objeto aninhado com forma customizada | declare o DTO aninhado manualmente |
-| coleção de objetos | declare `IReadOnlyList<ItemDetails>` ou `ItemDetails[]` |
+| coleção de objetos | declare `List<ItemDetails>`, `IReadOnlyList<ItemDetails>`, `ItemDetails[]` ou `HashSet<ItemDetails>` |
 | cálculo, agregação, formatação | `Expression<Func<Entity,Dto>>` manual |
 
 ## 4. Padrão canônico
@@ -94,6 +94,11 @@ UserDetails dto2 = user.ToUserDetails();
 Expression<Func<User, UserDetails>> expression =
     UserDetails.SelectUserExpression;
 ```
+
+Com SmartSearch no projeto, não registre nada: `Select{Entity}Expression` é uma propriedade `public static` do tipo
+`Expression<Func<TEntity, TDto>>`, e é assim que o SmartSearch descobre projeções (`criteria.Select<TDto>()`). Sem o
+membro gerado — DTO sem `AutoSelect` —, o SmartSearch constrói a projeção por reflexão em runtime. As libs não dependem
+uma da outra; cada uma funciona sozinha.
 
 Nomes gerados para origem `User` e destino `UserDetails`:
 
@@ -261,10 +266,12 @@ public class AuthorDetails
 Coleção de DTOs:
 
 ```csharp
-public IReadOnlyList<CommentDetails> Comments { get; set; } = [];
+public List<CommentDetails> Comments { get; set; } = [];
 ```
 
-Espere emissão com `Select(...).ToList()` quando o destino exigir lista.
+Espere emissão com `Select(...)` e a materialização do tipo declarado: `.ToList()` para `List<T>`/`IList<T>`/
+`ICollection<T>`/`IReadOnlyList<T>`/`IReadOnlyCollection<T>`, `.ToArray()` para `T[]`, `.ToHashSet()` para
+`HashSet<T>`/`ISet<T>`, e nada para `IEnumerable<T>`.
 
 Array de DTOs:
 

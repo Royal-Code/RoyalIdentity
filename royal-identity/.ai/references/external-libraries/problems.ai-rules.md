@@ -16,8 +16,8 @@ Pacote e namespace **divergem**. Não deduza; consulte.
 | `Problem`, `Problems`, `Result`, `Result<T>` | `RoyalCode.SmartProblems` | `RoyalCode.SmartProblems` |
 | `FindResult<>`, `Id<,>`, `FindCriterion`, `FindCriteria<>` | `RoyalCode.SmartProblems.Entities` | `RoyalCode.SmartProblems` |
 | `TryFindAsync`, `TryFindByAsync`, `FindByCriteria`, `AddTo`, `SaveChanges`, `RemoveFromAsync` | `Microsoft.EntityFrameworkCore` | `RoyalCode.SmartProblems.EntityFramework` |
-| `OkMatch`, `OkMatch<T>`, `CreatedMatch<T>`, `NoContentMatch` (tipos) | `RoyalCode.SmartProblems.HttpResults` | `RoyalCode.SmartProblems.ApiResults` |
-| `.OkMatch()`, `.CreatedMatch()`, `.NoContentMatch()` (extensions) | `Microsoft.AspNetCore.Http` | `RoyalCode.SmartProblems.ApiResults` |
+| `OkMatch`, `OkMatch<T>`, `CreatedMatch<T>`, `AcceptedMatch`, `AcceptedMatch<T>`, `NoContentMatch` (tipos) | `RoyalCode.SmartProblems.HttpResults` | `RoyalCode.SmartProblems.ApiResults` |
+| `.OkMatch()`, `.CreatedMatch()`, `.AcceptedMatch()`, `.NoContentMatch()` (extensions) | `Microsoft.AspNetCore.Http` | `RoyalCode.SmartProblems.ApiResults` |
 | `WithExceptionFilter` | `Microsoft.AspNetCore.Builder` | `RoyalCode.SmartProblems.ApiResults` |
 | `ToActionResult` (MVC) | `Microsoft.AspNetCore.Mvc` | `RoyalCode.SmartProblems.ApiResults` |
 | `ToResultAsync` | `System.Net.Http` | `RoyalCode.SmartProblems.Http` |
@@ -28,8 +28,8 @@ Pacote e namespace **divergem**. Não deduza; consulte.
 | `MapProblemDetailsDescriptionPage` | `Microsoft.AspNetCore.Builder` | `RoyalCode.SmartProblems.ProblemDetails` |
 | `EnsureIsValid`, `ToProblems`, `HasProblems` | `FluentValidation` | `RoyalCode.SmartProblems.FluentValidation` |
 
-Regras de namespace: tipos `OkMatch`/`CreatedMatch`/`NoContentMatch` usam `RoyalCode.SmartProblems.HttpResults`;
-extensions `.OkMatch()`/`.CreatedMatch()`/`.NoContentMatch()` usam `Microsoft.AspNetCore.Http`;
+Regras de namespace: tipos `OkMatch`/`CreatedMatch`/`AcceptedMatch`/`NoContentMatch` usam `RoyalCode.SmartProblems.HttpResults`;
+extensions `.OkMatch()`/`.CreatedMatch()`/`.AcceptedMatch()`/`.NoContentMatch()` usam `Microsoft.AspNetCore.Http`;
 `ToResultAsync` usa `System.Net.Http`; `ToProblemDetails` usa `RoyalCode.SmartProblems.Conversions`.
 
 ## 2. Regras invioláveis
@@ -183,9 +183,14 @@ API e cliente HTTP:
 OkMatch<T>      OkMatch<T>(this Result<T> result);
 CreatedMatch<T> CreatedMatch<T>(this Result<T> result, Func<T, string> createdPathFunction);
 CreatedMatch<T> CreatedMatch<T>(this Result<T> result, string createdPath, bool formatPathWithValue = false);
-// implícitos: Result -> OkMatch e NoContentMatch;
+AcceptedMatch      AcceptedMatch(this Result result, string? location = null);          // 202 sem corpo
+AcceptedMatch<T>   AcceptedMatch<T>(this Result<T> result, string? location = null);    // 202 com corpo T
+AcceptedMatch<T>   AcceptedMatch<T>(this Result<T> result, Func<T, string?> locationFunction);
+// implícitos: Result -> OkMatch, NoContentMatch e AcceptedMatch;
 //             Result<T>, FindResult<T>, T, Problem, Problems -> OkMatch<T>
+//             Result<T>, Problem, Problems -> AcceptedMatch<T>
 // => um handler pode retornar FindResult<T> direto como OkMatch<T>, sem ToResult()
+// AcceptedMatch responde 202 (aceito para processamento assíncrono); Location é sempre opcional
 
 Task<Result>    ToResultAsync(this HttpResponseMessage response, CancellationToken ct = default);
 Task<Result<T>> ToResultAsync<T>(this HttpResponseMessage response, JsonSerializerOptions? options = null, CancellationToken ct = default);

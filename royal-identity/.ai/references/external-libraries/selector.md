@@ -363,21 +363,21 @@ public class CommentDetails
 
 O generator projeta cada item com `Select` e materializa conforme o tipo declarado no destino:
 
-| Tipo do destino | Materializacao |
+| Tipo do destino | Materialização |
 | --- | --- |
 | `IEnumerable<T>` | nenhuma |
 | `List<T>`, `IList<T>`, `ICollection<T>`, `IReadOnlyList<T>`, `IReadOnlyCollection<T>` | `.ToList()` |
 | `T[]` | `.ToArray()` |
 | `HashSet<T>`, `ISet<T>` | `.ToHashSet()` |
 
-Um destino de colecao que o generator nao sabe materializar (um `Dictionary<K,V>`, por exemplo) e reportado como
-propriedade nao-assinavel, em vez de gerar codigo invalido.
+Um destino de coleção que o generator não sabe materializar (um `Dictionary<K,V>`, por exemplo) é reportado como
+propriedade não-assinável, em vez de gerar código inválido.
 
-Quando os elementos nao sao objetos a mapear, mas apenas a converter — uma colecao de enums equivalentes, por
-exemplo —, o `Select` emite so a conversao: `Status = source.Status.Select(b => (StatusDto)b).ToList()`.
+Quando os elementos não são objetos a mapear, mas apenas a converter — uma coleção de enums equivalentes, por
+exemplo —, o `Select` emite só a conversão: `Status = source.Status.Select(b => (StatusDto)b).ToList()`.
 
-> Antes do SmartSelector 0.5.1, um destino declarado com o tipo concreto `List<T>` gerava codigo invalido
-> (mapeava `Capacity`/`this[]` do proprio `List<T>`); o contorno era declarar a colecao como `IReadOnlyList<T>`.
+> Antes da 0.5.1, um destino declarado com o tipo concreto `List<T>` gerava código inválido (mapeava
+> `Capacity`/`this[]` do próprio `List<T>`); o contorno era declarar a coleção como `IReadOnlyList<T>`.
 > Corrigido — qualquer um dos tipos da tabela acima funciona.
 
 ### 10.3 Arrays
@@ -554,9 +554,8 @@ var result = await criteria.FilterBy(filter).Select<OrderDetails>().ToListAsync(
 ```
 
 O mesmo contrato aceita uma expressão escrita à mão — o que importa é o tipo da propriedade estática, não o nome nem
-quem a produziu. É também por ele que os endpoints gerados pelo SmartCommands (`MapFind`, `MapSearch`) projetam DTOs sem
-que o SmartCommands conheça o SmartSelector. Detalhes da ordem de resolução estão na documentação do SmartSearch, seção
-"Projeção para DTO".
+quem a produziu. Detalhes da ordem de resolução (registro no DI, propriedade estática, geração em runtime) estão na
+documentação do SmartSearch, seção "Projeção para DTO".
 
 ## 15. Referência dos atributos
 

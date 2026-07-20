@@ -41,10 +41,10 @@ vários casos — as linhas marcadas com ⚠️ não são dedutíveis a partir d
 | Tipo / membro | `using` (namespace) | Pacote NuGet |
 |---|---|---|
 | `Problem`, `Problems`, `Result`, `Result<T>` | `RoyalCode.SmartProblems` | `RoyalCode.SmartProblems` |
-| `FindResult<>`, `Id<,>`, `FindCriterion`, `FindCriteria<>`, `DisplayNames` | `RoyalCode.SmartProblems.Entities` | `RoyalCode.SmartProblems` |
+| `FindResult<>`, `Id<,>`, `FindCriterion`, `FindCriteria<>`, `FindCriteriaExtractor`, `DisplayNames` | `RoyalCode.SmartProblems.Entities` | `RoyalCode.SmartProblems` |
 | `TryFindAsync`, `TryFindByAsync`, `FindByCriteria`, `AddTo`, `SaveChanges`, `RemoveFromAsync` | ⚠️ `Microsoft.EntityFrameworkCore` | `RoyalCode.SmartProblems.EntityFramework` |
-| `OkMatch`, `OkMatch<T>`, `CreatedMatch<T>`, `NoContentMatch` (tipos) | ⚠️ `RoyalCode.SmartProblems.HttpResults` | ⚠️ `RoyalCode.SmartProblems.ApiResults` |
-| `.OkMatch()`, `.CreatedMatch()`, `.NoContentMatch()` (extensions) | ⚠️ `Microsoft.AspNetCore.Http` | ⚠️ `RoyalCode.SmartProblems.ApiResults` |
+| `OkMatch`, `OkMatch<T>`, `CreatedMatch<T>`, `AcceptedMatch`, `AcceptedMatch<T>`, `NoContentMatch` (tipos) | ⚠️ `RoyalCode.SmartProblems.HttpResults` | ⚠️ `RoyalCode.SmartProblems.ApiResults` |
+| `.OkMatch()`, `.CreatedMatch()`, `.AcceptedMatch()`, `.NoContentMatch()` (extensions) | ⚠️ `Microsoft.AspNetCore.Http` | ⚠️ `RoyalCode.SmartProblems.ApiResults` |
 | `WithExceptionFilter` | ⚠️ `Microsoft.AspNetCore.Builder` | `RoyalCode.SmartProblems.ApiResults` |
 | `ToActionResult` e afins (MVC) | ⚠️ `Microsoft.AspNetCore.Mvc` | `RoyalCode.SmartProblems.ApiResults` |
 | `ToResultAsync`, `FailureTypeReader` | ⚠️ `System.Net.Http` / `RoyalCode.SmartProblems.Http` | `RoyalCode.SmartProblems.Http` |
@@ -57,7 +57,7 @@ vários casos — as linhas marcadas com ⚠️ não são dedutíveis a partir d
 Pontos que causam erro de compilação ou pacote faltante com mais frequência:
 
 - Os tipos `OkMatch` e família estão no pacote **`ApiResults`**, mas no namespace **`HttpResults`**.
-- Os métodos `.OkMatch()`, `.CreatedMatch()` e `.NoContentMatch()` são extensions em **`Microsoft.AspNetCore.Http`**.
+- Os métodos `.OkMatch()`, `.CreatedMatch()`, `.AcceptedMatch()` e `.NoContentMatch()` são extensions em **`Microsoft.AspNetCore.Http`**.
 - `ToResultAsync` é injetado em **`System.Net.Http`** (namespace já implícito com `ImplicitUsings`),
   então "compila sem `using`" — mas exige o pacote `RoyalCode.SmartProblems.Http`. Os tipos auxiliares
   (`FailureTypeReader`) ficam em `RoyalCode.SmartProblems.Http`.
@@ -734,9 +734,41 @@ var res = entry.ToResult("id");
 // Se o parâmetro "id" for inválido, retorna Problem InvalidParameter com detail e property padronizados.
 ```
 
-## 6. Resultados de API (OkMatch, NoContentMatch, CreatedMatch)
+### Resultados projetados: ProjectedFrom
 
-Os tipos `OkMatch`, `NoContentMatch` e `CreatedMatch` permitem mapear `Result`/`Result<T>` para respostas HTTP padronizadas, convertendo automaticamente problemas em `ProblemDetails` (RFC 9457) quando necessário.
+Quando a busca projeta a entidade para um DTO no provider, o `FindResult` carrega o tipo do DTO —
+e as mensagens de problema nomeariam o DTO, não a entidade pesquisada. As factories `ProjectedFrom`
+preservam a identidade da entidade original e geram `NotFound` e `InvalidParameter` lazily, com a
+categoria correta e nomeando a entidade:
+
+```csharp
+// busca por critérios (chave alternativa/composta) projetada para DTO
+FindResult<ProductDetails> result = FindResult<ProductDetails>.ProjectedFrom<Product>(
+    dto, // ProductDetails? — null quando não encontrado
+    [new FindCriterion(nameof(Product.Sku), sku)]);
+
+// busca por id projetada para DTO
+FindResult<ProductDetails, int> byId = FindResult<ProductDetails, int>.ProjectedFrom<Product>(dto, id);
+
+// mensagens nomeiam a entidade: "The record of 'Product' with Sku 'SKU-X' was not found"
+```
+
+Critérios sem `ByName` têm o display name resolvido contra a entidade (respeitando `[DisplayName]`).
+Não use um `Problem` pré-construído no lugar das factories: `HasInvalidParameter` devolveria o
+problema armazenado com a categoria original (quirk documentado do construtor `FindResult(Problem)`).
+
+### Extração de critérios de expressões: FindCriteriaExtractor
+
+`FindCriteriaExtractor.Extract<TEntity>(filter)` extrai `FindCriterion[]` de um predicado, um
+critério por igualdade unida por `&&` (`e => e.Sku == sku && e.Region == region`), em ordem de
+declaração. A extração é **tudo-ou-nada e nunca lança**: qualquer construção não reconhecida
+(`||`, `!=`, `>`, membro profundo, chamada de método, negação, etc.) degrada para um array vazio —
+e a mensagem de problema resultante vira a genérica. É a mesma análise usada pelo `TryFindByAsync`
+do pacote EF, agora reutilizável por outros consumidores (ex.: repositórios com projeção por predicado).
+
+## 6. Resultados de API (OkMatch, NoContentMatch, CreatedMatch, AcceptedMatch)
+
+Os tipos `OkMatch`, `NoContentMatch`, `CreatedMatch` e `AcceptedMatch` permitem mapear `Result`/`Result<T>` para respostas HTTP padronizadas, convertendo automaticamente problemas em `ProblemDetails` (RFC 9457) quando necessário.
 
 Exemplos baseados em `MatchApi`:
 
@@ -796,6 +828,38 @@ Comportamento esperado (vide `MatchApiTests`):
 - Sucesso: 201/200/204 com Location e/ou corpo conforme tipo.
 - Falha: problemas convertidos para `ProblemDetails` com status coerente (404, 400, etc.).
 
+### AcceptedMatch: 202 para processamento assíncrono
+
+`AcceptedMatch` e `AcceptedMatch<T>` respondem `202 Accepted`: a solicitação foi aceita para
+processamento, mas ele ainda não foi concluído (RFC 9110). Diferente de `CreatedMatch`, a
+`Location` é **opcional** — quando informada, aponta um recurso para acompanhar o processamento.
+`Result` produz 202 sem corpo; `Result<T>` produz 202 com `T` no corpo. Problemas nunca viram 202.
+
+Exemplos baseados em `AcceptedApi` (vide `AcceptedApiTests`):
+
+```csharp
+// POST: enfileira e responde 202 sem corpo e sem Location
+private static async Task<AcceptedMatch> Queue(QueueRequest request)
+{
+    await EnqueueAsync(request);
+    return Result.Ok();
+}
+
+// POST: 202 sem corpo, com Location fixa de acompanhamento
+private static async Task<AcceptedMatch> QueueLocated(QueueRequest request)
+{
+    Result result = await EnqueueAsync(request);
+    return result.AcceptedMatch("/api/accepted/status/fixed");
+}
+
+// POST: 202 com corpo (ticket) e Location derivada do valor
+private static async Task<AcceptedMatch<TicketDetails>> TicketLocated(QueueRequest request)
+{
+    Result<TicketDetails> result = await EnqueueTicketAsync(request);
+    return result.AcceptedMatch(t => $"/api/accepted/status/{t.Ticket}");
+}
+```
+
 ### Filtro de exceções para Minimal API
 
 Use `WithExceptionFilter` na borda HTTP para transformar exceções inesperadas em `ProblemDetails` 500 padronizado. Prefira aplicar o filtro em grupos, para que todas as rotas do grupo compartilhem a mesma política:
@@ -820,12 +884,13 @@ group.MapGet("/produto/{id:int}", GetProduto);
 Regras para IA ao gerar Minimal APIs:
 - Use `WithExceptionFilter()` em `MapGroup` quando várias rotas compartilham a mesma borda de API.
 - Use o filtro para exceptions inesperadas, falhas de infraestrutura e erros não previstos.
-- Não use `try/catch` nem exception filter para validação esperada, regra de domínio ou recurso não encontrado; retorne `Result`/`Problems` e converta com `OkMatch`, `CreatedMatch` ou `NoContentMatch`.
+- Não use `try/catch` nem exception filter para validação esperada, regra de domínio ou recurso não encontrado; retorne `Result`/`Problems` e converta com `OkMatch`, `CreatedMatch`, `AcceptedMatch` ou `NoContentMatch`.
 - O filtro sempre registra exceptions capturadas como `LogLevel.Error`.
 - O parâmetro `logLevel` controla apenas o log de respostas de erro já modeladas como `MatchErrorResult`.
 
 Boas práticas (RFC 9457):
 - Para `CreatedMatch`, forneça `Location` com URI absoluta ou relativa estável.
+- Use `AcceptedMatch` somente quando o processamento continua após a resposta; para operação síncrona concluída, use `OkMatch`/`CreatedMatch`/`NoContentMatch`.
 - Títulos (`title`) claros e condizentes com o `type`; descrição (`detail`) objetiva.
 - Use `instance` quando aplicável para identificar o recurso/ocorrência.
 
@@ -1066,7 +1131,7 @@ Dê nomes distintos: `inputProblems`, `validationProblems`.
 SmartProblems fornece uma abordagem uniforme e eficiente para tratar sucesso e falha em operações .NET.
 Com `Problem`/`Problems` você modela erros com categorias e contexto; com `Result`/`Result<T>` você compõe fluxos sem lançar exceções em casos esperados.
 A biblioteca integra-se a APIs via `ProblemDetails` (RFC 9457), ao EF via `FindResult`/`TryFind*` e ao cliente HTTP com `ToResultAsync`.
-Tipos como `OkMatch`, `CreatedMatch` e `NoContentMatch` simplificam respostas HTTP consistentes.
+Tipos como `OkMatch`, `CreatedMatch`, `AcceptedMatch` e `NoContentMatch` simplificam respostas HTTP consistentes.
 O uso de `readonly struct` e APIs inlinadas favorece performance, e as extensões (`With`, `ChainProperty`) melhoram rastreabilidade.
 
 ## Instruções para Ferramentas de IA (GitHub Copilot)
@@ -1094,7 +1159,7 @@ e a §8 (erros comuns)** — juntas elas cobrem os erros que não aparecem no In
   - Para métodos `Async` com `TParam` e callbacks que retornam `Task`/`Task<T>`, gere chamadas no formato `MetodoAsync(param, static (..., token) => ..., ct)`.
   - Evite exceções para fluxos esperados; converta para problemas e propague via `Result`.
 - APIs Web (servidor)
-  - Converta `Result`/`Result<T>` em `OkMatch`, `CreatedMatch` (com `Location`) e `NoContentMatch`.
+  - Converta `Result`/`Result<T>` em `OkMatch`, `CreatedMatch` (com `Location`), `AcceptedMatch` (202, `Location` opcional) e `NoContentMatch`.
   - Para Minimal APIs, prefira `app.MapGroup("/group-route").WithExceptionFilter()` e mapeie as rotas no grupo; use o filtro apenas para exceptions inesperadas.
   - Configure `ProblemDetailsOptions`, registre descrições com `AddProblemDetailsDescriptions` e exponha `MapProblemDetailsDescriptionPage()` quando a API deve documentar seus tipos.
   - Descreva todo `typeId` customizado; respeite RFC 9457 (`type`, `title`, `status`, `detail`, `instance`).
