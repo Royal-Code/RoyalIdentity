@@ -22,19 +22,21 @@ edge redesign), `.ai/plans/plan-users-accounts-module-v2.md` (the `UserAccounts`
 module — rich accounts, own persistence, properties-by-scope, `.Integration`
 adapter; 10/10 phases done), `.ai/plans/plan-users-security-lifecycle.md` (password
 history/expiration, action tokens, `SecurityStamp`/`SessionsValidAfter`
-invalidation, lockout, email/phone verification), and
-`.ai/plans/plan-royalidentity-security.md` (shared `RoyalIdentity.Security`
-library for crypto/password hashing/key material). Treat each as the implemented
-target architecture before changing the area it covers.
+invalidation, lockout, email/phone verification), `.ai/plans/plan-royalidentity-security.md`
+(shared `RoyalIdentity.Security` library for crypto/password hashing/key material),
+and `.ai/plans/plan-users-accounts-sqlite-hardening.md` (3/3 phases: real
+concurrency retry via `RoyalCode.SmartCommands`/`.WorkContext` `0.1.0`; EF
+migrations for `.Sqlite`/`.PostgreSql` replacing `EnsureCreated`, PostgreSQL one
+validated against a real ephemeral PostgreSQL 17 via Podman; single reusable
+module seed, `Tests.UserAccounts/UserAccountsModuleSeed.cs`, linked into
+`Tests.Integration`, replacing duplicated Alice/Bob seeding, plus an expanded
+opt-in OIDC regression). Treat each as the implemented target architecture
+before changing the area it covers.
 
-Active plan: `.ai/plans/plan-users-accounts-sqlite-hardening.md` — hardens the
-`UserAccounts` backing toward replacing the in-memory fake (ADR-018). Fase 1
-(real concurrency retry on the credential/token/verification use cases, via
-`RoyalCode.SmartCommands`/`.WorkContext` `0.1.0`) and Fase 2 (EF migrations for
-`.Sqlite`/`.PostgreSql`, replacing `EnsureCreated`) are DONE; a reusable seed
-(Fase 3) remains. The PostgreSQL migration has not been run against a real
-server yet (no local Postgres in this environment). `.ai/plans/plans-roadmap-02.md`
-maps what comes after (supersedes `plans-roadmap-01.md`).
+No active plan right now. `.ai/plans/plans-roadmap-02.md` (supersedes
+`plans-roadmap-01.md`) maps what comes next — the recommended next step is the
+first sub-plan of `.ai/plans/plan-data-macro.md` (`plan-data-storage-baseline.md`,
+not yet created).
 
 Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:

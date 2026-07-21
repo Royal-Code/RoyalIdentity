@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
@@ -8,8 +7,6 @@ using RoyalIdentity.Security.Passwords;
 using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Storage.InMemory.Extensions;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
-using RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
-using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.Integration;
 using RoyalIdentity.UserAccounts.Options;
@@ -242,28 +239,6 @@ public abstract class UserDirectoryContractTests
 	protected static UserAccountsRealmOptions ContractOptions()
 		=> UserAccountsTestOptions.Relaxed(minimumLength: 1, allowProvidedSubjectId: true);
 
-	protected static UserSeed Alice(Realm realm)
-		=> new(
-			realm,
-			MemoryStorage.AliceSubjectId,
-			"alice",
-			"Alice",
-			"Alice@example.com",
-			"alice",
-			IsActive: true,
-			Roles: ["admin"]);
-
-	protected static UserSeed Bob(Realm realm)
-		=> new(
-			realm,
-			MemoryStorage.BobSubjectId,
-			"bob",
-			"Bob",
-			"bob@example.com",
-			"bob",
-			IsActive: true,
-			Roles: ["admin"]);
-
 	protected sealed class DirectoryContractHarness(ServiceProvider provider, Realm primaryRealm, Realm otherRealm)
 		: IAsyncDisposable
 	{
@@ -342,10 +317,13 @@ public abstract class UserDirectoryContractTests
 			var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
 			var harness = new DirectoryContractHarness(provider, MemoryStorage.DemoRealm, MemoryStorage.AccountRealm);
 
-			await SeedScopeAsync(harness, "profile");
-			await SeedScopeAsync(harness, "email");
-			await SeedAsync(harness, Alice(harness.PrimaryRealm));
-			await SeedAsync(harness, Bob(harness.PrimaryRealm));
+			using (var scope = harness.Provider.CreateScope())
+			{
+				var db = scope.ServiceProvider.GetRequiredService<UserAccountsDbContext>();
+				await UserAccountsModuleSeed.SeedDefaultScopesAsync(db, harness.PrimaryRealm.Id, Start);
+				await UserAccountsModuleSeed.SeedDefaultAccountsAsync(
+					scope.ServiceProvider, harness.PrimaryRealm.Id, options, Start);
+			}
 
 			return harness;
 		}
@@ -356,48 +334,10 @@ public abstract class UserDirectoryContractTests
 			var options = scope.ServiceProvider
 				.GetRequiredService<IUserAccountsRealmOptionsResolver>()
 				.Resolve(seed.Realm.Id);
-			var handler = scope.ServiceProvider.GetRequiredService<ICreateUserAccountHandler>();
-			var result = await handler.HandleAsync(new CreateUserAccount
-			{
-				RealmId = seed.Realm.Id,
-				Options = options,
-				Username = seed.Username,
-				DisplayName = seed.DisplayName,
-				Email = seed.Email,
-				EmailVerified = true,
-				Password = seed.Password,
-				SubjectId = seed.SubjectId,
-				Roles = seed.Roles
-			}, default);
 
-			Assert.True(result.IsSuccess);
-
-			if (seed.IsActive)
-			{
-				return;
-			}
-
-			var db = scope.ServiceProvider.GetRequiredService<UserAccountsDbContext>();
-			var account = await db.UserAccounts.SingleAsync(
-				a => a.RealmId == seed.Realm.Id && a.SubjectId == seed.SubjectId);
-			account.Deactivate(Start);
-			await db.SaveChangesAsync();
-		}
-
-		private static async Task SeedScopeAsync(DirectoryContractHarness harness, string scopeName)
-		{
-			using var scope = harness.Provider.CreateScope();
-			var db = scope.ServiceProvider.GetRequiredService<UserAccountsDbContext>();
-			if (await db.PropertyScopes.AnyAsync(s => s.RealmId == harness.PrimaryRealm.Id && s.Name == scopeName))
-			{
-				return;
-			}
-
-			var propertyScope = new PropertyScope(harness.PrimaryRealm.Id, scopeName, scopeName, Start);
-			var version = propertyScope.Versions.Single();
-			Assert.True(propertyScope.ApproveVersion(version, Start).IsSuccess);
-			db.PropertyScopes.Add(propertyScope);
-			await db.SaveChangesAsync();
+			await UserAccountsModuleSeed.SeedAccountAsync(
+				scope.ServiceProvider, seed.Realm.Id, options, seed.SubjectId, seed.Username, seed.DisplayName,
+				seed.Email, seed.Password, seed.IsActive, seed.Roles, Start);
 		}
 	}
 }

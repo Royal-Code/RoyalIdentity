@@ -106,5 +106,26 @@ public class UserAccountsOptInRegressionTests : IClassFixture<UserAccountsAppFac
 		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 	}
 
+	// Q9 (plan-users-accounts-sqlite-hardening.md, Fase 3) — expands the opt-in regression beyond the happy
+	// path: an invalid password against the module must be rejected with the same generic (anti-enumeration)
+	// message as the fake, and must not create a session. Uses Bob (not Alice, untouched by the tests above)
+	// to avoid polluting shared IClassFixture state with a mutated failed-attempt counter.
+	[Fact]
+	public async Task Login_WhenInvalidPassword_IsRejected_WithGenericMessage_AndNoSession()
+	{
+		var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+		{
+			AllowAutoRedirect = false
+		});
+
+		var response = await CharacterizationSeed.PostLoginAsync(client, "bob", "wrong-password");
+		var protectedResource = await client.GetAsync("demo/test/protected-resource");
+
+		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+		var content = await response.Content.ReadAsStringAsync();
+		Assert.Contains("Invalid username or password", content); // generic (anti-enumeration)
+		Assert.Equal(HttpStatusCode.Redirect, protectedResource.StatusCode); // no session created
+	}
+
 	private sealed record ClaimJson(string Type, string Value);
 }

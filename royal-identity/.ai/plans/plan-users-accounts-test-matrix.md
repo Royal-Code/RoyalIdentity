@@ -137,11 +137,16 @@ risco que introduz.
   passwordless/inactive, realm isolation e claims de seed.
 - Mesmo contrato executado contra fake in-memory e contra `UserAccounts` real com SQLite in-memory. **[OK]**
 - Seeds Alice/Bob devem produzir os mesmos `sub`, claims, roles e resultado de autenticação esperados hoje. **[OK]**
+  Desde a Fase 3 do `plan-users-accounts-sqlite-hardening.md` (Q8), o seed do lado módulo é uma única fonte —
+  `Tests.UserAccounts/UserAccountsModuleSeed.cs`, *linked* (não `ProjectReference` teste-para-teste) em
+  `Tests.Integration` — consumida tanto por `UserDirectoryContractTests.UserAccountsSqlite` quanto por
+  `UserAccountsAppFactory`/`UserAccountsSeedHostedService`, substituindo as duas cópias antes duplicadas.
 - Suite do IdP deve rodar contra fake atual. **[OK]** (default `Tests.Integration`).
 - Suite do IdP deve rodar contra módulo opt-in. **[Parcial]** Hoje a regressão opt-in é **representativa** —
-  `UserAccountsOptInRegressionTests` (5 testes HTTP) sobre `UserAccountsAppFactory`. Rodar a **suíte inteira** contra o
-  módulo depende da substituição do fake (ADR-018 / backlog), pois o restante da suíte e os seeds dinâmicos
-  (`CharacterizationSeed`) ainda escrevem no `MemoryStorage`.
+  `UserAccountsOptInRegressionTests` (6 testes HTTP, ampliado na Fase 3/Q9 do `plan-users-accounts-sqlite-hardening.md`
+  com o caso de senha inválida — mensagem genérica anti-enumeration e nenhuma sessão criada) sobre
+  `UserAccountsAppFactory`. Rodar a **suíte inteira** contra o módulo depende da substituição do fake (ADR-018 /
+  backlog), pois o restante da suíte e os seeds dinâmicos (`CharacterizationSeed`) ainda escrevem no `MemoryStorage`.
 - Regressão de realm isolation: dados criados em um realm não aparecem em outro. **[OK]**
 - Regressão de login/logout/session deve continuar verde com fake e com módulo opt-in. **[OK]**
 - Build completo da solution deve rodar antes de considerar a fase finalizada. **[OK]**

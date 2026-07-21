@@ -221,12 +221,19 @@ design: "migração in-memory→Sqlite nos testes").
 **Quando revisitar:** Junto do `plan-data-persistence`, ou quando a divergência fake×módulo nos comportamentos
 compartilhados começar a custar mais do que manter o fake.
 **Nota de design:**
-- **Primeiro passo (habilitador):** um **seed reutilizável do módulo** — Alice/Bob determinísticos (`sub`, username,
-  displayName, email verificado, roles, property scopes `profile`/`email`) — extraído do que hoje está espalhado em
-  `Tests.Integration/Prepare/UserAccountsAppFactory.cs` (+ `UserAccountsSeedHostedService`) e no seed inline do
-  `UserDirectoryContractTests.UserAccountsSqlite`. Vira o ponto único de seed para contract tests e regressão OIDC.
+- **Primeiro passo (habilitador) — ✅ CONCLUÍDO** (`plan-users-accounts-sqlite-hardening.md` Fase 3, Q8): o **seed
+  reutilizável do módulo** existe em `Tests.UserAccounts/UserAccountsModuleSeed.cs` — Alice/Bob determinísticos
+  (`sub`, username, displayName, email verificado, roles, property scopes `profile`/`email`), idempotente. É
+  *linked* (não `ProjectReference` teste-para-teste) em `Tests.Integration`, substituindo as cópias antes
+  duplicadas em `Tests.Integration/Prepare/UserAccountsAppFactory.cs` (+ `UserAccountsSeedHostedService`) e no seed
+  inline do `UserDirectoryContractTests.UserAccountsSqlite` — hoje ambos consomem a mesma fonte, o ponto único de
+  seed para contract tests e regressão OIDC opt-in.
 - **Migração:** apontar a suíte do IdP para o módulo opt-in como default (hoje o fake é default e o módulo é opt-in via
   `UserAccountsAppFactory`); então remover `RoyalIdentity.Storage.InMemory` e o lado fake do `UserDirectoryContractTests`.
+  A regressão opt-in (`UserAccountsOptInRegressionTests`) foi ampliada de 5 para 6 casos (Q9, mesma Fase 3) — inclui
+  agora senha inválida com mensagem genérica anti-enumeration e verificação de que nenhuma sessão é criada — mas
+  continua **representativa**, não a suíte inteira; o flip completo do default para o módulo segue dependendo desta
+  migração.
 - **Comportamentos do ciclo de segurança** (required action, security-state/`SessionsValidAfter`, verificação) deixam de
   ser "module-only por falta de fake" e passam a poder subir ao contrato — agora com as duas pontas sendo módulo+Sqlite
   (ou módulo vs. providers `.Sqlite`/`.PostgreSql`), não fake vs. módulo.

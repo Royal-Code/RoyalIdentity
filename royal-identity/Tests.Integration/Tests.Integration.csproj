@@ -17,4 +17,11 @@
 		<Using Include="RoyalIdentity.Security.Encoding" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- Single shared seed home (plan-users-accounts-sqlite-hardening.md Fase 3, Q8): the file physically
+		     lives in Tests.UserAccounts; linked (not project-referenced, to avoid a test-project-depends-on-
+		     test-project reference) so both suites compile the exact same source instead of duplicating it. -->
+		<Compile Include="..\Tests.UserAccounts\UserAccountsModuleSeed.cs" Link="Prepare\UserAccountsModuleSeed.cs" />
+	</ItemGroup>
+
 </Project>

@@ -22,24 +22,30 @@ definida em `../analisys/`.
   roadmap 01: extraiu `RoyalIdentity.Security` (crypto, hashing de senha, key material) como biblioteca
   compartilhada, removendo duplicação entre o core `RoyalIdentity` e o módulo `UserAccounts`. Ver
   [ADR-016](../../adrs/ADR-016.md).
+- [plan-users-accounts-sqlite-hardening.md](plan-users-accounts-sqlite-hardening.md) — CONCLUÍDO, 3/3 fases.
+  Nasceu da review-006 do `plan-users-security-lifecycle.md`, que achou lacunas entre o decidido e o implementado
+  no backing do módulo `UserAccounts`: concorrência (retry só detecta, não resolve), migrations (só
+  `EnsureCreated`) e seed (duplicado entre projetos de teste).
+  1. **Concorrência resiliente (retry no handler)** — `[WithRetryOnConcurrency]` nos use cases de mutação pura
+     de credencial; retry escopado manual nos fluxos com token (o consumo do token nunca re-executa);
+     `AuthenticateLocalCredential` fora do retry (Q4), mas fail-closed; esgotamento mapeado para `typeId`
+     `user_account.concurrency_conflict`; `ConcurrencyTests` reescrito contra os handlers reais, com conflitos
+     genuínos (não simulados).
+  2. **Migrations dos providers** (`.Sqlite`/`.PostgreSql`) — schema versionado por `IDesignTimeDbContextFactory`
+     + migration inicial; correção manual da coluna de sistema `xmin` no provider PostgreSql; validado contra
+     PostgreSQL 17 real via container Podman efêmero.
+  3. **Seed reutilizável e módulo como backing de testes** — seed único (`Tests.UserAccounts/
+     UserAccountsModuleSeed.cs`, linked em `Tests.Integration`) substituindo a duplicação Alice/Bob; regressão
+     OIDC opt-in ampliada de 5 para 6 testes (Q9); flip completo do default para o módulo diferido para o
+     `plan-data-macro.md`.
+
+  Era também o **Plano 0** do `plan-data-macro.md` abaixo — suas três fases eram pré-requisito para o plano de
+  dados do IdP não herdar pendências internas do módulo `UserAccounts`; pré-requisito agora satisfeito.
 
 ## Em andamento
 
-**Plano ativo:** [plan-users-accounts-sqlite-hardening.md](plan-users-accounts-sqlite-hardening.md)
-
-Nasceu da review-006 do `plan-users-security-lifecycle.md`, que achou lacunas entre o decidido e o implementado
-no backing do módulo `UserAccounts`: concorrência (retry só detecta, não resolve), migrations (só `EnsureCreated`)
-e seed (duplicado entre projetos de teste). Três fases:
-
-1. **Concorrência resiliente (retry no handler)** — CONCLUÍDA. `[WithRetryOnConcurrency]` nos use cases de
-   mutação pura de credencial; retry escopado manual nos dois fluxos com token (o consumo do token nunca re-executa);
-   `AuthenticateLocalCredential` fora do retry (Q4); esgotamento mapeado para `typeId` `user_account.concurrency_conflict`;
-   `ConcurrencyTests` reescrito contra os handlers reais, com conflitos genuínos (não simulados).
-2. **Migrations dos providers** (`.Sqlite`/`.PostgreSql`) — pendente.
-3. **Seed reutilizável e módulo como backing de testes** — pendente.
-
-Este plano é também o **Plano 0** do `plan-data-macro.md` abaixo: fechar suas três fases é pré-requisito para o
-plano de dados do IdP não herdar pendências internas do módulo `UserAccounts`.
+Nenhum plano ativo no momento. Próximo passo recomendado: iniciar o sub-plano 1 do `plan-data-macro.md`
+(`plan-data-storage-baseline.md`, ainda não criado) — ver "Próximos planos" abaixo.
 
 ## Próximos planos
 
@@ -52,7 +58,7 @@ que nenhum deles fique grande demais:
 
 | Ordem | Sub-plano | Propósito | Status |
 |---|---|---|---|
-| 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | Em andamento (ver acima) |
+| 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | Concluído (ver acima) |
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | Não criado |
 | 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (realms/clients/resources/scopes/keys/options) | Não criado |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | Não criado |
@@ -150,7 +156,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 
 ## Ordem recomendada
 
-1. Concluir `plan-users-accounts-sqlite-hardening.md` (Fases 1-3).
+1. ~~Concluir `plan-users-accounts-sqlite-hardening.md` (Fases 1-3).~~ CONCLUÍDO.
 2. Criar e executar os sub-planos 1-4 do `plan-data-macro.md` (storage-baseline → configuration-storage →
    operational-storage → test-migration); avaliar caching e audit-outbox (5-6) depois, só se ainda fizerem
    sentido no momento.

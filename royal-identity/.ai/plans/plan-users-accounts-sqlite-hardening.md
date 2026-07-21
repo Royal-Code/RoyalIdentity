@@ -1,16 +1,16 @@
 # Plan: Endurecimento do backing `UserAccounts` — concorrência resiliente, migrations e seed (`plan-users-accounts-sqlite-hardening`)
 
-## Status: EM ANDAMENTO - Fases 1-2 concluídas (concorrência resiliente; migrations); Fase 3 pendente
+## Status: CONCLUÍDO - Fases 1-3 concluídas (concorrência resiliente; migrations; seed reutilizável)
 
 ## Progresso
 
-`████████░░░░` **67%** - 2 de 3 fases
+`████████████` **100%** - 3 de 3 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Concorrência resiliente (retry no handler) | Concluida |
 | Fase 2 - Migrations dos providers (`.Sqlite`/`.PostgreSql`) | Concluida |
-| Fase 3 - Seed reutilizável e módulo como backing de testes | Pendente |
+| Fase 3 - Seed reutilizável e módulo como backing de testes | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -625,12 +625,12 @@ como backing de testes, executando o primeiro passo da ADR-018.
 
 **Tarefas:**
 
-- [ ] Aplicar as decisões Q8 (seed test-only compartilhado) e Q9 (dual mantido; regressão opt-in ampliada).
-- [ ] Criar o seed reutilizável; fazer `UserAccountsAppFactory` e o contract test `UserAccountsSqlite` consumirem o
+- [x] Aplicar as decisões Q8 (seed test-only compartilhado) e Q9 (dual mantido; regressão opt-in ampliada).
+- [x] Criar o seed reutilizável; fazer `UserAccountsAppFactory` e o contract test `UserAccountsSqlite` consumirem o
       mesmo artefato (eliminando a duplicação).
-- [ ] Conforme Q9, ampliar a regressão OIDC contra o módulo (além dos 5 testes representativos) e/ou preparar o flip do
+- [x] Conforme Q9, ampliar a regressão OIDC contra o módulo (além dos 5 testes representativos) e/ou preparar o flip do
       default.
-- [ ] Atualizar [plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md) e a nota da ADR-018/backlog
+- [x] Atualizar [plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md) e a nota da ADR-018/backlog
       com o estado real.
 
 **Critérios de aceite:** Q8–Q9 decididas; seed único consumido pelos dois caminhos; regressão opt-in ampliada conforme
@@ -640,7 +640,40 @@ decisão; matriz/backlog atualizados; suíte verde.
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluída.**
+
+- **Seed único (Q8):** `Tests.UserAccounts/UserAccountsModuleSeed.cs` (test-only, sem API pública no módulo) —
+  `SeedDefaultScopesAsync`/`SeedScopeAsync` (property scopes `profile`/`email`, idempotente) e
+  `SeedDefaultAccountsAsync`/`SeedAccountAsync` (Alice/Bob determinísticos via `ICreateUserAccountHandler`,
+  reaproveitando os `sub` do fake — `MemoryStorage.AliceSubjectId`/`BobSubjectId` — para que qualquer teste escrito
+  contra o contrato compartilhado observe a mesma identidade em fake ou módulo). Como o arquivo vive fisicamente em
+  `Tests.UserAccounts`, ele é **linked** (`<Compile Include="..\Tests.UserAccounts\UserAccountsModuleSeed.cs"
+  Link="Prepare\UserAccountsModuleSeed.cs" />`) em `Tests.Integration.csproj` — evita tanto duplicar o arquivo quanto
+  criar uma `ProjectReference` de teste-para-teste (a alternativa "pequeno projeto de suporte de testes" cogitada na
+  Q8 foi descartada por peso desnecessário).
+- **Consumidores migrados:** `UserAccountsAppFactory`/`UserAccountsSeedHostedService.StartAsync` (antes com
+  `SeedAccountAsync`/`SeedScopeAsync` privados duplicados) e `UserDirectoryContractTests.UserAccountsSqlite`
+  (`CreateHarnessAsync`/`SeedAsync`, antes com seed inline próprio) agora delegam inteiramente ao seed compartilhado.
+  Em particular, `CreateHarnessAsync` chama `SeedDefaultAccountsAsync` diretamente; `SeedAccountAsync` permanece no
+  contract test apenas para fixtures específicas de cada cenário. Os defaults locais `Alice()`/`Bob()` e os métodos
+  privados duplicados foram removidos.
+- **Idempotência coberta:** `UserAccountsModuleSeedTests` executa os seeds de scopes e contas duas vezes, em scopes de
+  DI distintos, e prova que persiste exatamente `profile`/`email`, Alice/Bob, uma credencial, um e-mail primário
+  verificado e a role `admin` por conta, preservando o estado ativo.
+- **Regressão opt-in ampliada (Q9):** `UserAccountsOptInRegressionTests` foi de 5 para **6** testes HTTP — novo
+  `Login_WhenInvalidPassword_IsRejected_WithGenericMessage_AndNoSession` prova que uma senha incorreta contra o
+  módulo é rejeitada com a mesma mensagem genérica anti-enumeration do fake e não cria sessão (verificado via
+  redirect em `demo/test/protected-resource`). Usa **Bob**, não Alice, para não poluir o contador de falhas
+  compartilhado pelo `IClassFixture<UserAccountsAppFactory>` entre os testes da classe. Por decisão Q9, o **flip**
+  completo do default para o módulo continua diferido para o `plan-data-persistence` — a regressão segue
+  **representativa**, não a suíte inteira.
+- **Documentação atualizada:** [plan-users-accounts-test-matrix.md](plan-users-accounts-test-matrix.md) (Fase 10 —
+  contagem de testes da regressão opt-in e nota do seed único) e [backlog-001.md](../backlogs/backlog-001.md) (item
+  "Substituir o storage fake in-memory..." — primeiro passo do habilitador marcado concluído; nota sobre a ampliação
+  Q9 e o flip ainda pendente).
+- **Suíte completa da solução: 564 aprovados + 1 PostgreSQL ignorado** (`dotnet test RoyalIdentity.sln`;
+  `Tests.Security` 116, `Tests.Pipelines` 3, `Tests.Identity` 13, `Tests.Architecture` 15, `Tests.UserAccounts` 194 + 1
+  ignorado, `Tests.Integration` 223).
 
 ---
 
