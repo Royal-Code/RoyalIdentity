@@ -31,9 +31,10 @@ Nasceu da review-006 do `plan-users-security-lifecycle.md`, que achou lacunas en
 no backing do módulo `UserAccounts`: concorrência (retry só detecta, não resolve), migrations (só `EnsureCreated`)
 e seed (duplicado entre projetos de teste). Três fases:
 
-1. **Concorrência resiliente (retry no handler)** — peças de biblioteca prontas (`RoyalCode.SmartCommands`
-   `0.1.0` + `RoyalCode.SmartCommands.WorkContext` `0.1.0`, já consumidas no `royal-identity`); aplicação nos
-   use cases de mutação de credencial em andamento.
+1. **Concorrência resiliente (retry no handler)** — CONCLUÍDA. `[WithRetryOnConcurrency]` nos use cases de
+   mutação pura de credencial; retry escopado manual nos dois fluxos com token (o consumo do token nunca re-executa);
+   `AuthenticateLocalCredential` fora do retry (Q4); esgotamento mapeado para `typeId` `user_account.concurrency_conflict`;
+   `ConcurrencyTests` reescrito contra os handlers reais, com conflitos genuínos (não simulados).
 2. **Migrations dos providers** (`.Sqlite`/`.PostgreSql`) — pendente.
 3. **Seed reutilizável e módulo como backing de testes** — pendente.
 

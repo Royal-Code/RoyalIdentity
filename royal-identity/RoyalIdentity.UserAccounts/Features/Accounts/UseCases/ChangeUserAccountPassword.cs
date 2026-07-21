@@ -62,7 +62,7 @@ public partial class ChangeUserAccountPassword
 	/// <summary>
 	/// Executes the change-password use case.
 	/// </summary>
-	[Command, WithValidateModel, WithWorkContext]
+	[Command, WithValidateModel, WithWorkContext, WithRetryOnConcurrency]
 	public async Task<Result> Execute(
 		UserAccountReader reader,
 		IUserAccountPasswordHasher passwordHasher,

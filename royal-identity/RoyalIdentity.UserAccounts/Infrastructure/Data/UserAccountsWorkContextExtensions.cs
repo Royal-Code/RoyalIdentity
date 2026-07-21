@@ -1,5 +1,8 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalCode.SmartCommands.WorkContext.Extensions;
+using RoyalCode.SmartCommands.WorkContext.Options;
 using RoyalCode.WorkContext;
 using RoyalCode.WorkContext.EntityFramework.Configurations;
 using RoyalIdentity.UserAccounts.Features.Accounts.Commons;
@@ -31,9 +34,21 @@ public static class UserAccountsWorkContextExtensions
 		// concrete provider context resolved by the WorkContext so both share the same scoped instance.
 		builder.Services.AddScoped<UserAccountsDbContext>(sp => sp.GetRequiredService<TDbContext>());
 
+		// The retry options below are bound from configuration (AddUnitOfWorkAccessor -> BindConfiguration), which
+		// requires an IConfiguration in the container. Real hosts always register one; this fallback keeps the
+		// module self-sufficient in bare-ServiceCollection scenarios (unit tests) that don't build a host.
+		builder.Services.TryAddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+
 		// SmartCommands unit-of-work adapter over IWorkContext, used by the generated command handlers.
 		builder.Services.ConfigureWorkContextAdapterOptions(_ => { });
 		builder.Services.AddUnitOfWorkAccessor<IWorkContext>();
+
+		// Fixed module invariant (ADR-017 §2.9 / plan-users-accounts-sqlite-hardening Fase 1): every
+		// optimistic-concurrency retry exhaustion in this module maps to this problem typeId. MaxAttempts stays
+		// appsettings-configurable via the "RetryOnConcurrency" section (bound by AddUnitOfWorkAccessor above);
+		// this only fixes the typeId, which is not a deployment knob.
+		builder.Services.Configure<RetryOnConcurrencyOptions>(
+			o => o.ExhaustedProblemTypeId = "user_account.concurrency_conflict");
 
 		// Generated DI registration for the module's command handlers (see UserAccountsCommandServices).
 		builder.Services.AddUserAccountsHandlersServices<IWorkContext>();

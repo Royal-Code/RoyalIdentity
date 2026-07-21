@@ -40,7 +40,7 @@ public partial class UnlockPasswordCredential
 	/// <summary>
 	/// Executes the administrative credential unlock.
 	/// </summary>
-	[Command, WithValidateModel, WithWorkContext]
+	[Command, WithValidateModel, WithWorkContext, WithRetryOnConcurrency]
 	public async Task<Result> Execute(
 		UserAccountReader reader,
 		TimeProvider clock,

@@ -1,14 +1,14 @@
 # Plan: Endurecimento do backing `UserAccounts` — concorrência resiliente, migrations e seed (`plan-users-accounts-sqlite-hardening`)
 
-## Status: EM ANDAMENTO - Fase 1: primitiva + atributo/gerador concluídos nas libs (SmartCommands); aplicação no royal-identity pendente
+## Status: EM ANDAMENTO - Fase 1 concluída (concorrência resiliente); Fases 2-3 pendentes
 
 ## Progresso
 
-`░░░░░░░░░░░░` **0%** - 0 de 3 fases (Fase 1 em andamento: peças de biblioteca prontas)
+`████░░░░░░░░` **33%** - 1 de 3 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Concorrência resiliente (retry no handler) | Em andamento (libs OK; aplicação no royal-identity pendente) |
+| Fase 1 - Concorrência resiliente (retry no handler) | Concluida |
 | Fase 2 - Migrations dos providers (`.Sqlite`/`.PostgreSql`) | Pendente |
 | Fase 3 - Seed reutilizável e módulo como backing de testes | Pendente |
 
@@ -395,28 +395,92 @@ até a política. Mecanismo (DF5): **primitiva de laço no `WorkContext`** + **a
       em `Tests/Generators/RetryOnConcurrencyTests.cs` (snapshot com options, snapshot com valor, RCCMD024, RCCMD025) +
       **suíte do SmartCommands verde (77 testes)** + **solução `SmartCommands.sln` compila (0 erros)**.
 
-*royal-identity (módulo) — PENDENTE (não solicitado nesta entrega):*
+*royal-identity (módulo) — CONCLUÍDO:*
 
-- [ ] Aplicar `[WithRetryOnConcurrency]` aos use cases de **mutação pura** (`ChangeOwnPassword`,
+- [x] Aplicado `[WithRetryOnConcurrency]` aos use cases de **mutação pura** (`ChangeOwnPassword`,
       `ChangeUserAccountPassword`, `UnlockPasswordCredential`, `BlockUserAccount`, `UnblockUserAccount`).
-- [ ] **`AuthenticateLocalCredential` fica de fora** (DF5/Q4 — best-effort).
-- [ ] Fluxos com token (`ResetPasswordWithToken`, `ChangeExpiredPasswordWithToken`, verificações): retry **escopado** ao
-      agregado, **após** o consumo do token (consumo permanece único, fora do laço — Q3).
-- [ ] Mapear o esgotamento para `Problems.InvalidState` (409, `typeId` `user_account.concurrency_conflict`).
-- [ ] Substituir o retry **manual** dos `ConcurrencyTests` por asserção do comportamento resiliente **do handler** (os 7
-      cenários passam a exercitar o retry real); cobrir esgotamento e o caso de fluxo com token sob conflito.
+- [x] **`AuthenticateLocalCredential` fica de fora do retry** (DF5/Q4 — best-effort), mas **não** fica sem tratamento:
+      troca `[WithWorkContext]` por `IWorkContext work` injetado direto e usa a primitiva manual
+      `RetryOnConcurrencyAsync<LocalAuthenticationResult>` com `MaxAttempts = 1` (uma execução, zero retries).
+      Assim o conflito devolve `Problems.InvalidState` (mesmo `typeId` `user_account.concurrency_conflict`) e a
+      primitiva ainda faz rollback/`CleanUp()` antes do retorno, sem deixar o WorkContext scoped contaminado — ver
+      "Achados da revisão" abaixo.
+- [x] Fluxos com token (`ResetPasswordWithToken`, `ChangeExpiredPasswordWithToken`, `ConfirmEmailVerification`,
+      `ConfirmPhoneVerification`): retry **escopado** ao agregado, **após** o consumo do token. Como
+      `[WithRetryOnConcurrency]` envolveria a execução inteira (incluindo o consumo), as quatro use cases trocaram
+      `[WithWorkContext]` por injeção direta de `IWorkContext work` (mesmo padrão já usado em `RequestPasswordRecovery`)
+      e chamam `work.RetryOnConcurrencyAsync(...)` manualmente só em torno de
+      `{recarregar agregado → revalidar precondições dependentes do agregado → reaplicar mutação → SaveAsync}`, com
+      `onExhausted` retornando o mesmo `Problem` das demais. As duas de verificação (email/telefone) não estavam na
+      lista de tarefas original — ver "Achados da revisão".
+- [x] Esgotamento mapeado para `Problems.InvalidState` (409, `typeId` `user_account.concurrency_conflict`) — fixado via
+      `services.Configure<RetryOnConcurrencyOptions>(o => o.ExhaustedProblemTypeId = "user_account.concurrency_conflict")`
+      em `UserAccountsWorkContextExtensions.ConfigureUserAccounts` (invariante do módulo, não configurável por
+      appsettings; `MaxAttempts` continua vindo da seção `"RetryOnConcurrency"`, default 3). Descoberta: a lib evoluiu
+      além do previsto na DF5.1 — mesmo sem `Operation` explícito no atributo, o gerador sempre injeta
+      `IConcurrencyRetryProblemFactory` e deriva uma chave de operação (`{Namespace}.{Comando}`), então o typeId fixo
+      no `IOptions` já cobre todos os comandos sem precisar de `AddConcurrencyRetryProblem` por comando.
+- [x] Efeito colateral descoberto e corrigido: `AddUnitOfWorkAccessor` (chamado por `ConfigureUserAccounts`) sempre
+      vincula `RetryOnConcurrencyOptions` a `IConfiguration` (`BindConfiguration`); cenários de teste com
+      `ServiceCollection` nu (sem host) quebravam ao resolver **qualquer** handler com `[WithWorkContext]`, retry ou
+      não. Corrigido com `TryAddSingleton<IConfiguration>(new ConfigurationBuilder().Build())` no próprio
+      `ConfigureUserAccounts` (não-invasivo: hosts reais que já registram `IConfiguration` não são afetados).
+- [x] Substituído o retry **manual** dos `ConcurrencyTests` por asserção do comportamento resiliente **do handler**.
+      Técnica: rastreia uma instância *stale* do agregado no `DbContext` de um scope (via `UserAccountReader`), grava
+      uma mutação concorrente por **outro** scope/`DbContext` (mesma conexão SQLite in-memory compartilhada) e resolve
+      o handler a partir do scope *stale* — o mapa de identidade do EF devolve a instância desatualizada ao reload
+      interno do handler, gerando um conflito **real** (não simulado) na primeira tentativa. **11/11 verdes**; suíte
+      completa da solução **558/558 verde**.
 
-**Critérios de aceite:** primitiva + atributo entregues com testes nas libs; duas tentativas concorrentes de credencial
-**não** geram exceção não tratada (viram retry ou `InvalidState` ao esgotar); os 7 cenários passam exercitando o retry do
-handler; fluxos com token não re-consomem o token sob retry; auth permanece sem retry (best-effort); nenhum evento
-despachado para tentativa não-commitada.
+**Achados da revisão pós-implementação (2026-07-20) — 4 corrigidos:**
 
-**Testes:** testes das libs (primitiva + gerador); `Tests.UserAccounts` (concorrência via Sqlite in-memory
-compartilhado, agora sem retry manual); regressão completa da solução.
+Uma revisão da entrega inicial da Fase 1 achou 3 bugs e 1 inconsistência, todos confirmados e corrigidos:
+
+1. **Alta — `SaveAsync` descartado nos fluxos manuais.** Em `ResetPasswordWithToken`/`ChangeExpiredPasswordWithToken`,
+   o corpo do retry fazia `await work.SaveAsync(ct); return result;` — o `SaveResult` de uma falha de persistência
+   **não-concorrência** (`DbUpdateException`, que `SaveAsync` converte em `SaveResult` falho **sem lançar**) era
+   descartado, devolvendo sucesso com o token **já consumido**. Corrigido: `return await work.SaveAsync(ct);`.
+2. **Alta — retry não revalidava precondições dependentes do agregado.** `PasswordHistoryPolicy.Validate` (e, em
+   `ChangeExpiredPasswordWithToken`, `StillRequiresPasswordChange`) rodava **uma vez**, antes do consumo do token,
+   contra o snapshot pré-corrida. O agregado (`SetPassword`/`ResetPassword`) não tem defesa própria contra reuso —
+   numa corrida real em que o estado muda entre a checagem e a 2ª tentativa do retry, a política podia ser violada
+   silenciosamente. Corrigido: as checagens que dependem do estado do agregado agora rodam **dentro** do corpo do
+   retry, contra o `fresh` recarregado; o consumo do token continua fora do laço (Q3, inalterado).
+3. **Alta — `ConfirmEmailVerification`/`ConfirmPhoneVerification` fora do escopo.** A nota original do plano
+   ("Consumo dos use cases de mutação") já citava "e os fluxos de verificação" como precisando do mesmo tratamento de
+   retry escopado — a entrega inicial só cobriu os dois fluxos de senha. Corrigido: mesmo padrão (`IWorkContext work`
+   manual + `RetryOnConcurrencyAsync` escopado) aplicado às duas.
+4. **Média — `AuthenticateLocalCredential` propagava `ConcurrencyException` sem tratamento.** A Q4 original ("best
+   effort", sem retry) descreveu a consequência aceita como um "incremento perdido" (sobrescrita silenciosa) — um
+   modelo que não corresponde à realidade uma vez que `Version` já é `IsConcurrencyToken()` (DF2): a segunda
+   gravação **lança**, não sobrescreve silenciosamente. Sem captura em lugar nenhum, uma corrida real no login viraria
+   erro não tratado na borda. Corrigido em duas camadas: no módulo, `AuthenticateLocalCredential` troca
+   `[WithWorkContext]` por `IWorkContext work` e executa a primitiva manual
+   `RetryOnConcurrencyAsync<LocalAuthenticationResult>` com `MaxAttempts = 1`; portanto não reexecuta a autenticação,
+   mas converte o conflito em `Problems.InvalidState` (mesmo `typeId` `user_account.concurrency_conflict`) e faz
+   rollback/`CleanUp()` antes do retorno — *fail-closed*: o resultado calculado sobre a conta stale é descartado,
+   nunca devolvido como sucesso. Na borda, `LocalUserAuthenticator` **já** colapsava qualquer `Result` sem valor em
+   `AuthenticationResult.Failed(InvalidCredentials)` — nenhuma mudança necessária ali; a `.Integration` continua sem
+   conhecer `ConcurrencyException`/`WorkContext` (ADR-013).
+
+Testes novos cobrindo os 4 achados: retry de `ChangeExpiredPasswordWithToken`/`ConfirmEmailVerification`/
+`ConfirmPhoneVerification` (token consumido uma única vez); revalidação de histórico rejeitando um candidato que virou
+reuso durante a corrida; auth devolvendo `Problem` controlado (não mais exceção) com o estado real preservado
+(fail-closed). **11 testes em `ConcurrencyTests`** (era 7).
+
+**Critérios de aceite:** primitiva + atributo entregues com testes nas libs; tentativas concorrentes de credencial
+**não** geram exceção não tratada em nenhum use case (viram retry, `InvalidState` ao esgotar, ou `Problem` controlado
+no caso da auth); fluxos com token não re-consomem o token sob retry e revalidam precondições contra o estado
+recarregado; falha de persistência não-concorrência nunca vira falso-sucesso; auth permanece sem retry (best-effort)
+mas fail-closed; nenhum evento despachado para tentativa não-commitada.
+
+**Testes:** testes das libs (primitiva + gerador); `Tests.UserAccounts/ConcurrencyTests.cs` (11 testes, concorrência
+via Sqlite in-memory compartilhado, conflitos reais via mapa de identidade do EF); regressão completa da solução
+(558/558).
 
 ### Resultado da Fase 1
 
-**Parcial — peças de biblioteca concluídas (2026-06-28); aplicação no `royal-identity` pendente.**
+**Concluída.** Peças de biblioteca (2026-06-28) + aplicação no `royal-identity`.
 
 Entregue no repo `SmartCommands` (aditivo/retrocompatível; `EnterprisePatterns` intocado — DF5.4):
 
@@ -430,14 +494,34 @@ Entregue no repo `SmartCommands` (aditivo/retrocompatível; `EnterprisePatterns`
   `Commands/RetryOnConcurrencyCommand.cs`, injeção condicional de `IOptions<RetryOnConcurrencyOptions>` e diagnostics
   `RCCMD024`/`RCCMD025`. O corpo `{Begin → finds → Execute → Complete}` vai para um `bodyTarget` separado quando há
   retry; a validação permanece no corpo do método.
+- **Evolução posterior (consumida via `RoyalCode.SmartCommands`/`.WorkContext` `0.1.0`, já usada aqui):** `Operation` no
+  atributo + `IConcurrencyRetryProblemFactory`/`AddConcurrencyRetryProblem*`/`ConcurrencyRetryOperations`. O gerador
+  agora **sempre** injeta a factory e deriva uma chave de operação (`{Namespace}.{Comando}`) mesmo sem `Operation`
+  explícito — foi assim que o typeId único do módulo pôde ser fixado só via `IOptions`, sem registro por comando.
 - **Testes**: 8 (primitiva) + 4 (gerador: 2 snapshots `.g.cs`, 2 diagnostics). **Suíte `SmartCommands` 77/77 verde**;
   **`SmartCommands.sln` compila com 0 erros** (warning `CS8785` no `Tests.Models` é pré-existente — versão de analyzer no
   ambiente, sem relação com esta entrega).
 
-**Falta** (grupo `royal-identity`, ainda não solicitado): consumir a nova versão dos pacotes; aplicar
-`[WithRetryOnConcurrency]` nos use cases de mutação pura; retry escopado nos fluxos com token; mapear esgotamento para o
-`typeId` `user_account.concurrency_conflict`; substituir o retry manual dos `ConcurrencyTests`. Enquanto a Fase 1 não
-fechar este grupo, a **tabela de progresso permanece em "Em andamento"** (não conta como fase concluída).
+Aplicado no `royal-identity`:
+
+- `[WithRetryOnConcurrency]` em `ChangeOwnPassword`, `ChangeUserAccountPassword`, `UnlockPasswordCredential`,
+  `BlockUserAccount`, `UnblockUserAccount`.
+- Retry escopado manual (`IWorkContext.RetryOnConcurrencyAsync`) em `ResetPasswordWithToken`,
+  `ChangeExpiredPasswordWithToken`, `ConfirmEmailVerification` e `ConfirmPhoneVerification`, após o consumo do
+  token — as quatro trocaram `[WithWorkContext]` por `IWorkContext work` injetado direto (padrão já usado em
+  `RequestPasswordRecovery`); as precondições dependentes do estado do agregado (histórico de senha,
+  `StillRequiresPasswordChange`) são revalidadas **dentro** do corpo do retry, contra o estado recarregado.
+- `AuthenticateLocalCredential` permanece fora do retry (Q4), mas troca `[WithWorkContext]` por `IWorkContext work` +
+  `RetryOnConcurrencyAsync<LocalAuthenticationResult>` manual com `MaxAttempts = 1` — uma execução, zero retries;
+  devolve `Problems.InvalidState` (mesmo `typeId`) em vez de deixar a exceção propagar, faz rollback/`CleanUp()` e
+  opera em *fail-closed*, nunca devolvendo o resultado calculado sobre a conta stale.
+- `UserAccountsWorkContextExtensions.ConfigureUserAccounts` ganhou o fix de `typeId` fixo (`ExhaustedProblemTypeId`) e
+  o fallback `TryAddSingleton<IConfiguration>` (necessário porque `AddUnitOfWorkAccessor` sempre vincula
+  `RetryOnConcurrencyOptions` a `IConfiguration`, o que quebrava testes com `ServiceCollection` nu).
+- `Tests.UserAccounts/ConcurrencyTests.cs` reescrito: instância *stale* rastreada via `UserAccountReader` num scope +
+  mutação concorrente por outro scope/`DbContext` (mesma conexão SQLite in-memory) + handler resolvido do scope
+  *stale* → conflito real via mapa de identidade do EF. **11/11 verde** (inclui os 4 achados da revisão pós-entrega).
+- **Suíte completa da solução: 558/558 verde** (`dotnet test RoyalIdentity.sln`).
 
 ---
 

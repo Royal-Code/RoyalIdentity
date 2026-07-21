@@ -38,7 +38,7 @@ public partial class UnblockUserAccount
 	/// <summary>
 	/// Executes the administrative unblock.
 	/// </summary>
-	[Command, WithValidateModel, WithWorkContext]
+	[Command, WithValidateModel, WithWorkContext, WithRetryOnConcurrency]
 	public async Task<Result> Execute(
 		UserAccountReader reader,
 		TimeProvider clock,

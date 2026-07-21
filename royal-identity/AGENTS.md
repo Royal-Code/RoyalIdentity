@@ -28,11 +28,11 @@ library for crypto/password hashing/key material). Treat each as the implemented
 target architecture before changing the area it covers.
 
 Active plan: `.ai/plans/plan-users-accounts-sqlite-hardening.md` — hardens the
-`UserAccounts` backing toward replacing the in-memory fake (ADR-018): real
-concurrency retry on the credential use cases (library pieces already shipped
-in `RoyalCode.SmartCommands`/`.WorkContext` `0.1.0`), provider migrations, and a
-reusable seed. `.ai/plans/plans-roadmap-02.md` maps what comes after (supersedes
-`plans-roadmap-01.md`).
+`UserAccounts` backing toward replacing the in-memory fake (ADR-018). Fase 1
+(real concurrency retry on the credential use cases, via `RoyalCode.SmartCommands`/
+`.WorkContext` `0.1.0`) is DONE; provider migrations and a reusable seed
+(Fases 2-3) remain. `.ai/plans/plans-roadmap-02.md` maps what comes after
+(supersedes `plans-roadmap-01.md`).
 
 Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:
