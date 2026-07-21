@@ -31,6 +31,7 @@
 - Inclua rastreabilidade entre objetivos, fases, decisões e testes.
 - Inclua diferidos/backlog para itens fora do escopo que foram encontrados durante o design.
 - Atualize o status, a barra de progresso e a tabela de fases sempre que uma fase for concluída.
+- Para barra, use um caractere por fase, use `█` para fases completas e `░` para fases a fazer. Não substitua os carateres por outros, como `#` ou `-`.
 - Não marque uma fase como concluída se houver decisão aberta, critério não atendido ou teste obrigatório não executado.
 - Ao concluir uma fase, preencha `Resultado da Fase` com entregáveis, arquivos alterados, desvios, verificação e pendências.
 - Ao validar o plano, confira se toda decisão citada por uma fase existe em `Decisões fechadas` ou `Histórico de decisões`.
