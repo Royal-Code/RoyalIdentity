@@ -1,6 +1,6 @@
 # Plan: Baseline dos contratos de storage do IdP (`plan-data-storage-baseline`)
 
-## Status: RASCUNHO - decisões Q4-Q17 abertas; nenhuma fase iniciada
+## Status: PLANEJADO - decisões Q1-Q17 fechadas; nenhuma fase iniciada
 
 ## Progresso
 
@@ -64,6 +64,18 @@
 - **Contratos adjacentes:** `IMessageStore`, `IReplayCache`, `IStorageProvider` e `IStorageSession` vivem em
   `Contracts/Storage`, mas não são stores obtidos de `IStorage`; `IUserSessionStore` vive em `Users/Contracts` e é
   obtido por `IStorage.GetUserSessionStore(realm)`.
+- **Authorize parameters têm estado server-side:** `IAuthorizeParametersStore` guarda `NameValueCollection` entre o
+  redirect para login/consent e o callback; a implementação fake usa um handle aleatório em dictionary e o callback
+  faz read+delete.
+- **Message store atual não armazena server-side:** `ProtectedDataMessageStore.WriteAsync` serializa e protege o
+  payload com ASP.NET Data Protection e devolve o próprio ciphertext Base64Url como id; `ReadAsync` desempacota esse
+  valor e `DeleteAsync` é no-op. É usado no fluxo de end-session/logout.
+- **Replay cache atual é infraestrutura de segurança:** `PrivateKeyJwtSecretEvaluator` consulta `purpose+jti` e registra
+  o handle até `exp+5min`; o default DI é `DefaultReplayNoCache`, enquanto existe implementação opcional sobre
+  `IDistributedCache`.
+- **Provider/session atuais não guardam registros:** somente o key cache usa `IStorageProvider.CreateSession()` para
+  obter um `IStorage` de vida curta ao reler o realm e calcular o TTL do cache; no fake a sessão devolve o singleton e
+  `Dispose()` é no-op.
 - **Binding por realm:** `MemoryStorage` mantém um `RealmMemoryStore` por `Realm.Id`; getters realm-bound lançam
   `ArgumentException` quando o realm não está cadastrado.
 - **Vida dos registros:** os stores in-memory guardam e retornam as próprias instâncias mutáveis de modelos do core;
@@ -105,8 +117,9 @@
   inspecionar estado sem criar APIs administrativas no core durante o baseline.
 - **Duas famílias de persistência:** dados do IdP e `UserAccounts` não compartilham `DbContext` nem adapter; misturá-los
   violaria ADR-013/015.
-- **Decisões abertas:** Q4-Q17 impedem fechar a matriz final e a Fase 5; as fases anteriores só podem avançar sem
-  antecipar essas respostas.
+- **Decisões fechadas, detalhamento pendente:** Q1-Q17 estão respondidas. As escolhas por store, campo ou método
+  exigidas por DF16, DF18, DF19 e DF25 serão produzidas na matriz durante as fases, sem delegar a semântica à
+  implementação fake ou à collation do provider.
 
 ### Superfícies impactadas a mapear
 
@@ -145,134 +158,17 @@
 - Alterar o módulo ou os providers de `RoyalIdentity.UserAccounts` — família de persistência própria, já endurecida.
 - Implementar cache ou audit/outbox — destinos condicionais: planos 5 e 6 do macro-plano.
 - Criar API/UI administrativa ou contratos de CRUD motivados apenas por uma futura UI — destino: plano próprio.
-- Resolver o redesign de resources/scopes dentro deste baseline — destino precisa ser fechado em Q14.
+- Resolver o redesign de resources/scopes dentro deste baseline — DF22 bloqueia sua persistência até o redesign.
+- Implementar PAR (RFC 9126), um `PersistentDataMessageStore` ou redesenhar os stores de authorization request —
+  análise em [an-par-rfc-9126.md](../analisys/an-par-rfc-9126.md) e destino no backlog.
 
 ---
 
 ## Perguntas ao humano
 
-> Q1-Q3 foram respondidas e estão em `Histórico de decisões`. Q4-Q17 permanecem abertas. Fases podem inventariar fatos
-> antes dessas respostas, mas nenhuma semântica ambígua pode entrar como contrato obrigatório ou ser diferida ao final
-> sem contrariar DF3.
-
-- **Q4 — Artefato durável do baseline:** onde deve viver a matriz completa de contratos/comportamentos/paridade?
-  - **Opções:**
-    - **A)** Arquivo irmão `.ai/plans/plan-data-storage-matrix.md`, seguindo o precedente de
-      `plan-users-accounts-test-matrix.md`.
-    - **B)** Seções mantidas dentro deste plano, sem documento auxiliar.
-    - **C)** Referência em `.ai/references/data-storage/storage-baseline.md`, separada dos planos executáveis.
-  - **Impacto se não decidir:** Fases 1-2 não têm destino estável para o catálogo e a Fase 5 não tem artefato de handoff.
-  - **Status:** Aberta.
-
-- **Q5 — Projeto dos contract tests:** onde deve viver a suíte provider-neutral?
-  - **Opções:**
-    - **A)** Em `Tests.Integration/Storage/Contracts`, ampliando o projeto que já cobre flows e `ResourceStore`.
-    - **B)** Em um novo `Tests.Storage`, isolado dos testes HTTP e preparado para referenciar cada provider.
-  - **Impacto se não decidir:** bloqueia a estrutura física, referências de projeto e comando focado da Fase 3.
-  - **Status:** Aberta.
-
-- **Q6 — Contratos adjacentes a `IStorage`:** qual destino de `IMessageStore`, `IReplayCache`,
-  `IStorageProvider` e `IStorageSession`?
-  - **Opções:**
-    - **A)** Inventariar todos; classificar message/replay como infraestrutura fora de `Data.*` e provider/session como
-      seam de lifetime do adapter, salvo nova decisão específica.
-    - **B)** Tratar todos como persistência operacional candidata a `Data.Operational`.
-    - **C)** Inventariar, mas exigir decisão individual por contrato na Fase 2.
-  - **Impacto se não decidir:** a classificação configuração×operacional fica incompleta.
-  - **Status:** Aberta.
-
-- **Q7 — Atomicidade de uso único:** qual é o critério de paridade para authorization code e consumo/update de refresh
-  token sob concorrência?
-  - **Opções:**
-    - **A)** Exigir operação atômica/condicional no comportamento alvo; registrar redesign de contrato para o Plano 3.
-    - **B)** Preservar get+remove/update separados e considerar a serialização responsabilidade exclusiva do caller.
-  - **Impacto se não decidir:** não há critério falsificável para single-use/tolerância em provider concorrente.
-  - **Status:** Aberta.
-
-- **Q8 — Colisão e repetição de escrita:** como definir create/store/save repetido?
-  - **Opções:**
-    - **A)** Decidir por store em uma tabela explícita (`reject`, `idempotent no-op`, `upsert`, `replace`), sem política
-      global artificial.
-    - **B)** Padronizar todas as escritas como upsert.
-    - **C)** Preservar exatamente a divergência atual do fake.
-  - **Impacto se não decidir:** testes de duplicidade podem estabilizar acidentes de `TryAdd`/indexer.
-  - **Status:** Aberta.
-
-- **Q9 — Mutabilidade após leitura:** o comportamento alvo pode depender de alterar a instância retornada pelo store
-  sem chamar método de persistência?
-  - **Opções:**
-    - **A)** Não; somente operações explícitas persistem, e live references do fake são comportamento a descartar.
-    - **B)** Sim; adapters devem emular tracking implícito observado no fake.
-  - **Impacto se não decidir:** o mesmo teste pode passar no fake e falhar após materialização EF.
-  - **Status:** Aberta.
-
-- **Q10 — Comparação de identificadores:** qual regra de case/collation deve valer para realm id/path/domain, client id,
-  key id, scope name, resource URI, token handle, subject id e session id?
-  - **Opções:**
-    - **A)** Decidir por campo protocolar/negocial e registrar comparador explícito na matriz.
-    - **B)** Usar `Ordinal` case-sensitive para todos.
-    - **C)** Delegar à collation default de cada provider.
-  - **Impacto se não decidir:** SQLite, PostgreSQL e dicionários podem resolver a mesma chave de formas diferentes.
-  - **Status:** Aberta.
-
-- **Q11 — Expiração e limpeza:** stores devem retornar registros expirados para validação no core ou filtrá-los na
-  leitura?
-  - **Opções:**
-    - **A)** Decidir por tipo e separar semântica de leitura da política de cleanup/TTL.
-    - **B)** Todo `Get` trata expirado como ausente.
-    - **C)** Todo `Get` retorna o registro; somente callers validam tempo.
-  - **Impacto se não decidir:** muda respostas de code/token/consent/session e o desenho dos índices/cleanup do Plano 3.
-  - **Status:** Aberta.
-
-- **Q12 — Exclusão de realm:** remover um realm não interno deve apagar em cascata configuração e dados operacionais?
-  - **Opções:**
-    - **A)** Preservar a cascata total observada no fake.
-    - **B)** Impedir exclusão enquanto houver dependências.
-    - **C)** Remover configuração e reter dados operacionais conforme política de retenção a definir.
-  - **Impacto se não decidir:** afeta integridade referencial, retenção e separação entre os dois `Data.*`.
-  - **Status:** Aberta.
-
-- **Q13 — Semântica de `IStorageSession`:** a sessão deve representar somente lifetime/disposal de acesso ou também
-  unidade transacional?
-  - **Opções:**
-    - **A)** Somente lifetime do adapter; transações são locais a operações explícitas dos stores.
-    - **B)** Unit of Work/transaction compartilhada entre stores.
-    - **C)** Marcar `IStorageProvider`/`IStorageSession` como legado a substituir, após mapear os dois consumidores de cache.
-  - **Impacto se não decidir:** o adapter EF não tem boundary de contexto/transação definido.
-  - **Status:** Aberta.
-
-- **Q14 — Resources sob redesign:** qual pré-requisito o baseline deve impor ao Plano 2?
-  - **Opções:**
-    - **A)** Persistir o modelo atual com migration futura assumida e risco explícito.
-    - **B)** Migrar primeiro realms/options/clients/keys e bloquear resources até o redesign fechar.
-    - **C)** Exigir a conclusão do redesign antes de iniciar qualquer parte do Plano 2.
-  - **Impacto se não decidir:** a ordem de migração de configuração não pode ser fechada.
-  - **Status:** Aberta.
-
-- **Q15 — Cancelamento e API síncrona:** qual comportamento alvo deve ser registrado?
-  - **Opções:**
-    - **A)** Exigir que providers honrem `CancellationToken` e registrar `IRealmStore.GetByPath` síncrono como contrato a
-      substituir antes/do Plano 2.
-    - **B)** Preservar cancelamento best-effort e manter lookup síncrono como requisito.
-  - **Impacto se não decidir:** contract tests podem exigir comportamento impossível ou inadequado para I/O real.
-  - **Status:** Aberta.
-
-- **Q16 — Ordenação:** quais listagens precisam de ordem determinística?
-  - **Opções:**
-    - **A)** Exigir ordem somente quando protocolo/regra existente a define; declarar as demais não ordenadas.
-    - **B)** Definir ordem determinística para toda listagem no baseline.
-    - **C)** Preservar a ordem observada de cada coleção do fake.
-  - **Impacto se não decidir:** testes podem depender acidentalmente da enumeração de dictionary ou do plano SQL.
-  - **Status:** Aberta.
-
-- **Q17 — Ausência e erro de lookup:** preservar os resultados atuais (`null` em finds, exceção em `GetKeyAsync`, no-op
-  em removes) ou normalizar?
-  - **Opções:**
-    - **A)** Decidir por método conforme nome/contrato e registrar exceções explícitas na matriz.
-    - **B)** Normalizar todo lookup ausente para `null` e toda remoção ausente para no-op.
-    - **C)** Preservar exatamente o fake sem reavaliação.
-  - **Impacto se não decidir:** adapters podem divergir em fluxos de ausência e revogação idempotente.
-  - **Status:** Aberta.
+> Q1-Q17 foram respondidas e estão registradas em `Decisões fechadas` e `Histórico de decisões`.
+> Não há pergunta aberta antes do início da Fase 1. Se o inventário encontrar uma semântica não coberta por essas
+> decisões ou pelas fontes normativas, ela deve voltar ao humano; não pode ser inferida do fake.
 
 ---
 
@@ -301,6 +197,54 @@
   memória; provider PostgreSQL não é requisito deste plano. Fonte: ADR-003 e DF2.
 - **DF11 — Não estabilizar redesign de resources:** o baseline inventaria o contrato atual, mas não decide nem
   implementa a hierarquia futura de resources/scopes. Fonte: product.md, structure.md e AGENTS.md.
+- **DF12 — Matriz em plano irmão:** o catálogo durável será `.ai/plans/plan-data-storage-matrix.md`, separado deste
+  plano executável e seguindo o precedente de `plan-users-accounts-test-matrix.md`. Fonte: resposta humana Q4.1.
+- **DF13 — Projeto único de contract tests de data-storages:** criar `Tests.Storage` para hospedar a suíte
+  provider-neutral de todos os storages do core, começando por `MemoryStorage` e recebendo as fixtures dos providers
+  futuros. Fonte: resposta humana Q5.1.
+- **DF14 — Classificação do estado transitório atual:** `IAuthorizeParametersStore` é estado operacional;
+  `IMessageStore` e `IReplayCache` são infraestrutura adjacente; `IStorageProvider`/`IStorageSession` representam o
+  lifecycle do adapter, com semântica final definida por DF21. PAR e os possíveis novos contratos/implementações de
+  mensagens ou authorization requests não fazem parte deste baseline. Fonte: resposta humana Q6.1 e
+  `an-par-rfc-9126.md`.
+- **DF15 — Consumo concorrente explícito:** authorization code single-use e transições de refresh token exigem
+  operações atômicas/condicionais no comportamento alvo. A separação atual get+remove/update é classificada como
+  contrato a substituir no Plano 3; a tolerância de refresh token permanece uma regra distinta. Fonte: resposta
+  humana Q7.1 e product.md.
+- **DF16 — Escrita repetida por operação:** não existe upsert global. A matriz atribui explicitamente `reject`,
+  `idempotent no-op`, `upsert` ou `replace` a cada create/store/save/remove conforme a semântica do método. O
+  comportamento divergente do fake não é fonte suficiente. Fonte: resposta humana Q8.1 e DF3/DF7.
+- **DF17 — Persistência explícita, sem live reference:** cada leitura pode materializar uma nova instância; somente
+  operações explícitas persistem alterações. Testes e providers não dependem de identidade de objeto entre leituras,
+  e o fake não será ampliado apenas para emular materialização EF. Fonte: resposta humana Q9.1 e ADR-018.
+- **DF18 — Comparação definida por campo:** case sensitivity e igualdade são decididas por identificador
+  protocolar/negocial e registradas com comparador explícito na matriz. Collation de SQLite/PostgreSQL deve implementar
+  essa regra e nunca defini-la implicitamente. Fonte: resposta humana Q10.1 e requisito de paridade entre providers.
+- **DF19 — Expiração por tipo, cleanup separado:** a matriz decide por tipo se uma leitura expõe ou oculta um registro
+  logicamente expirado. Expiração lógica, retenção necessária ao fluxo e remoção física/TTL são dimensões separadas.
+  Fonte: resposta humana Q11.1 e invariantes de code, refresh token, consent e sessão em product.md.
+- **DF20 — Exclusão de realm como cascata lógica coordenada:** excluir realm não interno remove todos os dados ativos
+  que ele possui, incluindo Configuration, Operational e contas em `UserAccounts`. Cada família remove os próprios
+  dados; não se assume FK nem transação distribuída entre bancos. A orquestração futura deve ser idempotente,
+  retomável após falha parcial e admitir retenção somente quando uma política explícita a exigir. O baseline apenas
+  mapeia a mudança necessária; não move `UserAccounts` para `Data.*`. Fonte: resposta humana Q12.1, product.md e
+  ADR-013/015.
+- **DF21 — `IStorageSession` é lifetime, não Unit of Work global:** session/provider delimitam acesso e disposal do
+  adapter. Transações ficam dentro de operações explícitas de cada store; consistência entre famílias não depende de
+  uma transação distribuída implícita. Fonte: resposta humana Q13.1 e separação Configuration×Operational da ADR-013.
+- **DF22 — Resources bloqueados até o redesign:** o Plano 2 pode persistir realms/options, clients e keys antes do
+  redesign, mas não implementa persistência de resources/scopes enquanto o modelo instável não estiver fechado.
+  Fonte: resposta humana Q14.1, product.md, structure.md e DF11.
+- **DF23 — I/O assíncrono cancelável:** operações que podem fazer I/O devem ser assíncronas, receber
+  `CancellationToken` e encaminhá-lo a toda chamada EF assíncrona. Implementações puramente in-memory não precisam
+  simular cancelamento de I/O inexistente. `IRealmStore.GetByPath` síncrono é contrato a substituir antes ou durante o
+  Plano 2. Fonte: resposta humana Q15.1.
+- **DF24 — Ordenação somente por regra:** listagens têm ordem determinística apenas quando protocolo ou regra de
+  negócio a define; as demais são declaradas não ordenadas e testadas como conjuntos. Ordem incidental de dictionary
+  ou plano SQL não é contrato. Fonte: resposta humana Q16.1 e DF3/DF7.
+- **DF25 — Ausência decidida por método:** a matriz decide por nome e semântica de cada operação quando retornar
+  `null`, lançar, produzir resultado discriminado ou fazer remoção/revogação idempotente. Não há normalização global
+  nem preservação automática do fake. Fonte: resposta humana Q17.1 e DF3.
 
 ---
 
@@ -326,6 +270,98 @@
   - **Considerações Q3.1:** os providers EF precisam receber critérios de paridade falsificáveis, não reproduzir o
     fake por tentativa.
   - **Conclusão Q3:** DF3.
+- **Q4 — Onde deve viver o artefato durável do baseline?**
+  - **Opções consideradas:** plano irmão em `.ai/plans` (A); incorporar ao plano executável (B); referência separada
+    em `.ai/references` (C).
+  - **Resposta Q4.1:** A.
+  - **Considerações Q4.1:** `plan-users-accounts-test-matrix.md` é o precedente local para uma matriz durável
+    consumida por mais de uma fase/plano.
+  - **Conclusão Q4:** DF12.
+- **Q5 — Onde deve viver a suíte provider-neutral?**
+  - **Opções consideradas:** `Tests.Integration/Storage/Contracts` (A); novo projeto `Tests.Storage` (B).
+  - **Resposta Q5.1:** B; um único projeto para testar todos os data-storages.
+  - **Considerações Q5.1:** o projeto fica independente dos testes HTTP e poderá receber fixtures in-memory, SQLite e
+    PostgreSQL sem duplicar os cenários de contrato.
+  - **Conclusão Q5:** DF13.
+- **Q6 — Como classificar o estado transitório e os contratos adjacentes atuais?**
+  - **Opções consideradas:** classificar authorize parameters como operacional e os demais conforme sua função atual
+    (A); apenas inventariar e decidir individualmente na Fase 2 (B).
+  - **Resposta Q6.1:** A.
+  - **Considerações Q6.1:** ownership semântico e backing físico são dimensões distintas. PAR,
+    `PersistentDataMessageStore` e um possível redesign de authorization requests foram separados para
+    [an-par-rfc-9126.md](../analisys/an-par-rfc-9126.md) e backlog.
+  - **Conclusão Q6:** DF14.
+- **Q7 — Como garantir uso único e transições de refresh token sob concorrência?**
+  - **Opções consideradas:** exigir operação atômica/condicional no alvo (A); manter get+remove/update e delegar
+    serialização ao caller (B).
+  - **Resposta Q7.1:** A.
+  - **Considerações Q7.1:** single-use é invariante de produto; a tolerância de refresh não elimina a necessidade de
+    transição condicional.
+  - **Conclusão Q7:** DF15.
+- **Q8 — Qual política aplicar a escritas repetidas?**
+  - **Opções consideradas:** decidir por operação (A); upsert global (B); copiar divergências do fake (C).
+  - **Resposta Q8.1:** A; upsert é útil em casos próprios, mas não serve como regra universal.
+  - **Considerações Q8.1:** create, save, emissão, remoção e revogação possuem semânticas distintas.
+  - **Conclusão Q8:** DF16.
+- **Q9 — A persistência pode depender da mesma referência de objeto após leitura?**
+  - **Opções consideradas:** exigir persistência explícita e admitir nova materialização (A); emular tracking implícito
+    do fake (B).
+  - **Resposta Q9.1:** A.
+  - **Considerações Q9.1:** cada scope/`DbContext` pode materializar uma nova instância; não serão criados ou ampliados
+    fakes apenas para imitar EF.
+  - **Conclusão Q9:** DF17.
+- **Q10 — Quem define igualdade/case de identificadores?**
+  - **Opções consideradas:** regra explícita por campo (A); `Ordinal` global (B); collation do provider (C).
+  - **Resposta Q10.1:** A, substituindo a preferência inicial por C após avaliar a divergência entre providers.
+  - **Considerações Q10.1:** collation é mecanismo físico para cumprir o contrato; não pode alterar identidade entre
+    SQLite, PostgreSQL ou ambientes.
+  - **Conclusão Q10:** DF18.
+- **Q11 — Como relacionar leitura de expirados e cleanup físico?**
+  - **Opções consideradas:** decidir por tipo e separar cleanup (A); ocultar todo expirado (B); retornar todo expirado
+    ao core (C).
+  - **Resposta Q11.1:** A.
+  - **Considerações Q11.1:** codes, refresh tokens, consent e sessões têm ciclos distintos; tolerância e retenção podem
+    exigir o registro após ele deixar de ser utilizável.
+  - **Conclusão Q11:** DF19.
+- **Q12 — Qual semântica de exclusão de realm não interno?**
+  - **Opções consideradas:** cascata total (A); bloquear por dependências (B); reter operacional por política ainda não
+    definida (C).
+  - **Resposta Q12.1:** A, refinada como cascata lógica coordenada e retomável.
+  - **Considerações Q12.1:** Configuration, Operational e `UserAccounts` mantêm ownership e bancos próprios; cada
+    família apaga seus dados, sem FK/transação distribuída. Retenção exige política explícita e a orquestração futura
+    deve sobreviver a falhas parciais.
+  - **Conclusão Q12:** DF20.
+- **Q13 — O que representa `IStorageSession`?**
+  - **Opções consideradas:** lifetime/disposal (A); Unit of Work cross-store (B); legado a substituir (C).
+  - **Resposta Q13.1:** A.
+  - **Considerações Q13.1:** transações pertencem às operações de cada store; famílias separadas não recebem Unit of
+    Work distribuída implícita.
+  - **Conclusão Q13:** DF21.
+- **Q14 — Como avançar enquanto resources/scopes estão em redesign?**
+  - **Opções consideradas:** persistir o shape atual (A); avançar com realms/options/clients/keys e bloquear resources
+    (B); bloquear todo Plano 2 (C).
+  - **Resposta Q14.1:** B.
+  - **Considerações Q14.1:** permite progresso em configuração estável sem cristalizar o modelo conhecido como
+    instável.
+  - **Conclusão Q14:** DF22.
+- **Q15 — Qual regra de cancelamento e API síncrona?**
+  - **Opções consideradas:** I/O assíncrono com `CancellationToken` e substituição do lookup síncrono (A); manter
+    best-effort e lookup síncrono (B).
+  - **Resposta Q15.1:** A, com a qualificação de que in-memory não precisa simular cancelamento de I/O inexistente.
+  - **Considerações Q15.1:** providers EF encaminham `ct` a queries, enumerações e `SaveChangesAsync`; APIs que podem
+    acessar I/O não permanecem síncronas.
+  - **Conclusão Q15:** DF23.
+- **Q16 — Quando uma listagem tem ordem determinística?**
+  - **Opções consideradas:** somente quando há regra (A); sempre (B); copiar a ordem do fake (C).
+  - **Resposta Q16.1:** A.
+  - **Considerações Q16.1:** resultados sem regra são conjuntos; ordenar tudo adicionaria custo e contrato artificial.
+  - **Conclusão Q16:** DF24.
+- **Q17 — Como tratar lookup/remoção ausente?**
+  - **Opções consideradas:** decidir por método (A); normalizar todos (B); copiar o fake (C).
+  - **Resposta Q17.1:** A.
+  - **Considerações Q17.1:** `Find`, `Get`, consumo, remoção e revogação possuem expectativas diferentes que precisam
+    aparecer na matriz.
+  - **Conclusão Q17:** DF25.
 
 ---
 
@@ -333,7 +369,8 @@
 
 ### Contratos e bordas
 
-- **Catálogo de storage:** uma linha por método/propriedade pública com, no mínimo: owner; lifecycle; binding de realm;
+- **Catálogo de storage:** `.ai/plans/plan-data-storage-matrix.md`, com uma linha por método/propriedade pública e, no
+  mínimo: owner; lifecycle; binding de realm;
   callers; comportamento atual; fonte normativa; classificação `preservar|descartar|substituir`; cenário de teste;
   plano destino; questão/decisão relacionada.
 - **Contract suite test-only:** abstração de fixture/provider cria o backing, realms e dados necessários sem expor
@@ -349,26 +386,25 @@
 
 ### Modelo, dados e persistência
 
-Este plano não define tabelas. O artefato de classificação deve usar o seguinte mapa conceitual já decidido, deixando
-Q6 explícita para as superfícies adjacentes:
+Este plano não define tabelas. O artefato de classificação deve usar o seguinte mapa conceitual já decidido:
 
 ```text
 Configuration (ADR-013 / plan-data-macro)
   ServerOptions global
   Realm + RealmOptions
   Client
-  IdentityScope / ResourceServer / Scope / ProtectedResource (shape atual; Q14)
+  IdentityScope / ResourceServer / Scope / ProtectedResource (shape atual bloqueado por DF22)
   KeyParameters (até KMS)
 
 Operational (ADR-013 / plan-data-macro)
-  AuthorizeParameters (classificação final depende de Q6)
+  AuthorizeParameters
   AccessToken
   RefreshToken
   AuthorizationCode
   Consent + ConsentedScope
   UserSession + UserSessionClient
 
-Adjacent infrastructure (destino depende de Q6/Q13)
+Adjacent infrastructure (classificação por DF14; lifecycle definido por DF21)
   IMessageStore
   IReplayCache
   IStorageProvider / IStorageSession
@@ -381,11 +417,11 @@ RoyalIdentity/
   Contracts/Storage/                 contratos existentes; não alterados neste plano
   Users/Contracts/IUserSessionStore  store operacional existente
 
-<projeto definido em Q5>/
+Tests.Storage/
   Storage/Contracts/                 cenários provider-neutral
   Storage/Support/                   fixture abstrata + fixture MemoryStorage
 
-<artefato definido em Q4>
+.ai/plans/plan-data-storage-matrix.md
   catálogo método×semântica×teste×destino
 
 Futuro, fora deste plano:
@@ -397,13 +433,15 @@ Futuro, fora deste plano:
 ### Segurança, concorrência e confiabilidade
 
 - Isolamento por realm é obrigatório inclusive quando chaves/handles iguais existem em realms diferentes.
-- Authorization codes permanecem single-use; refresh-token tolerance permanece; a primitiva concorrente exata
-  depende de Q7.
-- Remoções/revogações que já são declaradas idempotentes não podem passar a falhar por ausência sem decisão Q17.
+- Authorization codes permanecem single-use e refresh-token tolerance permanece; o Plano 3 deve introduzir as
+  operações atômicas/condicionais exigidas por DF15.
+- Duplicidade, ausência e erro são definidos por operação conforme DF16/DF25, sem política global.
 - Keys usadas para validação continuam consultáveis após expirar para assinatura; keys futuras não entram em
   `ListAllKeysIdsAsync(now)`.
-- Nenhum teste pode depender de live reference, collation, ordem ou overwrite acidental antes de Q8-Q10/Q16.
-- Cancellation, lifetime/transação e cleanup precisam de decisão Q11/Q13/Q15 antes da matriz final.
+- Nenhum teste pode depender de live reference, collation do provider, ordem ou overwrite acidental; aplicar
+  DF17/DF18/DF24.
+- Expiração/cleanup, lifetime/transação e cancelamento seguem DF19/DF21/DF23.
+- Exclusão de realm segue a cascata lógica coordenada de DF20, sem mover ownership entre famílias.
 
 ### Compatibilidade, migração e rollout
 
@@ -422,12 +460,13 @@ Futuro, fora deste plano:
 2. **Fase 2 (Classificação)** — separa ownership/lifecycle antes de desenhar fixtures e handoffs.
 3. **Fase 3 (Contract tests)** — trava somente invariantes referenciados e comportamentos já decididos.
 4. **Fase 4 (Seeds/dependências)** — mapeia como remover setup e inspeção direta do fake.
-5. **Fase 5 (Paridade/ordem)** — resolve Q7-Q17, ajusta a suíte ao alvo e entrega a sequência aos próximos planos.
+5. **Fase 5 (Paridade/ordem)** — aplica DF15-DF25, ajusta a suíte ao alvo e entrega a sequência aos próximos planos.
 
 Build/test padrão:
 
 ```powershell
 dotnet build RoyalIdentity.sln
+dotnet test Tests.Storage
 dotnet test RoyalIdentity.sln
 ```
 
@@ -435,10 +474,10 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Inventário de contratos, consumidores e comportamento atual
 
-**Depende de:** DF1, DF3, DF4, DF7 e Q4.
+**Depende de:** DF1, DF3, DF4, DF7 e DF12.
 
 **Escopo:** `RoyalIdentity/Contracts/Storage`, `IUserSessionStore`, `ResourceStoreExtensions`, implementações
-`RoyalIdentity.Storage.InMemory`, consumidores no core/server e artefato definido em Q4.
+`RoyalIdentity.Storage.InMemory`, consumidores no core/server e `plan-data-storage-matrix.md`.
 
 **O que/como:** gerar o catálogo por inspeção estática e confirmar cada linha na implementação fake e nos callers.
 Não classificar comportamento como obrigatório apenas porque existe no fake.
@@ -467,7 +506,7 @@ artefato compilável além de documentação.
 
 ## Fase 2 - Classificação por ciclo de vida e fronteira
 
-**Depende de:** Fase 1, DF4, DF5, DF8, DF9, Q6 e Q14.
+**Depende de:** Fase 1, DF4, DF5, DF8, DF9, DF14 e DF22.
 
 **Escopo:** catálogo do baseline, ADR-013, macro-plano, contratos adjacentes e modelo atual de resources/options.
 
@@ -478,10 +517,12 @@ para `Data.*` e o que está bloqueado por redesign.
 
 - [ ] Classificar `ServerOptions`, realms/options, clients, resources/scopes e keys como configuração conforme fontes.
 - [ ] Classificar tokens, codes, consents e sessões como operacional conforme fontes.
-- [ ] Fechar a classificação de authorize parameters e contratos adjacentes conforme Q6.
+- [ ] Aplicar a classificação de authorize parameters e contratos adjacentes conforme DF14.
 - [ ] Registrar dependências cross-store de cada operação e se cruzam Configuration×Operational.
 - [ ] Marcar tipos do core que precisarão de mapping pelo adapter, sem copiá-los para `Data.*` neste plano.
-- [ ] Marcar a instabilidade de resources/scopes e aplicar o gate decidido em Q14.
+- [ ] Marcar a instabilidade de resources/scopes e aplicar o bloqueio de DF22.
+- [ ] Mapear a exclusão coordenada de realm entre Configuration, Operational e `UserAccounts`, preservando o owner de
+      cada família conforme DF20.
 - [ ] Verificar que nenhuma entidade/porta de `UserAccounts` foi incluída em `Data.*`.
 
 **Critérios de aceite:** toda linha tem exatamente um owner (`Configuration`, `Operational`, `Adapter/Infrastructure` ou
@@ -497,13 +538,14 @@ para `Data.*` e o que está bloqueado por redesign.
 
 ## Fase 3 - Contract tests reutilizáveis
 
-**Depende de:** Fases 1-2, DF2, DF3, DF6, DF7, DF10, Q5 e decisões específicas aplicáveis a cada cenário.
+**Depende de:** Fases 1-2, DF2, DF3, DF6, DF7, DF10, DF13 e DF15-DF25.
 
-**Escopo:** projeto definido em Q5; fixture test-only provider-neutral; fixture `MemoryStorage`; contratos classificados
+**Escopo:** `Tests.Storage`; fixture test-only provider-neutral; fixture `MemoryStorage`; contratos classificados
 nas Fases 1-2.
 
 **O que/como:** criar testes por contrato/comportamento, não por detalhe de dictionary. A fixture abstrai setup e
-inspeção provider-specific. Antes da Fase 5, adicionar apenas invariantes com fonte ou perguntas já respondidas.
+inspeção provider-specific. Comportamentos `substituir` que o fake não consegue cumprir ficam como requisitos/testes de
+aceite dos planos destino, sem forçar feature parity no fake.
 
 **Tarefas:**
 
@@ -513,8 +555,8 @@ inspeção provider-specific. Antes da Fase 5, adicionar apenas invariantes com 
 - [ ] Cobrir isolamento por realm com handles/ids iguais em dois realms para cada store realm-bound.
 - [ ] Cobrir regras normativas já fechadas de realms internos, enabled resources, keys atuais/históricas, sessão,
       revogação idempotente, consent e fluxos single-use no nível permitido pelas decisões.
-- [ ] Cobrir ausência, duplicidade, ordem, expiração, mutabilidade, cancelamento e concorrência somente após a respectiva
-      Q7-Q17 estar respondida.
+- [ ] Cobrir ausência, duplicidade, ordem, expiração, mutabilidade, cancelamento e concorrência conforme
+      DF15-DF19 e DF23-DF25, sem exigir do fake comportamentos classificados `substituir`.
 - [ ] Relacionar cada teste à linha do catálogo e eliminar cobertura duplicada que não agrega contrato.
 - [ ] Garantir que a suíte focada não requer Podman, PostgreSQL, rede ou relógio real.
 
@@ -522,7 +564,7 @@ inspeção provider-specific. Antes da Fase 5, adicionar apenas invariantes com 
 in-memory executa a suíte verde; nenhum teste referencia `ConcurrentDictionary`, `RealmMemoryStore` ou getters de setup
 do fake; cada cenário aponta para fonte/decisão.
 
-**Testes:** comando focado definido após Q5, mais `dotnet test RoyalIdentity.sln`.
+**Testes:** `dotnet test Tests.Storage`; `dotnet test RoyalIdentity.sln`.
 
 ### Resultado da Fase 3
 
@@ -532,7 +574,7 @@ do fake; cada cenário aponta para fonte/decisão.
 
 ## Fase 4 - Seeds, dados globais e dependências entre stores
 
-**Depende de:** Fases 1-3, DF1, DF7, DF8 e catálogo definido em Q4.
+**Depende de:** Fases 1-3, DF1, DF7, DF8 e DF12.
 
 **Escopo:** `MemoryStorage`, `RealmMemoryStore`, server/demo/internal realms, tests/server composition e fixture de
 contract tests.
@@ -566,7 +608,7 @@ falsificável pela fixture.
 
 ## Fase 5 - Paridade obrigatória e ordem de migração
 
-**Depende de:** Fases 1-4, DF3, respostas Q7-Q17 e macro-planos 2-4.
+**Depende de:** Fases 1-4, DF3, DF15-DF25 e macro-planos 2-4.
 
 **Escopo:** catálogo final, contract suite, roadmap/macro/backlog e handoff para os três planos seguintes.
 
@@ -575,12 +617,12 @@ risco. Nenhuma decisão de schema/provider entra aqui.
 
 **Tarefas:**
 
-- [ ] Resolver Q7-Q17 com respostas humanas e mover conclusões para `Decisões fechadas`/`Histórico de decisões`.
+- [ ] Aplicar DF15-DF25 a cada linha da matriz, detalhando as escolhas exigidas por store, campo, tipo e método.
 - [ ] Classificar cada comportamento como `preservar`, `descartar` ou `substituir`, com fonte e plano destino.
 - [ ] Remover/ajustar testes que tenham cristalizado comportamento descartado durante a caracterização.
 - [ ] Garantir teste provider-neutral para todo comportamento final marcado `preservar`.
 - [ ] Produzir lista explícita de mudanças públicas requeridas antes/durante os Planos 2/3, sem implementá-las.
-- [ ] Ordenar stores de configuração e operacionais respeitando dependências e Q14.
+- [ ] Ordenar stores de configuração e operacionais respeitando dependências e o bloqueio de DF22.
 - [ ] Definir o gate que permite ao Plano 4 trocar o backing default e remover acessos ao fake.
 - [ ] Atualizar `plan-data-macro.md`, `plans-roadmap-02.md`, backlog e AGENTS.md com o resultado real quando concluído.
 - [ ] Executar a suíte completa e registrar contagens, skips e limitações.
@@ -601,11 +643,11 @@ artefato sem inferir semântica; suíte completa verde.
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Objetivo 1 - inventário completo | 1 | DF1, DF3 | 100% dos membros com implementação/callers/cobertura/fonte | buscas `rg`; `git diff --check` |
-| Objetivo 2 - classificação de ownership | 2 | DF4, DF5, DF8, DF9, Q6, Q14 | toda linha com owner único e dependências | `dotnet test Tests.Architecture --no-restore` |
-| Objetivo 3 - contract suite reutilizável | 3 | DF2, DF6, DF7, DF10, Q5, Q7-Q17 | comportamentos preservados cobertos sem tipo fake nos cenários | filtro de storage após Q5; solução completa |
+| Objetivo 1 - inventário completo | 1 | DF1, DF3, DF12 | 100% dos membros com implementação/callers/cobertura/fonte | buscas `rg`; `git diff --check` |
+| Objetivo 2 - classificação de ownership | 2 | DF4, DF5, DF8, DF9, DF14, DF20-DF22 | toda linha com owner único e dependências | `dotnet test Tests.Architecture --no-restore` |
+| Objetivo 3 - contract suite reutilizável | 3 | DF2, DF6, DF7, DF10, DF13, DF15-DF19, DF23-DF25 | comportamentos preservados cobertos sem tipo fake nos cenários | `dotnet test Tests.Storage`; solução completa |
 | Objetivo 4 - seeds/dependências | 4 | DF1, DF7, DF8 | todo acesso direto/seed com finalidade e destino | contract suite; `Tests.Integration` |
-| Objetivo 5 - paridade e ordem | 5 | DF3, Q7-Q17 | zero ambiguidades; handoff executável | build + solução completa |
+| Objetivo 5 - paridade e ordem | 5 | DF3, DF15-DF25 | zero ambiguidades; handoff executável | build + solução completa |
 
 ---
 
@@ -622,6 +664,11 @@ artefato sem inferir semântica; suíte completa verde.
 8. Realms internos continuam não removíveis; alteração de identidade imutável não é introduzida pelo baseline.
 9. O fake não recebe feature parity nova como destino; mudanças neste plano limitam-se a testes e documentação.
 10. Nenhum comportamento sem fonte ou resposta humana é promovido a critério de paridade.
+11. Persistência não depende de identidade de objeto nem de mutação implícita após leitura.
+12. Comparação de identificadores é explícita por campo e independe da collation default do provider.
+13. Exclusão de realm não interno remove logicamente todos os dados ativos do realm por orquestração retomável,
+    preservando o ownership de cada família.
+14. Todo I/O assíncrono futuro encaminha o `CancellationToken`; APIs síncronas não escondem acesso a banco.
 
 ---
 
@@ -642,13 +689,14 @@ artefato sem inferir semântica; suíte completa verde.
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Cristalizar acidente do fake | teste depende de live reference, dictionary order, collation ou overwrite sem fonte | provider EF precisa emular comportamento incorreto | DF3; gate Q7-Q17; revisão da suíte na Fase 5 | Aberto |
+| Cristalizar acidente do fake | teste depende de live reference, dictionary order, collation ou overwrite sem fonte | provider EF precisa emular comportamento incorreto | DF3, DF16-DF18, DF24/DF25; revisão da suíte na Fase 5 | Aberto |
 | Inventário incompleto | membro/caller não aparece no catálogo | Plano 2/3 descobre contrato tarde | buscas por interface, implementação e call site; critério de 100% na Fase 1 | Aberto |
 | Fixture vira API administrativa | setup de teste motiva write contract público no baseline | expansão de contrato/escopo | DF1; hooks exclusivamente test-only | Mitigado |
-| Atomicidade insuficiente | teste concorrente resgata/consome o mesmo handle duas vezes | violação OAuth/OIDC e revogação insegura | resolver Q7; requisito explícito para Plano 3 | Aberto |
+| Atomicidade insuficiente | teste concorrente resgata/consome o mesmo handle duas vezes | violação OAuth/OIDC e revogação insegura | DF15; requisito explícito para Plano 3 | Aberto |
 | Colisão cross-realm no schema futuro | fixture usa somente ids globalmente únicos | vazamento ou unique index incorreto | todos os contract tests realm-bound usam ids iguais em dois realms | Aberto |
-| Modelo de resources muda após persistência | Q14 aceita persistir shape instável sem gate | migration/schema retrabalhados | resolver Q14 e registrar ordem/bloqueio | Aberto |
-| Split Configuration×Operational exige transação não definida | operação cruza stores e Q13 não fecha boundary | consistência parcial em falha | mapear dependências na Fase 2; resolver Q13 antes da Fase 5 | Aberto |
+| Modelo de resources muda após persistência | implementação ignora o bloqueio de DF22 | migration/schema retrabalhados | não persistir resources/scopes antes do redesign | Mitigado |
+| Split Configuration×Operational tenta usar transação global | operação cruza stores/bancos | acoplamento ou consistência parcial em falha | DF21; mapear orquestração e operações locais na Fase 2 | Mitigado |
+| Exclusão de realm falha entre famílias | uma família apaga e outra permanece ativa | dados órfãos ou realm parcialmente removido | DF20; exigir orquestração idempotente/retomável nos planos de implementação | Aberto |
 | Suíte provider-neutral acopla ao fake | cenários fazem cast ou acessam `RealmMemoryStore` | providers futuros não reutilizam testes | fixture separada; critério negativo na Fase 3 | Aberto |
 | Baseline cresce para implementação | tarefa cria `Data.*`, EF ou muda core | plano deixa de ser auditável | DF1 e Fora de escopo; diferir com requisito/teste | Mitigado |
 
@@ -661,7 +709,7 @@ artefato sem inferir semântica; suíte completa verde.
 - Troca do backing default, migração de testes HTTP e remoção do fake — destino: `plan-data-test-migration.md`.
 - Cache sobre stores estáveis — destino condicional: `plan-data-caching.md`.
 - Auditoria durável/outbox — destino condicional: `plan-data-audit-outbox.md`.
-- Redesign completo de resources/scopes — destino definido após Q14; não implementar implicitamente neste plano.
+- Redesign completo de resources/scopes — pré-requisito de DF22; não persistir implicitamente neste plano/Plano 2.
 - KMS e retirada futura das keys do Configuration storage — destino: `plan-kms.md`/ADR própria.
 - API/UI administrativa e writes de configuração motivados por administração — destino: `plan-admin-api-ui.md` e
   plano de contratos correspondente.

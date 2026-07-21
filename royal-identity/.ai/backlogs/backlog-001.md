@@ -238,3 +238,20 @@ compartilhados começar a custar mais do que manter o fake.
   ser "module-only por falta de fake" e passam a poder subir ao contrato — agora com as duas pontas sendo módulo+Sqlite
   (ou módulo vs. providers `.Sqlite`/`.PostgreSql`), não fake vs. módulo.
 - O lado de **storage do core** (realms/clients/keys/sessions/tokens) segue o mesmo rumo no `plan-data-persistence`.
+
+---
+
+## Pushed Authorization Requests (PAR / RFC 9126)
+
+**Área:** OAuth2/OIDC / Authorization endpoint / Storage operacional
+**Deferral:** PAR é uma feature de protocolo completa, não apenas uma decisão de persistência. Exige endpoint direto
+autenticado, validação antecipada da authorization request, emissão de `request_uri` opaco e imprevisível, vínculo ao
+client, expiração, consumo concorrente seguro, metadata e política global/por client. Incorporar essas decisões ao
+baseline de storage ampliaria o plano e misturaria inventário dos contratos atuais com redesign futuro.
+**Quando revisitar:** Após o baseline dos contratos de storage e antes de planejar PAR ou evoluir o armazenamento de
+authorization requests/mensagens transitórias.
+**Nota de design:** A análise [an-par-rfc-9126.md](../analisys/an-par-rfc-9126.md) registra os requisitos e as
+alternativas ainda não decididas: `IPushedAuthorizationRequestStore` específico ou evolução para
+`IAuthorizationRequestStore` com operações distintas para continuação interna e PAR. Uma futura
+`PersistentDataMessageStore` continua válida para mensagens transitórias, mas o `IMessageStore` atual não expressa
+realm, client, TTL nem consumo atômico e não deve ser assumido como store de PAR sem redesign.
