@@ -52,7 +52,8 @@
 - `Tests.Integration/Storage/ResourceStoreTests.cs`, `Tests.Integration/Realm/RealmIsolationTests.cs` e testes de
   endpoints/usuários — cobertura atual direta ou incidental dos stores.
 - Comandos locais `rg --files -g "*.csproj"`, `rg -n "GetRealmMemoryStore|GetDemoRealmStore|GetServerRealmStore"
-  Tests.Integration -g "*.cs"` e inventário dos arquivos de contratos — evidências do estado descrito abaixo.
+  Tests.Integration Tests.UserAccounts -g "*.cs"` e inventário dos arquivos de contratos — evidências do estado
+  descrito abaixo.
 
 ### Estado atual do código (verificado em 2026-07-21)
 
@@ -78,19 +79,28 @@
   `Dispose()` é no-op.
 - **Binding por realm:** `MemoryStorage` mantém um `RealmMemoryStore` por `Realm.Id`; getters realm-bound lançam
   `ArgumentException` quando o realm não está cadastrado.
+- **Exclusão de realm já existe no fake:** `IRealmStore.DeleteAsync` retorna `false` para realm inexistente/interno e,
+  para realm comum, remove o registro de realm e o `RealmMemoryStore` inteiro. `RealmIsolationTests` cobre a recusa do
+  realm interno e a remoção do realm junto de um authorization code/data store. Não há caller de produção nem
+  `IRealmManager.DeleteAsync`; quando o core in-memory é composto com `UserAccounts` real, essa operação não alcança a
+  persistência própria do módulo e pode deixar contas órfãs.
 - **Vida dos registros:** os stores in-memory guardam e retornam as próprias instâncias mutáveis de modelos do core;
   não há materialização, detach ou cópia entre escrita e leitura.
 - **Escritas duplicadas divergentes:** access/refresh token usam `TryAdd`, authorization code e sessão sobrescrevem,
   consent e realm fazem upsert, e key atribui pelo `KeyId`; os contratos não documentam uma política uniforme.
-- **Uso único sem primitiva atômica:** `IAuthorizationCodeStore` separa get/remove; `IRefreshTokenStore` separa
-  get/update/remove. O produto exige code de uso único e tolerância de refresh token, mas a atomicidade de um futuro
-  provider concorrente não está expressa nos contratos.
+- **Uso único sem transição atômica válida:** `IAuthorizationCodeStore` separa get/remove; o fake de refresh token usa
+  `TryUpdate` contra a mesma referência mutável e ignora o resultado. Ambos são evidências a classificar `substituir`,
+  não modelos a corrigir/copiar. O provider EF deve cumprir DF15 com transição condicional real.
+- **Lookup de key é outlier de ausência:** `IKeyStore.GetKeyAsync` lança `ArgumentException` quando o key id não existe,
+  e `GetKeysAsync` propaga essa falha; os demais lookups individuais de realm/client/token/code/consent/session retornam
+  `null`. As exceções do resource store tratam inconsistência/ambiguidade da hierarquia, não simples ausência.
 - **Configuração sem facades completas de escrita:** `IClientStore`, `IResourceStore` e `IKeyStore` são
   predominantemente de leitura; muitos testes preparam clients/resources/keys mutando diretamente os dicionários de
   `RealmMemoryStore`.
-- **Acoplamento dos testes ao fake:** há 55 ocorrências de `GetRealmMemoryStore`/`GetDemoRealmStore`/
-  `GetServerRealmStore` em 15 arquivos de `Tests.Integration`; isso inclui setup de clients, resources, usuários e
-  inspeção de estado operacional.
+- **Acoplamento dos testes ao fake:** há 56 ocorrências de `GetRealmMemoryStore`/`GetDemoRealmStore`/
+  `GetServerRealmStore` em 16 arquivos: 55 ocorrências/15 arquivos em `Tests.Integration` e uma ocorrência adicional em
+  `Tests.UserAccounts/UserDirectoryContractTests.cs`, usada para semear diretamente o lado in-memory do contract test.
+  A superfície inclui setup de clients, resources, usuários e inspeção de estado operacional.
 - **Precedente de contract test:** `Tests.UserAccounts/UserDirectoryContractTests.cs` executa o mesmo contrato contra
   fake e módulo+SQLite, mas não existe equivalente provider-neutral para os stores do core.
 - **Cobertura atual desigual:** `ResourceStoreTests` cobre regras próprias do resource store e
@@ -132,6 +142,8 @@
 - `RoyalIdentity/Utils/Caching/` — consumidor de `IStorageProvider`/`IStorageSession` e premissas de lifetime.
 - `RoyalIdentity.Server/` — composição, seed/demo e escolha de backing.
 - `Tests.Integration/` — testes de fluxo, acesso direto ao fake e destino atual provável dos contract tests.
+- `Tests.UserAccounts/UserDirectoryContractTests.cs` — ocorrência adicional de seed direto no fake usada pelo
+  precedente de contract tests.
 - Futuros `RoyalIdentity.Data.Configuration`, `RoyalIdentity.Data.Operational` e
   `RoyalIdentity.Storage.EntityFramework*` — consumidores do baseline, sem criação neste plano.
 
@@ -223,12 +235,14 @@
 - **DF19 — Expiração por tipo, cleanup separado:** a matriz decide por tipo se uma leitura expõe ou oculta um registro
   logicamente expirado. Expiração lógica, retenção necessária ao fluxo e remoção física/TTL são dimensões separadas.
   Fonte: resposta humana Q11.1 e invariantes de code, refresh token, consent e sessão em product.md.
-- **DF20 — Exclusão de realm como cascata lógica coordenada:** excluir realm não interno remove todos os dados ativos
-  que ele possui, incluindo Configuration, Operational e contas em `UserAccounts`. Cada família remove os próprios
-  dados; não se assume FK nem transação distribuída entre bancos. A orquestração futura deve ser idempotente,
-  retomável após falha parcial e admitir retenção somente quando uma política explícita a exigir. O baseline apenas
-  mapeia a mudança necessária; não move `UserAccounts` para `Data.*`. Fonte: resposta humana Q12.1, product.md e
-  ADR-013/015.
+- **DF20 — Exclusão permanente com tombstone configuracional:** excluir realm não interno é uma transição irreversível,
+  distinta de `Enabled = false`. Providers EF preservam Configuration como tombstone lógico, invisível aos lookups
+  normais e incapaz de atender novas requests; path e domain permanecem reservados enquanto existir o tombstone.
+  Dados Operational são removidos fisicamente, e contas devem ser removidas posteriormente pelo próprio
+  `UserAccounts`. Cada família mantém ownership; não se assume FK nem transação distribuída. Este baseline registra o
+  requisito e o gap do `IRealmStore.DeleteAsync` atual, mas não escolhe saga, evento, chamada direta ou outro seam. A
+  coordenação idempotente/retomável e sua semântica de conclusão exigem decisão arquitetural junto ao futuro fluxo
+  administrativo de exclusão de realm. Fonte: resposta humana Q12.1/Q12.2, product.md e ADR-013/015.
 - **DF21 — `IStorageSession` é lifetime, não Unit of Work global:** session/provider delimitam acesso e disposal do
   adapter. Transações ficam dentro de operações explícitas de cada store; consistência entre famílias não depende de
   uma transação distribuída implícita. Fonte: resposta humana Q13.1 e separação Configuration×Operational da ADR-013.
@@ -326,10 +340,14 @@
 - **Q12 — Qual semântica de exclusão de realm não interno?**
   - **Opções consideradas:** cascata total (A); bloquear por dependências (B); reter operacional por política ainda não
     definida (C).
-  - **Resposta Q12.1:** A, refinada como cascata lógica coordenada e retomável.
-  - **Considerações Q12.1:** Configuration, Operational e `UserAccounts` mantêm ownership e bancos próprios; cada
-    família apaga seus dados, sem FK/transação distribuída. Retenção exige política explícita e a orquestração futura
-    deve sobreviver a falhas parciais.
+  - **Resposta Q12.1:** A, inicialmente refinada como cascata lógica coordenada e retomável.
+  - **Resposta Q12.2:** para providers EF, manter Configuration por exclusão lógica permanente e remover fisicamente
+    Operational; preservar path/domain do realm e remover posteriormente as contas pelo owner `UserAccounts`.
+  - **Considerações Q12.2:** `Deleted` não equivale a `Enabled = false` e não admite restauração normal porque dados
+    ativos serão apagados. Lookups normais tratam o tombstone como ausente. O fake pode continuar removendo fisicamente
+    desde que testes verifiquem o resultado observável, não linhas internas. O mecanismo cross-family não foi decidido:
+    cada família mantém banco/ownership próprios, e saga/evento/chamada/seam ficam para decisão arquitetural do futuro
+    fluxo administrativo de exclusão.
   - **Conclusão Q12:** DF20.
 - **Q13 — O que representa `IStorageSession`?**
   - **Opções consideradas:** lifetime/disposal (A); Unit of Work cross-store (B); legado a substituir (C).
@@ -441,12 +459,18 @@ Futuro, fora deste plano:
 - Nenhum teste pode depender de live reference, collation do provider, ordem ou overwrite acidental; aplicar
   DF17/DF18/DF24.
 - Expiração/cleanup, lifetime/transação e cancelamento seguem DF19/DF21/DF23.
-- Exclusão de realm segue a cascata lógica coordenada de DF20, sem mover ownership entre famílias.
+- Exclusão de realm segue DF20: tombstone permanente em Configuration, purge de Operational e requisito de cleanup por
+  `UserAccounts`, sem mover ownership nem escolher neste baseline o seam cross-family.
 
 ### Compatibilidade, migração e rollout
 
 - Durante este plano, o host e a suíte continuam usando `MemoryStorage` como default.
 - Os contract tests novos rodam somente contra o fake até existir fixture EF; isso não declara o fake como destino.
+- Para exclusão de realm, os contract tests provider-neutral verificam somente efeitos observáveis: realm deixa de ser
+  resolvido/atender requests e dados ativos ficam inacessíveis. Eles não exigem hard delete físico do provider EF nem
+  tombstone físico do fake.
+- A reserva de path/domain após o tombstone é requisito `substituir` para o provider EF e recebe teste de aceite no
+  Plano 2; não se amplia o fake, que hoje permite recriação após remover fisicamente o realm.
 - Cada requisito `substituir` deve apontar para Plano 2 ou 3 e declarar qual teste ficará vermelho/pendente até a nova
   implementação existir, sem alterar produção neste plano.
 - O Plano 4 só pode migrar testes de fluxo após os Planos 2/3 atenderem a matriz e substituírem os acessos diretos ao
@@ -521,8 +545,8 @@ para `Data.*` e o que está bloqueado por redesign.
 - [ ] Registrar dependências cross-store de cada operação e se cruzam Configuration×Operational.
 - [ ] Marcar tipos do core que precisarão de mapping pelo adapter, sem copiá-los para `Data.*` neste plano.
 - [ ] Marcar a instabilidade de resources/scopes e aplicar o bloqueio de DF22.
-- [ ] Mapear a exclusão coordenada de realm entre Configuration, Operational e `UserAccounts`, preservando o owner de
-      cada família conforme DF20.
+- [ ] Mapear o comportamento atual de `IRealmStore.DeleteAsync`, seu teste e o gap com `UserAccounts`; registrar o alvo
+      de tombstone Configuration + purge Operational de DF20, sem escolher o seam administrativo cross-family.
 - [ ] Verificar que nenhuma entidade/porta de `UserAccounts` foi incluída em `Data.*`.
 
 **Critérios de aceite:** toda linha tem exatamente um owner (`Configuration`, `Operational`, `Adapter/Infrastructure` ou
@@ -555,6 +579,10 @@ aceite dos planos destino, sem forçar feature parity no fake.
 - [ ] Cobrir isolamento por realm com handles/ids iguais em dois realms para cada store realm-bound.
 - [ ] Cobrir regras normativas já fechadas de realms internos, enabled resources, keys atuais/históricas, sessão,
       revogação idempotente, consent e fluxos single-use no nível permitido pelas decisões.
+- [ ] Cobrir exclusão de realm pelo comportamento observável comum ao hard delete do fake e ao tombstone EF, sem
+      inspecionar presença física da configuração.
+- [ ] Registrar como teste de aceite futuro do Plano 2 que path/domain de tombstone não podem ser reutilizados, sem
+      exigir essa feature do fake transitório.
 - [ ] Cobrir ausência, duplicidade, ordem, expiração, mutabilidade, cancelamento e concorrência conforme
       DF15-DF19 e DF23-DF25, sem exigir do fake comportamentos classificados `substituir`.
 - [ ] Relacionar cada teste à linha do catálogo e eliminar cobertura duplicada que não agrega contrato.
@@ -586,7 +614,8 @@ criação e dependências sem criar seed público de produção.
 
 - [ ] Inventariar `ServerOptions`, realms internos/demo, clients, resources/scopes, keys, authorize parameters e dados
       operacionais criados estaticamente ou por teste.
-- [ ] Inventariar as 55 ocorrências atuais de getters diretos do fake e classificar setup, inspeção ou dependência real.
+- [ ] Inventariar as 56 ocorrências atuais de getters diretos do fake — 55 em `Tests.Integration` e uma em
+      `Tests.UserAccounts/UserDirectoryContractTests.cs` — e classificar setup, inspeção ou dependência real.
 - [ ] Mapear dependências mínimas de seed: realm→options→resources/clients/keys e realm→dados operacionais.
 - [ ] Separar seed de host/demo, fixture compartilhada e dados específicos de cenário.
 - [ ] Definir no catálogo a substituição futura de cada acesso direto por facade, fixture ou seed do provider.
@@ -666,8 +695,8 @@ artefato sem inferir semântica; suíte completa verde.
 10. Nenhum comportamento sem fonte ou resposta humana é promovido a critério de paridade.
 11. Persistência não depende de identidade de objeto nem de mutação implícita após leitura.
 12. Comparação de identificadores é explícita por campo e independe da collation default do provider.
-13. Exclusão de realm não interno remove logicamente todos os dados ativos do realm por orquestração retomável,
-    preservando o ownership de cada família.
+13. Exclusão de realm não interno é permanente: Configuration mantém tombstone invisível e reserva path/domain;
+    Operational é removido; `UserAccounts` remove suas contas por coordenação futura, preservando ownership.
 14. Todo I/O assíncrono futuro encaminha o `CancellationToken`; APIs síncronas não escondem acesso a banco.
 
 ---
@@ -696,7 +725,7 @@ artefato sem inferir semântica; suíte completa verde.
 | Colisão cross-realm no schema futuro | fixture usa somente ids globalmente únicos | vazamento ou unique index incorreto | todos os contract tests realm-bound usam ids iguais em dois realms | Aberto |
 | Modelo de resources muda após persistência | implementação ignora o bloqueio de DF22 | migration/schema retrabalhados | não persistir resources/scopes antes do redesign | Mitigado |
 | Split Configuration×Operational tenta usar transação global | operação cruza stores/bancos | acoplamento ou consistência parcial em falha | DF21; mapear orquestração e operações locais na Fase 2 | Mitigado |
-| Exclusão de realm falha entre famílias | uma família apaga e outra permanece ativa | dados órfãos ou realm parcialmente removido | DF20; exigir orquestração idempotente/retomável nos planos de implementação | Aberto |
+| Exclusão de realm falha entre famílias | tombstone existe, mas cleanup de Operational/`UserAccounts` não conclui | dados ativos órfãos após exclusão lógica | DF20 bloqueia novas requests; decidir seam e exigir coordenação idempotente/retomável no fluxo administrativo futuro | Aberto |
 | Suíte provider-neutral acopla ao fake | cenários fazem cast ou acessam `RealmMemoryStore` | providers futuros não reutilizam testes | fixture separada; critério negativo na Fase 3 | Aberto |
 | Baseline cresce para implementação | tarefa cria `Data.*`, EF ou muda core | plano deixa de ser auditável | DF1 e Fora de escopo; diferir com requisito/teste | Mitigado |
 
@@ -710,6 +739,8 @@ artefato sem inferir semântica; suíte completa verde.
 - Cache sobre stores estáveis — destino condicional: `plan-data-caching.md`.
 - Auditoria durável/outbox — destino condicional: `plan-data-audit-outbox.md`.
 - Redesign completo de resources/scopes — pré-requisito de DF22; não persistir implicitamente neste plano/Plano 2.
+- Seam e semântica de conclusão da exclusão cross-family de realm — decisão arquitetural/ADR do futuro fluxo
+  administrativo; este baseline entrega somente requisito, gap e comportamento observável de DF20.
 - KMS e retirada futura das keys do Configuration storage — destino: `plan-kms.md`/ADR própria.
 - API/UI administrativa e writes de configuração motivados por administração — destino: `plan-admin-api-ui.md` e
   plano de contratos correspondente.
