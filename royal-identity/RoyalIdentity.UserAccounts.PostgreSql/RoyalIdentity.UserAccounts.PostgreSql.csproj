@@ -11,6 +11,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="RoyalCode.WorkContext.PostgreSql" Version="$(RcWorkContextVer)" />
+		<!-- Design-time tooling only (dotnet ef migrations): not part of the shipped runtime surface. -->
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" PrivateAssets="all" />
 	</ItemGroup>
 
 </Project>

@@ -29,10 +29,12 @@ target architecture before changing the area it covers.
 
 Active plan: `.ai/plans/plan-users-accounts-sqlite-hardening.md` — hardens the
 `UserAccounts` backing toward replacing the in-memory fake (ADR-018). Fase 1
-(real concurrency retry on the credential use cases, via `RoyalCode.SmartCommands`/
-`.WorkContext` `0.1.0`) is DONE; provider migrations and a reusable seed
-(Fases 2-3) remain. `.ai/plans/plans-roadmap-02.md` maps what comes after
-(supersedes `plans-roadmap-01.md`).
+(real concurrency retry on the credential/token/verification use cases, via
+`RoyalCode.SmartCommands`/`.WorkContext` `0.1.0`) and Fase 2 (EF migrations for
+`.Sqlite`/`.PostgreSql`, replacing `EnsureCreated`) are DONE; a reusable seed
+(Fase 3) remains. The PostgreSQL migration has not been run against a real
+server yet (no local Postgres in this environment). `.ai/plans/plans-roadmap-02.md`
+maps what comes after (supersedes `plans-roadmap-01.md`).
 
 Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:

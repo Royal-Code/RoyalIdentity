@@ -1,15 +1,15 @@
 # Plan: Endurecimento do backing `UserAccounts` — concorrência resiliente, migrations e seed (`plan-users-accounts-sqlite-hardening`)
 
-## Status: EM ANDAMENTO - Fase 1 concluída (concorrência resiliente); Fases 2-3 pendentes
+## Status: EM ANDAMENTO - Fases 1-2 concluídas (concorrência resiliente; migrations); Fase 3 pendente
 
 ## Progresso
 
-`████░░░░░░░░` **33%** - 1 de 3 fases
+`████████░░░░` **67%** - 2 de 3 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Concorrência resiliente (retry no handler) | Concluida |
-| Fase 2 - Migrations dos providers (`.Sqlite`/`.PostgreSql`) | Pendente |
+| Fase 2 - Migrations dos providers (`.Sqlite`/`.PostgreSql`) | Concluida |
 | Fase 3 - Seed reutilizável e módulo como backing de testes | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -534,22 +534,85 @@ refletindo os mapeamentos atuais (incluindo índices parciais de primário únic
 
 **Tarefas:**
 
-- [ ] Aplicar as decisões Q5–Q7 (migrations agora; testes rápidos com `EnsureCreated`; testes dedicados com `Migrate()`;
-      Sqlite no CI e PostgreSql validado localmente por ora).
-- [ ] `IDesignTimeDbContextFactory` por provider (se necessário para o tooling de migrations).
-- [ ] Migration inicial `.Sqlite` refletindo o modelo atual; validar criação de schema file-based.
-- [ ] Migration inicial `.PostgreSql` (incluindo `xmin` como token e índices parciais com sintaxe PG).
-- [ ] Definir o caminho de testes (manter `EnsureCreated` in-memory vs aplicar migrations — Q6).
+- [x] Aplicar as decisões Q5–Q7 (migrations agora; testes rápidos com `EnsureCreated`; testes dedicados com `Migrate()`;
+      Sqlite no CI e PostgreSql validado localmente por ora, via container Podman efêmero).
+- [x] `IDesignTimeDbContextFactory` por provider (necessário: nenhum dos dois providers tinha acesso a `IConfiguration`
+      fora de um host, e o tooling `dotnet ef` precisa construir o contexto sem subir a aplicação).
+- [x] Migration inicial `.Sqlite` refletindo o modelo atual; validada (schema funcional, ver testes).
+- [x] Migration inicial `.PostgreSql` (incluindo `xmin` como token e índices parciais com sintaxe PG) — com correção
+      manual necessária (ver "Achado" abaixo).
+- [x] Caminho de testes definido (Q6): suíte existente mantém `EnsureCreated` (rápida); testes novos dedicados aplicam
+      `Migrate()` sobre SQLite in-memory compartilhado.
 
-**Critérios de aceite:** decisões Q5–Q7 aplicadas; `AddUserAccountsSqlite` (file) cria/evolui schema via migration;
-migration PG gerada e validada localmente; validação automatizada via .NET Aspire registrada como futuro; testes
-existentes seguem verdes.
+**Achado durante a implementação — migration do PostgreSQL tentava criar a coluna de sistema `xmin`:**
 
-**Testes:** round-trip de persistência sobre o schema migrado; suíte do módulo verde.
+O mapeamento de `UserAccount.Version` para `xmin`/`xid` (`ValueGeneratedOnAddOrUpdate().IsConcurrencyToken()`) já
+existia (DF2), mas o scaffolder do EF não sabe que `xmin` é uma **coluna de sistema reservada do PostgreSQL**
+(presente automaticamente em toda tabela) — `dotnet ef migrations add` gerou
+`xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)` dentro do `CreateTable` de
+`UserAccounts`, o que o PostgreSQL **rejeitaria** em tempo real (`column name "xmin" conflicts with a system
+column name"`). Investiguei `UseXminAsConcurrencyToken()` (o helper histórico do Npgsql para este cenário) e
+confirmei, inspecionando a DLL instalada, que **não existe mais no Npgsql EF Core 10.0.0** (presente em 8.0.11,
+removido depois — o Npgsql atual unificou em torno do `IsRowVersion()` genérico do EF Core, sem suprimir sozinho
+a geração de DDL para uma coluna de sistema). Não há API para "excluir só esta coluna" da migration (existe
+`ExcludeFromMigrations()`, mas é por **tabela inteira**, usado para views). A correção aplicada — e documentada
+como prática estabelecida para este cenário específico — foi editar manualmente a migration gerada, removendo a
+linha da coluna `xmin` do `CreateTable` (o snapshot do modelo, usado para calcular o *diff* de migrations
+futuras, **não** foi tocado — continua sabendo que `Version` mapeia para `xmin`). Deixei um comentário na
+migration alertando que essa edição manual precisa ser refeita em qualquer migration futura que altere a tabela
+`UserAccounts` (o `dotnet ef migrations add` volta a gerar a linha).
+
+**Critérios de aceite:** decisões Q5–Q7 aplicadas; `AddUserAccountsSqlite` (file) cria/evolui schema via
+`Database.MigrateAsync()`; migration PG gerada, corrigida e executada contra PostgreSQL 17 real em container Podman
+efêmero (ver teste/script abaixo); validação automatizada em CI via .NET Aspire permanece registrada como futuro
+(Q7); testes existentes seguem verdes.
+
+**Testes:** `Tests.UserAccounts/UserAccountsSqliteMigrationTests.cs` (4 testes novos) aplicam `Migrate()` sobre uma
+conexão SQLite in-memory compartilhada (não `EnsureCreated()`) e prova que o schema migrado é funcional: round-trip
+de conta com credencial/email; os índices parciais únicos de e-mail e telefone primários
+(`UX_UserAccountEmails_PrimaryPerAccount`/`UX_UserAccountPhones_PrimaryPerAccount`) rejeitam um segundo primário; e o
+token de concorrência (`Version`) continua rejeitando atualização concorrente obsoleta. Suíte do módulo e da solução
+verdes (ver "Resultado" abaixo).
+
+**Teste PostgreSQL opt-in:** `Tests.UserAccounts/UserAccountsPostgreSqlMigrationTests.cs` recebe a connection string
+por `ROYALIDENTITY_TEST_POSTGRES`; sem ela, fica explicitamente ignorado e a suíte normal permanece independente de
+infraestrutura. `scripts/Test-UserAccountsPostgreSql.ps1` verifica/inicia a `podman machine`, sobe
+`postgres:17-alpine` num container efêmero com porta host dinâmica (nunca 5432), aguarda `pg_isready`, injeta a
+connection string apenas no processo e executa a categoria `PostgreSql`. O teste aplica `MigrateAsync()`, faz
+round-trip de conta/credencial/e-mail, prova o índice parcial de e-mail primário e confirma o comportamento real do
+`xmin` (valor gerado/atualizado e `DbUpdateConcurrencyException` para uma escrita stale). O container é removido em
+`finally`; a machine não é parada, pois pode ser compartilhada. Validado localmente em PostgreSQL 17: **1/1 verde**.
+
+**Geração de script SQL (Q5, para aplicação manual pelo DBA):** confirmado funcionando nos dois providers via
+`dotnet ef migrations script` (comando padrão do EF, não precisa de código extra). Limitação encontrada: o
+provider SQLite **não suporta** `--idempotent` ("Generating idempotent scripts for migrations is not currently
+supported for SQLite") — script incremental funciona normalmente; PostgreSQL suporta `--idempotent` sem
+problemas, e o script gerado confirma que a correção do `xmin` chegou corretamente até a saída SQL (sem nenhuma
+menção a "xmin" no `CREATE TABLE`).
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída.**
+
+- **`RoyalIdentity.UserAccounts.Sqlite`**: `Microsoft.EntityFrameworkCore.Design` (10.0.10, `PrivateAssets="all"`) +
+  `UserAccountsSqliteDesignTimeDbContextFactory` (conexão dummy `DataSource=design-time.db`, dispatcher no-op) +
+  `Migrations/InitialCreate` refletindo o modelo completo (12 tabelas, todos os índices incluindo os dois parciais
+  únicos de primário email/phone). Validada por `Migrate()` real em `UserAccountsSqliteMigrationTests.cs`.
+- **`RoyalIdentity.UserAccounts.PostgreSql`**: mesma estrutura (`UserAccountsPostgreSqlDesignTimeDbContextFactory`,
+  conexão dummy Npgsql) + `Migrations/InitialCreate` com a correção manual do `xmin` (ver achado acima). Executada
+  contra PostgreSQL 17 real via `scripts/Test-UserAccountsPostgreSql.ps1`: migration, índice parcial e concorrência
+  por `xmin` verdes. A automação em CI via .NET Aspire continua diferida para fase futura.
+- Nenhum builder-extension novo tipo `MigrateDatabase()` foi criado: `EnsureDatabaseCreated()`/`SeedDatabase()` (já
+  existentes) são mecanismos **exclusivos do hook de conexão in-memory do SQLite** — não fazem nada em
+  `AddSqliteWorkContext`/`AddPostgreWorkContext` (confirmado lendo o código-fonte do pacote). Para os providers
+  reais, aplicar a migration é responsabilidade explícita do host — prática padrão do EF Core (`await
+  serviceProvider.GetRequiredService<TDbContext>().Database.MigrateAsync();` no startup), sem abstração adicional
+  necessária.
+- **Suíte completa sem infraestrutura: 562 aprovados + 1 PostgreSQL ignorado** (`dotnet test RoyalIdentity.sln`;
+  `Tests.UserAccounts`: 193 aprovados + 1 ignorado). **Suíte PostgreSQL opt-in: 1/1 verde** via script Podman.
+- Revisão pós-fase: a pilha Microsoft EF Core foi alinhada em `10.0.10` (`Relational` no módulo e `Design` nos dois
+  providers, a mesma versão do `dotnet-ef`). Isso removeu a resolução transitiva vulnerável de
+  `System.Security.Cryptography.Xml` 9.0.0; o audit NuGet dos dois providers ficou sem pacotes vulneráveis.
 
 ---
 
