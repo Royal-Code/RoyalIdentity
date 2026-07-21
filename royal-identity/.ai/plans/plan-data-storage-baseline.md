@@ -1,14 +1,14 @@
 # Plan: Baseline dos contratos de storage do IdP (`plan-data-storage-baseline`)
 
-## Status: PLANEJADO - decisões Q1-Q17 fechadas; nenhuma fase iniciada
+## Status: EM EXECUÇÃO - Fase 1 de 5 concluída
 
 ## Progresso
 
-`░░░░░` **0%** - 0 de 5 fases concluídas
+`█░░░░` **20%** - 1 de 5 fases concluídas
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Inventário de contratos, consumidores e comportamento atual | Pendente |
+| Fase 1 - Inventário de contratos, consumidores e comportamento atual | Concluida |
 | Fase 2 - Classificação por ciclo de vida e fronteira | Pendente |
 | Fase 3 - Contract tests reutilizáveis | Pendente |
 | Fase 4 - Seeds, dados globais e dependências entre stores | Pendente |
@@ -508,13 +508,13 @@ Não classificar comportamento como obrigatório apenas porque existe no fake.
 
 **Tarefas:**
 
-- [ ] Listar todas as interfaces, propriedades, métodos e extensões que compõem a superfície de storage.
-- [ ] Mapear cada método de `IStorage` ao getter/propriedade, implementação fake e dicionário subjacente.
-- [ ] Mapear consumidores por símbolo, incluindo caches, middleware, handlers, defaults, responses e server wiring.
-- [ ] Registrar assinatura, retorno de ausência, exceções, duplicate-write, mutabilidade, ordem, cancelamento e tempo.
-- [ ] Registrar quais regras possuem fonte normativa e quais são apenas comportamento observado.
-- [ ] Registrar todos os testes existentes que cobrem cada linha direta ou incidentalmente.
-- [ ] Executar `rg` de verificação e anexar os comandos/resultados resumidos ao artefato.
+- [x] Listar todas as interfaces, propriedades, métodos e extensões que compõem a superfície de storage.
+- [x] Mapear cada método de `IStorage` ao getter/propriedade, implementação fake e dicionário subjacente.
+- [x] Mapear consumidores por símbolo, incluindo caches, middleware, handlers, defaults, responses e server wiring.
+- [x] Registrar assinatura, retorno de ausência, exceções, duplicate-write, mutabilidade, ordem, cancelamento e tempo.
+- [x] Registrar quais regras possuem fonte normativa e quais são apenas comportamento observado.
+- [x] Registrar todos os testes existentes que cobrem cada linha direta ou incidentalmente.
+- [x] Executar `rg` de verificação e anexar os comandos/resultados resumidos ao artefato.
 
 **Critérios de aceite:** 100% dos membros públicos dos contratos inventariados; cada membro aponta para implementação,
 callers, cobertura atual e fonte/ausência de fonte; nenhum comportamento sem referência está marcado `preservar`.
@@ -524,7 +524,25 @@ artefato compilável além de documentação.
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Concluída em 2026-07-21.** Criado
+[plan-data-storage-matrix.md](plan-data-storage-matrix.md) com o inventário estático completo do baseline:
+
+- 15 contratos e uma extensão, totalizando 62 métodos/propriedades contratuais; os sete membros públicos do tipo de
+  suporte `ResourceResolution` também foram catalogados;
+- cada operação aponta para owner inicial, binding, backing fake, comportamento observado, consumidores, cobertura,
+  fonte/classificação inicial, cenário ou lacuna e plano destino;
+- os 11 membros de `IStorage` foram ligados aos estados globais ou ao dictionary correspondente de
+  `RealmMemoryStore`, e os contratos adjacentes foram separados de `Data.*`;
+- foram registrados os gaps de consumo atômico de authorization code, CAS ineficaz de refresh token, lookup de key
+  como outlier, exclusão real de realm no fake sem coordenação com `UserAccounts`, resources bloqueados e superfícies
+  sem cobertura direta;
+- buscas por símbolos confirmaram as 56 referências diretas ao fake (55 em 15 arquivos de `Tests.Integration` e uma
+  em `Tests.UserAccounts`), nenhum caller de produção de `IRealmStore.DeleteAsync` e nenhum caller de
+  `GetAllResourcesAsync`.
+
+Nenhum comportamento sem ADR, foundation, regra de produto ou decisão DF foi marcado como `preservar`; as semânticas
+ainda abertas por store/campo/método permanecem `avaliar` para fechamento na Fase 5. Como a fase alterou somente
+documentação, não foi executado build; `git diff --check` concluiu sem erros.
 
 ---
 
