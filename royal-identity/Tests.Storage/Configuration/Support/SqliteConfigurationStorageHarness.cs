@@ -8,11 +8,11 @@ using RoyalIdentity.Models;
 using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
-using RoyalIdentity.Security.Keys;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
+using RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Users;
@@ -87,6 +87,7 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 		collection.AddSingleton<IConfigurationResourceSource>(resourceSource);
 		collection.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(database.Connection));
 		collection.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
+		collection.AddAesKeyMaterialProtector(options => options.Key = TestProtectorKey.ToArray());
 
 		var services = collection.BuildServiceProvider(new ServiceProviderOptions
 		{
@@ -191,6 +192,15 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			OptionsJson = payload.Json,
 		};
 
+	private static ReadOnlySpan<byte> TestProtectorKey
+		=>
+		[
+			0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+			0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+			0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+			0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20,
+		];
+
 	private sealed class MutableConfigurationResourceSource : IConfigurationResourceSource
 	{
 		private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, IdentityScope>> identityScopes = new();
@@ -246,7 +256,7 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			=> new UserConsentStore(GetData(realm).Consents);
 
 		public IKeyStore GetKeyStore(Realm realm)
-			=> new KeyStore(GetData(realm).Keys);
+			=> configuration.GetKeyStore(realm);
 
 		public IClientStore GetClientStore(Realm realm)
 			=> configuration.GetClientStore(realm);
@@ -301,7 +311,6 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 
 	private sealed class RealmOperationalData
 	{
-		public ConcurrentDictionary<string, KeyParameters> Keys { get; } = new(StringComparer.Ordinal);
 		public ConcurrentDictionary<string, AccessToken> AccessTokens { get; } = new(StringComparer.Ordinal);
 		public ConcurrentDictionary<string, RefreshToken> RefreshTokens { get; } = new(StringComparer.Ordinal);
 		public ConcurrentDictionary<string, AuthorizationCode> AuthorizationCodes { get; } = new(StringComparer.Ordinal);

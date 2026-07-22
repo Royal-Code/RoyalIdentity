@@ -3,6 +3,7 @@ using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
+using RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 
 namespace RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 
@@ -11,7 +12,9 @@ internal sealed class EntityFrameworkConfigurationStoreFactory(
 	EntityFrameworkRealmStore realmStore,
 	IConfigurationDbContextAccessor accessor,
 	ClientMaterializer clientMaterializer,
-	IConfigurationResourceSource resourceSource) : IConfigurationStoreFactory
+	IConfigurationResourceSource resourceSource,
+	KeyMaterialProtectorResolver protectorResolver,
+	TimeProvider clock) : IConfigurationStoreFactory
 {
 	public IRealmStore Realms => realmStore;
 
@@ -22,6 +25,12 @@ internal sealed class EntityFrameworkConfigurationStoreFactory(
 	{
 		ArgumentNullException.ThrowIfNull(realm);
 		return new EntityFrameworkClientStore(realm.Id, accessor, realmStore, clientMaterializer);
+	}
+
+	public IKeyStore GetKeyStore(Realm realm)
+	{
+		ArgumentNullException.ThrowIfNull(realm);
+		return new EntityFrameworkKeyStore(realm.Id, accessor, protectorResolver, clock);
 	}
 
 	public IResourceStore GetResourceStore(Realm realm)

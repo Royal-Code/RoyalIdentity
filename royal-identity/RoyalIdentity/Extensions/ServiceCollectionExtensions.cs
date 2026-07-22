@@ -8,7 +8,6 @@ using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
-using RoyalIdentity.Contracts.Defaults.Jobs;
 using RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints;
@@ -41,7 +40,7 @@ public static class ServiceCollectionExtensions
 
         // jobs
         services.AddTransient<IHostedService, DefaultServerJobsStartup>();
-        services.AddTransient<IServerJob, FirstKeyJob>();
+        services.AddTransient<IHostedService, SigningKeyStartupValidator>();
 
         // Default contract implementations
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();

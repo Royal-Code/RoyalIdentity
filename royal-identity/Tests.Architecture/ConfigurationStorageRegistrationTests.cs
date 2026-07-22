@@ -1,11 +1,17 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Configuration;
+using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Defaults;
+using RoyalIdentity.Contracts.Defaults.Jobs;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Storage.EntityFramework.Configuration;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
+using RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 
 namespace Tests.Architecture;
@@ -82,6 +88,7 @@ public class ConfigurationStorageRegistrationTests
 		Assert.Null(scope.ServiceProvider.GetService<IStorage>());
 		Assert.Null(scope.ServiceProvider.GetService<IStorageProvider>());
 		Assert.Null(scope.ServiceProvider.GetService<IStorageSession>());
+		Assert.Empty(scope.ServiceProvider.GetServices<IKeyMaterialProtector>());
 	}
 
 	[Fact]
@@ -119,5 +126,20 @@ public class ConfigurationStorageRegistrationTests
 		Assert.Null(scope.ServiceProvider.GetService<IStorage>());
 		Assert.Null(scope.ServiceProvider.GetService<IStorageProvider>());
 		Assert.Null(scope.ServiceProvider.GetService<IStorageSession>());
+	}
+
+	[Fact]
+	public void CoreRegistration_UsesFailFastSigningKeyValidator_AndDoesNotRegisterWriterJob()
+	{
+		var services = new ServiceCollection();
+
+		services.AddOpenIdConnectProviderServices();
+
+		Assert.Contains(services, descriptor =>
+			descriptor.ServiceType == typeof(IHostedService)
+			&& descriptor.ImplementationType == typeof(SigningKeyStartupValidator));
+		Assert.DoesNotContain(services, descriptor =>
+			descriptor.ServiceType == typeof(IServerJob)
+			&& descriptor.ImplementationType == typeof(FirstKeyJob));
 	}
 }

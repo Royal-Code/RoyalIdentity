@@ -1,10 +1,10 @@
 # Plan: Persistência EF dos dados de configuração do IdP (`plan-data-configuration-storage`)
 
-## Status: EM EXECUÇÃO - Fase 4 de 7 concluída
+## Status: EM EXECUÇÃO - Fase 5 de 7 concluída
 
 ## Progresso
 
-`████░░░` **57%** - 4 de 7 fases
+`█████░░` **71%** - 5 de 7 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Modelo híbrido e provider SQLite | Concluida |
 | Fase 3 - Adapter, lifecycle e snapshot assíncrono | Concluida |
 | Fase 4 - ServerOptions, realms, clients e bridge de resources | Concluida |
-| Fase 5 - Proteção e persistência de signing keys | Pendente |
+| Fase 5 - Proteção e persistência de signing keys | Concluida |
 | Fase 6 - PostgreSQL, migrations, runner e seeds | Pendente |
 | Fase 7 - Paridade, integração e fechamento | Pendente |
 
@@ -670,17 +670,17 @@ Validação: `dotnet build RoyalIdentity.sln` — êxito; `dotnet test Tests.Sto
 
 **Tarefas:**
 
-- [ ] Definir `IKeyMaterialProtector` assíncrono e envelope versionado com identificador do protector.
-- [ ] Implementar `PlainKeyMaterialProtector` com opt-in explícito e warning sem material sensível.
-- [ ] Implementar `AspNetDataProtectionKeyMaterialProtector` com purpose estável/versionado e documentação sobre key ring persistente/compartilhado.
-- [ ] Implementar `AesKeyMaterialProtectorOptions` e AES-GCM com validação de chave, nonce aleatório e autenticação.
-- [ ] Implementar `IKeyStore` EF com insert create-only, listagens temporais/ordem e exceções de ausência definidas na matriz.
-- [ ] Testar ciphertext diferente para o mesmo plaintext em duas proteções AES e falha em envelope/tag adulterado.
-- [ ] Testar que Data Protection round-trip funciona entre instâncias que compartilham o mesmo provider e falha fechado com provider incompatível.
-- [ ] Remover `FirstKeyJob` da composição padrão e aplicar DF27 por `IKeyManager.GetSigningCredentialsAsync(realm, ct)` ou caminho equivalente completo: falhar `StartAsync` se cada realm habilitado não possuir key atual desprotegível, materializável e com o algoritmo principal configurado.
-- [ ] Testar startup com key ausente, ciphertext corrompido, protector incompatível e key atual de algoritmo diferente; todos falham antes de servir requests.
-- [ ] Atualizar seeds/fixtures in-memory para fornecer uma key utilizável por realm habilitado antes do startup, sem reintroduzir job escritor.
-- [ ] Garantir que logs/exceções/snapshots não contenham key material nem chave AES.
+- [x] Definir `IKeyMaterialProtector` assíncrono e envelope versionado com identificador do protector.
+- [x] Implementar `PlainKeyMaterialProtector` com opt-in explícito e warning sem material sensível.
+- [x] Implementar `AspNetDataProtectionKeyMaterialProtector` com purpose estável/versionado e documentação sobre key ring persistente/compartilhado.
+- [x] Implementar `AesKeyMaterialProtectorOptions` e AES-GCM com validação de chave, nonce aleatório e autenticação.
+- [x] Implementar `IKeyStore` EF com insert create-only, listagens temporais/ordem e exceções de ausência definidas na matriz.
+- [x] Testar ciphertext diferente para o mesmo plaintext em duas proteções AES e falha em envelope/tag adulterado.
+- [x] Testar que Data Protection round-trip funciona entre instâncias que compartilham o mesmo provider e falha fechado com provider incompatível.
+- [x] Remover `FirstKeyJob` da composição padrão e aplicar DF27 por `IKeyManager.GetSigningCredentialsAsync(realm, ct)` ou caminho equivalente completo: falhar `StartAsync` se cada realm habilitado não possuir key atual desprotegível, materializável e com o algoritmo principal configurado.
+- [x] Testar startup com key ausente, ciphertext corrompido, protector incompatível e key atual de algoritmo diferente; todos falham antes de servir requests.
+- [x] Atualizar seeds/fixtures in-memory para fornecer uma key utilizável por realm habilitado antes do startup, sem reintroduzir job escritor.
+- [x] Garantir que logs/exceções/snapshots não contenham key material nem chave AES.
 
 **Critérios de aceite:** nenhuma key nova é criada pelo host; cada realm habilitado sem key atual utilizável para seu algoritmo principal falha o startup (DF27); existência de id sem materialização válida não produz falso positivo; duplicidade não sobrescreve; KY-02/03 respeitam bordas inclusivas e ordem; os três protectors possuem testes; `Plain` nunca é default.
 
@@ -688,7 +688,44 @@ Validação: `dotnet build RoyalIdentity.sln` — êxito; `dotnet test Tests.Sto
 
 ### Resultado da Fase 5
 
-*a preencher*
+**Concluída em 2026-07-22.** Signing keys agora possuem persistência Configuration EF create-only,
+proteção substituível e validação fail-fast de usabilidade antes de o host servir requests.
+
+- **Envelope e seleção explícita:** `IKeyMaterialProtector` produz `KeyMaterialEnvelope` v1 com identificador
+  estável e payload opaco; sua representação textual sempre redige o payload. A registration de Configuration
+  não escolhe protector implicitamente e exige exatamente um para writes. `Plain` somente entra por
+  `AddPlainKeyMaterialProtector()` e emite warning sem material sensível.
+- **Protectors produtivos:** ASP.NET Data Protection usa purpose estável
+  `RoyalIdentity.Storage.EntityFramework.SigningKeyMaterial.v1` e documenta a obrigação de key ring
+  persistente/compartilhado na composição. AES-GCM aceita somente chaves de 128/192/256 bits fornecidas pelo
+  consumidor, copia e zera sua própria chave ao dispor, usa nonce aleatório de 96 bits e tag de 128 bits;
+  payload/tag adulterado falha fechado.
+- **`IKeyStore` EF:** `IConfigurationStoreFactory.GetKeyStore(realm)` cria binding scoped que protege somente
+  `KeyParameters.Key`, mantém metadata relacional, propaga CT e filtra tombstones. Insert é create-only pela PK
+  `(realm_id, key_id)`; duplicidade falha sem sobrescrever. KY-02/KY-03 preservam bordas inclusivas e ordem por
+  `Created`; KY-04/KY-05 preservam `ArgumentException` em ausência e a ordem solicitada; cada leitura materializa
+  uma instância independente.
+- **Startup DF27:** `FirstKeyJob` saiu da composição padrão. `SigningKeyStartupValidator` é um `IHostedService`
+  próprio, porque falhas de `IServerJob` são isoladas pelo executor legado; para cada realm habilitado ele percorre
+  o caminho completo de `IKeyManager.GetSigningCredentialsAsync` e propaga uma falha de `StartAsync` se a key
+  atual estiver ausente, corrompida, protegida por provider incompatível, não materializável ou não corresponder
+  ao algoritmo principal. Mensagens nunca incluem material da key ou chave AES.
+- **Fixture in-memory:** os realms iniciais do backing de testes/exemplo recebem uma key utilizável durante sua
+  construção, antes dos hosted services; realms criados em runtime continuam sem provisão automática, conforme
+  o limite explícito de DF27. Nenhum job do host cria ou rotaciona keys.
+- **Cobertura (+29 em `Tests.Storage`, +1 em `Tests.Architecture`):** os 11 cenários KY provider-neutral foram
+  reutilizados contra SQLite; aceites adicionais cobrem create-only, ciphertext em repouso, independência, CT,
+  Plain/warning, envelope, AES nonce/tag/key-size, Data Protection compartilhado/incompatível e os quatro modos
+  de falha de startup. O guard arquitetural prova que `Plain` não é default e que `FirstKeyJob` não é registrado.
+
+Critérios de aceite verificados: nenhuma criação/rotação ocorre por job do host; toda key persistida pelo store é
+protegida por estratégia explicitamente escolhida; duplicidade não sobrescreve; janelas e ordens KY são
+preservadas; um id corrente sem desproteção/materialização/algoritmo utilizável não produz falso positivo.
+
+Validação: `dotnet build RoyalIdentity.sln --no-restore` — êxito (0 erros; 5 warnings preexistentes);
+`dotnet test Tests.Storage` — 213 aprovados; `dotnet test Tests.Security` — 116;
+`dotnet test Tests.Architecture` — 35; `dotnet test Tests.Integration` — 227; solução completa — 801 aprovados,
+0 falhas, 1 ignorado (PostgreSQL opt-in preexistente de `Tests.UserAccounts`).
 
 ---
 

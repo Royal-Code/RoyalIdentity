@@ -8,6 +8,7 @@ using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Snapshot;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
+using RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 
 namespace RoyalIdentity.Storage.EntityFramework.Extensions;
 
@@ -39,6 +40,7 @@ public static class ServiceCollectionExtensions
 		services.TryAddSingleton<RealmOptionsPayloadSerializer>();
 		services.TryAddSingleton<RealmMaterializer>();
 		services.TryAddSingleton<ClientMaterializer>();
+		services.TryAddSingleton<KeyMaterialProtectorResolver>();
 		services.TryAddSingleton<IConfigurationResourceSource, DefaultConfigurationResourceSource>();
 		services.TryAddScoped<IConfigurationDbContextAccessor, ConfigurationDbContextAccessor<TContext>>();
 		services.TryAddScoped<ConfigurationServerOptionsReader>();

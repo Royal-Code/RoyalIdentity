@@ -201,4 +201,10 @@ public abstract class KeyStoreContractTests : StorageContractTests
 	{
 		protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
 	}
+
+	public sealed class Sqlite : KeyStoreContractTests
+	{
+		protected override Task<StorageContractHarness> CreateHarnessAsync()
+			=> Configuration.Support.SqliteConfigurationStorageHarness.CreateAsync();
+	}
 }

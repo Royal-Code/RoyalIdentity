@@ -20,6 +20,9 @@ public interface IConfigurationStoreFactory
 	/// <summary>Creates a database-backed, realm-bound client store.</summary>
 	IClientStore GetClientStore(Realm realm);
 
+	/// <summary>Creates a database-backed, realm-bound signing-key store.</summary>
+	IKeyStore GetKeyStore(Realm realm);
+
 	/// <summary>Creates the transitional volatile, realm-bound resource bridge.</summary>
 	IResourceStore GetResourceStore(Realm realm);
 }

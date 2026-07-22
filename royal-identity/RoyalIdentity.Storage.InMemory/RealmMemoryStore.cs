@@ -1,6 +1,7 @@
 ﻿using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Scopes;
+using RoyalIdentity.Models.Keys;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Security.Keys;
@@ -24,6 +25,11 @@ public class RealmMemoryStore
         UserAccounts = realm.Id == MemoryStorage.DemoRealm.Id
             ? DemoUsers()
             : new ConcurrentDictionary<string, MemoryUserAccount>();
+
+        // The in-memory composition is a fixture/example backing: provision its initial enabled realms before
+        // host startup. Runtime-created realms deliberately remain without a key until an admin/KMS flow exists.
+        var signingKey = KeyParametersFactory.Create(realm.Options.Keys);
+        KeyParameters.TryAdd(signingKey.KeyId, signingKey);
     }
 
     /// <summary>Constructor for programmatically created realms — starts with no clients.</summary>
