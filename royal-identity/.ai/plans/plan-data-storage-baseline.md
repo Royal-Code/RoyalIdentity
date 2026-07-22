@@ -1,16 +1,16 @@
 # Plan: Baseline dos contratos de storage do IdP (`plan-data-storage-baseline`)
 
-## Status: EM EXECUÇÃO - Fases 1-2 de 5 concluídas
+## Status: EM EXECUÇÃO - Fases 1-3 de 5 concluídas
 
 ## Progresso
 
-`██░░░` **40%** - 2 de 5 fases concluídas
+`███░░` **60%** - 3 de 5 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Inventário de contratos, consumidores e comportamento atual | Concluida |
 | Fase 2 - Classificação por ciclo de vida e fronteira | Concluida |
-| Fase 3 - Contract tests reutilizáveis | Pendente |
+| Fase 3 - Contract tests reutilizáveis | Concluida |
 | Fase 4 - Seeds, dados globais e dependências entre stores | Pendente |
 | Fase 5 - Paridade obrigatória e ordem de migração | Pendente |
 
@@ -614,20 +614,20 @@ aceite dos planos destino, sem forçar feature parity no fake.
 
 **Tarefas:**
 
-- [ ] Criar a abstração test-only de fixture com lifecycle isolado por teste e controle de tempo quando necessário.
-- [ ] Criar a fixture `MemoryStorage` sem expor o tipo concreto aos cenários provider-neutral.
-- [ ] Criar grupos de contrato por store, com nomes que descrevam comportamento e não implementação.
-- [ ] Cobrir isolamento por realm com handles/ids iguais em dois realms para cada store realm-bound.
-- [ ] Cobrir regras normativas já fechadas de realms internos, enabled resources, keys atuais/históricas, sessão,
+- [x] Criar a abstração test-only de fixture com lifecycle isolado por teste e controle de tempo quando necessário.
+- [x] Criar a fixture `MemoryStorage` sem expor o tipo concreto aos cenários provider-neutral.
+- [x] Criar grupos de contrato por store, com nomes que descrevam comportamento e não implementação.
+- [x] Cobrir isolamento por realm com handles/ids iguais em dois realms para cada store realm-bound.
+- [x] Cobrir regras normativas já fechadas de realms internos, enabled resources, keys atuais/históricas, sessão,
       revogação idempotente, consent e fluxos single-use no nível permitido pelas decisões.
-- [ ] Cobrir exclusão de realm pelo comportamento observável comum ao hard delete do fake e ao tombstone EF, sem
+- [x] Cobrir exclusão de realm pelo comportamento observável comum ao hard delete do fake e ao tombstone EF, sem
       inspecionar presença física da configuração.
-- [ ] Registrar como teste de aceite futuro do Plano 2 que path/domain de tombstone não podem ser reutilizados, sem
+- [x] Registrar como teste de aceite futuro do Plano 2 que path/domain de tombstone não podem ser reutilizados, sem
       exigir essa feature do fake transitório.
-- [ ] Cobrir ausência, duplicidade, ordem, expiração, mutabilidade, cancelamento e concorrência conforme
+- [x] Cobrir ausência, duplicidade, ordem, expiração, mutabilidade, cancelamento e concorrência conforme
       DF15-DF19 e DF23-DF25, sem exigir do fake comportamentos classificados `substituir`.
-- [ ] Relacionar cada teste à linha do catálogo e eliminar cobertura duplicada que não agrega contrato.
-- [ ] Garantir que a suíte focada não requer Podman, PostgreSQL, rede ou relógio real.
+- [x] Relacionar cada teste à linha do catálogo e eliminar cobertura duplicada que não agrega contrato.
+- [x] Garantir que a suíte focada não requer Podman, PostgreSQL, rede ou relógio real.
 
 **Critérios de aceite:** todos os comportamentos marcados `preservar` até esta fase têm teste provider-neutral; a fixture
 in-memory executa a suíte verde; nenhum teste referencia `ConcurrentDictionary`, `RealmMemoryStore` ou getters de setup
@@ -637,7 +637,35 @@ do fake; cada cenário aponta para fonte/decisão.
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluída em 2026-07-21.** Criado o projeto `Tests.Storage` (DF13), adicionado à solução, com a suíte
+provider-neutral executando 69 cenários verdes contra a fixture `MemoryStorage`:
+
+- **Fixture:** `Storage/Support/StorageContractHarness.cs` é a abstração test-only — dois realms não internos
+  isolados criados pelo contrato público (`SaveAsync`), realm interno para a regra de recusa de exclusão,
+  `FakeClock` (`TimeProvider` controlável, sem relógio real) e hooks de seed para clients/resources (contratos
+  de configuração sem write — DF1); `InMemoryStorageHarness` implementa via `AddInMemoryStorage` e é o único
+  arquivo que toca `MemoryStorage`/`RealmMemoryStore`. Lifecycle isolado por teste.
+- **Cenários:** 12 grupos de contrato por store em `Storage/Contracts/` (gateway/realm, client, key, access
+  token, refresh token, authorization code, consent, sessão, authorize parameters, resource, storage session e
+  message store), cada cenário anotado com a linha da matriz e a fonte/decisão; provedores futuros adicionam
+  uma classe aninhada por grupo sem reescrever cenários. Isolamento por realm coberto com ids/handles
+  colidentes em dois realms para todos os stores realm-bound (DF6).
+- **Exclusão de realm:** coberta somente por efeito observável comum ao hard delete do fake e ao tombstone EF
+  (DF20): realm deixa de resolver por id/path/domain e dados operacionais ficam inacessíveis; nenhuma inspeção
+  de presença física.
+- **Aceites futuros registrados sem parity no fake (ADR-018):** reserva de path/domain do tombstone e
+  invisibilidade do tombstone (Plano 2), consumo atômico de code e transição condicional de refresh (Plano 3,
+  DF15), disposal real do adapter (Plano 2, DF21) e check+add atômico de replay (plano próprio) — tabela em
+  `plan-data-storage-matrix.md`, seção "Testes de aceite futuros registrados". `IReplayCache` não recebeu
+  contract test para não cristalizar o no-op do default.
+- **Semânticas `avaliar` load-bearing** (lookups ausentes → `null`, remoções idempotentes, upsert de consent,
+  no-ops de sessão ausente) foram cobertas com anotação explícita da decisão pendente (DF16/DF19/DF25) para
+  ajuste na Fase 5; RS-04/RS-05 permanecem em `Tests.Integration/ResourceStoreTests`, sem duplicação.
+
+Validação: `dotnet test Tests.Storage` — 69 aprovados, 0 falhas; `dotnet test RoyalIdentity.sln` — 633
+aprovados, 0 falhas, 1 ignorado (PostgreSQL opt-in preexistente de `Tests.UserAccounts`). Nenhum código de
+produção foi alterado (DF1); busca em `Storage/Contracts` confirma que nenhum cenário referencia
+`ConcurrentDictionary`, `RealmMemoryStore` ou getters de setup do fake.
 
 ---
 

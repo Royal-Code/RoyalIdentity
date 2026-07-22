@@ -396,13 +396,63 @@ Resultados resumidos:
 - A matriz não marca como `preservar` comportamento observado sem citar ADR, foundation, produto ou decisão DF. Tudo
   que ainda depende de decisão por store/campo/método permanece explicitamente `avaliar`.
 
+## Contract tests provider-neutral — Fase 3
+
+Suíte criada em `Tests.Storage` (DF13), executada em 2026-07-21 com 69 cenários verdes contra a fixture
+`MemoryStorage`. Estrutura conforme o design alvo do plano:
+
+- `Tests.Storage/Storage/Support/` — `StorageContractHarness` (abstração provider-neutral com dois realms
+  isolados, realm interno, `FakeClock` e hooks test-only de seed de clients/resources) e
+  `InMemoryStorageHarness` (única classe autorizada a tocar `MemoryStorage`/`RealmMemoryStore`; usa
+  `AddInMemoryStorage`). Lifecycle isolado por teste: cada cenário cria e descarta seu próprio harness.
+- `Tests.Storage/Storage/Contracts/` — um grupo de contrato por store, nomes por comportamento; cada provider
+  futuro adiciona apenas uma classe aninhada por grupo (`InMemory` hoje; `Sqlite`/`PostgreSql` nos Planos 2/3).
+
+| Grupo de contrato | Linhas cobertas | Cenários |
+|---|---|---:|
+| `RealmStoreContractTests` | RL-01, RL-03..RL-07 (RL-06 update preserva dados; RL-07 por efeito observável de DF20) | 8 |
+| `ClientStoreContractTests` | CL-01, CL-02, DF6 com client id colidente | 6 |
+| `KeyStoreContractTests` | KY-01..KY-05, DF6 com key id colidente; janelas atuais/históricas e ordem por `Created` | 7 |
+| `AccessTokenStoreContractTests` | AT-01..AT-04, DF6 com jti colidente | 7 |
+| `RefreshTokenStoreContractTests` | RT-01, RT-02, RT-03 (somente persistência explícita — DF17), RT-04, RT-05, DF6 | 7 |
+| `AuthorizationCodeStoreContractTests` | AC-01..AC-03, DF6 com handle colidente | 6 |
+| `UserConsentStoreContractTests` | CN-01..CN-03, DF6/invariante 6 com par subject+client colidente | 5 |
+| `UserSessionStoreContractTests` | SS-01..SS-06, DF6 com sid colidente; dedup de client com relógio controlado | 11 |
+| `AuthorizeParametersStoreContractTests` | AP-01..AP-03; leitura não consome; handles distintos | 5 |
+| `ResourceStoreContractTests` | RS-02 (filtro enabled), RS-03 + DF6; RS-04/RS-05 permanecem em `ResourceStoreTests` (sem duplicação) | 3 |
+| `StorageSessionContractTests` | SP-01..SP-03 (lifetime seam de DF21; nada é assertado pós-dispose) | 2 |
+| `MessageStoreContractTests` | MS-01..MS-03 (roundtrip do id; delete apenas completa) — fixture `ProtectedData` | 2 |
+
+Regras aplicadas na suíte:
+
+- Nenhum cenário referencia `ConcurrentDictionary`, `RealmMemoryStore` ou getters de setup do fake; o único
+  ponto provider-specific é a classe aninhada de fixture (verificado por busca em `Storage/Contracts`).
+- Nenhum cenário depende de live reference, identidade de objeto, ordem incidental, collation ou relógio real
+  (DF17/DF18/DF24; tempo via `FakeClock`).
+- Comportamentos `avaliar` exercitados por serem load-bearing para consumidores atuais (lookups ausentes →
+  `null`, remoções idempotentes, upsert de consent, no-ops de sessão ausente) estão anotados nos cenários com
+  a linha da matriz e a decisão pendente (DF16/DF19/DF25); a Fase 5 pode ajustá-los sem quebrar o desenho.
+- `IReplayCache` (RC-01/RC-02) não recebeu contract test: o default `DefaultReplayNoCache` não oferece
+  proteção e um teste cristalizaria o no-op; a operação atômica check+add permanece requisito de plano
+  próprio, como já registrado.
+
+### Testes de aceite futuros registrados (sem parity no fake — ADR-018)
+
+| Requisito | Linha/decisão | Plano destino | Observação |
+|---|---|---|---|
+| Path/domain de realm excluído permanecem reservados pelo tombstone | RL-07 / DF20 | Plano 2 | Fake remove fisicamente e permite recriação; o provider EF de configuração deve adicionar o cenário de reserva. |
+| Tombstone Configuration invisível a lookups normais | RL-07 / DF20 | Plano 2 | A suíte atual já cobre o efeito observável comum; a inspeção do tombstone é teste do provider. |
+| Consumo atômico single-use de authorization code | AC-02/AC-03 / DF15 | Plano 3 | Concorrência get+remove não é exercida contra o fake. |
+| Transição condicional/atômica de refresh token | RT-03 / DF15 | Plano 3 | Suíte cobre somente persistência explícita de `ConsumedTime` (DF17). |
+| Disposal real de `IStorageSession` (context/conexão) | SP-03 / DF21 | Plano 2 | Nada é assertado pós-dispose contra o fake no-op. |
+| Check+add atômico de replay | RC-01/RC-02 | plano próprio | Sem teste contra o default no-cache. |
+
 ## Handoff para as próximas fases
 
 - **Fase 2:** confirmar exatamente um owner por linha, detalhar dependências Configuration×Operational e manter
   resources bloqueados; documentar RL-07 sem escolher o seam administrativo cross-family.
-- **Fase 3:** criar cenários provider-neutral para todas as regras preservadas e para os gaps relevantes, sem acoplar
-  os testes a dictionary/live references; requisitos `substituir` ficam como aceite dos providers futuros quando o
-  fake transitório não puder cumpri-los.
+- **Fase 3 (concluída):** cenários provider-neutral criados em `Tests.Storage`; ver a seção
+  "Contract tests provider-neutral — Fase 3" e a tabela de aceites futuros registrados.
 - **Fase 4:** decompor as 56 referências diretas ao fake por setup, inspeção ou dependência real e mapear seeds.
 - **Fase 5:** resolver todos os `avaliar`, atribuir política de duplicidade, comparadores, expiração e ausência por
   operação, e produzir a ordem final de migração.
