@@ -14,6 +14,23 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 /// </summary>
 public sealed class ClientMaterializer
 {
+	private static readonly HashSet<string> KnownStringValueKinds = new(StringComparer.Ordinal)
+	{
+		ClientStringValueKinds.AllowedIdentityScope,
+		ClientStringValueKinds.AllowedResourceServer,
+		ClientStringValueKinds.AllowedScope,
+		ClientStringValueKinds.AllowedResponseType,
+		ClientStringValueKinds.AllowedGrantType,
+		ClientStringValueKinds.AllowedIdentityTokenSigningAlgorithm,
+		ClientStringValueKinds.AllowedAccessTokenSigningAlgorithm,
+		ClientStringValueKinds.IdentityProviderRestriction,
+		ClientStringValueKinds.RedirectUri,
+		ClientStringValueKinds.PostLogoutRedirectUri,
+		ClientStringValueKinds.AllowedCorsOrigin,
+		ClientStringValueKinds.FrontChannelLogoutUri,
+		ClientStringValueKinds.BackChannelLogoutUri,
+	};
+
 	/// <summary>The full relational projection of one <see cref="Client"/>.</summary>
 	public readonly record struct ClientEntitySet(
 		ClientEntity Root,
@@ -125,6 +142,11 @@ public sealed class ClientMaterializer
 		ArgumentNullException.ThrowIfNull(secrets);
 		ArgumentNullException.ThrowIfNull(realm);
 
+		var stringValueRows = stringValues.ToList();
+		var claimRows = claims.ToList();
+		var secretRows = secrets.ToList();
+		ValidateProjection(root, stringValueRows, claimRows, secretRows, realm);
+
 		var client = new Client
 		{
 			Id = root.ClientId,
@@ -163,7 +185,7 @@ public sealed class ClientMaterializer
 			BackChannelLogoutSessionRequired = root.BackChannelLogoutSessionRequired,
 		};
 
-		var valuesByKind = stringValues
+		var valuesByKind = stringValueRows
 			.GroupBy(v => v.Kind)
 			.ToDictionary(g => g.Key, g => g.Select(v => v.Value).ToList());
 
@@ -183,15 +205,48 @@ public sealed class ClientMaterializer
 		Fill(client.BackChannelLogoutUri, valuesByKind, ClientStringValueKinds.BackChannelLogoutUri);
 
 		client.Claims.Clear();
-		foreach (var claim in claims.OrderBy(c => c.Ordinal))
+		foreach (var claim in claimRows.OrderBy(c => c.Ordinal))
 			client.Claims.Add(new Claim(claim.Type, claim.Value, claim.ValueType, claim.Issuer, claim.OriginalIssuer));
 
 		client.ClientSecrets.Clear();
-		foreach (var secret in secrets.OrderBy(s => s.Ordinal))
+		foreach (var secret in secretRows.OrderBy(s => s.Ordinal))
 			client.ClientSecrets.Add(new ClientSecret(secret.Value, secret.Description, secret.ExpirationUtc) { Type = secret.Type });
 
 		return client;
 	}
+
+	private static void ValidateProjection(
+		ClientEntity root,
+		IReadOnlyCollection<ClientStringValueEntity> stringValues,
+		IReadOnlyCollection<ClientClaimEntity> claims,
+		IReadOnlyCollection<ClientSecretEntity> secrets,
+		Realm realm)
+	{
+		if (!string.Equals(root.RealmId, realm.Id, StringComparison.Ordinal))
+			throw ConfigurationMaterializationException.RealmMismatch();
+
+		if (stringValues.Any(value => !BelongsToRoot(value.RealmId, value.ClientId, root)))
+			throw ConfigurationMaterializationException.SatelliteMismatch("string-value");
+
+		if (claims.Any(claim => !BelongsToRoot(claim.RealmId, claim.ClientId, root)))
+			throw ConfigurationMaterializationException.SatelliteMismatch("claim");
+
+		if (secrets.Any(secret => !BelongsToRoot(secret.RealmId, secret.ClientId, root)))
+			throw ConfigurationMaterializationException.SatelliteMismatch("secret");
+
+		if (stringValues.Any(value => !KnownStringValueKinds.Contains(value.Kind)))
+			throw ConfigurationMaterializationException.UnknownStringValueKind();
+
+		if (!Enum.IsDefined((ClientType)root.ClientType))
+			throw ConfigurationMaterializationException.InvalidEnum(nameof(Client.ClientType));
+
+		if (!Enum.IsDefined((TokenExpiration)root.RefreshTokenExpiration))
+			throw ConfigurationMaterializationException.InvalidEnum(nameof(Client.RefreshTokenExpiration));
+	}
+
+	private static bool BelongsToRoot(string realmId, string clientId, ClientEntity root)
+		=> string.Equals(realmId, root.RealmId, StringComparison.Ordinal)
+			&& string.Equals(clientId, root.ClientId, StringComparison.Ordinal);
 
 	private static void AddStringValues(
 		List<ClientStringValueEntity> target, string realmId, string clientId, string kind, IEnumerable<string> values)

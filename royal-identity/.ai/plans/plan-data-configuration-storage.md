@@ -468,21 +468,24 @@ os tipos core permanecem fora do projeto puro (materialização/serialização v
   materializa valores de `Discovery.CustomEntries` nos tipos CLR naturais de JSON, preservando inclusive strings
   relativas `~/...` usadas pelo discovery handler, em vez de devolvê-las como `JsonElement`.
   `ClientMaterializer` mapeia `Client` ↔ (root + string values por kind + claims + secrets) reconstruindo o
-  comparer `OrdinalIgnoreCase` de `AllowedCorsOrigins` (comparison key em lowercase). Falha de versão/JSON é
+  comparer `OrdinalIgnoreCase` de `AllowedCorsOrigins` (comparison key em lowercase); antes de materializar,
+  rejeita root fora do realm solicitado, satélites de outro `(realm, client)`, kind desconhecido e enums inválidos
+  via `ConfigurationMaterializationException`, sem incluir ids/valores nas mensagens. Falha de versão/JSON é
   fail-closed via `ConfigurationPayloadException` (mensagem sem payload — invariante 10).
 - **Provider SQLite:** `ConfigurationSqliteDbContext` (sobrescreve só o hook `ApplyConfigurationModel` para
   chamar a extensão pública), `ConfigurationSqliteDesignTimeDbContextFactory` e a migration inicial
   `InitialConfiguration` gerada por `dotnet ef` (sem `EnsureCreated`) — cria **apenas** as 7 tabelas de
   Configuration, com a colação e os índices esperados. Pacote `Microsoft.EntityFrameworkCore.Design`
   (`PrivateAssets=all`) adicionado ao provider para a tooling.
-- **Testes (`Tests.Storage/Configuration/`, +19):** `SqliteConfigurationMigrationTests` (EnsureDeleted →
+- **Testes (`Tests.Storage/Configuration/`, +26):** `SqliteConfigurationMigrationTests` (EnsureDeleted →
   MigrateAsync → histórico; só as 7 tabelas; check constraint do singleton), `ConfigurationMaterializationClientTests`
   (round-trip de client totalmente preenchido; independência do grafo materializado — DF25; isolamento de mesmo
   client id em dois realms), `ConfigurationModelPayloadTests` (round-trip estável e fiel; sem ref circular;
   fail-closed de versão/JSON), `ConfigurationModelClientCoverageTests` (guarda: toda propriedade pública de
   `Client` tem decisão de persistência documentada) e `SqliteConfigurationSigningKeyTests` (mesmo key id em dois
   realms; PK create-only rejeita duplicata — DF24). Os testes de payload também cobrem valores primitivos/nested
-  de `CustomEntries` e rejeição de coleção get-only `null` nos grafos server/realm. Helper
+  de `CustomEntries` e rejeição de coleção get-only `null` nos grafos server/realm; os testes do materializador
+  cobrem fail-closed para projeções cross-realm/cross-client, kind desconhecido e enums inválidos. Helper
   `SqliteConfigurationDatabase` cria banco real `:memory:` migrado sobre conexão compartilhada.
 
 Critérios de aceite verificados: a migration cria somente tabelas Configuration; todos os campos de `Client`
@@ -492,8 +495,8 @@ mantido; o context SQLite e um customizado usam a mesma extensão pública (vali
 `ConfigurationModelExtensibilityTests`).
 
 Validação: `dotnet build RoyalIdentity.sln` — êxito (0 erros; nenhum warning novo nos projetos criados);
-`dotnet test Tests.Storage` — 120 aprovados (101 preexistentes + 19 novos); `dotnet test Tests.Architecture` —
-33 aprovados (sem regressão de fronteira); solução completa — 702 aprovados, 0 falhas, 1 ignorado (PostgreSQL
+`dotnet test Tests.Storage` — 127 aprovados (101 preexistentes + 26 novos); `dotnet test Tests.Architecture` —
+33 aprovados (sem regressão de fronteira); solução completa — 709 aprovados, 0 falhas, 1 ignorado (PostgreSQL
 opt-in preexistente de `Tests.UserAccounts`).
 
 ---

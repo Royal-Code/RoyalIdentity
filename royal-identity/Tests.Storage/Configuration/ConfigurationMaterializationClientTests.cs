@@ -139,6 +139,71 @@ public class ConfigurationMaterializationClientTests
 		Assert.Same(realmB, loadedB.Realm);
 	}
 
+	[Fact]
+	public void Materializer_RejectsRootFromAnotherRealm()
+	{
+		var realm = ConfigurationTestData.BuildRealm("realm-a");
+		var set = materializer.ToEntitySet(ConfigurationTestData.BuildFullyPopulatedClient(realm, "client-a"));
+		set.Root.RealmId = "realm-b";
+
+		Assert.Throws<ConfigurationMaterializationException>(
+			() => materializer.ToClient(set.Root, set.StringValues, set.Claims, set.Secrets, realm));
+	}
+
+	[Theory]
+	[InlineData("string-value")]
+	[InlineData("claim")]
+	[InlineData("secret")]
+	public void Materializer_RejectsSatelliteRowsFromAnotherClient(string satellite)
+	{
+		var realm = ConfigurationTestData.BuildRealm("realm-a");
+		var set = materializer.ToEntitySet(ConfigurationTestData.BuildFullyPopulatedClient(realm, "client-a"));
+
+		switch (satellite)
+		{
+			case "string-value":
+				set.StringValues[0].ClientId = "client-b";
+				break;
+			case "claim":
+				set.Claims[0].ClientId = "client-b";
+				break;
+			case "secret":
+				set.Secrets[0].ClientId = "client-b";
+				break;
+		}
+
+		Assert.Throws<ConfigurationMaterializationException>(
+			() => materializer.ToClient(set.Root, set.StringValues, set.Claims, set.Secrets, realm));
+	}
+
+	[Fact]
+	public void Materializer_RejectsUnknownStringValueKind()
+	{
+		var realm = ConfigurationTestData.BuildRealm("realm-a");
+		var set = materializer.ToEntitySet(ConfigurationTestData.BuildFullyPopulatedClient(realm, "client-a"));
+		set.StringValues[0].Kind = "unknown_kind";
+
+		Assert.Throws<ConfigurationMaterializationException>(
+			() => materializer.ToClient(set.Root, set.StringValues, set.Claims, set.Secrets, realm));
+	}
+
+	[Theory]
+	[InlineData("client-type")]
+	[InlineData("refresh-token-expiration")]
+	public void Materializer_RejectsInvalidEnumValues(string property)
+	{
+		var realm = ConfigurationTestData.BuildRealm("realm-a");
+		var set = materializer.ToEntitySet(ConfigurationTestData.BuildFullyPopulatedClient(realm, "client-a"));
+
+		if (property == "client-type")
+			set.Root.ClientType = int.MaxValue;
+		else
+			set.Root.RefreshTokenExpiration = int.MaxValue;
+
+		Assert.Throws<ConfigurationMaterializationException>(
+			() => materializer.ToClient(set.Root, set.StringValues, set.Claims, set.Secrets, realm));
+	}
+
 	private async Task SeedAsync(SqliteConfigurationDatabase database, IEnumerable<RoyalIdentity.Data.Configuration.Entities.RealmEntity> realms, IEnumerable<Client> clients)
 	{
 		await using var context = database.NewContext();
