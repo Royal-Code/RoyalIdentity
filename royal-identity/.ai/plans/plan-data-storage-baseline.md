@@ -637,8 +637,9 @@ do fake; cada cenário aponta para fonte/decisão.
 
 ### Resultado da Fase 3
 
-**Concluída em 2026-07-21.** Criado o projeto `Tests.Storage` (DF13), adicionado à solução, com a suíte
-provider-neutral executando 69 cenários verdes contra a fixture `MemoryStorage`:
+**Concluída em 2026-07-21** (revisada no mesmo dia após análise externa — ver nota ao final). Criado o
+projeto `Tests.Storage` (DF13), adicionado à solução, com a suíte provider-neutral executando 75 cenários
+verdes contra a fixture `MemoryStorage`:
 
 - **Fixture:** `Storage/Support/StorageContractHarness.cs` é a abstração test-only — dois realms não internos
   isolados criados pelo contrato público (`SaveAsync`), realm interno para a regra de recusa de exclusão,
@@ -660,9 +661,21 @@ provider-neutral executando 69 cenários verdes contra a fixture `MemoryStorage`
   contract test para não cristalizar o no-op do default.
 - **Semânticas `avaliar` load-bearing** (lookups ausentes → `null`, remoções idempotentes, upsert de consent,
   no-ops de sessão ausente) foram cobertas com anotação explícita da decisão pendente (DF16/DF19/DF25) para
-  ajuste na Fase 5; RS-04/RS-05 permanecem em `Tests.Integration/ResourceStoreTests`, sem duplicação.
+  ajuste na Fase 5; somente as regras de construção do índice do fake (scope/URI duplicados, URI malformada)
+  permanecem em `Tests.Integration/ResourceStoreTests` como cobertura da implementação atual.
 
-Validação: `dotnet test Tests.Storage` — 69 aprovados, 0 falhas; `dotnet test RoyalIdentity.sln` — 633
+**Revisão pós-conclusão (mesmo dia):** uma análise externa apontou cinco ajustes, todos confirmados e
+aplicados: (1) RS-04/RS-05 eram `preservar` sem teste provider-neutral — os cenários essenciais de resolução
+scope+resource e de subset/downscope (ADR-012/RFC 8707) foram adicionados a `ResourceStoreContractTests`
+(+7 cenários); (2) dois testes passavam por live reference — o update de realm (RL-06) passou a salvar uma
+instância nova com o mesmo id, e o cenário de `UpdateAsync` de refresh token foi removido por ser
+infalsificável contra o fake, virando aceite explícito do Plano 3 (DF15/DF17); (3) a exclusão de realm
+aceitava qualquer exceção como recusa de binding — restrita a `ArgumentException`, o sinal contratual atual;
+(4) propagação de `CancellationToken` (DF23) entrou na tabela de aceites dos providers EF, já que o fake não
+simula cancelamento; (5) o delete de id desconhecido do message store foi removido para não antecipar a
+decisão `avaliar` de MS-03 (DF25).
+
+Validação: `dotnet test Tests.Storage` — 75 aprovados, 0 falhas; `dotnet test RoyalIdentity.sln` — 639
 aprovados, 0 falhas, 1 ignorado (PostgreSQL opt-in preexistente de `Tests.UserAccounts`). Nenhum código de
 produção foi alterado (DF1); busca em `Storage/Contracts` confirma que nenhum cenário referencia
 `ConcurrentDictionary`, `RealmMemoryStore` ou getters de setup do fake.

@@ -34,15 +34,15 @@ public abstract class MessageStoreContractTests
 		Assert.Equal(message.Data, read.Data);
 	}
 
-	// MS-03: delete completes without error for any id (no-op today; persistent semantics — Fase 5/backlog).
+	// MS-03: deleting a previously written id completes without error. The semantics for an unknown id
+	// remain `avaliar` (DF25/Fase 5) and are deliberately not asserted here.
 	[Fact]
-	public async Task Delete_CompletesWithoutError()
+	public async Task Delete_OfWrittenId_CompletesWithoutError()
 	{
 		var store = CreateStore();
 		var id = await store.WriteAsync(new Message<ContractPayload>(new ContractPayload("x", 1), 1L), default);
 
 		await store.DeleteAsync(id, default);
-		await store.DeleteAsync("contract-unknown-id", default);
 	}
 
 	public sealed class ProtectedData : MessageStoreContractTests

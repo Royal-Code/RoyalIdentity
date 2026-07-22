@@ -1,3 +1,4 @@
+using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using Tests.Storage.Support;
 
@@ -54,7 +55,8 @@ public abstract class RealmStoreContractTests : StorageContractTests
 
 	// RL-06: saving an existing realm persists the new configuration and must not destroy the realm's
 	// operational data (IRealmManager.UpdateAsync depends on this; the duplicate-write policy per
-	// operation is refined in Fase 5 — DF16).
+	// operation is refined in Fase 5 — DF16). A fresh Realm instance with the same id is saved so the
+	// assertion cannot be satisfied by mutating a live reference already held by the backing (DF17).
 	[Fact]
 	public async Task Save_ExistingRealm_UpdatesConfiguration_AndKeepsOperationalData()
 	{
@@ -64,8 +66,9 @@ public abstract class RealmStoreContractTests : StorageContractTests
 		var code = NewAuthorizationCode(realm, "client-x", "subject-x");
 		await harness.Storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
 
-		realm.DisplayName = "Contract Realm updated";
-		await harness.Storage.Realms.SaveAsync(realm);
+		var updatedRealm = new Realm(realm.Id, realm.Domain, realm.Path, "Contract Realm updated", false,
+			realm.Options);
+		await harness.Storage.Realms.SaveAsync(updatedRealm);
 
 		var updated = await harness.Storage.Realms.GetByIdAsync(realm.Id, default);
 		var survivingCode = await harness.Storage.GetAuthorizationCodeStore(realm)
@@ -137,15 +140,17 @@ public abstract class RealmStoreContractTests : StorageContractTests
 		Assert.Null(await harness.Storage.Realms.GetByPathAsync(realm.Path, default));
 		Assert.Null(await harness.Storage.Realms.GetByDomainAsync(realm.Domain, default));
 
-		// Either the realm binding refuses the deleted realm (fake) or the lookup finds nothing (EF purge);
-		// both satisfy DF20's "active data becomes inaccessible".
+		// Either the realm binding refuses the deleted realm or the lookup finds nothing (EF purge); both
+		// satisfy DF20's "active data becomes inaccessible". Only ArgumentException — the binding refusal
+		// the contract exhibits today (ST-04..ST-11) — is accepted, so infrastructure failures still fail
+		// the test; if Fase 5 (DF25) redefines the refusal signal, this catch is adjusted with it.
 		AuthorizationCode? survivor = null;
 		try
 		{
 			survivor = await harness.Storage.GetAuthorizationCodeStore(realm)
 				.GetAuthorizationCodeAsync(code.Code, default);
 		}
-		catch (Exception)
+		catch (ArgumentException)
 		{
 			// binding refusal is an accepted observable effect
 		}

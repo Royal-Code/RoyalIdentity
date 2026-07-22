@@ -3,10 +3,12 @@ using Tests.Storage.Support;
 namespace Tests.Storage.Contracts;
 
 /// <summary>
-/// Contract of <c>IRefreshTokenStore</c> (matrix RT-01..RT-05). The update scenario asserts only explicit
-/// persistence (DF17) — the current get→mutate→update pattern (RT-03) is classified `substituir` and the
-/// conditional/atomic transition under concurrency is a Plano 3 acceptance requirement (DF15), not asserted
-/// against the transitional fake.
+/// Contract of <c>IRefreshTokenStore</c> (matrix RT-01..RT-05). RT-03 (<c>UpdateAsync</c>) has no scenario
+/// here on purpose: the fake's live-reference backing makes any persistence assertion pass trivially (a
+/// mutation is visible before the update call) and its reference-equality CAS rejects a rematerialized
+/// instance, so explicit-update persistence cannot be falsified against the fake (DF17/ADR-018). Both the
+/// persistence of the update and the conditional/atomic consumed transition (DF15) are Plano 3 acceptance
+/// requirements of the EF provider — see the acceptance table in plan-data-storage-matrix.md.
 /// </summary>
 public abstract class RefreshTokenStoreContractTests : StorageContractTests
 {
@@ -35,26 +37,6 @@ public abstract class RefreshTokenStoreContractTests : StorageContractTests
 		var found = await harness.Storage.GetRefreshTokenStore(harness.RealmA).GetAsync("contract-unknown", default);
 
 		Assert.Null(found);
-	}
-
-	// RT-03 (explicit persistence only — DF17): an explicit update persists the consumed transition so a
-	// later read observes it. The atomic compare-and-swap semantics are a Plano 3 acceptance (DF15).
-	[Fact]
-	public async Task Update_PersistsConsumedTime()
-	{
-		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.GetRefreshTokenStore(harness.RealmA);
-		await store.StoreAsync(NewRefreshToken(harness.RealmA, "contract-consume", "subject-a", "client-a"), default);
-
-		var token = await store.GetAsync("contract-consume", default);
-		Assert.NotNull(token);
-		token.ConsumedTime = Start.AddMinutes(5);
-		await store.UpdateAsync(token, default);
-
-		var reloaded = await store.GetAsync("contract-consume", default);
-
-		Assert.NotNull(reloaded);
-		Assert.Equal(Start.AddMinutes(5), reloaded.ConsumedTime);
 	}
 
 	// RT-04: removal makes the token unavailable.

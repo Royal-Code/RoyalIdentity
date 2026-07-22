@@ -398,8 +398,9 @@ Resultados resumidos:
 
 ## Contract tests provider-neutral — Fase 3
 
-Suíte criada em `Tests.Storage` (DF13), executada em 2026-07-21 com 69 cenários verdes contra a fixture
-`MemoryStorage`. Estrutura conforme o design alvo do plano:
+Suíte criada em `Tests.Storage` (DF13), executada em 2026-07-21 com 75 cenários verdes contra a fixture
+`MemoryStorage` (revisada no mesmo dia após análise externa — ver as regras e a tabela de aceites abaixo).
+Estrutura conforme o design alvo do plano:
 
 - `Tests.Storage/Storage/Support/` — `StorageContractHarness` (abstração provider-neutral com dois realms
   isolados, realm interno, `FakeClock` e hooks test-only de seed de clients/resources) e
@@ -414,21 +415,26 @@ Suíte criada em `Tests.Storage` (DF13), executada em 2026-07-21 com 69 cenário
 | `ClientStoreContractTests` | CL-01, CL-02, DF6 com client id colidente | 6 |
 | `KeyStoreContractTests` | KY-01..KY-05, DF6 com key id colidente; janelas atuais/históricas e ordem por `Created` | 7 |
 | `AccessTokenStoreContractTests` | AT-01..AT-04, DF6 com jti colidente | 7 |
-| `RefreshTokenStoreContractTests` | RT-01, RT-02, RT-03 (somente persistência explícita — DF17), RT-04, RT-05, DF6 | 7 |
+| `RefreshTokenStoreContractTests` | RT-01, RT-02, RT-04, RT-05, DF6 (RT-03 deliberadamente sem cenário — aceite P3, ver tabela abaixo) | 6 |
 | `AuthorizationCodeStoreContractTests` | AC-01..AC-03, DF6 com handle colidente | 6 |
 | `UserConsentStoreContractTests` | CN-01..CN-03, DF6/invariante 6 com par subject+client colidente | 5 |
 | `UserSessionStoreContractTests` | SS-01..SS-06, DF6 com sid colidente; dedup de client com relógio controlado | 11 |
 | `AuthorizeParametersStoreContractTests` | AP-01..AP-03; leitura não consome; handles distintos | 5 |
-| `ResourceStoreContractTests` | RS-02 (filtro enabled), RS-03 + DF6; RS-04/RS-05 permanecem em `ResourceStoreTests` (sem duplicação) | 3 |
+| `ResourceStoreContractTests` | RS-02 (filtro enabled), RS-03 + DF6, RS-04 (resolução scope+resource, scope ausente/disabled, invalid targets de URI desconhecida/server disabled) e RS-05 (subset não autorizado → `invalid_target`, conjunto completo sem indicators, downscope coerente) | 10 |
 | `StorageSessionContractTests` | SP-01..SP-03 (lifetime seam de DF21; nada é assertado pós-dispose) | 2 |
-| `MessageStoreContractTests` | MS-01..MS-03 (roundtrip do id; delete apenas completa) — fixture `ProtectedData` | 2 |
+| `MessageStoreContractTests` | MS-01..MS-03 (roundtrip do id; delete de id escrito completa; id desconhecido não assertado — `avaliar`/DF25) — fixture `ProtectedData` | 2 |
 
 Regras aplicadas na suíte:
 
 - Nenhum cenário referencia `ConcurrentDictionary`, `RealmMemoryStore` ou getters de setup do fake; o único
   ponto provider-specific é a classe aninhada de fixture (verificado por busca em `Storage/Contracts`).
 - Nenhum cenário depende de live reference, identidade de objeto, ordem incidental, collation ou relógio real
-  (DF17/DF18/DF24; tempo via `FakeClock`).
+  (DF17/DF18/DF24; tempo via `FakeClock`). Em particular, o update de realm (RL-06) salva uma instância nova
+  com o mesmo id — a asserção não é satisfeita por mutação da referência já retida pelo backing — e RT-03
+  ficou sem cenário porque o fake não consegue falsificar persistência explícita (ver aceites abaixo).
+- A recusa de binding pós-exclusão de realm aceita somente `ArgumentException` (o sinal atual de
+  ST-04..ST-11); qualquer outra exceção de infraestrutura reprova o teste. Se a Fase 5 (DF25) redefinir o
+  sinal de recusa, o catch acompanha a decisão.
 - Comportamentos `avaliar` exercitados por serem load-bearing para consumidores atuais (lookups ausentes →
   `null`, remoções idempotentes, upsert de consent, no-ops de sessão ausente) estão anotados nos cenários com
   a linha da matriz e a decisão pendente (DF16/DF19/DF25); a Fase 5 pode ajustá-los sem quebrar o desenho.
@@ -443,7 +449,8 @@ Regras aplicadas na suíte:
 | Path/domain de realm excluído permanecem reservados pelo tombstone | RL-07 / DF20 | Plano 2 | Fake remove fisicamente e permite recriação; o provider EF de configuração deve adicionar o cenário de reserva. |
 | Tombstone Configuration invisível a lookups normais | RL-07 / DF20 | Plano 2 | A suíte atual já cobre o efeito observável comum; a inspeção do tombstone é teste do provider. |
 | Consumo atômico single-use de authorization code | AC-02/AC-03 / DF15 | Plano 3 | Concorrência get+remove não é exercida contra o fake. |
-| Transição condicional/atômica de refresh token | RT-03 / DF15 | Plano 3 | Suíte cobre somente persistência explícita de `ConsumedTime` (DF17). |
+| Persistência do update e transição condicional/atômica de refresh token | RT-03 / DF15, DF17 | Plano 3 | O backing por live reference do fake não falsifica persistência explícita (a mutação fica visível antes do update e o CAS por referência rejeita instância rematerializada); RT-03 fica sem cenário na suíte e vira aceite do provider EF. |
+| Propagação de `CancellationToken` em todo I/O real | DF23 | Planos 2/3 | O fake não simula cancelamento de I/O inexistente; os providers EF devem encaminhar `ct` a queries, enumerações e `SaveChangesAsync`, com cenário de aceite próprio. |
 | Disposal real de `IStorageSession` (context/conexão) | SP-03 / DF21 | Plano 2 | Nada é assertado pós-dispose contra o fake no-op. |
 | Check+add atômico de replay | RC-01/RC-02 | plano próprio | Sem teste contra o default no-cache. |
 
