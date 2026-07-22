@@ -454,12 +454,140 @@ Regras aplicadas na suíte:
 | Disposal real de `IStorageSession` (context/conexão) | SP-03 / DF21 | Plano 2 | Nada é assertado pós-dispose contra o fake no-op. |
 | Check+add atômico de replay | RC-01/RC-02 | plano próprio | Sem teste contra o default no-cache. |
 
+## Seeds, dados globais e acessos diretos — Fase 4
+
+Inventário produzido em 2026-07-21 por inspeção de `MemoryStorage`/`RealmMemoryStore`, das composições de host
+(`RoyalIdentity.Server`, `Tests.Host`, `AppFactory`/`UserAccountsAppFactory`) e das 56 ocorrências de getters
+diretos do fake. Nenhum código foi alterado nesta fase (DF1); as linhas abaixo são entradas executáveis dos
+Planos 2/3/4.
+
+### Seeds estáticos e globais do fake
+
+| Seed | Onde nasce | Conteúdo | Owner/finalidade | Destino |
+|---|---|---|---|---|
+| `ServerOptions` global | `MemoryStorage.serverOptions` (static) | instância única compartilhada por todas as `RealmOptions` | Configuration; base de opções do servidor | P2 persiste/materializa; deixa de ser instância mutável compartilhada (DF17) |
+| Realms internos | statics `ServerRealm`/`AccountRealm`/`AdminRealm` | 3 realms `Internal = true` | produto: realms internos obrigatórios e não removíveis | seed de produto na composição/migração do P2 |
+| Realm demo | static `DemoRealm` (+ branding no static ctor) | realm comum `demo` | dev/demo do host | seed de dev/demo da composição do host; nunca requisito do provider |
+| Clients iniciais | ctor de `RealmMemoryStore(realm, isServer)` | server → `server_admin`; account/admin/demo → `demo_client`+`demo_consent_client` | `server_admin` é produto/host; demo clients são dev/demo. **Acidente:** o parâmetro binário `isServer` faz account/admin receberem os clients de demo | P2/host seed; o vazamento de demo clients para account/admin **não é comportamento a preservar** |
+| Identity scopes padrão | property initializer de `RealmMemoryStore.IdentityScopes` | openid, profile, email, address, phone em **todo** realm, inclusive os criados por `SaveAsync` | openid é exigência de produto; o conjunto padrão é candidato a seed de criação de realm | decisão do P2/redesign: o que a criação de realm semeia é regra explícita, não initializer escondido |
+| Resource server demo | property initializer de `RealmMemoryStore.ResourceServers` | `apiserver` (api, api:read, api:write; URI `https://api.demo.local/apiserver`) em **todo** realm | dev/demo. **Acidente:** realms novos também o recebem | seed demo da composição; bloqueado por DF22 para persistência |
+| Contas demo | `DemoUsers()` no ctor (somente demo realm) + constantes `AliceSubjectId`/`BobSubjectId` | alice/bob com hash de senha | fora do storage do IdP (família `UserAccounts`); fake transitório ADR-018 | composição com o módulo real + `UserAccountsModuleSeed` (precedente: `UserAccountsAppFactory`) |
+| Keys | nenhum seed estático | `KeyParameters` nasce vazio; `FirstKeyJob` (job de startup, `IServerJob`) percorre `Realms.GetAllAsync` criando keys — mas **encerra o job inteiro** (`return`) ao encontrar o primeiro realm que já possua key, e `RealmManager.CreateAsync` não provisiona key para realms criados em runtime; o key manager não cria on-demand (lookups retornam `null`/vazio) | produto: todo realm precisa de key de assinatura. Hoje o job só cobre todos os realms porque o backing em memória renasce vazio a cada startup | P2 persiste keys pelo `AddKeyAsync` **já existente** (não é write facade nova); a **provisão de key é lacuna de lifecycle/orquestração** — ver nota abaixo |
+| Authorize parameters | dictionary global vazio | estado transitório por request | Operational; sem seed | n/a |
+
+**Lacuna de provisão de keys (lifecycle/orquestração):** com persistência durável, o `return` do `FirstKeyJob`
+faz o job parar no primeiro realm já provisionado após um reinício, deixando sem key qualquer realm ainda não
+coberto; e realms criados em runtime (`RealmManager.CreateAsync`) não recebem key por nenhum caminho — não há
+criação lazy no key manager. O comportamento atual não é modelo a copiar: os Planos 2/futuro fluxo
+administrativo devem definir a orquestração de provisão (startup idempotente por realm + provisão na criação
+do realm), usando o `AddKeyAsync` contratual. Este baseline registra a lacuna sem alterar produção (DF1).
+
+### Composição de host e testes
+
+- `RoyalIdentity.Server/HostServices` e `Tests.Host/HostServices` chamam `AddInMemoryStorage()` — todo o seed
+  acima entra por essa única chamada; não existe seed público de produção separado do fake.
+- `Tests.Integration/Prepare/AppFactory` usa o `Program` de `Tests.Host` + Data Protection persistido em disco;
+  é a fixture compartilhada dos testes de fluxo HTTP.
+- `Tests.Integration/Prepare/UserAccountsAppFactory` (opt-in) mantém o storage do IdP in-memory e troca a
+  borda de contas para o módulo real (Sqlite in-memory) com `UserAccountsSeedHostedService` chamando
+  `UserAccountsModuleSeed.SeedDefaultScopesAsync`/`SeedDefaultAccountsAsync` — **precedente do P4** para seed
+  por composição, correlacionado apenas por `realmId`/`SubjectId` escalares (DF8).
+- `Tests.Storage` (Fase 3) cria os realms pela própria facade (`SaveAsync`) e semeia clients/resources por
+  hooks test-only do harness; keys entram pela facade contratual (`AddKeyAsync`).
+
+### Classificação das 56 ocorrências de getters diretos do fake
+
+Por arquivo (55 em `Tests.Integration`, 1 em `Tests.UserAccounts`):
+
+| Arquivo | Ocorrências | Uso |
+|---|---:|---|
+| `Endpoints/ClientTokenTests.cs` | 14 | setup: 8 clients, 6 resource servers |
+| `Realm/RealmIsolationTests.cs` | 8 | setup: clients (incl. realm B com id colidente) |
+| `Endpoints/RefreshTokenTests.cs` | 7 | setup: 4 clients, 2 resource servers; 1 leitura de `ResourceServers` para derivar `AllowedResourceServers` do client |
+| `Endpoints/CodeTokenTests.cs` | 7 | setup: 4 clients, 3 resource servers |
+| `Endpoints/CodeAuthorizeTests.cs` | 4 | setup: 3 clients, 1 resource server |
+| `Endpoints/SigningAlgorithmTests.cs` | 3 | setup: 1 resource server, 1 conta (alice em realm novo), 1 client |
+| `Prepare/CharacterizationSeed.cs` | 3 | helper compartilhado: 1 seed de conta; 1 inspeção e mutação de conta (contadores/lockout e desativação por live reference); 1 inspeção de sessão por `SubjectId` |
+| `Characterization/BackChannelLogoutCharacterizationTests.cs` | 2 | setup: clients |
+| `Endpoints/DiscoveryTests.cs` | 1 | setup: resource server |
+| `Endpoints/EndSessionTests.cs` | 1 | setup: client |
+| `Characterization/PromptInteractionCharacterizationTests.cs` | 1 | setup: client |
+| `Realm/EventIsolationTests.cs` | 1 | setup: client |
+| `UI/LoginConsentUIFlowTests.cs` | 1 | setup: client |
+| `Realm/RealmOptionsPhase4Tests.cs` | 1 | setup: client |
+| `Realm/RealmOptionsPhase5Tests.cs` | 1 | setup: client |
+| `Tests.UserAccounts/UserDirectoryContractTests.cs` | 1 | seed de conta do lado in-memory do contract test |
+
+Por categoria, com destino de substituição:
+
+| Categoria | Ocorrências | Destino |
+|---|---:|---|
+| Setup de clients | 36 | write facade de configuração do P2 (quando existir) ou seed test-only do provider; até lá, hook de fixture — nunca API pública criada pelo baseline (DF1) |
+| Setup de resource servers | 14 | **bloqueado por DF22**: permanece hook test-only até o redesign fechar o modelo; o P4 não pode migrar esses testes para write facade inexistente |
+| Setup de contas (fake) | 3 (`CharacterizationSeed.SeedUser`, `SigningAlgorithmTests.SeedAlice`, `UserDirectoryContractTests.InMemory.SeedAsync`) | composição com módulo `UserAccounts` + `UserAccountsModuleSeed` (ADR-018); o lado fake do contract test morre com o fake |
+| Inspeção **e mutação** de conta | 1 (`CharacterizationSeed.GetDetails` — lê contadores de falha/lockout e, em `ActiveRuleCharacterizationTests`, **desativa a conta mutando a referência viva** retornada) | leituras viram asserção de comportamento observável (respostas do fluxo) ou superfície do módulo real; a mutação exige uma operação de atualização/desativação pelo módulo `UserAccounts` ou hook test-only da fixture — estado interno de conta não vira contrato do IdP |
+| Inspeção de sessão | 1 (`CharacterizationSeed.FindSession` — scan de `UserSessions` por `SubjectId`) | o contrato não tem consulta por subject (somente `FindByIdAsync`/`EndSessionsForSubjectAsync`); substituir capturando o `sid` no próprio fluxo de teste. Se o P3 julgar necessário um lookup por subject, é mudança pública a listar na Fase 5 — não inferida aqui |
+| Leitura de configuração para setup | 1 (`RefreshTokenTests` — deriva owners de resource URIs) | substituível pela facade de leitura existente (`IResourceStore.FindRequestedResourcesAsync`) |
+
+Com uma exceção, nenhuma das 56 ocorrências é dependência semântica do backing (ninguém depende de
+`ConcurrentDictionary` ou de ordem para o comportamento assertado). A exceção é a mutação por live reference
+via `GetDetails` descrita acima — o único caso que exige rota própria (operação do módulo ou hook test-only)
+em vez de mera troca de mecanismo de setup. Não há setup indispensável sem estratégia test-only.
+
+### Acoplamento adicional: statics do fake como handles
+
+Além dos getters, `Tests.Integration` usa `MemoryStorage.DemoRealm`/`ServerRealm`/`AccountRealm`/
+`AliceSubjectId`/`BobSubjectId` como handles em 248 linhas contendo 260 referências, em 26 arquivos (contagem
+por `MemoryStorage\.(DemoRealm|ServerRealm|AccountRealm|AdminRealm|AliceSubjectId|BobSubjectId)`; algumas
+linhas contêm mais de uma referência). Não é acesso a
+estado interno, mas é acoplamento de composição ao fake: o P4 deve fornecer esses handles pela fixture
+(realms/subjects resolvidos da composição corrente) ao trocar o backing default.
+
+### Dependências mínimas de seed (ordem falsificável)
+
+1. `ServerOptions` existe antes de qualquer realm (as `RealmOptions` derivam dele).
+2. Realm salvo (`IRealmStore.SaveAsync`) antes de qualquer store realm-bound — o binding falha para realm
+   desconhecido (ST-04..ST-11).
+3. Configuração do realm antes dos fluxos que a consomem: clients (authorize/token), identity
+   scopes/resource servers (discovery/grants; shape bloqueado por DF22), keys (assinatura — via
+   `AddKeyAsync` ou `FirstKeyJob`).
+4. Dados operacionais (tokens, codes, consents, sessões, authorize parameters) somente com o realm resolvido;
+   nos fluxos HTTP exigem também client/scopes existentes. No nível do store, nenhuma operação valida
+   client/conta — correlação é escalar (Fase 2).
+5. Contas ficam fora desta ordem: são semeadas pela família `UserAccounts` na composição (module seed),
+   correlacionadas por `SubjectId`; o storage do IdP não participa (DF8).
+
+A fixture da Fase 3 falsifica essa ordem: o harness cria `ServerOptions`→realms→dados nessa sequência e os
+cenários DF6 provam dois realms isolados com ids/handles colidentes em todos os stores realm-bound
+(`SameClientId/SameKeyId/SameJti/SameHandle/SameCodeHandle/SameSubjectAndClient/SameSid…_InTwoRealms`).
+
+### Separação de responsabilidades de seed
+
+| Camada | Conteúdo | Hoje | Alvo |
+|---|---|---|---|
+| Host/produto | realms internos, `server_admin`; provisão de keys pelo `FirstKeyJob` do core | realms/client embutidos no fake via `AddInMemoryStorage`; o job é registrado por `AddOpenIdConnectProviderServices` e persiste pela facade `IKeyStore` | seed explícito de composição/migração; P2 implementa a persistência de keys, enquanto a orquestração resolve a lacuna de provisão registrada acima |
+| Dev/demo | demo realm, demo clients, `apiserver`, alice/bob | embutido no fake | seed de dev/demo do host, opcional, fora do provider |
+| Fixture compartilhada | `AppFactory`/`Tests.Host` (fluxos HTTP); `StorageContractHarness` (contract tests) | AppFactory herda todo o seed do fake; harness cria o próprio estado | P4: fixture fornece realms/handles e seed mínimo pela composição corrente |
+| Cenário | clients/resources/keys/contas únicos por teste (sufixos aleatórios) | mutação direta de dictionary (56 ocorrências) | hooks test-only → facades/seed do provider conforme tabela de categorias |
+
+### Gate para o Plano 4 (troca de backing)
+
+O P4 só migra os testes de fluxo quando: (a) P2 entregar write facade ou seed test-only para clients e
+implementar a persistência do `AddKeyAsync` já existente para keys, com a lacuna de provisão de keys
+resolvida ou contornada pela fixture; (b) resources tiverem rota test-only própria enquanto DF22 vigorar;
+(c) contas forem semeadas pela composição do módulo (`UserAccountsModuleSeed`), já demonstrado por
+`UserAccountsAppFactory`; (d) os handles estáticos (`DemoRealm` etc.) forem substituídos por handles da
+fixture. Os acessos de `CharacterizationSeed` além de seed devem ser resolvidos antes da troca do backing:
+as leituras de conta viram comportamento observável, a mutação de conta ganha rota pelo módulo ou hook test-only,
+e `FindSession` passa a capturar o `sid` no próprio fluxo e consultar a sessão por `FindByIdAsync`.
+
 ## Handoff para as próximas fases
 
 - **Fase 2:** confirmar exatamente um owner por linha, detalhar dependências Configuration×Operational e manter
   resources bloqueados; documentar RL-07 sem escolher o seam administrativo cross-family.
 - **Fase 3 (concluída):** cenários provider-neutral criados em `Tests.Storage`; ver a seção
   "Contract tests provider-neutral — Fase 3" e a tabela de aceites futuros registrados.
-- **Fase 4:** decompor as 56 referências diretas ao fake por setup, inspeção ou dependência real e mapear seeds.
+- **Fase 4 (concluída):** seeds, composições e as 56 referências diretas decompostas com destino por
+  categoria; ver a seção "Seeds, dados globais e acessos diretos — Fase 4" e o gate do Plano 4.
 - **Fase 5:** resolver todos os `avaliar`, atribuir política de duplicidade, comparadores, expiração e ausência por
   operação, e produzir a ordem final de migração.

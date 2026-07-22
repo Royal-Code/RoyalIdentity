@@ -1,17 +1,17 @@
 # Plan: Baseline dos contratos de storage do IdP (`plan-data-storage-baseline`)
 
-## Status: EM EXECUÇÃO - Fases 1-3 de 5 concluídas
+## Status: EM EXECUÇÃO - Fases 1-4 de 5 concluídas
 
 ## Progresso
 
-`███░░` **60%** - 3 de 5 fases concluídas
+`████░` **80%** - 4 de 5 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Inventário de contratos, consumidores e comportamento atual | Concluida |
 | Fase 2 - Classificação por ciclo de vida e fronteira | Concluida |
 | Fase 3 - Contract tests reutilizáveis | Concluida |
-| Fase 4 - Seeds, dados globais e dependências entre stores | Pendente |
+| Fase 4 - Seeds, dados globais e dependências entre stores | Concluida |
 | Fase 5 - Paridade obrigatória e ordem de migração | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -695,15 +695,15 @@ criação e dependências sem criar seed público de produção.
 
 **Tarefas:**
 
-- [ ] Inventariar `ServerOptions`, realms internos/demo, clients, resources/scopes, keys, authorize parameters e dados
+- [x] Inventariar `ServerOptions`, realms internos/demo, clients, resources/scopes, keys, authorize parameters e dados
       operacionais criados estaticamente ou por teste.
-- [ ] Inventariar as 56 ocorrências atuais de getters diretos do fake — 55 em `Tests.Integration` e uma em
+- [x] Inventariar as 56 ocorrências atuais de getters diretos do fake — 55 em `Tests.Integration` e uma em
       `Tests.UserAccounts/UserDirectoryContractTests.cs` — e classificar setup, inspeção ou dependência real.
-- [ ] Mapear dependências mínimas de seed: realm→options→resources/clients/keys e realm→dados operacionais.
-- [ ] Separar seed de host/demo, fixture compartilhada e dados específicos de cenário.
-- [ ] Definir no catálogo a substituição futura de cada acesso direto por facade, fixture ou seed do provider.
-- [ ] Registrar dependências de `UserAccounts` apenas no nível de composição do teste, sem mover suas tabelas/seeds.
-- [ ] Validar que a fixture provider-neutral consegue criar dois realms isolados e dados com ids colidentes.
+- [x] Mapear dependências mínimas de seed: realm→options→resources/clients/keys e realm→dados operacionais.
+- [x] Separar seed de host/demo, fixture compartilhada e dados específicos de cenário.
+- [x] Definir no catálogo a substituição futura de cada acesso direto por facade, fixture ou seed do provider.
+- [x] Registrar dependências de `UserAccounts` apenas no nível de composição do teste, sem mover suas tabelas/seeds.
+- [x] Validar que a fixture provider-neutral consegue criar dois realms isolados e dados com ids colidentes.
 
 **Critérios de aceite:** todo seed/dado global e todo acesso direto identificado tem owner, finalidade, dependências e
 destino; não há setup indispensável escondido em mutation de dictionary sem estratégia test-only; a ordem de seed é
@@ -714,7 +714,59 @@ falsificável pela fixture.
 
 ### Resultado da Fase 4
 
-*a preencher*
+**Concluída em 2026-07-21.** Fase exclusivamente documental (DF1 — nenhum código de produção ou teste foi
+alterado). A [matriz](plan-data-storage-matrix.md) ganhou a seção
+"Seeds, dados globais e acessos diretos — Fase 4" com:
+
+- **Inventário de seeds do fake:** `ServerOptions` estático compartilhado; realms internos + demo (statics);
+  clients iniciais por realm; identity scopes padrão e `apiserver` via property initializer em **todo**
+  `RealmMemoryStore` (inclusive realms criados por `SaveAsync`); alice/bob somente no demo realm; keys sem
+  seed estático — e com **lacuna de provisão registrada**: o `FirstKeyJob` encerra no primeiro realm já
+  provisionado (problemático com persistência durável após reinícios) e `RealmManager.CreateAsync` não
+  provisiona key para realms de runtime, sem criação lazy no key manager; a orquestração de provisão fica
+  para o P2/fluxo administrativo, sobre o `AddKeyAsync` já existente. Authorize parameters sem seed. Dois acidentes
+  registrados como não-preserváveis: account/admin recebem os clients de demo (parâmetro binário `isServer`)
+  e realms novos recebem o resource server de demo. O conjunto padrão de identity scopes na criação de realm
+  ficou registrado como decisão explícita do P2/redesign, não como initializer escondido.
+- **Composição:** todo o seed entra por `AddInMemoryStorage()` (Server e Tests.Host); `AppFactory` é a
+  fixture compartilhada dos fluxos HTTP; `UserAccountsAppFactory` + `UserAccountsSeedHostedService` é o
+  precedente do P4 para seed de contas por composição do módulo (correlação escalar apenas — DF8, tarefa de
+  `UserAccounts` registrada só no nível de composição).
+- **As 56 ocorrências classificadas** por arquivo e por categoria com destino: 36 setups de clients (write
+  facade/seed do P2), 14 setups de resource servers (**bloqueados por DF22** — permanecem hook test-only até
+  o redesign), 3 seeds de conta (composição com módulo + `UserAccountsModuleSeed`), 1 inspeção **e mutação**
+  de conta (`GetDetails` — além de ler contadores, `ActiveRuleCharacterizationTests` desativa a conta pela
+  referência viva; leituras viram comportamento observável e a mutação exige operação do módulo ou hook
+  test-only), 1 inspeção de sessão (sem consulta por subject no contrato — qualquer novo lookup é mudança
+  pública a listar na Fase 5) e 1 leitura de configuração substituível pela facade existente. Fora a mutação
+  por live reference de `GetDetails`, nenhuma ocorrência é dependência semântica do backing.
+- **Acoplamento adicional registrado:** statics do fake (`MemoryStorage.DemoRealm`, `AliceSubjectId`, …)
+  usados como handles em 248 linhas contendo 260 referências, em 26 arquivos — substituíveis por handles da
+  fixture no P4.
+- **Ordem mínima de seed** (ServerOptions→realm→configuração→operacional; contas fora, pela família do
+  módulo) e separação host/dev-demo/fixture/cenário documentadas; a fixture da Fase 3 falsifica a ordem e a
+  tarefa de dois realms isolados com ids colidentes já está provada pelos cenários DF6 da suíte
+  (`Same*_InTwoRealms`).
+- **Gate do Plano 4 definido:** write facade/seed de clients e persistência do `AddKeyAsync` existente para
+  keys — com a lacuna de provisão resolvida ou contornada pela fixture (P2) —, rota test-only para resources
+  enquanto DF22 vigorar, contas pela composição do módulo, handles da fixture no lugar dos statics, e
+  resolução dos acessos não-seed de `CharacterizationSeed` (leituras de conta → comportamento observável;
+  mutação → rota pelo módulo ou hook test-only; `FindSession` → captura do `sid` no fluxo + `FindByIdAsync`)
+  antes da troca de backing. A provisão de keys pelo `FirstKeyJob` pertence ao core; `AddInMemoryStorage`
+  fornece o backing atual, e o P2 implementará a persistência pelo `IKeyStore` existente.
+
+**Revisão pós-conclusão (mesmo dia):** uma análise externa apontou quatro ajustes, todos confirmados e
+aplicados na matriz e neste resultado: (1) o ciclo de vida de keys estava descrito de forma incompleta — o
+`return` do `FirstKeyJob` e a ausência de provisão para realms de runtime viraram lacuna registrada de
+lifecycle/orquestração, e o gate passou a citar o `AddKeyAsync` existente em vez de uma "write facade" nova
+para keys; (2) `GetDetails` não é só inspeção — há mutação de conta por referência viva em
+`ActiveRuleCharacterizationTests`, registrada como a única dependência semântica do backing entre as 56
+ocorrências, com destino próprio; (3) a contagem de setups de clients foi corrigida de 33 para 36 (as
+categorias agora somam 56); (4) a contagem de statics foi precisada para 248 linhas/260 referências.
+
+Validação: `dotnet test Tests.Storage` — 78 aprovados, 0 falhas (inclui os 3 cenários de URI inválida
+adicionados após a revisão da Fase 3); `dotnet test Tests.Integration --no-restore` — 223 aprovados, 0
+falhas; `git diff --check` sem erros.
 
 ---
 
