@@ -26,8 +26,17 @@ superfície contratual.
 
 ## Legenda
 
-- **Owner:** `Configuration`, `Operational`, `Infrastructure` ou `Gateway`. A confirmação exaustiva de ownership e
-  dependências cross-store pertence à Fase 2.
+- **Owner:** cada linha possui exatamente um entre `Configuration`, `Operational` e `Adapter/Infrastructure`. As
+  superfícies explicitamente excluídas são `fora do storage`. `IStorage` é o gateway contratual, mas cada accessor é
+  atribuído ao owner dos dados que expõe; a implementação do gateway pertence ao adapter.
+- **Gateway:** neste documento, é exclusivamente o ponto de entrada contratual `IStorage`, que agrega propriedades e
+  fábricas de facades (`Realms`, `AuthorizeParameters` e `Get*Store(realm)`) sem possuir os dados nem sua semântica de
+  persistência. O termo não significa API gateway, gateway de integração externa, repository, Unit of Work ou a
+  `.Integration` de um módulo. Cada membro de `IStorage` continua atribuído ao owner dos dados que expõe, e a
+  implementação concreta desse gateway é responsabilidade do adapter de storage.
+- **Lifecycle:** `Configuration` é estado durável de baixa rotatividade; `Operational` é estado transitório/de alta
+  rotatividade, sujeito a expiração, revogação e purge; `Adapter/Infrastructure` tem lifetime técnico e não é dado de
+  `Data.*`. Essa correspondência é normativa para todas as linhas e não depende do backing atual.
 - **Binding:** `global`, `realm` ou `n/a`. Nos stores realm-bound, o fake resolve um `RealmMemoryStore` pelo `Realm.Id`;
   realm desconhecido lança `ArgumentException` ao obter o store.
 - **Mutabilidade:** salvo indicação diferente, o fake guarda e devolve a mesma instância mutável. Isso é
@@ -49,17 +58,17 @@ registra `IStorage` transient apontando para essa mesma instância.
 
 | ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|---|
-| ST-01 | `ServerOptions { get; }` | Gateway / global / instância estática compartilhada | Retorna a mesma instância mutável. | `ConfigureRealmCookieAuthenticationOptions`, `RealmManager`, `DefaultEventDispatcher` | fluxo: testes de realm/options | ADR-013; live reference `descartar` (DF17); P2/baseline |
-| ST-02 | `Realms { get; }` | Gateway / global / `realms` + `realmMemoryStore` | Cria nova facade `RealmStore` sobre os mesmos backings. | todos os callers de `IRealmStore` | direta: `RealmIsolationTests` | ADR-013; facade `preservar`; P2/baseline |
-| ST-03 | `AuthorizeParameters { get; }` | Gateway / global / `authorizeParameters` | Cria nova facade sobre o mesmo dictionary global. | responses/page services do authorize flow | fluxo: login/consent callbacks | DF14; facade `preservar`; P3/baseline |
-| ST-04 | `GetAccessTokenStore(Realm)` | Gateway / realm / `AccessTokens` | Nova facade; realm inexistente falha antes da operação. | token factory/validator, refresh e revocation handlers | direta: `RealmIsolationTests`; fluxo: token/revocation | DF6; binding `preservar`; P3/baseline |
-| ST-05 | `GetRefreshTokenStore(Realm)` | Gateway / realm / `RefreshTokens` | Idem. | token factory, `LoadRefreshToken`, refresh/revocation/session revocation | direta/fluxo: `RealmIsolationTests`, `RefreshTokenTests`, `SessionLifecycleTests` | DF6; binding `preservar`; P3/baseline |
-| ST-06 | `GetAuthorizationCodeStore(Realm)` | Gateway / realm / `AuthorizationCodes` | Idem. | `DefaultCodeFactory`, `LoadCode` | direta/fluxo: `RealmIsolationTests`, `CodeTokenTests` | DF6; binding `preservar`; P3/baseline |
-| ST-07 | `GetUserConsentStore(Realm)` | Gateway / realm / `UserConsents` | Idem. | `DefaultConsentService` | direta/fluxo: `RealmIsolationTests` e authorize/consent | DF6; binding `preservar`; P3/baseline |
-| ST-08 | `GetKeyStore(Realm)` | Gateway / realm / `KeyParameters` | Idem. | `DefaultKeyManager` | fluxo: signing/JWKS/key jobs | DF6/DF9; binding `preservar`; P2/baseline |
-| ST-09 | `GetClientStore(Realm)` | Gateway / realm / `Clients` | Idem. | middleware, validators, secret evaluators, sign-out | direta: `RealmIsolationTests`; fluxo: endpoints | DF6; binding `preservar`; P2/baseline |
-| ST-10 | `GetResourceStore(Realm)` | Gateway / realm / resources/scopes | Nova facade e novos índices derivados do estado corrente. | discovery, client/resource decorator, code/refresh handlers | direta: `ResourceStoreTests`, `RealmIsolationTests` | DF6/DF22; binding `preservar`, persistência bloqueada; baseline/redesign |
-| ST-11 | `GetUserSessionStore(Realm)` | Gateway / realm / `UserSessions` | Nova facade ligada ao realm. | session service, code/sign-out/end-session/session revocation | direta/fluxo: suites de sessão/logout | ADR-014/DF6; binding `preservar`; P3/baseline |
+| ST-01 | `ServerOptions { get; }` | Configuration / global / instância estática compartilhada | Retorna a mesma instância mutável. | `ConfigureRealmCookieAuthenticationOptions`, `RealmManager`, `DefaultEventDispatcher` | fluxo: testes de realm/options | ADR-013; live reference `descartar` (DF17); P2/baseline |
+| ST-02 | `Realms { get; }` | Configuration / global / `realms` + `realmMemoryStore` | Cria nova facade `RealmStore` sobre os mesmos backings. | todos os callers de `IRealmStore` | direta: `RealmIsolationTests` | ADR-013; facade `preservar`; P2/baseline |
+| ST-03 | `AuthorizeParameters { get; }` | Operational / global / `authorizeParameters` | Cria nova facade sobre o mesmo dictionary global. | responses/page services do authorize flow | fluxo: login/consent callbacks | DF14; facade `preservar`; P3/baseline |
+| ST-04 | `GetAccessTokenStore(Realm)` | Operational / realm / `AccessTokens` | Nova facade; realm inexistente falha antes da operação. | token factory/validator, refresh e revocation handlers | direta: `RealmIsolationTests`; fluxo: token/revocation | DF6; binding `preservar`; P3/baseline |
+| ST-05 | `GetRefreshTokenStore(Realm)` | Operational / realm / `RefreshTokens` | Idem. | token factory, `LoadRefreshToken`, refresh/revocation/session revocation | direta/fluxo: `RealmIsolationTests`, `RefreshTokenTests`, `SessionLifecycleTests` | DF6; binding `preservar`; P3/baseline |
+| ST-06 | `GetAuthorizationCodeStore(Realm)` | Operational / realm / `AuthorizationCodes` | Idem. | `DefaultCodeFactory`, `LoadCode` | direta/fluxo: `RealmIsolationTests`, `CodeTokenTests` | DF6; binding `preservar`; P3/baseline |
+| ST-07 | `GetUserConsentStore(Realm)` | Operational / realm / `UserConsents` | Idem. | `DefaultConsentService` | direta/fluxo: `RealmIsolationTests` e authorize/consent | DF6; binding `preservar`; P3/baseline |
+| ST-08 | `GetKeyStore(Realm)` | Configuration / realm / `KeyParameters` | Idem. | `DefaultKeyManager` | fluxo: signing/JWKS/key jobs | DF6/DF9; binding `preservar`; P2/baseline |
+| ST-09 | `GetClientStore(Realm)` | Configuration / realm / `Clients` | Idem. | middleware, validators, secret evaluators, sign-out | direta: `RealmIsolationTests`; fluxo: endpoints | DF6; binding `preservar`; P2/baseline |
+| ST-10 | `GetResourceStore(Realm)` | Configuration / realm / resources/scopes | Nova facade e novos índices derivados do estado corrente. | discovery, client/resource decorator, code/refresh handlers | direta: `ResourceStoreTests`, `RealmIsolationTests` | DF6/DF22; binding `preservar`, persistência bloqueada; baseline/redesign |
+| ST-11 | `GetUserSessionStore(Realm)` | Operational / realm / `UserSessions` | Nova facade ligada ao realm. | session service, code/sign-out/end-session/session revocation | direta/fluxo: suites de sessão/logout | ADR-014/DF6; binding `preservar`; P3/baseline |
 
 ## Configuração
 
@@ -76,7 +85,7 @@ retornam live references e, exceto a enumeração, ignoram CT.
 | RL-04 | `GetByDomainAsync(domain, ct)` | Configuration / global / scan de `realms.Values` | Primeiro match exato ou `null`; ordem incidental se duplicado. | `RealmManager.CreateAsync` (unicidade) | fluxo: criação de realm; sem teste direto localizado | unicidade é premissa do caller; comparador/ausência `avaliar`; P2/baseline |
 | RL-05 | `GetAllAsync(ct)` | Configuration / global / `realms.Values` | Conjunto de live references; observa cancelamento entre itens e encerra normalmente. | `FirstKeyJob` | fluxo: inicialização de keys | DF24: ordem incidental `descartar`; cancelamento/resultado `avaliar`; P2/baseline |
 | RL-06 | `SaveAsync(realm, ct)` | Configuration / global / `AddOrUpdate` + `TryAdd` do backing do realm | Upsert/replace do `Realm`; criar inicializa backing vazio, atualizar preserva o backing existente. | `RealmManager`; setup de testes/options | direta/fluxo: realm/options/isolation | duplicate-write `avaliar` por operação (DF16); live reference `descartar`; P2/baseline |
-| RL-07 | `DeleteAsync(realmId, ct)` | Configuration + efeito Operational / global | `false` se ausente/interno; para realm comum remove fisicamente realm e todo `RealmMemoryStore`. Não alcança `UserAccounts`. | somente testes; nenhum caller de produção ou `IRealmManager.DeleteAsync` | direta: dois cenários em `RealmIsolationTests` | proteção de internal `preservar`; hard delete config `substituir` por tombstone + purge Operational (DF20); seam cross-family pendente; P2/P3/plano admin |
+| RL-07 | `DeleteAsync(realmId, ct)` | Configuration / global / realm + backing operacional | `false` se ausente/interno; para realm comum remove fisicamente realm e todo `RealmMemoryStore`. É uma operação Configuration com efeito cross-store Operational e não alcança `UserAccounts`. | somente testes; nenhum caller de produção ou `IRealmManager.DeleteAsync` | direta: dois cenários em `RealmIsolationTests` | proteção de internal `preservar`; hard delete config `substituir` por tombstone + purge Operational (DF20); seam cross-family pendente; P2/P3/plano admin |
 
 ### `IClientStore`
 
@@ -98,7 +107,7 @@ duplicada e URI inválida. O shape está bloqueado para persistência por DF22.
 | RS-02 | `GetAllEnabledResourcesAsync(ct)` | Configuration / realm / mesmos backings | Filtra identity scopes, servers e scopes enabled; clona cada server para filtrar scopes; conjuntos. | `DiscoveryHandler`, `ClientResourceDecorator` | direta: `ResourceStoreTests`; fluxo: discovery/authorize | filtro enabled `preservar` (ADR-010 e consumers); ordem `descartar`; baseline/redesign |
 | RS-03 | `FindResourcesByScopeAsync(scopes, onlyEnabled, ct)` | Configuration / realm / índices por nome | Delega ao lookup combinado sem resource URI. | `UserInfoHandler`; `Tests.Host/HostEndpoints`; setup e cenários de testes | direta: `ResourceStoreTests`; fluxo: userinfo/code/signing/isolation | semântica atual coberta por ADR-010; API/shape `avaliar`, persistência bloqueada; baseline/redesign |
 | RS-04 | `FindRequestedResourcesAsync(scopes, uris, onlyEnabled, ct)` | Configuration / realm / índices Ordinal | Resolve identity/resource scopes; trata `offline_access`; registra scopes ausentes e targets inválidos/disabled; resource URI deve ser absoluta HTTPS sem fragment, com exceção HTTP localhost; deduplica owners. | `RefreshTokenHandler`, `ProtectedResourceMetadataHandler`, `ResourcesDecorator`, `ClientResourceDecorator` e RS-05 | direta: `ResourceStoreTests`; fluxo: token grants/metadata | validação atual `preservar` enquanto o contrato existir (ADR-010/012); shape bloqueado DF22; baseline/redesign |
-| RS-05 | `ResolveAuthorizedSubsetAsync(...)` | Configuration sem estado próprio / realm por receiver | Garante subset de resource indicators, downscope coerente e mapeia falhas para `invalid_target`/`invalid_scope`; pode chamar RS-04 até três vezes. | `AuthorizationCodeHandler`, `RefreshTokenHandler` | direta/fluxo: `CodeTokenTests`, `RefreshTokenTests`, `ResourceStoreTests` | semântica `preservar` (ADR-012/RFC 8707 já adotada); baseline/redesign |
+| RS-05 | `ResolveAuthorizedSubsetAsync(...)` | Configuration / realm por receiver / sem backing próprio | Garante subset de resource indicators, downscope coerente e mapeia falhas para `invalid_target`/`invalid_scope`; pode chamar RS-04 até três vezes. | `AuthorizationCodeHandler`, `RefreshTokenHandler` | direta/fluxo: `CodeTokenTests`, `RefreshTokenTests`, `ResourceStoreTests` | semântica `preservar` (ADR-012/RFC 8707 já adotada); baseline/redesign |
 
 ### `IKeyStore`
 
@@ -190,9 +199,9 @@ serializado e protegido por ASP.NET Data Protection.
 
 | ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|---|
-| MS-01 | `WriteAsync<T>(message, ct)` | Infrastructure / n/a / Data Protection | Serializa JSON, protege bytes e devolve ciphertext Base64Url completo; CT sem efeito. | end-session handler; login/consent/end-session page services | fluxo: `EndSessionTests`, back-channel logout | classificação infra `preservar` (DF14); formato/mutabilidade `avaliar`; adjacente/baseline |
-| MS-02 | `ReadAsync<T>(id, ct)` | Infrastructure / n/a / Data Protection | Base64Url decode→unprotect→deserialize; qualquer falha é logada e retorna `null`; leitura repetível. | sign-out e page services | fluxo: end-session/logout; sem teste direto de tamper | fail-closed como ausência `avaliar`; adjacente/baseline |
-| MS-03 | `DeleteAsync(id, ct)` | Infrastructure / n/a / sem backing | No-op incondicional. | page/flow cleanup quando aplicável | lacuna direta | no-op é específico da implementação e `avaliar`; adjacente/baseline |
+| MS-01 | `WriteAsync<T>(message, ct)` | Adapter/Infrastructure / n/a / Data Protection | Serializa JSON, protege bytes e devolve ciphertext Base64Url completo; CT sem efeito. | end-session handler; login/consent/end-session page services | fluxo: `EndSessionTests`, back-channel logout | classificação infra `preservar` (DF14); formato/mutabilidade `avaliar`; adjacente/baseline |
+| MS-02 | `ReadAsync<T>(id, ct)` | Adapter/Infrastructure / n/a / Data Protection | Base64Url decode→unprotect→deserialize; qualquer falha é logada e retorna `null`; leitura repetível. | sign-out e page services | fluxo: end-session/logout; sem teste direto de tamper | fail-closed como ausência `avaliar`; adjacente/baseline |
+| MS-03 | `DeleteAsync(id, ct)` | Adapter/Infrastructure / n/a / sem backing | No-op incondicional. | page/flow cleanup quando aplicável | lacuna direta | no-op é específico da implementação e `avaliar`; adjacente/baseline |
 
 ### `IReplayCache`
 
@@ -200,8 +209,8 @@ Implementações: `DefaultReplayNoCache` (default DI) e `DefaultReplayDistribute
 
 | ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|---|
-| RC-01 | `AddAsync(purpose, handle, expiration)` | Infrastructure / global / no-op ou `IDistributedCache` | Default não grava. Distribuído grava bytes vazios em `Prefix + purpose + handle`, sem delimitador, com expiração absoluta; API não recebe CT. | `PrivateKeyJwtSecretEvaluator` | lacuna relevante | proteção contra replay é regra de segurança; API/backing/atomicidade `avaliar`; adjacente/baseline |
-| RC-02 | `ExistsAsync(purpose, handle)` | Infrastructure / global / constante false ou cache | Default sempre `false`; distribuído faz `GetAsync`. Check+add do caller não é atômico. | `PrivateKeyJwtSecretEvaluator` | lacuna relevante | implementação default não oferece proteção; `substituir`/decidir operação atômica em plano próprio; adjacente |
+| RC-01 | `AddAsync(purpose, handle, expiration)` | Adapter/Infrastructure / global / no-op ou `IDistributedCache` | Default não grava. Distribuído grava bytes vazios em `Prefix + purpose + handle`, sem delimitador, com expiração absoluta; API não recebe CT. | `PrivateKeyJwtSecretEvaluator` | lacuna relevante | proteção contra replay é regra de segurança; API/backing/atomicidade `avaliar`; adjacente/baseline |
+| RC-02 | `ExistsAsync(purpose, handle)` | Adapter/Infrastructure / global / constante false ou cache | Default sempre `false`; distribuído faz `GetAsync`. Check+add do caller não é atômico. | `PrivateKeyJwtSecretEvaluator` | lacuna relevante | implementação default não oferece proteção; `substituir`/decidir operação atômica em plano próprio; adjacente |
 
 ### `IStorageProvider` e `IStorageSession`
 
@@ -209,23 +218,23 @@ Implementações: `DefaultReplayNoCache` (default DI) e `DefaultReplayDistribute
 
 | ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|---|
-| SP-01 | `IStorageProvider.CreateSession()` | Infrastructure / n/a / próprio singleton | Retorna `this` como `IStorageSession`; não abre conexão, contexto ou transação. | `KeyCacheEntry` | lacuna direta | lifetime seam `preservar`, não UoW global (DF21); implementação `substituir` no adapter EF; P2/adapter |
-| SP-02 | `IStorageSession.GetStorage()` | Infrastructure / n/a / `MemoryStorage` singleton | Retorna sempre o mesmo `IStorage`. | `KeyCacheEntry` | lacuna direta | acesso dentro do lifetime `preservar` (DF21); implementação `substituir`; P2/adapter |
-| SP-03 | `IDisposable.Dispose()` | Infrastructure / n/a / no-op | Não libera recurso. | `using` em `KeyCacheEntry` | lacuna direta | disposal/lifetime `preservar` (DF21); no-op do fake `descartar`; P2/adapter |
+| SP-01 | `IStorageProvider.CreateSession()` | Adapter/Infrastructure / n/a / próprio singleton | Retorna `this` como `IStorageSession`; não abre conexão, contexto ou transação. | `KeyCacheEntry` | lacuna direta | lifetime seam `preservar`, não UoW global (DF21); implementação `substituir` no adapter EF; P2/adapter |
+| SP-02 | `IStorageSession.GetStorage()` | Adapter/Infrastructure / n/a / `MemoryStorage` singleton | Retorna sempre o mesmo `IStorage`. | `KeyCacheEntry` | lacuna direta | acesso dentro do lifetime `preservar` (DF21); implementação `substituir`; P2/adapter |
+| SP-03 | `IDisposable.Dispose()` | Adapter/Infrastructure / n/a / no-op | Não libera recurso. | `using` em `KeyCacheEntry` | lacuna direta | disposal/lifetime `preservar` (DF21); no-op do fake `descartar`; P2/adapter |
 
 ## Tipo de suporte `ResourceResolution`
 
 Esses membros não persistem dados, mas fazem parte da superfície pública introduzida pela extensão RS-05.
 
-| ID | Membro público | Semântica atual | Consumidores/cobertura | Fonte, classe inicial e destino |
-|---|---|---|---|---|
-| RR-01 | `Resources { get; }` | Resultado resolvido quando há sucesso; `null` em falha. | code/refresh handlers; tests desses grants | ADR-012; `preservar` enquanto RS-05 existir; baseline/redesign |
-| RR-02 | `Error { get; }` | `null` em sucesso; erro OAuth em falha. | idem | ADR-012; `preservar`; baseline/redesign |
-| RR-03 | `ErrorDescription { get; }` | Descrição estável criada pela extensão. | idem | texto exato `avaliar`; baseline/redesign |
-| RR-04 | `Detail { get; }` | Lista/razão opcional para diagnóstico. | idem | conteúdo/formato `avaliar`; baseline/redesign |
-| RR-05 | `IsSuccess { get; }` | Verdadeiro quando `Error is null`. | handlers/testes | coerência do resultado `preservar`; baseline/redesign |
-| RR-06 | `Ok(resources)` | Constrói sucesso sem campos de erro. | RS-05 | coerência do resultado `preservar`; baseline/redesign |
-| RR-07 | `Fail(error, description, detail)` | Constrói falha sem resources. | RS-05 | coerência do resultado `preservar`; baseline/redesign |
+| ID | Membro público | Owner / lifecycle | Semântica atual | Consumidores/cobertura | Fonte, classe inicial e destino |
+|---|---|---|---|---|---|
+| RR-01 | `Resources { get; }` | Configuration / resultado transitório | Resultado resolvido quando há sucesso; `null` em falha. | code/refresh handlers; tests desses grants | ADR-012; `preservar` enquanto RS-05 existir; baseline/redesign |
+| RR-02 | `Error { get; }` | Configuration / resultado transitório | `null` em sucesso; erro OAuth em falha. | idem | ADR-012; `preservar`; baseline/redesign |
+| RR-03 | `ErrorDescription { get; }` | Configuration / resultado transitório | Descrição estável criada pela extensão. | idem | texto exato `avaliar`; baseline/redesign |
+| RR-04 | `Detail { get; }` | Configuration / resultado transitório | Lista/razão opcional para diagnóstico. | idem | conteúdo/formato `avaliar`; baseline/redesign |
+| RR-05 | `IsSuccess { get; }` | Configuration / resultado transitório | Verdadeiro quando `Error is null`. | handlers/testes | coerência do resultado `preservar`; baseline/redesign |
+| RR-06 | `Ok(resources)` | Configuration / resultado transitório | Constrói sucesso sem campos de erro. | RS-05 | coerência do resultado `preservar`; baseline/redesign |
+| RR-07 | `Fail(error, description, detail)` | Configuration / resultado transitório | Constrói falha sem resources. | RS-05 | coerência do resultado `preservar`; baseline/redesign |
 
 ## Backings do fake e dependências
 
@@ -247,6 +256,101 @@ Esses membros não persistem dados, mas fazem parte da superfície pública intr
 | `IDistributedCache` opcional | `IReplayCache` | infraestrutura | Default efetivo continua sendo o no-cache. |
 | Persistência de `UserAccounts` | nenhuma superfície deste catálogo | família separada | RL-07 não a alcança; integração futura deve respeitar ADR-013/015 e DF20. |
 
+## Classificação de ownership e lifecycle — Fase 2
+
+A classificação usa o owner dos dados/efeito principal, não o projeto onde o contrato está declarado. Por isso os
+accessors de `IStorage` não recebem um owner artificial chamado “Gateway”: cada um segue a família que expõe. O
+adapter implementa o gateway, mas não se torna owner dos registros.
+
+| Owner único | IDs | Lifecycle | Destino arquitetural |
+|---|---|---|---|
+| Configuration | ST-01, ST-02, ST-08..ST-10; RL-01..RL-07; CL-01..CL-02; RS-01..RS-05; KY-01..KY-05 | Durável, baixa rotatividade; tombstones configuracionais sobrevivem à exclusão lógica. Keys ficam aqui temporariamente até existir KMS. | `RoyalIdentity.Data.Configuration`, adaptado somente por `RoyalIdentity.Storage.EntityFramework`; resources permanecem bloqueados por DF22. |
+| Operational | ST-03..ST-07, ST-11; AT-01..AT-04; RT-01..RT-05; AC-01..AC-03; CN-01..CN-03; SS-01..SS-06; AP-01..AP-03 | Transitório/alta rotatividade; possui consumo, revogação, expiração, retenção e purge próprios por tipo. | `RoyalIdentity.Data.Operational`, adaptado somente por `RoyalIdentity.Storage.EntityFramework`. |
+| Adapter/Infrastructure | MS-01..MS-03; RC-01..RC-02; SP-01..SP-03 | Lifetime técnico, criptográfico, cache ou de acesso ao adapter; não constitui registro de `Data.*`. | Implementações/decorators de infraestrutura adjacente e lifecycle do `Storage.EntityFramework`. |
+| Configuration (resultado não persistido) | RR-01..RR-07 | Objetos transitórios de resposta da resolução de configuração; não são entidades. | Construídos pelo adapter/core a partir do resource store; bloqueados com RS-05 pelo redesign. |
+| fora do storage | `IUserDirectory`, `ISubjectStore`, `ILocalUserAuthenticator`, `IUserClaimsProvider`, `IUserSecurityStateProvider` e tipos de conta | Lifecycle próprio do módulo de contas. Nenhuma linha contratual incluída na contagem 62 pertence aqui. | `RoyalIdentity.UserAccounts` e sua `.Integration`; nunca `Data.Configuration`/`Data.Operational`. |
+
+Contagem de controle das 62 linhas contratuais: 24 `Configuration`, 30 `Operational` e 8
+`Adapter/Infrastructure`. Não existe linha com owner `Gateway`, owner composto ou `a definir`. Os sete membros RR são
+suporte público de Configuration e ficam fora da contagem 62, como já indicado no inventário.
+
+## Dependências cross-store
+
+“Direta” abaixo significa que a própria operação consulta/muta outro store. “Orquestrada” significa que o caller
+combina stores, sem transferir a regra de negócio ou a transação para uma facade individual. Isso evita interpretar
+referências como `ClientId`/`SubjectId` dentro dos models como ownership ou FK obrigatória entre famílias.
+
+| Operações | Dependência observada ou alvo | Cruza Configuration×Operational? | Consequência para os planos seguintes |
+|---|---|---|---|
+| ST-01, ST-02; RL-01..RL-06 | Somente estado Configuration global. RL-06 cria também o container operacional vazio no fake, mas isso é inicialização do backing, não semântica pública de `SaveAsync`. | Não como contrato; o acoplamento de inicialização do fake deve ser descartado. | P2 persiste configuração; readiness Operational é responsabilidade de composição/adapter, sem ampliar `SaveAsync`. |
+| ST-08..ST-10; CL-*, RS-*, KY-* | O getter valida a existência do realm; depois, cada operação permanece dentro de Configuration. `FirstKeyJob` encadeia realms→keys e discovery/client flows encadeiam realms/clients/resources. | Não; são dependências internas à mesma família. | Podem compartilhar unidade transacional somente quando uma operação explícita do mesmo store assim exigir; DF21 não cria UoW global. |
+| ST-03; AP-* | Estado Operational global no contrato atual, sem lookup direto de realm/configuração. O authorize flow liga o handle ao contexto da request fora do store. | Não diretamente. | P3 deve decidir particionamento/expiração sem inferir realm binding inexistente hoje. |
+| ST-04..ST-07, ST-11 | A obtenção de cada store Operational exige um `Realm` já resolvido e um backing cadastrado para seu `Realm.Id`. | **Sim, no binding:** Configuration identifica o realm; Operational contém os registros. | O adapter deve preservar isolamento por realm sem expor entidade Configuration ao projeto Operational nem pressupor transação distribuída. |
+| AT-*, RT-*, AC-*, CN-*, SS-* | Após o binding, nenhuma implementação atual consulta outro store. `ClientId`, `SubjectId`, `SessionId` e `RealmId` são valores de correlação, não navegações para conta/configuração. | Não dentro da operação; pode existir na orquestração do caller. | Queries continuam realm-scoped. Nenhuma FK ou referência a entidade do core/`UserAccounts` é decidida neste baseline. |
+| AC-02/AC-03 + RS-05 + AT-/RT-* | Code/refresh handlers combinam consumo Operational, resolução Configuration de resources e emissão Operational. | **Sim, orquestrada.** | Atomicidade de consumo fica na operação condicional Operational (DF15); não há transação Configuration×Operational. A configuração é lida para validar/projetar. |
+| RT-02/RT-04 + AT-03/AT-04 | `RevocationHandler` combina refresh e access tokens. | Não; somente Operational. | P3 define idempotência e consistência dentro das operações explícitas. |
+| SS-06 + RT-05 | `DefaultSessionRevocationService` encerra sessões e remove refresh tokens do subject. | Não; somente Operational, mas são dois stores. | Orquestração continua explícita; DF21 não promete transação global. |
+| CL-01 + SS-* + MS-* | Sign-out resolve client Configuration, lê/muta sessão Operational e usa message infrastructure. | **Sim, orquestrada**, mais infraestrutura adjacente. | Falha/retomada do fluxo não deve ser escondida em `IStorageSession`; sem UoW distribuída. |
+| RL-07 | Hoje remove realm Configuration e o container com todos os stores Operational do fake. Alvo: tombstone Configuration + purge Operational. Depois, a família `UserAccounts` deve remover suas próprias contas. | **Sim, direta hoje e coordenada no alvo.** | O contrato permanece owner de Configuration; P2 implementa tombstone, P3 implementa purge. O seam administrativo cross-family e a semântica de conclusão exigem decisão futura própria. |
+| SP-01..SP-03 + RL-03 | `KeyCacheEntry` abre um lifetime de adapter e relê realm Configuration para calcular TTL. | Não entre famílias de dados; cruza Infrastructure→Configuration. | O adapter EF pode possuir contexts/scopes descartáveis, mas não uma transação implícita entre `Data.*` (DF21). |
+| MS-*, RC-* | Não dependem de `Data.Configuration` nem `Data.Operational`; seus callers podem participar de fluxos que usam ambos. | Não na operação. | Permanecem infraestrutura adjacente (DF14); não criar tabelas em `Data.*` por efeito deste plano. |
+
+As demais linhas são operações locais do mesmo store e não têm dependência cross-store adicional além do binding já
+descrito. Em particular, o store não valida a existência de client ou conta ao persistir um identificador recebido;
+essa validação, quando necessária, pertence aos callers e não autoriza acoplamento entre projetos de dados.
+
+## Tipos do core e responsabilidade de mapping
+
+Os tipos abaixo atravessam as facades atuais, mas **não** podem ser usados como entidades em `Data.*`, pois esses
+projetos não referenciam o core. `RoyalIdentity.Storage.EntityFramework` materializa/projeta entre os modelos puros de
+persistência e os tipos do contrato. Esta lista identifica raízes e objetos de resultado; não define schema, tabela,
+chave, navegação ou estratégia de serialização.
+
+| Owner | Tipos do core/BCL vistos pelas facades | Responsabilidade futura |
+|---|---|---|
+| Configuration | `ServerOptions`; `Realm` e seu grafo `RealmOptions`/routes; `Client` e seu grafo de secrets, claims, URIs, grants e restrições; `KeyParameters` | P2 cria entidades puras próprias e o adapter faz mapping nos dois sentidos. Referências entre esses grafos não autorizam `Data.Configuration` a referenciar assemblies do core. |
+| Configuration — bloqueado | `ResourceServer`, `IdentityScope`, `Scope`, `ProtectedResource`, containers `AllScopes`/`RequestedResources` e `ResourceResolution` | Os containers/resultados são construídos, não persistidos. Entidades para resources/scopes não serão desenhadas nem implementadas até o redesign fechar o modelo (DF11/DF22). |
+| Operational | `AccessToken`, `RefreshToken`, `AuthorizationCode` e o grafo comum de token/claims/audiences/scopes; `Consent`/`ConsentedScope`; `UserSession`/`UserSessionClient`; `NameValueCollection` de authorize parameters | P3 define modelos puros e mappings. Claims/collections/tempos exigem projeção explícita, mas o formato físico permanece fora deste baseline. |
+| Adapter/Infrastructure | `Message<T>`, `IStorage`, `IStorageSession`; primitivas de replay (`purpose`, `handle`, `expiration`) | Não gerar entidades de `Data.*`. Message store, replay cache e lifetime são implementações/decorators adjacentes. |
+| fora do storage | `Subject` e tipos/agregados/credenciais/propriedades de `RoyalIdentity.UserAccounts` | Não mapear no `Storage.EntityFramework`; somente a `.Integration` do módulo traduz a borda core-owned para o módulo. |
+
+Os identificadores `SubjectId` presentes em consent, sessão e tokens são valores protocolares de correlação. Eles não
+transferem ownership da conta ao operacional, não autorizam navegação EF para `UserAccounts` e não implicam FK entre
+DbContexts. A mesma regra vale para `ClientId` e `RealmId` entre Operational e Configuration: integridade cross-family
+é tratada por validação/orquestração, não por um modelo compartilhado decidido aqui.
+
+## Bloqueios e fronteiras
+
+### Resources/scopes
+
+RS-01..RS-05 e RR-01..RR-07 têm owner Configuration, mas destino `baseline/redesign`, não P2 implementável. O
+inventário atual pode gerar contract tests do comportamento vigente; não pode gerar entidade, mapping ou migration.
+O desbloqueio exige fechar o redesign de `Client.AllowedScopes`/`AllowOfflineAccess` e da hierarquia de resource
+servers, protected resources, scopes e identity scopes (DF11/DF22). Realms/options, clients e keys não ficam
+bloqueados junto com esse grafo.
+
+### Exclusão de realm
+
+RL-07 já é executável e testado no fake, mas não tem caller de produção. Seu owner único é Configuration; o efeito
+cross-family não muda esse ownership. O alvo fechado por DF20 é:
+
+1. recusar realm interno e tratar ausência conforme a semântica final ainda a fechar em DF25;
+2. criar tombstone Configuration permanente, invisível a lookups normais, reservando path e domain;
+3. impedir que o realm excluído atenda novas requests;
+4. purgar fisicamente os dados Operational do realm;
+5. solicitar que `UserAccounts` remova posteriormente os dados que ele próprio possui.
+
+Este baseline **não** escolhe evento, saga, chamada direta ou outro seam, não define uma transação distribuída e não
+considera a limpeza de `UserAccounts` concluída pelo simples sucesso de RL-07. Essa decisão acompanha a futura
+arquitetura/API administrativa de exclusão de realm e pode exigir ADR própria.
+
+### Exclusão explícita de `UserAccounts`
+
+Nenhuma linha ST/RL/CL/RS/KY/AT/RT/AC/CN/SS/AP/MS/RC/SP/RR possui owner `UserAccounts`. Nenhuma entidade de conta,
+credencial, propriedade, email, telefone, token de ação ou options do módulo entra em `Data.Configuration` ou
+`Data.Operational`. Apenas ids escalares e a coordenação futura de exclusão cruzam a fronteira. Isso preserva
+ADR-013/015 e DF8.
+
 ## Consumidores e cobertura por área
 
 | Área | Consumidores principais | Testes atuais relevantes | Lacunas observadas |
@@ -266,8 +370,8 @@ Esses membros não persistem dados, mas fazem parte da superfície pública intr
 Buscas executadas a partir da raiz do repositório:
 
 ```powershell
-rg --files RoyalIdentity/Contracts/Storage RoyalIdentity/Users/Contracts |
-  rg "(Storage|ResourceStoreExtensions)\.cs$"
+rg --files RoyalIdentity/Contracts/Storage
+rg --files RoyalIdentity/Users/Contracts -g "IUserSessionStore.cs"
 
 rg -n "public interface I(Storage|RealmStore|ClientStore|ResourceStore|KeyStore|AccessTokenStore|RefreshTokenStore|AuthorizationCodeStore|UserConsentStore|AuthorizeParametersStore|MessageStore|ReplayCache|StorageProvider|StorageSession|UserSessionStore)" RoyalIdentity
 

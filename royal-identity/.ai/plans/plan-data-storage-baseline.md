@@ -1,15 +1,15 @@
 # Plan: Baseline dos contratos de storage do IdP (`plan-data-storage-baseline`)
 
-## Status: EM EXECUÇÃO - Fase 1 de 5 concluída
+## Status: EM EXECUÇÃO - Fases 1-2 de 5 concluídas
 
 ## Progresso
 
-`█░░░░` **20%** - 1 de 5 fases concluídas
+`██░░░` **40%** - 2 de 5 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Inventário de contratos, consumidores e comportamento atual | Concluida |
-| Fase 2 - Classificação por ciclo de vida e fronteira | Pendente |
+| Fase 2 - Classificação por ciclo de vida e fronteira | Concluida |
 | Fase 3 - Contract tests reutilizáveis | Pendente |
 | Fase 4 - Seeds, dados globais e dependências entre stores | Pendente |
 | Fase 5 - Paridade obrigatória e ordem de migração | Pendente |
@@ -557,15 +557,15 @@ para `Data.*` e o que está bloqueado por redesign.
 
 **Tarefas:**
 
-- [ ] Classificar `ServerOptions`, realms/options, clients, resources/scopes e keys como configuração conforme fontes.
-- [ ] Classificar tokens, codes, consents e sessões como operacional conforme fontes.
-- [ ] Aplicar a classificação de authorize parameters e contratos adjacentes conforme DF14.
-- [ ] Registrar dependências cross-store de cada operação e se cruzam Configuration×Operational.
-- [ ] Marcar tipos do core que precisarão de mapping pelo adapter, sem copiá-los para `Data.*` neste plano.
-- [ ] Marcar a instabilidade de resources/scopes e aplicar o bloqueio de DF22.
-- [ ] Mapear o comportamento atual de `IRealmStore.DeleteAsync`, seu teste e o gap com `UserAccounts`; registrar o alvo
+- [x] Classificar `ServerOptions`, realms/options, clients, resources/scopes e keys como configuração conforme fontes.
+- [x] Classificar tokens, codes, consents e sessões como operacional conforme fontes.
+- [x] Aplicar a classificação de authorize parameters e contratos adjacentes conforme DF14.
+- [x] Registrar dependências cross-store de cada operação e se cruzam Configuration×Operational.
+- [x] Marcar tipos do core que precisarão de mapping pelo adapter, sem copiá-los para `Data.*` neste plano.
+- [x] Marcar a instabilidade de resources/scopes e aplicar o bloqueio de DF22.
+- [x] Mapear o comportamento atual de `IRealmStore.DeleteAsync`, seu teste e o gap com `UserAccounts`; registrar o alvo
       de tombstone Configuration + purge Operational de DF20, sem escolher o seam administrativo cross-family.
-- [ ] Verificar que nenhuma entidade/porta de `UserAccounts` foi incluída em `Data.*`.
+- [x] Verificar que nenhuma entidade/porta de `UserAccounts` foi incluída em `Data.*`.
 
 **Critérios de aceite:** toda linha tem exatamente um owner (`Configuration`, `Operational`, `Adapter/Infrastructure` ou
 `fora do storage`); nenhuma linha fica `a definir`; dependências cross-store e bloqueios de redesign estão explícitos.
@@ -574,7 +574,30 @@ para `Data.*` e o que está bloqueado por redesign.
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída em 2026-07-21.** A
+[matriz de storage](plan-data-storage-matrix.md) passou a registrar a classificação arquitetural fechada:
+
+- as 62 linhas contratuais possuem exatamente um owner: 24 `Configuration`, 30 `Operational` e 8
+  `Adapter/Infrastructure`; os sete membros de suporte `ResourceResolution` pertencem à superfície Configuration,
+  mas são resultados transitórios e não entidades;
+- o lifecycle decorre explicitamente do owner: configuração durável/baixa rotatividade, operacional
+  transitório/alta rotatividade e infraestrutura com lifetime técnico fora de `Data.*`;
+- dependências diretas e orquestradas foram separadas, incluindo binding realm Configuration→Operational, grants que
+  combinam resources com codes/tokens, revogação, sign-out, key cache e exclusão de realm;
+- foram listados os grafos de tipos do core que exigirão mapping no `Storage.EntityFramework`, sem definir schema nem
+  permitir referência do `Data.*` ao core;
+- resources/scopes e `ResourceResolution` permanecem bloqueados pelo redesign de DF11/DF22, sem bloquear
+  realms/options, clients e keys;
+- `IRealmStore.DeleteAsync` ficou com owner Configuration e efeito cross-store explícito: tombstone Configuration,
+  purge Operational e limpeza posterior pelo próprio `UserAccounts`, sem escolher seam ou transação distribuída;
+- portas, entidades e options de `UserAccounts` estão explicitamente fora de ambos os `Data.*`; ids de subject são
+  apenas correlação escalar, sem FK/navegação cross-family.
+
+O comando residual da evidência da Fase 1 também foi corrigido para enumerar todos os arquivos de
+`Contracts/Storage` e somente `IUserSessionStore.cs` em `Users/Contracts`.
+
+Validação: `dotnet test Tests.Architecture --no-restore` — 15 aprovados, 0 falhas, 0 ignorados; `git diff --check`
+sem erros. O build acionado pelo teste manteve apenas warnings preexistentes do repositório.
 
 ---
 
