@@ -1,5 +1,6 @@
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
+using Tests.Storage.Configuration.Support;
 using Tests.Storage.Support;
 
 namespace Tests.Storage.Contracts;
@@ -225,5 +226,11 @@ public abstract class RealmStoreContractTests : StorageContractTests
 	public sealed class InMemory : RealmStoreContractTests
 	{
 		protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
+	}
+
+	public sealed class Sqlite : RealmStoreContractTests
+	{
+		protected override Task<StorageContractHarness> CreateHarnessAsync()
+			=> SqliteConfigurationStorageHarness.CreateAsync();
 	}
 }

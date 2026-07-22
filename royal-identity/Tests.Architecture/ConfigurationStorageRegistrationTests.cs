@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Configuration;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Storage.EntityFramework.Configuration;
+using RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 
@@ -45,19 +46,25 @@ public class ConfigurationStorageRegistrationTests
 		{
 			firstContext = firstScope.ServiceProvider.GetRequiredService<CustomConfigurationDbContext>();
 			var firstAccessor = firstScope.ServiceProvider.GetRequiredService<IConfigurationDbContextAccessor>();
+			var firstStores = firstScope.ServiceProvider.GetRequiredService<IConfigurationStoreFactory>();
 
 			Assert.Same(firstContext, firstAccessor.DbContext);
 			Assert.Same(firstAccessor,
 				firstScope.ServiceProvider.GetRequiredService<IConfigurationDbContextAccessor>());
+			Assert.Same(firstStores,
+				firstScope.ServiceProvider.GetRequiredService<IConfigurationStoreFactory>());
+			Assert.Same(firstStores.Realms, firstScope.ServiceProvider.GetRequiredService<IRealmStore>());
 			Assert.Equal(ConnectionState.Closed, firstContext.Database.GetDbConnection().State);
 		}
 
 		using var secondScope = provider.CreateScope();
 		var secondContext = secondScope.ServiceProvider.GetRequiredService<CustomConfigurationDbContext>();
 		var secondAccessor = secondScope.ServiceProvider.GetRequiredService<IConfigurationDbContextAccessor>();
+		var secondStores = secondScope.ServiceProvider.GetRequiredService<IConfigurationStoreFactory>();
 
 		Assert.Same(secondContext, secondAccessor.DbContext);
 		Assert.NotSame(firstContext, secondContext);
+		Assert.NotNull(secondStores.Realms);
 		Assert.Equal(ConnectionState.Closed, secondContext.Database.GetDbConnection().State);
 	}
 

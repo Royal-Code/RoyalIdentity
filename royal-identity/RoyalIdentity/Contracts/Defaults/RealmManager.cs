@@ -32,16 +32,17 @@ public class RealmManager : IRealmManager
         CancellationToken ct = default)
     {
         var realmStore = storage.Realms;
+        var normalizedDomain = domain.ToLowerInvariant();
 
         var existing = await realmStore.GetByPathAsync(path, ct);
         if (existing is not null)
             throw new InvalidOperationException($"A realm with path '{path}' already exists.");
 
-        var existingByDomain = await realmStore.GetByDomainAsync(domain, ct);
+        var existingByDomain = await realmStore.GetByDomainAsync(normalizedDomain, ct);
         if (existingByDomain is not null)
-            throw new InvalidOperationException($"A realm with domain '{domain}' already exists.");
+            throw new InvalidOperationException($"A realm with domain '{normalizedDomain}' already exists.");
 
-        var realm = new Realm(null, domain, path, displayName, false, new RealmOptions(snapshot.ServerOptions));
+        var realm = new Realm(null, normalizedDomain, path, displayName, false, new RealmOptions(snapshot.ServerOptions));
 
         await realmStore.SaveAsync(realm, ct);
 

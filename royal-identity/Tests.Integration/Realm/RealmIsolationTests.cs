@@ -550,6 +550,25 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task RealmManager_CreateAsync_NormalizesDomainToLowercase()
+    {
+        using var scope = factory.Services.CreateScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IRealmManager>();
+        var suffix = CryptoRandom.CreateUniqueId(6).ToLowerInvariant();
+
+        var realm = await manager.CreateAsync(
+            $"normalized-{suffix}",
+            $"Mixed-{suffix}.Contract.Test",
+            "Normalized domain");
+
+        Assert.Equal($"mixed-{suffix}.contract.test", realm.Domain);
+        var stored = await factory.Services.GetRequiredService<IStorage>().Realms
+            .GetByDomainAsync(realm.Domain);
+        Assert.NotNull(stored);
+        Assert.Equal(realm.Id, stored.Id);
+    }
+
+    [Fact]
     public async Task RealmManager_CreateAsync_DuplicatePath_Throws()
     {
         using var scope = factory.Services.CreateScope();

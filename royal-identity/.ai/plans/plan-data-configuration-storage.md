@@ -1,17 +1,17 @@
 # Plan: Persistência EF dos dados de configuração do IdP (`plan-data-configuration-storage`)
 
-## Status: EM EXECUÇÃO - Fase 3 de 7 concluída
+## Status: EM EXECUÇÃO - Fase 4 de 7 concluída
 
 ## Progresso
 
-`███░░░░` **43%** - 3 de 7 fases
+`████░░░` **57%** - 4 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Fronteiras, projetos e modelo extensível | Concluida |
 | Fase 2 - Modelo híbrido e provider SQLite | Concluida |
 | Fase 3 - Adapter, lifecycle e snapshot assíncrono | Concluida |
-| Fase 4 - ServerOptions, realms, clients e bridge de resources | Pendente |
+| Fase 4 - ServerOptions, realms, clients e bridge de resources | Concluida |
 | Fase 5 - Proteção e persistência de signing keys | Pendente |
 | Fase 6 - PostgreSQL, migrations, runner e seeds | Pendente |
 | Fase 7 - Paridade, integração e fechamento | Pendente |
@@ -605,15 +605,15 @@ Validação: `dotnet build RoyalIdentity.sln` — êxito (0 erros; nenhum warnin
 
 **Tarefas:**
 
-- [ ] Implementar leitura singleton de `ServerOptions` e falhar quando o registro autoritativo estiver ausente/inválido.
-- [ ] Implementar todos os lookups async de realm e aplicar DF28 ao upsert/exclusão legados (compatibilidade/contract tests; host EF não os chama).
-- [ ] Normalizar domain nas bordas core e rejeitar `SaveAsync` EF direto quando o valor não estiver lowercase.
-- [ ] Preservar tombstone, options, clients e keys; filtrar realm excluído de todos os lookups e bindings normais.
-- [ ] Garantir que path/domain de tombstone permaneçam reservados pelos unique indexes.
-- [ ] Implementar `IClientStore` somente leitura, incluindo filtro `Enabled` e materialização integral de collections/claims/secrets.
-- [ ] Implementar bridge volátil realm-bound de resources/scopes, sem referência do adapter ao `Storage.InMemory`.
-- [ ] Inicializar standard identity scopes por realm no bridge a partir de sua configuração de produto e manter recursos demo em rota opt-in separada.
-- [ ] Reutilizar os contract tests P2-owned contra a fixture SQLite e adicionar aceites de domain/tombstone/cancelamento.
+- [x] Implementar leitura singleton de `ServerOptions` e falhar quando o registro autoritativo estiver ausente/inválido.
+- [x] Implementar todos os lookups async de realm e aplicar DF28 ao upsert/exclusão legados (compatibilidade/contract tests; host EF não os chama).
+- [x] Normalizar domain nas bordas core e rejeitar `SaveAsync` EF direto quando o valor não estiver lowercase.
+- [x] Preservar tombstone, options, clients e keys; filtrar realm excluído de todos os lookups e bindings normais.
+- [x] Garantir que path/domain de tombstone permaneçam reservados pelos unique indexes.
+- [x] Implementar `IClientStore` somente leitura, incluindo filtro `Enabled` e materialização integral de collections/claims/secrets.
+- [x] Implementar bridge volátil realm-bound de resources/scopes, sem referência do adapter ao `Storage.InMemory`.
+- [x] Inicializar standard identity scopes por realm no bridge a partir de sua configuração de produto e manter recursos demo em rota opt-in separada.
+- [x] Reutilizar os contract tests P2-owned contra a fixture SQLite e adicionar aceites de domain/tombstone/cancelamento.
 
 **Critérios de aceite:** RL/CL preservam a matriz; tombstone é invisível mas reserva path/domain; internal/ausente retorna `false`; client disabled só aparece no lookup não-enabled; resources não criam tabelas; todo CT chega ao EF.
 
@@ -621,7 +621,42 @@ Validação: `dotnet build RoyalIdentity.sln` — êxito (0 erros; nenhum warnin
 
 ### Resultado da Fase 4
 
-*a preencher*
+**Concluída em 2026-07-22.** As portas de leitura de Configuration foram implementadas sobre EF/SQLite,
+sem registrar um `IStorage` parcial e sem antecipar a persistência do modelo instável de resources/scopes.
+
+- **Seam Configuration-only:** `IConfigurationStoreFactory` é scoped e expõe somente leitura autoritativa de
+  `ServerOptions`, `IRealmStore` e bindings de client/resource. `AddEntityFrameworkConfigurationStorage<TContext>`
+  registra essas portas sobre o context escolhido pelo consumidor, mas continua sem fornecer
+  `IStorage`/`IStorageProvider`/`IStorageSession`, sem abrir conexão e sem aplicar migration (DF3/DF6/DF20).
+- **ServerOptions e realms:** um reader único materializa o singleton versionado e é reutilizado pela source do
+  snapshot; ausência ou payload inválido falha fechado. O realm store implementa todos os lookups com consultas
+  async/canceláveis e materialização independente, upsert legado, recusa de ressurreição, proteção da identidade
+  de realms internos e exclusão lógica permanente via `DeletedAtUtc` (DF22/DF25/DF28).
+- **Domain e tombstone:** `RealmManager.CreateAsync` normaliza domain com `ToLowerInvariant()` antes da consulta e
+  escrita; o adapter rejeita `SaveAsync` direto não canônico. Path/domain continuam reservados pelos índices
+  únicos sem filtro. A exclusão conserva payload de options, clients e signing keys, mas realm, client e resource
+  deixam de aparecer nos lookups/bindings normais.
+- **Clients:** `IClientStore` realm-bound consulta root e satélites no banco, distingue lookup comum/enabled e
+  usa `ClientMaterializer` para reconstruir integralmente escalares, strings, claims, secrets e comparadores, sem
+  entregar referências persistentes compartilhadas.
+- **Resources/scopes voláteis:** `IConfigurationResourceSource` + `ConfigurationResourceBridgeOptions` alimentam
+  uma bridge realm-bound sem referência a `Storage.InMemory` e sem novas tabelas. Os cinco standard identity
+  scopes são configuração padrão por realm; `AddEntityFrameworkConfigurationDemoResources(realmId)` é um opt-in
+  separado e limitado ao realm informado. Cada leitura entrega cópias profundas e valida nomes/URIs Ordinal.
+- **Contract suite e aceites (+38 em `Tests.Storage`, +1 em `Tests.Integration`):** a fixture
+  `SqliteConfigurationStorageHarness` reutiliza sem alteração os 31 cenários RL/CL/RS provider-neutral por um
+  composite exclusivamente test-only; mais 7 aceites cobrem singleton/independência, client completo,
+  tombstone/reserva/ressurreição, domain, cancelamento, cópia da bridge e standard/demo. O teste de integração
+  comprova a normalização do manager; o guard de arquitetura verifica factory/realm store scoped e ausência do
+  gateway parcial.
+
+Critérios de aceite verificados: RL/CL preservam a matriz; tombstone é invisível e reserva path/domain;
+internal/ausente retorna `false`; client disabled aparece apenas no lookup não-enabled; resources permanecem
+fora do model/migration; todas as operações EF assíncronas recebem `CancellationToken`; host padrão não mudou.
+
+Validação: `dotnet build RoyalIdentity.sln` — êxito; `dotnet test Tests.Storage` — 184 aprovados;
+`dotnet test Tests.Architecture` — 34; `dotnet test Tests.Integration` — 227; solução completa — 771 aprovados,
+0 falhas, 1 ignorado (PostgreSQL opt-in preexistente de `Tests.UserAccounts`).
 
 ---
 

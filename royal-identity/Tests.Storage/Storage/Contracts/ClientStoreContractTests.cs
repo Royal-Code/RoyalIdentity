@@ -1,3 +1,4 @@
+using Tests.Storage.Configuration.Support;
 using Tests.Storage.Support;
 
 namespace Tests.Storage.Contracts;
@@ -111,5 +112,11 @@ public abstract class ClientStoreContractTests : StorageContractTests
 	public sealed class InMemory : ClientStoreContractTests
 	{
 		protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
+	}
+
+	public sealed class Sqlite : ClientStoreContractTests
+	{
+		protected override Task<StorageContractHarness> CreateHarnessAsync()
+			=> SqliteConfigurationStorageHarness.CreateAsync();
 	}
 }

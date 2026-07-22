@@ -2,9 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalIdentity.Configuration;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Storage.EntityFramework.Configuration;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
+using RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Snapshot;
+using RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 
 namespace RoyalIdentity.Storage.EntityFramework.Extensions;
 
@@ -20,8 +23,9 @@ public static class ServiceCollectionExtensions
 	/// <para>
 	///     This registration NEVER provides <c>IStorage</c>, <c>IStorageProvider</c> or
 	///     <c>IStorageSession</c> — there is no partial production gateway before Plano 3 (plan DF20) —
-	///     and never applies migrations (plan DF11). The Configuration stores and the snapshot source are
-	///     added over this same seam by the following phases.
+	///     and never applies migrations (plan DF11). It exposes only the Configuration-specific
+	///     <see cref="IConfigurationStoreFactory"/> and <see cref="IRealmStore"/> ports; the snapshot source is
+	///     registered separately over the same scoped context seam.
 	/// </para>
 	/// </summary>
 	public static IServiceCollection AddEntityFrameworkConfigurationStorage<TContext>(this IServiceCollection services)
@@ -29,8 +33,35 @@ public static class ServiceCollectionExtensions
 	{
 		ArgumentNullException.ThrowIfNull(services);
 
+		services.AddOptions<ConfigurationResourceBridgeOptions>();
+		services.TryAddSingleton(TimeProvider.System);
+		services.TryAddSingleton<ServerOptionsPayloadSerializer>();
+		services.TryAddSingleton<RealmOptionsPayloadSerializer>();
+		services.TryAddSingleton<RealmMaterializer>();
+		services.TryAddSingleton<ClientMaterializer>();
+		services.TryAddSingleton<IConfigurationResourceSource, DefaultConfigurationResourceSource>();
 		services.TryAddScoped<IConfigurationDbContextAccessor, ConfigurationDbContextAccessor<TContext>>();
+		services.TryAddScoped<ConfigurationServerOptionsReader>();
+		services.TryAddScoped<EntityFrameworkRealmStore>();
+		services.TryAddScoped<IRealmStore>(provider => provider.GetRequiredService<EntityFrameworkRealmStore>());
+		services.TryAddScoped<IConfigurationStoreFactory, EntityFrameworkConfigurationStoreFactory>();
 
+		return services;
+	}
+
+	/// <summary>
+	/// Adds the development/demo resource server to one explicit realm in the volatile bridge. This opt-in is
+	/// separate from the normal Configuration registration so production composition never acquires demo
+	/// URLs implicitly (plan DF12/DF15).
+	/// </summary>
+	public static IServiceCollection AddEntityFrameworkConfigurationDemoResources(
+		this IServiceCollection services,
+		string realmId)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+		ArgumentException.ThrowIfNullOrWhiteSpace(realmId);
+
+		services.Configure<ConfigurationResourceBridgeOptions>(options => options.AddDemoResources(realmId));
 		return services;
 	}
 

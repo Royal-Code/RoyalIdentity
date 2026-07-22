@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.Configuration;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
+using RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 
 namespace RoyalIdentity.Storage.EntityFramework.Configuration.Snapshot;
 
@@ -14,20 +15,13 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Snapshot;
 /// </summary>
 internal sealed class EntityFrameworkConfigurationSnapshotSource(
 	IConfigurationDbContextAccessor accessor,
-	ServerOptionsPayloadSerializer serverOptionsSerializer,
+	ConfigurationServerOptionsReader serverOptionsReader,
 	RealmMaterializer realmMaterializer) : IConfigurationSnapshotSource
 {
 	public async Task<ConfigurationSnapshotData> LoadAsync(CancellationToken ct)
 	{
 		var db = accessor.DbContext;
-
-		var serverRow = await db.Set<ServerOptionsEntity>()
-			.AsNoTracking()
-			.SingleOrDefaultAsync(e => e.Id == ServerOptionsEntity.SingletonId, ct)
-			?? throw new InvalidOperationException(
-				"The Configuration store has no server_options row. Run the migrations and the seed before starting the host.");
-
-		var serverOptions = serverOptionsSerializer.Deserialize(serverRow.PayloadVersion, serverRow.PayloadJson);
+		var serverOptions = await serverOptionsReader.ReadAsync(ct);
 
 		var realmRows = await db.Set<RealmEntity>()
 			.AsNoTracking()
