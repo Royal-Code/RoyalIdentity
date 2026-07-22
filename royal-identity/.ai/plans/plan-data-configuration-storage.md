@@ -1,14 +1,14 @@
 # Plan: Persistência EF dos dados de configuração do IdP (`plan-data-configuration-storage`)
 
-## Status: RASCUNHO - decisões fechadas (Q1-Q18); pronto para execução
+## Status: EM EXECUÇÃO - Fase 1 de 7 concluída
 
 ## Progresso
 
-`░░░░░░░` **0%** - 0 de 7 fases
+`█░░░░░░` **14%** - 1 de 7 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Fronteiras, projetos e modelo extensível | Pendente |
+| Fase 1 - Fronteiras, projetos e modelo extensível | Concluida |
 | Fase 2 - Modelo híbrido e provider SQLite | Pendente |
 | Fase 3 - Adapter, lifecycle e snapshot assíncrono | Pendente |
 | Fase 4 - ServerOptions, realms, clients e bridge de resources | Pendente |
@@ -352,22 +352,69 @@ dotnet test RoyalIdentity.sln
 
 **Tarefas:**
 
-- [ ] Criar `RoyalIdentity.Data.Configuration`, `RoyalIdentity.Storage.EntityFramework`, `.Sqlite`, `.PostgreSql` e `RoyalIdentity.Migrations` em `src` da solução.
-- [ ] Adicionar somente referências permitidas: `Data.Configuration` → EF Core; adapter → core + Data; providers → adapter/Data + provider EF; runner → providers.
-- [ ] Criar entidades puras iniciais e `ConfigurationDbContext` sem referência a tipos do core, com hook virtual que apenas seleciona a extensão externa de mapping.
-- [ ] Criar `ConfigurationModelBuilderExtensions` neutra, opções de model/schema fora do DbContext e extensões públicas de mapping por provider.
-- [ ] Fazer stores/queries futuros dependerem de `TContext : DbContext`/`Set<TEntity>()`, não do context concreto.
-- [ ] Criar registration extensions genéricas que permitam substituir o context padrão por context customizado.
-- [ ] Adicionar testes em `Tests.Architecture` para bloquear core em `Data.Configuration`, provider no Data e dependências invertidas.
-- [ ] Adicionar `CombinedTestDbContext` sem herdar de `ConfigurationDbContext` e testar que as extensões SQLite e PostgreSQL produzem, separadamente, o model neutro mais os refinamentos do provider escolhido.
+- [x] Criar `RoyalIdentity.Data.Configuration`, `RoyalIdentity.Storage.EntityFramework`, `.Sqlite`, `.PostgreSql` e `RoyalIdentity.Migrations` em `src` da solução.
+- [x] Adicionar somente referências permitidas: `Data.Configuration` → EF Core; adapter → core + Data; providers → adapter/Data + provider EF; runner → providers.
+- [x] Criar entidades puras iniciais e `ConfigurationDbContext` sem referência a tipos do core, com hook virtual que apenas seleciona a extensão externa de mapping.
+- [x] Criar `ConfigurationModelBuilderExtensions` neutra, opções de model/schema fora do DbContext e extensões públicas de mapping por provider.
+- [x] Fazer stores/queries futuros dependerem de `TContext : DbContext`/`Set<TEntity>()`, não do context concreto.
+- [x] Criar registration extensions genéricas que permitam substituir o context padrão por context customizado.
+- [x] Adicionar testes em `Tests.Architecture` para bloquear core em `Data.Configuration`, provider no Data e dependências invertidas.
+- [x] Adicionar `CombinedTestDbContext` sem herdar de `ConfigurationDbContext` e testar que as extensões SQLite e PostgreSQL produzem, separadamente, o model neutro mais os refinamentos iniciais do provider escolhido.
+- [x] Testar a registration genérica com context customizado: lifetime scoped, accessor sobre a mesma instância, conexão fechada sem trabalho implícito e ausência de `IStorage`/`IStorageProvider`/`IStorageSession` parciais.
 
-**Critérios de aceite:** projetos compilam; `Data.Configuration` não referencia `RoyalIdentity`; um context arbitrário aplica o mesmo model completo de cada provider; `jsonb`/schema/collations/índices PostgreSQL e tipos/refinamentos SQLite não dependem dos contexts concretos; provider-specific code não entra no projeto puro; nenhuma extensão registra auto-migrate.
+**Critérios de aceite:** projetos compilam; `Data.Configuration` não referencia `RoyalIdentity`; um context arbitrário aplica o model neutro e os refinamentos presentes nesta fase (`jsonb`/schema no PostgreSQL, `TEXT`/sem schema no SQLite); as extensões públicas são o único seam pelo qual collations/índices completos serão adicionados nas Fases 2/6, sem depender dos contexts concretos; provider-specific code não entra no projeto puro; a registration genérica usa o context customizado scoped, não registra gateway parcial e não abre conexão nem executa migration implicitamente.
 
 **Testes:** `dotnet build RoyalIdentity.sln`; `dotnet test Tests.Architecture`.
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Concluída em 2026-07-22.** Topologia criada com comandos `dotnet` (new/sln/add), projetos no solution
+folder `src`:
+
+- **`RoyalIdentity.Data.Configuration`** (puro): remove o `FrameworkReference` de ASP.NET herdado do
+  `Directory.Build.props` (precedente do módulo `UserAccounts`) e referencia somente
+  `Microsoft.EntityFrameworkCore.Relational 10.0.10`. Contém as 7 entidades iniciais do schema do design
+  (`ServerOptionsEntity`, `RealmEntity`, `ClientEntity`, `ClientStringValueEntity`, `ClientClaimEntity`,
+  `ClientSecretEntity`, `SigningKeyEntity` — `ClientEntity` com identidade + primeiros escalares; o
+  inventário completo de `Client` é da Fase 2), `ConfigurationModelOptions` (schema fora do context),
+  `ConfigurationModelBuilderExtensions.ApplyRoyalIdentityConfigurationMappings` (tabelas/colunas snake_case,
+  PKs compostas, FKs, check constraint do singleton de server options, índice `(realm_id, created_utc)` de
+  keys; uniques/comparadores/serialização ficam na Fase 2) e `ConfigurationDbContext` com `OnModelCreating`
+  **sealed** delegando ao hook virtual `ApplyConfigurationModel` (default = extensão neutra).
+- **`RoyalIdentity.Storage.EntityFramework`** (adapter): referencia core + Data; entrega o seam scoped
+  `IConfigurationDbContextAccessor`/`ConfigurationDbContextAccessor<TContext>` e
+  `AddEntityFrameworkConfigurationStorage<TContext>() where TContext : DbContext`, que registra somente as
+  portas de Configuration — sem `IStorage`/`IStorageProvider`/`IStorageSession` (DF20) e sem auto-migrate
+  (DF11); stores/snapshot das próximas fases usam esse seam via `Set<TEntity>()`.
+- **`.Sqlite`/`.PostgreSql`** (providers): referenciam adapter + Data + provider EF
+  (`Microsoft.EntityFrameworkCore.Sqlite 10.0.10` com bundle SQLitePCLRaw 3.0.3;
+  `Npgsql.EntityFrameworkCore.PostgreSQL 10.0.0` — mesmas versões resolvidas pela família `UserAccounts`) e
+  expõem as extensões públicas `ApplyRoyalIdentityConfigurationSqliteMappings` (sem schema, payloads TEXT) e
+  `ApplyRoyalIdentityConfigurationPostgreSqlMappings` (schema `configuration`, payloads `jsonb`), compondo a
+  extensão neutra (DF3/DF18). Contexts de provider ficam para as Fases 2/6.
+- **`RoyalIdentity.Migrations`** (runner): console separado, sem SDK web e sem referência ao host, referencia os
+  dois providers; a dependência transitiva de runtime em `Microsoft.AspNetCore.App` via adapter/core foi aceita
+  na revisão da Fase 1. O `Program` stub recusa execução implícita (mensagem + exit code 64) até a Fase 6.
+- **`Tests.Architecture`**: +18 testes — `ConfigurationStorageBoundaryTests` (pureza do Data por assembly
+  refs e csproj; adapter → core+Data; providers → adapter+Data sem bind direto do core; runner → providers;
+  host e core sem referência à família nova) com o helper `ProjectReferenceReader`, e
+  `ConfigurationModelExtensibilityTests` (contexts combinados `CombinedSqliteDbContext`/
+  `CombinedPostgreSqlDbContext` que **não** herdam de `ConfigurationDbContext` e obtêm o model neutro + os
+  refinamentos iniciais do provider escolhido: mesmas tabelas nos dois providers, schema/jsonb no PostgreSQL,
+  sem schema/TEXT no SQLite; o context padrão aplica o model neutro), além de
+  `ConfigurationStorageRegistrationTests` (context customizado e accessor na mesma instância scoped, scopes
+  independentes, conexão fechada, fluent return/null guard e ausência do gateway parcial de DF20).
+
+Critérios de aceite verificados: solução compila (0 erros; nenhum warning novo nos projetos criados);
+`Data.Configuration` sem `ProjectReference` algum e sem bind de core/adapter/ASP.NET; contexts arbitrários
+aplicam o model neutro e os refinamentos iniciais de cada provider pelas extensões públicas; collations,
+índices e demais refinamentos completos permanecem critérios explícitos das Fases 2/6; nenhum código
+provider-specific no projeto puro; a registration genérica usa o context customizado scoped, não registra
+gateway parcial e não abre conexão nem executa migration.
+
+Validação: `dotnet build RoyalIdentity.sln` — êxito; `dotnet test Tests.Architecture` — 33 aprovados
+(15 preexistentes + 18 novos); solução completa — 683 aprovados, 0 falhas, 1 ignorado (PostgreSQL opt-in
+preexistente de `Tests.UserAccounts`).
 
 ---
 

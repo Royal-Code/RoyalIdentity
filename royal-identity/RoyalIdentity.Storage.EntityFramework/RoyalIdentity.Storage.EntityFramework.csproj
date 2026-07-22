@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		EF storage adapter (ADR-013 §2.3): the only project that knows both the IdP core contracts and the
+		pure Data.Configuration entities. Materialization, stores, snapshot and key-material protection land
+		here in later phases. It must never register a partial production IStorage (plan DF20) and never
+		apply migrations (plan DF11).
+	-->
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Data.Configuration\RoyalIdentity.Data.Configuration.csproj" />
+	</ItemGroup>
+
+</Project>

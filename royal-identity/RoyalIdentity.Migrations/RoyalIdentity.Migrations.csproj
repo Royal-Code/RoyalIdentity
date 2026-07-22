@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Migration/seed runner (plan DF11/DF21): the only executable that applies migrations outside tests.
+		Never referenced by the host; provider selection, migrate and optional seed are implemented in
+		Fase 6. Not an ASP.NET application.
+	-->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Remove="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.Sqlite\RoyalIdentity.Storage.EntityFramework.Sqlite.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.PostgreSql\RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj" />
+	</ItemGroup>
+
+</Project>
