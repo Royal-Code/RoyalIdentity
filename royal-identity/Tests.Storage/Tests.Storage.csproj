@@ -5,6 +5,9 @@
 	<ItemGroup>
 		<ProjectReference Include="..\RoyalIdentity.Security\RoyalIdentity.Security.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Data.Configuration\RoyalIdentity.Data.Configuration.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework\RoyalIdentity.Storage.EntityFramework.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.Sqlite\RoyalIdentity.Storage.EntityFramework.Sqlite.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

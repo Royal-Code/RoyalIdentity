@@ -22,11 +22,55 @@ public static class SqliteConfigurationModelBuilderExtensions
 
 		modelBuilder.ApplyRoyalIdentityConfigurationMappings(options);
 
-		// JSON payloads are TEXT columns on SQLite; validation, when supported, is added with the
-		// Fase 2 model work.
+		// JSON payloads are TEXT columns on SQLite (validation is a provider concern deferred to later phases).
 		modelBuilder.Entity<ServerOptionsEntity>().Property(e => e.PayloadJson).HasColumnType("TEXT");
 		modelBuilder.Entity<RealmEntity>().Property(e => e.OptionsJson).HasColumnType("TEXT");
 
+		// DF23: pin Ordinal (case-sensitive, byte-wise) comparison on every identifier that backs a primary
+		// key or a unique index, so uniqueness never silently depends on the provider's default collation.
+		// SQLite's default happens to be BINARY, but declaring it makes the guarantee explicit and testable.
+		modelBuilder.Entity<RealmEntity>(entity =>
+		{
+			entity.Property(e => e.Id).UseCollation(Ordinal);
+			entity.Property(e => e.Path).UseCollation(Ordinal);
+			entity.Property(e => e.Domain).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientStringValueEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+			entity.Property(e => e.Kind).UseCollation(Ordinal);
+			entity.Property(e => e.ComparisonKey).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientClaimEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientSecretEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<SigningKeyEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.KeyId).UseCollation(Ordinal);
+		});
+
 		return modelBuilder;
 	}
+
+	/// <summary>SQLite's byte-wise (case-sensitive) collation, the Ordinal equivalent (plan DF23).</summary>
+	private const string Ordinal = "BINARY";
 }

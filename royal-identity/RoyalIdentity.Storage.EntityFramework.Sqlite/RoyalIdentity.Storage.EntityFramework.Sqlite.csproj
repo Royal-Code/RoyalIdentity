@@ -10,6 +10,8 @@
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
 		<!-- Promote the transitive SQLitePCLRaw native bundle past the 2.1.11 advisory (NU1903). -->
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+		<!-- Design-time tooling only (dotnet ef migrations): not part of the shipped runtime surface. -->
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" PrivateAssets="all" />
 	</ItemGroup>
 
 </Project>

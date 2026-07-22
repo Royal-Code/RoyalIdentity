@@ -43,6 +43,10 @@ public static class ConfigurationModelBuilderExtensions
 			entity.Property(e => e.OptionsVersion).HasColumnName("options_version");
 			entity.Property(e => e.OptionsJson).HasColumnName("options_json");
 			entity.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
+			// Path/domain are reserved even for tombstones (plan DF22): no filter, so a deleted realm keeps
+			// its slot. Ordinal comparison is pinned by the provider collation refinement (plan DF23).
+			entity.HasIndex(e => e.Path).IsUnique().HasDatabaseName("ux_realms_path");
+			entity.HasIndex(e => e.Domain).IsUnique().HasDatabaseName("ux_realms_domain");
 		});
 
 		modelBuilder.Entity<ClientEntity>(entity =>
@@ -52,7 +56,38 @@ public static class ConfigurationModelBuilderExtensions
 			entity.Property(e => e.RealmId).HasColumnName("realm_id");
 			entity.Property(e => e.ClientId).HasColumnName("client_id");
 			entity.Property(e => e.Name).HasColumnName("name");
+			entity.Property(e => e.Description).HasColumnName("description");
+			entity.Property(e => e.ClientUri).HasColumnName("client_uri");
+			entity.Property(e => e.LogoUri).HasColumnName("logo_uri");
 			entity.Property(e => e.Enabled).HasColumnName("enabled");
+			entity.Property(e => e.ProtocolType).HasColumnName("protocol_type");
+			entity.Property(e => e.RequirePkce).HasColumnName("require_pkce");
+			entity.Property(e => e.AllowPlainTextPkce).HasColumnName("allow_plain_text_pkce");
+			entity.Property(e => e.ClientType).HasColumnName("client_type");
+			entity.Property(e => e.AllowOfflineAccess).HasColumnName("allow_offline_access");
+			entity.Property(e => e.AllowAllResourceServers).HasColumnName("allow_all_resource_servers");
+			entity.Property(e => e.IncludeJwtId).HasColumnName("include_jwt_id");
+			entity.Property(e => e.AlwaysSendClientClaims).HasColumnName("always_send_client_claims");
+			entity.Property(e => e.AlwaysIncludeUserClaimsInIdToken).HasColumnName("always_include_user_claims_in_id_token");
+			entity.Property(e => e.ClientClaimsPrefix).HasColumnName("client_claims_prefix");
+			entity.Property(e => e.EnableLocalLogin).HasColumnName("enable_local_login");
+			entity.Property(e => e.UserSsoLifetime).HasColumnName("user_sso_lifetime");
+			entity.Property(e => e.AccessTokenLifetime).HasColumnName("access_token_lifetime");
+			entity.Property(e => e.IdentityTokenLifetime).HasColumnName("identity_token_lifetime");
+			entity.Property(e => e.AuthorizationCodeLifetime).HasColumnName("authorization_code_lifetime");
+			entity.Property(e => e.AbsoluteRefreshTokenLifetime).HasColumnName("absolute_refresh_token_lifetime");
+			entity.Property(e => e.SlidingRefreshTokenLifetime).HasColumnName("sliding_refresh_token_lifetime");
+			entity.Property(e => e.ConsentLifetime).HasColumnName("consent_lifetime");
+			entity.Property(e => e.RequireConsent).HasColumnName("require_consent");
+			entity.Property(e => e.AllowRememberConsent).HasColumnName("allow_remember_consent");
+			entity.Property(e => e.RequireClientSecret).HasColumnName("require_client_secret");
+			entity.Property(e => e.RefreshTokenExpiration).HasColumnName("refresh_token_expiration");
+			entity.Property(e => e.RefreshTokenPostConsumedTimeToleranceTicks)
+				.HasColumnName("refresh_token_post_consumed_time_tolerance_ticks");
+			entity.Property(e => e.UpdateAccessTokenClaimsOnRefresh).HasColumnName("update_access_token_claims_on_refresh");
+			entity.Property(e => e.AllowLogoutWithoutUserConfirmation).HasColumnName("allow_logout_without_user_confirmation");
+			entity.Property(e => e.FrontChannelLogoutSessionRequired).HasColumnName("front_channel_logout_session_required");
+			entity.Property(e => e.BackChannelLogoutSessionRequired).HasColumnName("back_channel_logout_session_required");
 			entity.HasOne<RealmEntity>()
 				.WithMany()
 				.HasForeignKey(e => e.RealmId)

@@ -1,15 +1,15 @@
 # Plan: Persistência EF dos dados de configuração do IdP (`plan-data-configuration-storage`)
 
-## Status: EM EXECUÇÃO - Fase 1 de 7 concluída
+## Status: EM EXECUÇÃO - Fase 2 de 7 concluída
 
 ## Progresso
 
-`█░░░░░░` **14%** - 1 de 7 fases
+`██░░░░░` **28%** - 2 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Fronteiras, projetos e modelo extensível | Concluida |
-| Fase 2 - Modelo híbrido e provider SQLite | Pendente |
+| Fase 2 - Modelo híbrido e provider SQLite | Concluida |
 | Fase 3 - Adapter, lifecycle e snapshot assíncrono | Pendente |
 | Fase 4 - ServerOptions, realms, clients e bridge de resources | Pendente |
 | Fase 5 - Proteção e persistência de signing keys | Pendente |
@@ -428,15 +428,15 @@ preexistente de `Tests.UserAccounts`).
 
 **Tarefas:**
 
-- [ ] Implementar entidades/tabelas de server options, realms, clients, client values/claims/secrets e signing keys.
-- [ ] Implementar PKs, FKs, unique indexes e comparadores/collations explícitos necessários para semântica Ordinal.
-- [ ] Implementar payload JSON versionado para `ServerOptions`/`RealmOptions`, sem serializar a referência circular de server options.
-- [ ] Mapear todos os escalares e coleções atuais de `Client`; adicionar teste que falha quando nova propriedade pública do modelo não possui decisão de persistência/materialização.
-- [ ] Implementar `ConfigurationSqliteDbContext`, refinamentos SQLite e design-time factory.
-- [ ] Fazer o context SQLite padrão e um context customizado chamarem a mesma extensão pública `ApplyRoyalIdentityConfigurationSqliteMappings`.
-- [ ] Criar a migration inicial SQLite sem `EnsureCreated`.
-- [ ] Testar schema `EnsureDeleted` → `MigrateAsync` → consulta do histórico de migrations.
-- [ ] Testar round-trip com objetos materializados independentes, dois realms com ids de client/key iguais e payload JSON inválido/version desconhecida fail-closed.
+- [x] Implementar entidades/tabelas de server options, realms, clients, client values/claims/secrets e signing keys.
+- [x] Implementar PKs, FKs, unique indexes e comparadores/collations explícitos necessários para semântica Ordinal.
+- [x] Implementar payload JSON versionado para `ServerOptions`/`RealmOptions`, sem serializar a referência circular de server options.
+- [x] Mapear todos os escalares e coleções atuais de `Client`; adicionar teste que falha quando nova propriedade pública do modelo não possui decisão de persistência/materialização.
+- [x] Implementar `ConfigurationSqliteDbContext`, refinamentos SQLite e design-time factory.
+- [x] Fazer o context SQLite padrão e um context customizado chamarem a mesma extensão pública `ApplyRoyalIdentityConfigurationSqliteMappings`.
+- [x] Criar a migration inicial SQLite sem `EnsureCreated`.
+- [x] Testar schema `EnsureDeleted` → `MigrateAsync` → consulta do histórico de migrations.
+- [x] Testar round-trip com objetos materializados independentes, dois realms com ids de client/key iguais e payload JSON inválido/version desconhecida fail-closed.
 
 **Critérios de aceite:** migration SQLite cria somente tabelas Configuration; todos os campos de `Client` possuem round-trip; alteração de objeto carregado não muda banco sem save; indexes Ordinal não dependem da collation default; não há tabelas de resources/Operational.
 
@@ -444,7 +444,57 @@ preexistente de `Tests.UserAccounts`).
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída em 2026-07-22.** Modelo híbrido completo e provider SQLite validado com banco real em memória; todos
+os tipos core permanecem fora do projeto puro (materialização/serialização vivem no adapter).
+
+- **Entidades (`Data.Configuration`, puro):** `ClientEntity` recebeu o inventário completo de escalares do core
+  `Client` (35 colunas), com enums (`ClientType`, `TokenExpiration`) e `TimeSpan` armazenados como primitivos
+  (`int`/`long ticks`) — o projeto não referencia o core, então a conversão fica no adapter. Novo
+  `ClientStringValueKinds` (vocabulário de persistência das 13 coleções de string do client). Demais entidades
+  (server options, realms, client values/claims/secrets, signing keys) já vinham da Fase 1.
+- **Mappings neutros:** colunas snake_case de todos os escalares de `ClientEntity`; unique indexes
+  `ux_realms_path`/`ux_realms_domain` **sem filtro** (path/domain reservados inclusive para tombstones — DF22);
+  PKs/FKs compostas e check constraint do singleton mantidos.
+- **Refinamento SQLite (`.Sqlite`):** colação `BINARY` explícita em todas as colunas identificadoras (id, path,
+  domain, realm_id, client_id, kind, comparison_key, key_id) — semântica Ordinal não depende do default do
+  provider (DF23); payloads como `TEXT`.
+- **Materialização e serialização (adapter):** `ServerOptionsPayloadSerializer`/`RealmOptionsPayloadSerializer`
+  produzem payload JSON **versionado** (v1) e determinístico; `RealmOptions` **não** serializa a referência
+  circular `ServerOptions` (removida por modifier), reconstruída a partir do grafo autoritativo no
+  `Deserialize(..., ServerOptions)` (via `CreateObject`). `GetOnlyCollectionModifier` dá às coleções get-only
+  das options semântica *clear-then-add* (fidelidade total — inclusive **remover** um item default, p.ex.
+  restringir `Keys.SigningCredentialsAlgorithms` — e preservação de comparers como o CORS case-insensitive);
+  coleção persistida como `null` falha fechado em vez de conservar defaults. `ConfigurationObjectJsonConverter`
+  materializa valores de `Discovery.CustomEntries` nos tipos CLR naturais de JSON, preservando inclusive strings
+  relativas `~/...` usadas pelo discovery handler, em vez de devolvê-las como `JsonElement`.
+  `ClientMaterializer` mapeia `Client` ↔ (root + string values por kind + claims + secrets) reconstruindo o
+  comparer `OrdinalIgnoreCase` de `AllowedCorsOrigins` (comparison key em lowercase). Falha de versão/JSON é
+  fail-closed via `ConfigurationPayloadException` (mensagem sem payload — invariante 10).
+- **Provider SQLite:** `ConfigurationSqliteDbContext` (sobrescreve só o hook `ApplyConfigurationModel` para
+  chamar a extensão pública), `ConfigurationSqliteDesignTimeDbContextFactory` e a migration inicial
+  `InitialConfiguration` gerada por `dotnet ef` (sem `EnsureCreated`) — cria **apenas** as 7 tabelas de
+  Configuration, com a colação e os índices esperados. Pacote `Microsoft.EntityFrameworkCore.Design`
+  (`PrivateAssets=all`) adicionado ao provider para a tooling.
+- **Testes (`Tests.Storage/Configuration/`, +19):** `SqliteConfigurationMigrationTests` (EnsureDeleted →
+  MigrateAsync → histórico; só as 7 tabelas; check constraint do singleton), `ConfigurationMaterializationClientTests`
+  (round-trip de client totalmente preenchido; independência do grafo materializado — DF25; isolamento de mesmo
+  client id em dois realms), `ConfigurationModelPayloadTests` (round-trip estável e fiel; sem ref circular;
+  fail-closed de versão/JSON), `ConfigurationModelClientCoverageTests` (guarda: toda propriedade pública de
+  `Client` tem decisão de persistência documentada) e `SqliteConfigurationSigningKeyTests` (mesmo key id em dois
+  realms; PK create-only rejeita duplicata — DF24). Os testes de payload também cobrem valores primitivos/nested
+  de `CustomEntries` e rejeição de coleção get-only `null` nos grafos server/realm. Helper
+  `SqliteConfigurationDatabase` cria banco real `:memory:` migrado sobre conexão compartilhada.
+
+Critérios de aceite verificados: a migration cria somente tabelas Configuration; todos os campos de `Client`
+têm round-trip; alterar objeto carregado não muda o banco sem save; indexes Ordinal não dependem da collation
+default (BINARY explícito); nenhuma tabela de resources/Operational. Provider-specific fora do projeto puro
+mantido; o context SQLite e um customizado usam a mesma extensão pública (validado desde a Fase 1 por
+`ConfigurationModelExtensibilityTests`).
+
+Validação: `dotnet build RoyalIdentity.sln` — êxito (0 erros; nenhum warning novo nos projetos criados);
+`dotnet test Tests.Storage` — 120 aprovados (101 preexistentes + 19 novos); `dotnet test Tests.Architecture` —
+33 aprovados (sem regressão de fronteira); solução completa — 702 aprovados, 0 falhas, 1 ignorado (PostgreSQL
+opt-in preexistente de `Tests.UserAccounts`).
 
 ---
 
@@ -665,7 +715,7 @@ preexistente de `Tests.UserAccounts`).
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Payload JSON perde opção nova | propriedade pública de options/client não entra no round-trip | configuração silenciosamente alterada | teste de cobertura de propriedades + payload versionado | Aberto |
+| Payload JSON perde opção nova | propriedade pública de options/client não entra no round-trip | configuração silenciosamente alterada | teste de cobertura de propriedades de `Client` + payload versionado + `GetOnlyCollectionModifier` (clear-then-add fiel a remoções em coleções get-only das options) | Mitigado (Fase 2) |
 | Context combinado é apenas teórico | store exige `ConfigurationDbContext` concreto ou perde refinamentos do provider | terceiros não conseguem unificar contexts com model equivalente | registration genérica + `CombinedTestDbContext` SQLite na Fase 2 e PostgreSQL na Fase 6 | Aberto |
 | Snapshot fica obsoleto | refresh falha ou intervalo é excessivo | configuração antiga continua ativa | intervalo obrigatório, idade observável e last-known-good explícito | Aberto |
 | Snapshot expõe mutabilidade | caller altera `ServerOptions`/`Realm` retornado | configuração publicada muda fora do refresh | grafo interno inacessível, cópia defensiva e teste de mutação | Aberto |
