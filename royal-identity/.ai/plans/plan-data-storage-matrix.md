@@ -398,7 +398,7 @@ Resultados resumidos:
 
 ## Contract tests provider-neutral — Fase 3
 
-Suíte criada em `Tests.Storage` (DF13), executada em 2026-07-21 com 75 cenários verdes contra a fixture
+Suíte criada em `Tests.Storage` (DF13), executada em 2026-07-21 com 78 cenários verdes contra a fixture
 `MemoryStorage` (revisada no mesmo dia após análise externa — ver as regras e a tabela de aceites abaixo).
 Estrutura conforme o design alvo do plano:
 
@@ -420,7 +420,7 @@ Estrutura conforme o design alvo do plano:
 | `UserConsentStoreContractTests` | CN-01..CN-03, DF6/invariante 6 com par subject+client colidente | 5 |
 | `UserSessionStoreContractTests` | SS-01..SS-06, DF6 com sid colidente; dedup de client com relógio controlado | 11 |
 | `AuthorizeParametersStoreContractTests` | AP-01..AP-03; leitura não consome; handles distintos | 5 |
-| `ResourceStoreContractTests` | RS-02 (filtro enabled), RS-03 + DF6, RS-04 (resolução scope+resource, scope ausente/disabled, invalid targets de URI desconhecida/server disabled) e RS-05 (subset não autorizado → `invalid_target`, conjunto completo sem indicators, downscope coerente) | 10 |
+| `ResourceStoreContractTests` | RS-02 (filtro enabled), RS-03 + DF6, RS-04 (resolução scope+resource, scope ausente/disabled, invalid targets de URI desconhecida/server disabled/malformada/HTTP não-loopback e HTTP localhost aceito) e RS-05 (subset não autorizado → `invalid_target`, conjunto completo sem indicators, downscope coerente) | 13 |
 | `StorageSessionContractTests` | SP-01..SP-03 (lifetime seam de DF21; nada é assertado pós-dispose) | 2 |
 | `MessageStoreContractTests` | MS-01..MS-03 (roundtrip do id; delete de id escrito completa; id desconhecido não assertado — `avaliar`/DF25) — fixture `ProtectedData` | 2 |
 

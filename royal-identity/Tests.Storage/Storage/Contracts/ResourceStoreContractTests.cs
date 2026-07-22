@@ -151,6 +151,53 @@ public abstract class ResourceStoreContractTests : StorageContractTests
 		Assert.Contains("https://contract-rs4off.api.test/resource", resources.InvalidTargets);
 	}
 
+	// RS-04 `preservar` (ADR-012): relative resource indicators and absolute URIs with fragments are malformed
+	// protocol input and must be reported as invalid targets by every provider.
+	[Fact]
+	public async Task FindRequestedResources_RelativeOrFragmentResourceUri_IsInvalidTarget()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetResourceStore(harness.RealmA);
+
+		var resources = await store.FindRequestedResourcesAsync(
+			[], ["contract-relative-resource", "https://contract.api.test/resource#fragment"],
+			onlyEnabled: true, default);
+
+		Assert.True(resources.HasInvalidTargets);
+		Assert.Contains("contract-relative-resource", resources.InvalidTargets);
+		Assert.Contains("https://contract.api.test/resource#fragment", resources.InvalidTargets);
+	}
+
+	// RS-04 `preservar` (ADR-012/local policy): plain HTTP is not accepted for a non-loopback resource URI.
+	[Fact]
+	public async Task FindRequestedResources_HttpNonLoopbackResourceUri_IsInvalidTarget()
+	{
+		await using var harness = await CreateHarnessAsync();
+
+		var resources = await harness.Storage.GetResourceStore(harness.RealmA).FindRequestedResourcesAsync(
+			[], ["http://contract.api.test/resource"], onlyEnabled: true, default);
+
+		Assert.True(resources.HasInvalidTargets);
+		Assert.Contains("http://contract.api.test/resource", resources.InvalidTargets);
+	}
+
+	// RS-04 `preservar` (local development policy): HTTP remains valid for a loopback protected resource.
+	[Fact]
+	public async Task FindRequestedResources_HttpLocalhostResourceUri_IsAccepted()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var server = NewResourceServer("contract:rs4local");
+		server.ProtectedResources = [new ProtectedResource("http://localhost:5100/resource")];
+		await harness.SeedResourceServerAsync(harness.RealmA, server);
+
+		var resources = await harness.Storage.GetResourceStore(harness.RealmA).FindRequestedResourcesAsync(
+			[], ["http://localhost:5100/resource"], onlyEnabled: true, default);
+
+		Assert.False(resources.HasInvalidTargets);
+		Assert.Contains(resources.ProtectedResources,
+			resource => resource.ResourceUri == "http://localhost:5100/resource");
+	}
+
 	// RS-05 `preservar` (ADR-012/RFC 8707): a requested resource indicator outside the previously authorized
 	// set fails with invalid_target, reporting the offending URI.
 	[Fact]
