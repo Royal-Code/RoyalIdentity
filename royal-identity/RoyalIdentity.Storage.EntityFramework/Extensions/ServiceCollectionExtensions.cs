@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using RoyalIdentity.Configuration;
 using RoyalIdentity.Storage.EntityFramework.Configuration;
+using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
+using RoyalIdentity.Storage.EntityFramework.Configuration.Snapshot;
 
 namespace RoyalIdentity.Storage.EntityFramework.Extensions;
 
@@ -27,6 +30,30 @@ public static class ServiceCollectionExtensions
 		ArgumentNullException.ThrowIfNull(services);
 
 		services.TryAddScoped<IConfigurationDbContextAccessor, ConfigurationDbContextAccessor<TContext>>();
+
+		return services;
+	}
+
+	/// <summary>
+	/// <para>
+	///     Registers the EF <see cref="IConfigurationSnapshotSource"/> and its stateless materialization
+	///     helpers over the scoped Configuration ports (plan DF7). The core registers the snapshot holder and
+	///     the hosted refresher; this supplies the EF-backed async source. The mandatory refresh interval
+	///     (<see cref="ConfigurationSnapshotRefreshOptions"/>) is provided by the composition, never here.
+	/// </para>
+	/// <para>
+	///     Like <see cref="AddEntityFrameworkConfigurationStorage{TContext}"/>, this never registers
+	///     <c>IStorage</c>, <c>IStorageProvider</c> or <c>IStorageSession</c> (plan DF20).
+	/// </para>
+	/// </summary>
+	public static IServiceCollection AddEntityFrameworkConfigurationSnapshotSource(this IServiceCollection services)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+
+		services.TryAddSingleton<ServerOptionsPayloadSerializer>();
+		services.TryAddSingleton<RealmOptionsPayloadSerializer>();
+		services.TryAddSingleton<RealmMaterializer>();
+		services.TryAddScoped<IConfigurationSnapshotSource, EntityFrameworkConfigurationSnapshotSource>();
 
 		return services;
 	}

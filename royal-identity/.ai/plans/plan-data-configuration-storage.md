@@ -1,16 +1,16 @@
 # Plan: Persistência EF dos dados de configuração do IdP (`plan-data-configuration-storage`)
 
-## Status: EM EXECUÇÃO - Fase 2 de 7 concluída
+## Status: EM EXECUÇÃO - Fase 3 de 7 concluída
 
 ## Progresso
 
-`██░░░░░` **28%** - 2 de 7 fases
+`███░░░░` **43%** - 3 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Fronteiras, projetos e modelo extensível | Concluida |
 | Fase 2 - Modelo híbrido e provider SQLite | Concluida |
-| Fase 3 - Adapter, lifecycle e snapshot assíncrono | Pendente |
+| Fase 3 - Adapter, lifecycle e snapshot assíncrono | Concluida |
 | Fase 4 - ServerOptions, realms, clients e bridge de resources | Pendente |
 | Fase 5 - Proteção e persistência de signing keys | Pendente |
 | Fase 6 - PostgreSQL, migrations, runner e seeds | Pendente |
@@ -511,19 +511,19 @@ opt-in preexistente de `Tests.UserAccounts`).
 
 **Tarefas:**
 
-- [ ] Registrar somente as portas Configuration EF scoped; impedir por teste de DI que a registration pública do Plano 2 forneça `IStorage`, `IStorageProvider` ou `IStorageSession` parciais.
-- [ ] Criar composite exclusivamente test-only, combinando Configuration EF com Operational in-memory, para reutilizar os contratos P2 que ainda recebem `IStorage`.
-- [ ] No composite test-only, implementar `IStorageProvider` que cria scope e `IStorageSession` owner desse scope; comprovar que `Dispose` libera uma dependência scoped, sem cristalizar comportamento após disposal.
-- [ ] Introduzir `IConfigurationSnapshotSource.LoadAsync(ct)`, `IConfigurationSnapshot` e `ConfigurationSnapshotRefreshOptions` com intervalo obrigatório na composição EF.
-- [ ] Carregar snapshot inicial antes do tráfego e realizar refresh periódico com scope novo e `CancellationToken`.
-- [ ] Implementar a política last-known-good indefinida de DF26 e publicar estado/idade observável sem payload sensível.
-- [ ] Implementar sources EF e in-memory que materializam grafos independentes sem ler `IStorage.ServerOptions`; registrar a source in-memory no host padrão.
-- [ ] Migrar `ConfigureRealmCookieAuthenticationOptions`, `DefaultEventDispatcher`, `RealmManager` e `CheckSessionResult` para a leitura síncrona do snapshot já carregado no ponto de uso, sem capturar uma cópia indefinidamente; manter `IStorage.ServerOptions` apenas como contrato legado até a composição completa do Plano 3.
-- [ ] Remover `IRealmStore.GetByPath` síncrono e suas implementações após migrar todos os callers.
-- [ ] Publicar snapshots atomicamente e devolver cópias defensivas; provar que mutar `ServerOptions`/`Realm` obtido do snapshot não altera a próxima leitura.
-- [ ] Após cada refresh bem-sucedido, usar `TryRemove` no cache de `CookieAuthenticationOptions` para o scheme default e a união dos schemes de realm anterior/novo; após falha, preservar snapshot/options e nunca remover scheme externo ao RoyalIdentity.
-- [ ] Fazer writes legados usados por testes solicitarem reload assíncrono; publicar/invalidate somente se a nova carga completa for válida.
-- [ ] Criar testes de ausência de sync I/O, bootstrap sem ciclo, refresh periódico configurado, falha inicial, last-known-good, invalidação de named options e disposal real do composite test-only.
+- [x] Registrar somente as portas Configuration EF scoped; impedir por teste de DI que a registration pública do Plano 2 forneça `IStorage`, `IStorageProvider` ou `IStorageSession` parciais.
+- [x] Criar composite exclusivamente test-only, combinando Configuration EF com Operational in-memory, para reutilizar os contratos P2 que ainda recebem `IStorage`.
+- [x] No composite test-only, implementar `IStorageProvider` que cria scope e `IStorageSession` owner desse scope; comprovar que `Dispose` libera uma dependência scoped, sem cristalizar comportamento após disposal.
+- [x] Introduzir `IConfigurationSnapshotSource.LoadAsync(ct)`, `IConfigurationSnapshot` e `ConfigurationSnapshotRefreshOptions` com intervalo obrigatório na composição EF.
+- [x] Carregar snapshot inicial antes do tráfego e realizar refresh periódico com scope novo e `CancellationToken`.
+- [x] Implementar a política last-known-good indefinida de DF26 e publicar estado/idade observável sem payload sensível.
+- [x] Implementar sources EF e in-memory que materializam grafos independentes sem ler `IStorage.ServerOptions`; registrar a source in-memory no host padrão.
+- [x] Migrar `ConfigureRealmCookieAuthenticationOptions`, `DefaultEventDispatcher`, `RealmManager` e `CheckSessionResult` para a leitura síncrona do snapshot já carregado no ponto de uso, sem capturar uma cópia indefinidamente; manter `IStorage.ServerOptions` apenas como contrato legado até a composição completa do Plano 3.
+- [x] Remover `IRealmStore.GetByPath` síncrono e suas implementações após migrar todos os callers.
+- [x] Publicar snapshots atomicamente e devolver cópias defensivas; provar que mutar `ServerOptions`/`Realm` obtido do snapshot não altera a próxima leitura.
+- [x] Após cada refresh bem-sucedido, usar `TryRemove` no cache de `CookieAuthenticationOptions` para o scheme default e a união dos schemes de realm anterior/novo; após falha, preservar snapshot/options e nunca remover scheme externo ao RoyalIdentity.
+- [x] Fazer writes legados usados por testes solicitarem reload assíncrono; publicar/invalidate somente se a nova carga completa for válida.
+- [x] Criar testes de ausência de sync I/O, bootstrap sem ciclo, refresh periódico configurado, falha inicial, last-known-good, invalidação de named options e disposal real do composite test-only.
 
 **Critérios de aceite:** cookie options e os outros consumidores inventariados não leem `IStorage.ServerOptions`; nenhuma source depende de `IStorage` para obter o estado inicial; nenhum método síncrono consulta EF; `GetByPath` síncrono não existe; a registration EF pública não resolve gateway parcial; cada sessão do composite test-only cria/libera scope próprio; configuração sem intervalo falha na validação; a mesma named option RoyalIdentity já materializada é recriada com novos valores após refresh, permanece coerente após refresh falho e um scheme externo permanece cacheado; DF26 está aplicada e testada; host padrão continua in-memory e funcional com o snapshot.
 
@@ -531,7 +531,67 @@ opt-in preexistente de `Tests.UserAccounts`).
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluída em 2026-07-22.** Snapshot com bootstrap/refresh assíncrono entregue; todos os consumidores
+síncronos inventariados migrados; `GetByPath` síncrono removido; nenhum gateway EF parcial registrado.
+
+- **Cópia defensiva (core):** copy ctor de `ServerOptions` (e o único faltante, `ServerUIOptions`) — completa o
+  padrão de copy ctors já existente nas demais options. O snapshot assume propriedade de uma cópia integral na
+  publicação, religa cada `RealmOptions.ServerOptions` ao server autoritativo interno e entrega novas cópias nas
+  leituras. `DiscoveryOptions.CustomEntries` também é copiado recursivamente, sem compartilhar dicionários ou
+  coleções aninhadas com a source ou com consumidores (DF7/invariante 17).
+- **Contratos e infra do snapshot (core, `RoyalIdentity/Configuration/`):** `IConfigurationSnapshot` (view
+  síncrona singleton: `ServerOptions`/`FindRealmByPath` devolvem cópias defensivas; `IsLoaded`, `RealmPaths`,
+  `LoadedAtUtc`, `LastRefreshFailureUtc`); `IConfigurationSnapshotSource.LoadAsync(ct)`;
+  `ConfigurationSnapshotData`; `ConfigurationSnapshotRefreshOptions` (intervalo obrigatório, `Validate()`);
+  `PublishedConfigurationSnapshot` (imutável, publica atômico); `ConfigurationSnapshotHolder` (swap volátil,
+  `Publish`/`MarkRefreshFailure`); `IConfigurationSnapshotRefresher` serializa cargas explícitas e periódicas por
+  um gate assíncrono, com `RefreshAsync` fail-closed para bootstrap/writes e `TryRefreshAsync` last-known-good +
+  grava falha + log sem payload (DF26), propagando cancelamento solicitado pelo caller;
+  `ConfigurationSnapshotHostedService` faz a carga inicial não-guardada no `StartAsync` (falha o startup) e usa
+  um loop sequencial com `PeriodicTimer`/`TimeProvider`, cancelado e aguardado no shutdown; seam público
+  `AddConfigurationSnapshot()`.
+- **Invalidação de named options:** após publish, o refresher chama `TryRemove` no
+  `IOptionsMonitorCache<CookieAuthenticationOptions>` para o scheme default + união dos schemes de realm
+  anterior/novo; schemes externos ao RoyalIdentity nunca são tocados; refresh falho não invalida nada.
+- **Sources:** in-memory (`RoyalIdentity.Storage.InMemory`, lê o estado do `MemoryStorage` direto — nunca
+  `IStorage.ServerOptions` — e clona; registrada no host padrão por `AddInMemoryStorage` com intervalo default
+  de 5 min) e EF (`EntityFrameworkConfigurationSnapshotSource` + `RealmMaterializer`, lê `server_options`
+  singleton + realms live filtrando tombstones via accessor scoped; server options ausente é fail-closed);
+  `AddEntityFrameworkConfigurationSnapshotSource` registra source scoped + serializers/materializer, sem
+  gateway parcial (DF20).
+- **Migração dos consumidores:** `ConfigureRealmCookieAuthenticationOptions` (agora
+  `snapshot.ServerOptions`/`FindRealmByPath`), `DefaultEventDispatcher` (lê `DispatchEvents` do snapshot no
+  dispatch, não no ctor), `RealmManager.CreateAsync` (usa `snapshot.ServerOptions`) e `CheckSessionResult`
+  (dívida inalcançável migrada; o singleton lê o snapshot em cada execução, sem reter a primeira configuração).
+  `IStorage.ServerOptions` permanece como contrato legado. `RealmManager`
+  dispara `snapshotRefresher.RefreshAsync` após create/update/enable/disable, para que um realm criado em
+  runtime fique visível de imediato aos consumidores síncronos (writes legados solicitando reload — DF7/DF28).
+- **`IRealmStore.GetByPath` síncrono removido** (interface + impl InMemory); único caller era o cookie config.
+- **Testes (+23):** `Tests.Storage/Configuration/` — `ConfigurationSnapshotTests` (publish atômico, propriedade
+  integral e cópias defensivas inclusive do grafo aninhado, bootstrap-throws-before-load, last-known-good +
+  gravação de falha + preservação de scheme externo, falha antes do bootstrap, propagação de cancelamento,
+  serialização de refreshes concorrentes e releitura do `CheckSessionResult`),
+  `ConfigurationSnapshotHostedServiceTests` (carga inicial, falha inicial falha o startup, intervalo inválido,
+  cancelamento e espera do refresh periódico no shutdown), `ConfigurationSnapshotSourceSqliteTests`
+  (materialização EF + exclusão de tombstone + fail-closed),
+  `CompositeStorageSessionTests` (session combina Config EF + Operational in-memory, scope independente por
+  session, `Dispose` libera a dependência scoped e não sobrevive após disposal), com o harness `SnapshotTestHarness`
+  (compõe a infra interna pelo seam público + source/cache/clock controláveis); `Tests.Architecture`
+  (`ConfigurationStorageRegistrationTests` +1 guard do snapshot source scoped sem gateway parcial);
+  `Tests.Integration/Realm/RealmConfigurationSnapshotTests` (snapshot carregado no startup, realm em runtime
+  visível, cópia defensiva end-to-end).
+
+Critérios de aceite verificados: cookie options e os demais consumidores não leem `IStorage.ServerOptions`;
+nenhuma source depende de `IStorage`; nenhum método síncrono consulta EF; `GetByPath` síncrono não existe; a
+registration EF pública não resolve gateway parcial; cada session do composite cria/libera scope próprio;
+configuração sem intervalo falha na validação; named options RoyalIdentity são recriadas após refresh e
+preservadas após falha, sem afetar scheme externo; DF26 aplicada e testada; host padrão continua in-memory e
+funcional com o snapshot.
+
+Validação: `dotnet build RoyalIdentity.sln` — êxito (0 erros; nenhum warning novo nos arquivos criados);
+`dotnet test Tests.Storage` — 146 aprovados; `dotnet test Tests.Architecture` — 34; `dotnet test Tests.Integration`
+— 226 (sem regressão após a migração dos consumidores); solução completa — 732 aprovados, 0 falhas, 1 ignorado
+(PostgreSQL opt-in preexistente de `Tests.UserAccounts`).
 
 ---
 
@@ -720,9 +780,9 @@ opt-in preexistente de `Tests.UserAccounts`).
 |---|---|---|---|---|
 | Payload JSON perde opção nova | propriedade pública de options/client não entra no round-trip | configuração silenciosamente alterada | teste de cobertura de propriedades de `Client` + payload versionado + `GetOnlyCollectionModifier` (clear-then-add fiel a remoções em coleções get-only das options) | Mitigado (Fase 2) |
 | Context combinado é apenas teórico | store exige `ConfigurationDbContext` concreto ou perde refinamentos do provider | terceiros não conseguem unificar contexts com model equivalente | registration genérica + `CombinedTestDbContext` SQLite na Fase 2 e PostgreSQL na Fase 6 | Aberto |
-| Snapshot fica obsoleto | refresh falha ou intervalo é excessivo | configuração antiga continua ativa | intervalo obrigatório, idade observável e last-known-good explícito | Aberto |
-| Snapshot expõe mutabilidade | caller altera `ServerOptions`/`Realm` retornado | configuração publicada muda fora do refresh | grafo interno inacessível, cópia defensiva e teste de mutação | Aberto |
-| Cookie mantém named options antigas | snapshot renova após scheme já materializado | autenticação continua com cookie/rotas anteriores | `TryRemove` do default e união dos schemes anterior/novo após publicação válida; testar mesmo nome e preservação de scheme externo | Aberto |
+| Snapshot fica obsoleto | refresh falha ou intervalo é excessivo | configuração antiga continua ativa | intervalo obrigatório (`Validate()`), idade observável (`LoadedAtUtc`/`LastRefreshFailureUtc`) e last-known-good explícito (`TryRefreshAsync`) | Mitigado (Fase 3) |
+| Snapshot expõe mutabilidade | caller altera `ServerOptions`/`Realm` retornado | configuração publicada muda fora do refresh | grafo interno inacessível, cópia defensiva (copy ctor de `ServerOptions`/clone de `Realm`) e teste de mutação | Mitigado (Fase 3) |
+| Cookie mantém named options antigas | snapshot renova após scheme já materializado | autenticação continua com cookie/rotas anteriores | `TryRemove` do default e união dos schemes anterior/novo após publicação válida; testado mesmo nome e preservação de scheme externo | Mitigado (Fase 3) |
 | Data Protection não compartilha key ring | nós usam rings distintos ou efêmeros | signing key persistida não pode ser aberta | documentação/acceptance multi-instância; configuração pertence ao consumidor | Aberto |
 | Chave AES fraca/exposta | options recebe tamanho inválido ou segredo aparece em log | perda de confidencialidade das signing keys | validação AES-GCM; redaction; testes negativos | Aberto |
 | Plain vira default acidental | DI resolve Plain sem opt-in | segredo em texto claro | sem default + warning + teste de registration | Aberto |

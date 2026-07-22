@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
-using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Configuration;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
@@ -9,11 +9,11 @@ namespace RoyalIdentity.Authentication;
 
 public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<CookieAuthenticationOptions>
 {
-    private readonly IStorage storage;
+    private readonly IConfigurationSnapshot snapshot;
 
-    public ConfigureRealmCookieAuthenticationOptions(IStorage storage)
+    public ConfigureRealmCookieAuthenticationOptions(IConfigurationSnapshot snapshot)
     {
-        this.storage = storage;
+        this.snapshot = snapshot;
     }
 
     public void Configure(string? name, CookieAuthenticationOptions options)
@@ -25,7 +25,7 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
 
         string? realmPath = null;
         Realm? realm = null;
-        var authOptions = storage.ServerOptions.Authentication;
+        var authOptions = snapshot.ServerOptions.Authentication;
 
         if (name == Server.DefaultCookieAuthenticationScheme)
         {
@@ -39,7 +39,7 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
         if (realmPath.IsMissing())
             return;
 
-        realm = storage.Realms.GetByPath(realmPath);
+        realm = snapshot.FindRealmByPath(realmPath);
 
         if (realm is not null && name != Server.DefaultCookieAuthenticationScheme)
             authOptions = realm.Options.Authentication;

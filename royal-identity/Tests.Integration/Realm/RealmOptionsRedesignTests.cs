@@ -41,7 +41,8 @@ public class RealmOptionsRedesignTests : IClassFixture<AppFactory>
         await storage.Realms.SaveAsync(realmA);
         await storage.Realms.SaveAsync(realmB);
 
-        var configure = new ConfigureRealmCookieAuthenticationOptions(storage);
+        var snapshot = new StubConfigurationSnapshot(storage.ServerOptions, realmA, realmB);
+        var configure = new ConfigureRealmCookieAuthenticationOptions(snapshot);
         var optionsA = new CookieAuthenticationOptions();
         var optionsB = new CookieAuthenticationOptions();
 

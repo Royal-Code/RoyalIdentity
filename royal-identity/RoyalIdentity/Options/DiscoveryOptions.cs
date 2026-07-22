@@ -1,5 +1,7 @@
 ﻿namespace RoyalIdentity.Options;
 
+using System.Text.Json;
+
 /// <summary>
 /// Options class to configure discovery endpoint
 /// </summary>
@@ -23,7 +25,10 @@ public class DiscoveryOptions
         ShowTokenEndpointAuthenticationMethods = other.ShowTokenEndpointAuthenticationMethods;
         ExpandRelativePathsInCustomEntries = other.ExpandRelativePathsInCustomEntries;
         ResponseCacheInterval = other.ResponseCacheInterval;
-        CustomEntries = new(other.CustomEntries);
+        CustomEntries = other.CustomEntries.ToDictionary(
+            entry => entry.Key,
+            entry => CloneJsonValue(entry.Value)!,
+            StringComparer.Ordinal);
 
         SupportedResponseTypes.Clear();
         foreach (var value in other.SupportedResponseTypes)
@@ -225,5 +230,46 @@ public class DiscoveryOptions
     public bool TokenTypeHintIsSupported(string tokenTypeHint)
     {
         return SupportedTokenTypeHints.Contains(tokenTypeHint);
+    }
+
+    private static object? CloneJsonValue(object? value)
+    {
+        if (value is null)
+            return null;
+
+        var element = JsonSerializer.SerializeToElement(value, value.GetType());
+        return MaterializeJsonValue(element);
+    }
+
+    private static object? MaterializeJsonValue(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Null => null,
+        JsonValueKind.String => element.GetString(),
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Number => MaterializeNumber(element),
+        JsonValueKind.Array => element.EnumerateArray().Select(MaterializeJsonValue).ToList(),
+        JsonValueKind.Object => element.EnumerateObject().ToDictionary(
+            property => property.Name,
+            property => MaterializeJsonValue(property.Value),
+            StringComparer.Ordinal),
+        _ => throw new JsonException($"Unsupported discovery custom-entry JSON value kind '{element.ValueKind}'."),
+    };
+
+    private static object MaterializeNumber(JsonElement element)
+    {
+        if (element.TryGetInt32(out var int32))
+            return int32;
+
+        if (element.TryGetInt64(out var int64))
+            return int64;
+
+        if (element.TryGetUInt64(out var uint64))
+            return uint64;
+
+        if (element.TryGetDecimal(out var decimalValue))
+            return decimalValue;
+
+        return element.GetDouble();
     }
 }

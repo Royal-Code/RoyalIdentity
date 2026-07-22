@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RoyalIdentity.Configuration;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Storage.EntityFramework.Configuration;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
@@ -88,5 +89,28 @@ public class ConfigurationStorageRegistrationTests
 		IServiceCollection nullServices = null!;
 		Assert.Throws<ArgumentNullException>(() =>
 			nullServices.AddEntityFrameworkConfigurationStorage<CustomConfigurationDbContext>());
+	}
+
+	[Fact]
+	public void SnapshotSourceRegistration_RegistersScopedSource_AndNoPartialStorageGateway()
+	{
+		var services = new ServiceCollection();
+		services.AddDbContext<CustomConfigurationDbContext>(options =>
+			options.UseSqlite("Data Source=:memory:"));
+		services.AddEntityFrameworkConfigurationStorage<CustomConfigurationDbContext>();
+		services.AddEntityFrameworkConfigurationSnapshotSource();
+
+		// The EF snapshot source is scoped (it reads the scoped DbContext), so resolving it at the root scope
+		// must fail validation — proving it is not a hidden singleton over a captured context.
+		using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+		Assert.Throws<InvalidOperationException>(() => provider.GetService<IConfigurationSnapshotSource>());
+
+		using var scope = provider.CreateScope();
+		Assert.NotNull(scope.ServiceProvider.GetService<IConfigurationSnapshotSource>());
+
+		// DF20: neither Fase 2 registration provides a partial production gateway.
+		Assert.Null(scope.ServiceProvider.GetService<IStorage>());
+		Assert.Null(scope.ServiceProvider.GetService<IStorageProvider>());
+		Assert.Null(scope.ServiceProvider.GetService<IStorageSession>());
 	}
 }

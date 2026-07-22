@@ -7,6 +7,34 @@ namespace RoyalIdentity.Options;
 /// </summary>
 public class ServerOptions
 {
+    public ServerOptions()
+    {
+    }
+
+    /// <summary>
+    /// Creates a new independent copy of another <see cref="ServerOptions"/> instance. Used to hand out
+    /// defensive copies from the configuration snapshot so a caller can never mutate the published graph
+    /// (plan DF7, invariante 17).
+    /// </summary>
+    public ServerOptions(ServerOptions other)
+    {
+        Authentication = new AuthenticationOptions(other.Authentication);
+        InputLengthRestrictions = new InputLengthRestrictions(other.InputLengthRestrictions);
+        UI = new ServerUIOptions(other.UI);
+        Logging = new LoggingOptions(other.Logging);
+        Discovery = new DiscoveryOptions(other.Discovery);
+        Endpoints = new EndpointsOptions(other.Endpoints);
+        Csp = new CspOptions(other.Csp);
+        Cors = new CorsOptions(other.Cors);
+        MutualTls = new MutualTlsOptions(other.MutualTls);
+        Keys = new KeyOptions(other.Keys);
+        IssuerUri = other.IssuerUri;
+        LowerCaseIssuerUri = other.LowerCaseIssuerUri;
+        AccessTokenJwtType = other.AccessTokenJwtType;
+        EmitScopesAsSpaceDelimitedStringInJwt = other.EmitScopesAsSpaceDelimitedStringInJwt;
+        DispatchEvents = other.DispatchEvents;
+    }
+
     /// <summary>
     /// Gets or sets the authentication options.
     /// </summary>

@@ -32,9 +32,23 @@ public class RealmOptions
     /// Creates a new independent copy of another <see cref="RealmOptions"/> instance.
     /// </summary>
     /// <param name="other">The realm options to copy.</param>
-    public RealmOptions(RealmOptions other)
+    public RealmOptions(RealmOptions other) : this(other, other.ServerOptions)
     {
-        ServerOptions = other.ServerOptions;
+    }
+
+    /// <summary>
+    /// Creates an independent copy of another <see cref="RealmOptions"/> instance and binds it to the
+    /// supplied authoritative <see cref="ServerOptions"/> graph. The configuration snapshot uses this
+    /// overload so none of its returned realm copies retain a reference to the published server graph.
+    /// </summary>
+    /// <param name="other">The realm options to copy.</param>
+    /// <param name="serverOptions">The authoritative server options for the new copy.</param>
+    public RealmOptions(RealmOptions other, ServerOptions serverOptions)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        ArgumentNullException.ThrowIfNull(serverOptions);
+
+        ServerOptions = serverOptions;
         Discovery = new DiscoveryOptions(other.Discovery);
         UI = new RealmUIOptions(other.UI);
         Authentication = new AuthenticationOptions(other.Authentication);

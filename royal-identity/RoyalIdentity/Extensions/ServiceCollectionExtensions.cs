@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Authentication;
+using RoyalIdentity.Configuration;
 using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
@@ -31,6 +33,11 @@ public static class ServiceCollectionExtensions
 
         // Default Pipelines
         services.AddRoyalIdentityPipelines(customization);
+
+        // Configuration snapshot (plan DF7): the singleton holder is the sync view; the hosted refresher loads
+        // it before traffic and refreshes periodically. The snapshot source and refresh interval are supplied
+        // by the storage backing (in-memory host default, or the EF composition).
+        services.AddConfigurationSnapshot();
 
         // jobs
         services.AddTransient<IHostedService, DefaultServerJobsStartup>();

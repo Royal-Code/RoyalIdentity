@@ -1,14 +1,12 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using RoyalIdentity.Configuration;
 using RoyalIdentity.Extensions;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Responses.HttpResults;
 
 public class CheckSessionResult : IResult, IStatusCodeHttpResult
 {
-    private ServerOptions? options;
-
     private static readonly object locker = new();
     private static volatile string? formattedHtml;
     private static volatile string? lastCheckSessionCookieName;
@@ -17,8 +15,9 @@ public class CheckSessionResult : IResult, IStatusCodeHttpResult
 
     public async Task ExecuteAsync(HttpContext httpContext)
     {
-        // init
-        options ??= httpContext.RequestServices.GetRequiredService<ServerOptions>();
+        // Read at the point of use: CheckSessionResponse is a singleton, so retaining this copy in a field
+        // would pin the first published configuration for every later request.
+        var options = httpContext.RequestServices.GetRequiredService<IConfigurationSnapshot>().ServerOptions;
 
         // add CSP headers
         httpContext.Response.AddScriptCspHeaders(options.Csp, "sha256-fa5rxHhZ799izGRP38+h4ud5QXNT0SFaFlh4eqDumBI=");

@@ -5,6 +5,20 @@
 /// </summary>
 public class ServerUIOptions
 {
+    public ServerUIOptions()
+    {
+    }
+
+    /// <summary>Creates an independent copy of another <see cref="ServerUIOptions"/> instance.</summary>
+    public ServerUIOptions(ServerUIOptions other)
+    {
+        SelectDomainPath = other.SelectDomainPath;
+        AccessDeniedPath = other.AccessDeniedPath;
+        ErrorPath = other.ErrorPath;
+        ErrorParameter = other.ErrorParameter;
+        CustomRedirectParameter = other.CustomRedirectParameter;
+    }
+
     /// <summary>
     /// Gets or sets the select domain URL. If a local URL, the value must start with a leading slash.
     /// </summary>

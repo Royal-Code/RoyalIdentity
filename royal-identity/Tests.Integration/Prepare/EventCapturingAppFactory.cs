@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using RoyalIdentity.Configuration;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
-using RoyalIdentity.Contracts.Storage;
 
 namespace Tests.Integration.Prepare;
 
@@ -25,7 +25,7 @@ public class EventCapturingAppFactory : AppFactory
             services.AddTransient<IEventDispatcher>(sp =>
             {
                 var inner = new DefaultEventDispatcher(
-                    sp.GetRequiredService<IStorage>(),
+                    sp.GetRequiredService<IConfigurationSnapshot>(),
                     sp);
                 return new CapturingEventDispatcher(inner, EventCapture);
             });

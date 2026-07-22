@@ -1,24 +1,23 @@
-﻿using RoyalIdentity.Contracts.Storage;
+﻿using RoyalIdentity.Configuration;
 using RoyalIdentity.Events;
 using RoyalIdentity.Models;
-using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultEventDispatcher : IEventDispatcher
 {
-    private readonly ServerOptions options;
+    private readonly IConfigurationSnapshot snapshot;
     private readonly IServiceProvider sp;
 
-    public DefaultEventDispatcher(IStorage storage, IServiceProvider sp)
+    public DefaultEventDispatcher(IConfigurationSnapshot snapshot, IServiceProvider sp)
     {
-        options = storage.ServerOptions;
+        this.snapshot = snapshot;
         this.sp = sp;
     }
 
     public async ValueTask DispatchAsync(Event evt)
     {
-        if (!options.DispatchEvents)
+        if (!snapshot.ServerOptions.DispatchEvents)
             return;
 
         await DispatchCoreAsync(evt);
