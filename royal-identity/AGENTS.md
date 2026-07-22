@@ -38,11 +38,15 @@ migration order — plus the provider-neutral contract suite `Tests.Storage`,
 which future EF providers reuse by adding fixtures only). Treat each as the
 implemented target architecture before changing the area it covers.
 
-No active plan right now. `.ai/plans/plans-roadmap-02.md` (supersedes
-`plans-roadmap-01.md`) maps what comes next — the recommended next step is
-sub-plan 2 of `.ai/plans/plan-data-macro.md` (`plan-data-configuration-storage.md`,
-not yet created), which must consume the storage matrix without re-inferring
-semantics.
+The active implementation plan is `.ai/plans/plan-data-configuration-storage.md`
+(sub-plan 2 of `.ai/plans/plan-data-macro.md`, 0/7 phases, all decisions closed —
+Q1-Q18/DF1-DF28). It
+persists ServerOptions, realms/options, clients and signing keys with SQLite/
+PostgreSQL, keeps resources/scopes volatile per baseline DF22, and leaves the default host
+in-memory until the Operational and test-migration plans are complete. Plan 2 must
+not register a production `IStorage`/`IStorageProvider` with unavailable Operational
+members; the complete EF gateway is composed in Plan 3. It must consume
+`.ai/plans/plan-data-storage-matrix.md` without re-inferring semantics.
 
 Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:

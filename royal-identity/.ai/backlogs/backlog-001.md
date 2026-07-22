@@ -122,6 +122,23 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 
 ---
 
+## Aspire e orquestração de ambiente
+
+**Área:** Host / Operação / Developer Experience
+**Deferral:** O [plan-data-configuration-storage.md](../plans/plan-data-configuration-storage.md) cria o executável
+geral `RoyalIdentity.Migrations`, separado dos hosts. A solução ainda não possui projetos Aspire nem composição de
+containers para todos os hosts e dependências.
+**Quando revisitar:** Depois dos Planos 2 e 3 do `plan-data-macro.md`, quando Configuration e Operational possuírem
+migrations executáveis pelo mesmo runner.
+**Nota de design:**
+- O AppHost Aspire deve subir bancos e demais dependências e executar `RoyalIdentity.Migrations` como
+  workload/container separado antes dos hosts.
+- Hosts do IdP, APIs administrativas e demais aplicações nunca executam migrations implicitamente.
+- Configuration e Operational podem usar bancos distintos ou o mesmo banco; a orquestração deve aceitar ambos.
+- Seed continua opt-in e separado de migrate; ambientes produtivos podem preferir os scripts SQL revisados.
+
+---
+
 ## Módulo de Contas de Usuário (RoyalIdentity.UserAccounts)
 
 > **Promovido a plano ativo (2026-06-17):** este item deixou de ser apenas backlog — virou

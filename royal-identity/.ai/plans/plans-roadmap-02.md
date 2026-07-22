@@ -51,9 +51,9 @@ definida em `../analisys/`.
 
 ## Em andamento
 
-Nenhum plano ativo no momento. Próximo passo recomendado: criar o sub-plano 2 do `plan-data-macro.md`
-(`plan-data-configuration-storage.md`), consumindo a matriz do baseline sem re-inferir semântica — ver
-"Próximos planos" abaixo.
+[plan-data-configuration-storage.md](plan-data-configuration-storage.md) — RASCUNHO, 0/7 fases, com Q1-Q18/DF1-DF28
+fechadas e pronto para execução. É o sub-plano 2 do `plan-data-macro.md`; persiste ServerOptions, realms/options, clients e
+signing keys, mantendo resources/scopes voláteis pela DF22 do baseline e o host padrão in-memory até os Planos 3/4.
 
 ## Próximos planos
 
@@ -68,7 +68,7 @@ que nenhum deles fique grande demais:
 |---|---|---|---|
 | 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | Concluído (ver acima) |
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | Concluído (ver acima) |
-| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (realms/clients/resources/scopes/keys/options) | Não criado |
+| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; resources/scopes continuam voláteis) | Rascunho — decisões fechadas, pronto para execução (0/7) |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | Não criado |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | Não criado |
 | 5 | `plan-data-caching.md` | Cache sobre os stores EF, quando a semântica estiver estável | Não criado (pode ficar fora do primeiro corte) |

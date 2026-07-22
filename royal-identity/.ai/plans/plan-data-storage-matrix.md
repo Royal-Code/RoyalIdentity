@@ -49,7 +49,7 @@ superfície contratual.
 - **Cobertura:** `direta` exercita a operação/semântica do store; `fluxo` a alcança incidentalmente; `lacuna` significa
   que não foi encontrado teste relevante.
 - **Classe:** `preservar`, `descartar`, `substituir` ou `avaliar` (classificação final da Fase 5).
-- **Destino:** P2 = futuro `plan-data-configuration-storage`; P3 = futuro `plan-data-operational-storage`; P4 = futuro
+- **Destino:** P2 = `plan-data-configuration-storage`; P3 = futuro `plan-data-operational-storage`; P4 = futuro
   `plan-data-test-migration`; `baseline` = contract tests deste plano; `adjacente` = fora de `Data.*`.
 
 ## Gateway `IStorage`
@@ -82,7 +82,7 @@ retornam live references e, exceto a enumeração, ignoram CT.
 | ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|---|
 | RL-01 | `GetByPathAsync(path, ct)` | Configuration / global / scan de `realms.Values` | Primeiro match exato ou `null`; ordem incidental se houver duplicidade. | realm discovery; `RealmManager.CreateAsync` | fluxo: realm discovery/options | isolamento/product; ausência/comparador `avaliar` (DF18/DF25); P2/baseline |
-| RL-02 | `GetByPath(path)` | Configuration / global / mesmo scan | Versão síncrona do lookup anterior. | cookie authentication options | fluxo: autenticação/cookie | `substituir` por API async (DF23); P2 |
+| RL-02 | `GetByPath(path)` | Configuration / global / mesmo scan | Versão síncrona do lookup anterior. | cookie authentication options | fluxo: autenticação/cookie | `substituir` por source async + snapshot síncrono sem I/O (DF23; DF7 do P2); P2 |
 | RL-03 | `GetByIdAsync(id, ct)` | Configuration / global / chave de `realms` | Match exato ou `null`. | `KeyCacheEntry`, `DefaultSignOutManager`, `RealmManager` | direta/fluxo: `RealmIsolationTests`, realm/session | isolamento/product; ausência/comparador `avaliar`; P2/baseline |
 | RL-04 | `GetByDomainAsync(domain, ct)` | Configuration / global / scan de `realms.Values` | Primeiro match exato ou `null`; ordem incidental se duplicado. | `RealmManager.CreateAsync` (unicidade) | fluxo: criação de realm; sem teste direto localizado | unicidade é premissa do caller; comparador/ausência `avaliar`; P2/baseline |
 | RL-05 | `GetAllAsync(ct)` | Configuration / global / `realms.Values` | Conjunto de live references; observa cancelamento entre itens e encerra normalmente. | `FirstKeyJob` | fluxo: inicialização de keys | DF24: ordem incidental `descartar`; cancelamento/resultado `avaliar`; P2/baseline |
@@ -479,15 +479,15 @@ Planos 2/3/4.
 | Identity scopes padrão | property initializer de `RealmMemoryStore.IdentityScopes` | openid, profile, email, address, phone em **todo** realm, inclusive os criados por `SaveAsync` | openid é exigência de produto; o conjunto padrão é candidato a seed de criação de realm | decisão do P2/redesign: o que a criação de realm semeia é regra explícita, não initializer escondido |
 | Resource server demo | property initializer de `RealmMemoryStore.ResourceServers` | `apiserver` (api, api:read, api:write; URI `https://api.demo.local/apiserver`) em **todo** realm | dev/demo. **Acidente:** realms novos também o recebem | seed demo da composição; bloqueado por DF22 para persistência |
 | Contas demo | `DemoUsers()` no ctor (somente demo realm) + constantes `AliceSubjectId`/`BobSubjectId` | alice/bob com hash de senha | fora do storage do IdP (família `UserAccounts`); fake transitório ADR-018 | composição com o módulo real + `UserAccountsModuleSeed` (precedente: `UserAccountsAppFactory`) |
-| Keys | nenhum seed estático | `KeyParameters` nasce vazio; `FirstKeyJob` (job de startup, `IServerJob`) percorre `Realms.GetAllAsync` criando keys — mas **encerra o job inteiro** (`return`) ao encontrar o primeiro realm que já possua key, e `RealmManager.CreateAsync` não provisiona key para realms criados em runtime; o key manager não cria on-demand (lookups retornam `null`/vazio) | produto: todo realm precisa de key de assinatura. Hoje o job só cobre todos os realms porque o backing em memória renasce vazio a cada startup | P2 persiste keys pelo `AddKeyAsync` **já existente** (não é write facade nova); a **provisão de key é lacuna de lifecycle/orquestração** — ver nota abaixo |
+| Keys | nenhum seed estático | `KeyParameters` nasce vazio; `FirstKeyJob` (job de startup, `IServerJob`) percorre `Realms.GetAllAsync` criando keys — mas **encerra o job inteiro** (`return`) ao encontrar o primeiro realm que já possua key, e `RealmManager.CreateAsync` não provisiona key para realms criados em runtime; o key manager não cria on-demand (lookups retornam `null`/vazio) | produto: todo realm habilitado precisa de key de assinatura utilizável. Hoje o job só cobre todos os realms porque o backing em memória renasce vazio a cada startup | P2 remove o job escritor, persiste keys pelo `AddKeyAsync` legado somente por compatibilidade/testes, semeia uma key utilizável por realm habilitado e valida material/algoritmo no startup; criação/rotação em runtime fica para admin/KMS (DF19/DF27/DF28 do P2) |
 | Authorize parameters | dictionary global vazio | estado transitório por request | Operational; sem seed | n/a |
 
-**Lacuna de provisão de keys (lifecycle/orquestração):** com persistência durável, o `return` do `FirstKeyJob`
-faz o job parar no primeiro realm já provisionado após um reinício, deixando sem key qualquer realm ainda não
-coberto; e realms criados em runtime (`RealmManager.CreateAsync`) não recebem key por nenhum caminho — não há
-criação lazy no key manager. O comportamento atual não é modelo a copiar: os Planos 2/futuro fluxo
-administrativo devem definir a orquestração de provisão (startup idempotente por realm + provisão na criação
-do realm), usando o `AddKeyAsync` contratual. Este baseline registra a lacuna sem alterar produção (DF1).
+**Lacuna de provisão de keys (lifecycle/orquestração) — decisão superada pelo Plano 2:** o problema factual do
+`FirstKeyJob` permanece como estado de partida, mas MP-4 não é mais o design alvo. DF19/DF27/DF28 de
+`plan-data-configuration-storage.md` removem o job escritor, fazem o runner/seed provisionar uma key atual,
+desprotegível e compatível com o algoritmo principal para cada realm habilitado e fazem o startup falhar quando
+essa condição não é atendida. A provisão de realms criados/habilitados em runtime e a rotação permanecem no
+futuro fluxo administrativo/KMS.
 
 ### Composição de host e testes
 
@@ -573,7 +573,7 @@ cenários DF6 provam dois realms isolados com ids/handles colidentes em todos os
 
 | Camada | Conteúdo | Hoje | Alvo |
 |---|---|---|---|
-| Host/produto | realms internos, `server_admin`; provisão de keys pelo `FirstKeyJob` do core | realms/client embutidos no fake via `AddInMemoryStorage`; o job é registrado por `AddOpenIdConnectProviderServices` e persiste pela facade `IKeyStore` | seed explícito de composição/migração; P2 implementa a persistência de keys, enquanto a orquestração resolve a lacuna de provisão registrada acima |
+| Host/produto | realms internos, `server_admin`; provisão de keys pelo `FirstKeyJob` do core | realms/client embutidos no fake via `AddInMemoryStorage`; o job é registrado por `AddOpenIdConnectProviderServices` e persiste pela facade `IKeyStore` | seed explícito de composição/migração; P2 remove o job, semeia key por realm habilitado e valida sua usabilidade no startup; admin/KMS futuro assume criação/rotação em runtime |
 | Dev/demo | demo realm, demo clients, `apiserver`, alice/bob | embutido no fake | seed de dev/demo do host, opcional, fora do provider |
 | Fixture compartilhada | `AppFactory`/`Tests.Host` (fluxos HTTP); `StorageContractHarness` (contract tests) | AppFactory herda todo o seed do fake; harness cria o próprio estado | P4: fixture fornece realms/handles e seed mínimo pela composição corrente |
 | Cenário | clients/resources/keys/contas únicos por teste (sufixos aleatórios) | mutação direta de dictionary (56 ocorrências) | hooks test-only → facades/seed do provider conforme tabela de categorias |
@@ -658,7 +658,7 @@ cita a decisão DF e a fonte normativa ou a regra protocolar/negocial que o sust
 | ST-03 | preservar (facade) / substituir (binding global → realm-bound, MP-5) | o alvo particiona authorize parameters por realm | `AuthorizeParametersStoreContractTests` + aceite P3 |
 | ST-04..ST-11 | preservar | binding realm-bound obrigatório; realm desconhecido/excluído nunca expõe dados. O `ArgumentException` do fake é sinal aceito, não exigência do accessor EF síncrono; leitura vazia após purge também satisfaz o contrato | cenários DF6 `Same*_InTwoRealms` + indisponibilidade pós-delete |
 | RL-01 | preservar | `null` em ausência; path Ordinal; unicidade de path vira índice único P2 (elimina a "ordem incidental de duplicidade") | `Save_NewRealm…`, `GetByPath_Unknown…` |
-| RL-02 | substituir | DF23 — API síncrona removida em favor de lookup async | mudança pública MP-1 |
+| RL-02 | substituir | DF23 + DF7 do P2 — método do store removido; source carrega async e consumidor síncrono lê snapshot sem I/O | mudança pública MP-1 |
 | RL-03 | preservar | `null`; id Ordinal | testes de realm |
 | RL-04 | preservar (`null` em ausência; Ordinal no store) / **substituir** (normalização lowercase — comportamento novo, MP-10) | normalização no `RealmManager` e nas bordas de consulta; `SaveAsync` direto rejeita domain não canônico no adapter EF; unicidade sobre o valor normalizado (aceite P2) | `Save_NewRealm…`, `GetByDomain_Unknown…`, casing → `null` no store + aceites P2 |
 | RL-05 | preservar | enumeração completa como conjunto; ordem `descartar` | `GetAll_ContainsSavedRealms` |
@@ -733,10 +733,10 @@ O fake não recebe TTL/particionamento (ADR-018); os itens 1-5 são testes de ac
 
 | # | Mudança | Linha/decisão | Plano |
 |---|---|---|---|
-| MP-1 | Remover `IRealmStore.GetByPath` síncrono. O consumidor (`ConfigureRealmCookieAuthenticationOptions`) implementa `IConfigureNamedOptions<CookieAuthenticationOptions>.Configure`, que é **síncrono por assinatura da infraestrutura de options** — "migrar para async" não é executável diretamente. A semântica está fechada (não fazer I/O síncrono); o desenho interno é decisão explícita do P2 entre: (a) snapshot/cache de realms carregado assincronamente (startup + invalidação em `SaveAsync`), com `Configure` lendo somente do cache; (b) reformular a configuração das cookie options para derivar do realm já resolvido pelo `UseRealmDiscovery` (repensando o ciclo de vida das named options, que hoje são cacheadas por scheme); ou (c) outro redesign que preserve a mesma restrição. A remoção do método síncrono só ocorre após o consumidor migrar. | RL-02 / DF23 | P2 (design interno, não semântica de storage) |
+| MP-1 | Remover `IRealmStore.GetByPath` síncrono. **Desenho fechado por DF7 do P2:** `IConfigurationSnapshotSource` carrega assincronamente um snapshot defensivo antes do tráfego e em refresh periódico; os consumidores síncronos leem somente o snapshot. Após publicação válida, o loader remove do `IOptionsMonitorCache<CookieAuthenticationOptions>` somente o scheme default e a união dos schemes de realm anterior/novo; falha mantém snapshot/options last-known-good. A remoção do método síncrono só ocorre após todos os callers inventariados migrarem. | RL-02 / DF23 + DF7/DF26 do P2 | P2 |
 | MP-2 | Operação atômica de consumo single-use de authorization code (substitui o par get+remove no fluxo de token) | AC-02/AC-03 / DF15 | P3 |
 | MP-3 | Transição condicional/atômica de refresh token (consumo/rotação; substitui o `UpdateAsync` CAS-trivial) | RT-03 / DF15 | P3 |
-| MP-4 | Correção do lifecycle de provisão de keys: `FirstKeyJob` idempotente por realm (sem `return` prematuro) e provisão na criação de realm em runtime | lacuna Fase 4 | P2 (job/orquestração; sem mudança de contrato de storage) |
+| MP-4 | **SUPERSEDED por DF19/DF27/DF28 do P2:** não corrigir nem manter o `FirstKeyJob`; removê-lo da composição, provisionar uma key utilizável por realm habilitado via runner/seed e falhar startup se material/algoritmo forem inválidos. Provisão/rotação em runtime pertence ao futuro admin/KMS. | lacuna Fase 4 | P2 (seed + validação); admin/KMS futuro |
 | MP-5 | Authorize parameters: contrato global → realm-bound (accessor por realm), TTL absoluto gravado na escrita com janela configurável por realm (default numérico é decisão de produto documentada pelo P3), leitura fail-closed de expirado, purge de abandonados e regeneração de handle em colisão — semânticas de storage fechadas na seção "Fechamento de `IAuthorizeParametersStore`" | ST-03, AP-01..AP-03 / DF6, DF19 | P3 |
 | MP-6 | Cleanup físico/TTL por tipo Operational (tokens, codes, consents, sessões), separado da leitura lógica | DF19 | P3 |
 | MP-7 | Semântica de exclusão de realm: tombstone Configuration + purge Operational + reserva de path/domain (não muda assinatura de `DeleteAsync`) | RL-07 / DF20 | P2/P3; seam cross-family em ADR própria futura |
@@ -758,7 +758,7 @@ migração exige transação cross-família (DF21).
 1. `ServerOptions` (base de tudo; materialização sem instância compartilhada);
 2. Realms + `RealmOptions` (inclui tombstone, índices únicos de path/domain e reserva — MP-7; e MP-1);
 3. Clients (inclui a write facade/seed test-only exigida pelo gate do P4);
-4. Keys (persistência do `AddKeyAsync` + reject de duplicidade + MP-4).
+4. Keys (persistência do `AddKeyAsync` legado + reject de duplicidade + seed/validação de DF19/DF27/DF28 do P2; MP-4 superada).
 
 **Resources/scopes não entram no P2** (DF22): o adapter EF compõe uma ponte transitória para RS-*
 (implementação em memória semeada por composição), sem persistir o shape instável; a persistência real

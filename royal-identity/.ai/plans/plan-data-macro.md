@@ -1,6 +1,6 @@
 # Macro-plano: Persistência de dados do IdP e aposentadoria do fake
 
-## Status: EM EXECUÇÃO — Planos 0 e 1 concluídos; próximo: Plano 2
+## Status: EM EXECUÇÃO — Planos 0 e 1 concluídos; Plano 2 em rascunho, com decisões fechadas e pronto para execução
 
 Este documento organiza os próximos planos de dados após:
 
@@ -31,7 +31,7 @@ com SQLite/PostgreSQL, preservando as fronteiras da ADR-013:
 |---|---|---|
 | 0 | `plan-users-accounts-sqlite-hardening.md` | Fechar retry, migrations e seed do módulo `UserAccounts`. **CONCLUÍDO.** |
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos atuais e comportamento do `MemoryStorage`. **CONCLUÍDO (2026-07-22, 5/5 fases).** |
-| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. |
+| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. **RASCUNHO (0/7, Q1-Q18 fechadas).** |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais do IdP. |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real. |
 | 5 | `plan-data-caching.md` | Adicionar cache sobre os stores EF quando a semântica estiver estável. |
@@ -72,13 +72,15 @@ resolver pendências internas do módulo.
   propagação de `CancellationToken`, disposal do adapter);
 - gate do Plano 4 definido (o que precisa existir antes de trocar o backing default dos testes).
 
-Os Planos 2 e 3 devem ser criados consumindo a matriz sem re-inferir semântica.
+O Plano 2 foi criado consumindo a matriz sem re-inferir semântica; o Plano 3 deve seguir a mesma regra.
 
 ---
 
 ## Plano 2 - `plan-data-configuration-storage.md`
 
-**Escopo:** dados de configuração de baixa rotatividade.
+**CRIADO em 2026-07-22 (rascunho, 0/7 fases, Q1-Q18 fechadas; pronto para execução).**
+
+**Escopo:** dados de configuração duráveis e de baixa rotatividade.
 
 Projetos esperados:
 
@@ -86,24 +88,27 @@ Projetos esperados:
 - `RoyalIdentity.Storage.EntityFramework`
 - `RoyalIdentity.Storage.EntityFramework.Sqlite`
 - `RoyalIdentity.Storage.EntityFramework.PostgreSql`
+- `RoyalIdentity.Migrations`
 
 Dados alvo:
 
+- `ServerOptions`;
 - realms;
 - realm options;
 - clients;
-- resources/scopes;
 - signing keys e metadados de chaves enquanto KMS não existir.
 
-Fases sugeridas:
+`Resources/scopes` não são persistidos pela DF22 do baseline: permanecem numa bridge volátil até o redesign.
 
-1. Criar projeto `Data.Configuration` com entidades persistentes puras.
-2. Mapear EFCore para SQLite primeiro.
-3. Implementar stores de leitura/escrita de realm.
-4. Implementar stores de clients e resources/scopes.
-5. Implementar store de keys no escopo compatível com o core atual.
-6. Adicionar provider PostgreSQL e migrations.
-7. Rodar suíte de integração com configuration storage EF opt-in.
+Fases fechadas no plano executor:
+
+1. Fronteiras, projetos e modelo extensível.
+2. Modelo híbrido e provider SQLite.
+3. Adapter, lifecycle e snapshot assíncrono.
+4. ServerOptions, realms, clients e bridge de resources.
+5. Proteção e persistência de signing keys.
+6. PostgreSQL, migrations, runner e seeds.
+7. Paridade, integração e fechamento.
 
 Fora de escopo:
 
@@ -111,6 +116,9 @@ Fora de escopo:
 - sessões/tokens/codes/consents;
 - UI/API administrativa;
 - KMS completo.
+
+Decisões operacionais principais: o host padrão continua in-memory; o IdP não escreve Configuration; migrations e
+seed opcional rodam em `RoyalIdentity.Migrations`, nunca no host; SQL revisável é o caminho preferido em produção.
 
 ---
 
