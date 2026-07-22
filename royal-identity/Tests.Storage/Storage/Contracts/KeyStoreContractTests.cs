@@ -4,10 +4,11 @@ namespace Tests.Storage.Contracts;
 
 /// <summary>
 /// Contract of <c>IKeyStore</c> (matrix KY-01..KY-05): key availability windows and historical retention
-/// are product rules (`preservar`); listing order by creation is chronological by rule. Absence semantics of
-/// <c>GetKeyAsync</c> (today an <c>ArgumentException</c> outlier) stays open for Fase 5 (DF25) and is not
-/// locked here. Exact boundary instants (`NotBefore`/`Expires` equality) close with DF19 in Fase 5, so the
-/// scenarios use instants clearly inside/outside the windows.
+/// are product rules (`preservar`); listing order by creation is chronological by rule. Fase 5 closed the
+/// remaining semantics: absence of <c>GetKeyAsync</c>/<c>GetKeysAsync</c> throws <c>ArgumentException</c>
+/// (ids come from the store's own listings — absence signals inconsistency), window boundaries are
+/// inclusive (<c>NotBefore &lt;= now &lt;= Expires</c>, <c>null</c> = unbounded), and <c>GetKeysAsync</c>
+/// returns keys in the requested order (DF24 rule-backed order).
 /// </summary>
 public abstract class KeyStoreContractTests : StorageContractTests
 {
@@ -49,6 +50,26 @@ public abstract class KeyStoreContractTests : StorageContractTests
 		Assert.DoesNotContain("key-future", currentIds);
 	}
 
+	// KY-02 (Fase 5/DF19 closed): window boundaries are inclusive — a key whose NotBefore equals now and a
+	// key whose Expires equals now are both current.
+	[Fact]
+	public async Task ListAllCurrentKeysIds_WindowBoundaries_AreInclusive()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetKeyStore(harness.RealmA);
+		var now = Start;
+
+		await store.AddKeyAsync(NewKey("key-nb-boundary", now.AddDays(-1),
+			notBefore: now, expires: now.AddDays(1)), default);
+		await store.AddKeyAsync(NewKey("key-exp-boundary", now.AddDays(-2),
+			notBefore: now.AddDays(-1), expires: now), default);
+
+		var currentIds = await store.ListAllCurrentKeysIdsAsync(now, default);
+
+		Assert.Contains("key-nb-boundary", currentIds);
+		Assert.Contains("key-exp-boundary", currentIds);
+	}
+
 	// KY-03 `preservar` (product): keys used to sign remain available for validation after expiring;
 	// only future keys are excluded.
 	[Fact]
@@ -72,6 +93,22 @@ public abstract class KeyStoreContractTests : StorageContractTests
 		Assert.DoesNotContain("key-future", allIds);
 	}
 
+	// KY-03 (Fase 5/DF19): the historical-key lower boundary is inclusive — a key becomes available for
+	// validation exactly at NotBefore.
+	[Fact]
+	public async Task ListAllKeysIds_NotBeforeBoundary_IsInclusive()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetKeyStore(harness.RealmA);
+		var now = Start;
+
+		await store.AddKeyAsync(NewKey("key-history-nb-boundary", now.AddDays(-1), notBefore: now), default);
+
+		var allIds = await store.ListAllKeysIdsAsync(now, default);
+
+		Assert.Contains("key-history-nb-boundary", allIds);
+	}
+
 	// KY-02/KY-03 `preservar`: listings are ordered chronologically by creation (rule-backed order — DF24).
 	[Fact]
 	public async Task KeyListings_AreOrderedByCreation()
@@ -88,9 +125,10 @@ public abstract class KeyStoreContractTests : StorageContractTests
 		Assert.Equal(["key-first", "key-second", "key-third"], currentIds);
 	}
 
-	// KY-05: requested keys are returned matching the requested ids.
+	// KY-05 (Fase 5/DF24): the result comes in the order of the requested ids — a rule-backed order
+	// (correspondence to the request), not creation or backing order.
 	[Fact]
-	public async Task GetKeys_ReturnsTheRequestedKeys()
+	public async Task GetKeys_ReturnsKeysInRequestedOrder()
 	{
 		await using var harness = await CreateHarnessAsync();
 		var store = harness.Storage.GetKeyStore(harness.RealmA);
@@ -98,11 +136,33 @@ public abstract class KeyStoreContractTests : StorageContractTests
 		await store.AddKeyAsync(NewKey("key-one", Start.AddHours(-2)), default);
 		await store.AddKeyAsync(NewKey("key-two", Start.AddHours(-1)), default);
 
-		var keys = await store.GetKeysAsync(["key-one", "key-two"], default);
+		var keys = await store.GetKeysAsync(["key-two", "key-one"], default);
 
-		Assert.Equal(2, keys.Count);
-		Assert.Contains(keys, k => k.KeyId == "key-one");
-		Assert.Contains(keys, k => k.KeyId == "key-two");
+		Assert.Equal(["key-two", "key-one"], keys.Select(k => k.KeyId));
+	}
+
+	// KY-04 (Fase 5/DF25): absence throws — key ids come from the store's own listings, so a missing id
+	// signals inconsistency, not normal flow. ArgumentException is the parity signal (current contract).
+	[Fact]
+	public async Task GetKey_UnknownKeyId_ThrowsArgumentException()
+	{
+		await using var harness = await CreateHarnessAsync();
+
+		await Assert.ThrowsAsync<ArgumentException>(() =>
+			harness.Storage.GetKeyStore(harness.RealmA).GetKeyAsync("contract-unknown-key", default));
+	}
+
+	// DF18: key ids are opaque and compare Ordinal. The key-lookup absence contract remains the KY-04
+	// ArgumentException outlier.
+	[Fact]
+	public async Task GetKey_KeyIdDifferingOnlyByCase_ThrowsArgumentException()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetKeyStore(harness.RealmA);
+		await store.AddKeyAsync(NewKey("contract-case-key", Start), default);
+
+		await Assert.ThrowsAsync<ArgumentException>(() =>
+			store.GetKeyAsync("CONTRACT-CASE-KEY", default));
 	}
 
 	// DF6: the same key id in two realms resolves to each realm's own key material.

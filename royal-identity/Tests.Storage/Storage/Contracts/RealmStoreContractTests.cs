@@ -30,8 +30,8 @@ public abstract class RealmStoreContractTests : StorageContractTests
 		Assert.Equal(realm.Id, byDomain.Id);
 	}
 
-	// RL-03: absent lookup returns null. Load-bearing for realm discovery (404 realm_not_found);
-	// final absence semantics per method close in Fase 5 (DF25).
+	// RL-03 (Fase 5/DF25 closed): absent lookup returns null. Load-bearing for realm discovery
+	// (404 realm_not_found).
 	[Fact]
 	public async Task GetById_UnknownRealm_ReturnsNull()
 	{
@@ -53,9 +53,36 @@ public abstract class RealmStoreContractTests : StorageContractTests
 		Assert.Null(realm);
 	}
 
-	// RL-06: saving an existing realm persists the new configuration and must not destroy the realm's
-	// operational data (IRealmManager.UpdateAsync depends on this; the duplicate-write policy per
-	// operation is refined in Fase 5 — DF16). A fresh Realm instance with the same id is saved so the
+	// RL-04 (Fase 5/DF25): absent domain lookup returns null. Domain comparison is Ordinal over the
+	// value normalized (lowercase) at the write edge — never provider collation (DF18).
+	[Fact]
+	public async Task GetByDomain_UnknownDomain_ReturnsNull()
+	{
+		await using var harness = await CreateHarnessAsync();
+
+		var realm = await harness.Storage.Realms.GetByDomainAsync("unknown.contract.test", default);
+
+		Assert.Null(realm);
+	}
+
+	// DF18 (Fase 5): path and domain lookups are Ordinal at the store — values differing only by casing do
+	// not match. Domain normalization (lowercase) belongs to the edges (MP-10, new behavior for the EF
+	// provider/manager), never to the store or provider collation.
+	[Fact]
+	public async Task GetByIdPathOrDomain_DifferingOnlyByCase_ReturnsNull()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var realm = await harness.CreateRealmAsync("case");
+
+		Assert.Null(await harness.Storage.Realms.GetByIdAsync(realm.Id.ToUpperInvariant(), default));
+		Assert.NotNull(await harness.Storage.Realms.GetByPathAsync(realm.Path, default));
+		Assert.Null(await harness.Storage.Realms.GetByPathAsync(realm.Path.ToUpperInvariant(), default));
+		Assert.Null(await harness.Storage.Realms.GetByDomainAsync(realm.Domain.ToUpperInvariant(), default));
+	}
+
+	// RL-06 (Fase 5/DF16 closed: SaveAsync is upsert by method semantics): saving an existing realm
+	// persists the new configuration and must not destroy the realm's operational data
+	// (IRealmManager.UpdateAsync depends on this). A fresh Realm instance with the same id is saved so the
 	// assertion cannot be satisfied by mutating a live reference already held by the backing (DF17).
 	[Fact]
 	public async Task Save_ExistingRealm_UpdatesConfiguration_AndKeepsOperationalData()
@@ -110,7 +137,7 @@ public abstract class RealmStoreContractTests : StorageContractTests
 		Assert.NotNull(stillThere);
 	}
 
-	// RL-07: deleting an unknown realm reports false today; final absence semantics close in Fase 5 (DF25).
+	// RL-07 (Fase 5/DF25 closed): deleting an unknown realm reports false, idempotently.
 	[Fact]
 	public async Task Delete_UnknownRealm_ReturnsFalse()
 	{
@@ -122,16 +149,27 @@ public abstract class RealmStoreContractTests : StorageContractTests
 	}
 
 	// RL-07 + DF20: observable effects of deleting a common realm, valid for both the fake's hard delete
-	// and the future EF tombstone — the realm stops resolving by id/path/domain and its operational data
-	// becomes inaccessible. No physical presence (row/tombstone) is inspected.
+	// and the future EF tombstone — the realm stops resolving by id/path/domain and data previously stored
+	// in EVERY realm-bound store (ST-04..ST-11) becomes inaccessible. No physical presence (row/tombstone)
+	// is inspected.
 	[Fact]
-	public async Task Delete_CommonRealm_MakesRealmUnresolvable_AndOperationalDataInaccessible()
+	public async Task Delete_CommonRealm_MakesRealmUnresolvable_AndAllRealmBoundDataInaccessible()
 	{
 		await using var harness = await CreateHarnessAsync();
 		var realm = await harness.CreateRealmAsync("delete-obs");
 
-		var code = NewAuthorizationCode(realm, "client-del", "subject-del");
+		await harness.SeedClientAsync(NewClient(realm, "del-client"));
+		await harness.SeedIdentityScopeAsync(realm, NewIdentityScope("contract:del-scope"));
+		await harness.Storage.GetKeyStore(realm).AddKeyAsync(NewKey("del-key", Start), default);
+		await harness.Storage.GetAccessTokenStore(realm)
+			.StoreAsync(NewAccessToken(realm, "del-jti", "del-client"), default);
+		await harness.Storage.GetRefreshTokenStore(realm)
+			.StoreAsync(NewRefreshToken(realm, "del-handle", "del-subject", "del-client"), default);
+		var code = NewAuthorizationCode(realm, "del-client", "del-subject");
 		await harness.Storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
+		await harness.Storage.GetUserConsentStore(realm)
+			.StoreUserConsentAsync(NewConsent(realm, "del-subject", "del-client", "openid"), default);
+		await harness.Storage.GetUserSessionStore(realm).CreateAsync(NewSession("del-sid", "del-subject"));
 
 		var deleted = await harness.Storage.Realms.DeleteAsync(realm.Id);
 
@@ -140,21 +178,42 @@ public abstract class RealmStoreContractTests : StorageContractTests
 		Assert.Null(await harness.Storage.Realms.GetByPathAsync(realm.Path, default));
 		Assert.Null(await harness.Storage.Realms.GetByDomainAsync(realm.Domain, default));
 
-		// Either the realm binding refuses the deleted realm or the lookup finds nothing (EF purge); both
-		// satisfy DF20's "active data becomes inaccessible". Only ArgumentException — the binding refusal
-		// the contract exhibits today (ST-04..ST-11) — is accepted, so infrastructure failures still fail
-		// the test; if Fase 5 (DF25) redefines the refusal signal, this catch is adjusted with it.
-		AuthorizationCode? survivor = null;
+		// Every realm-bound accessor (ST-04..ST-11) must refuse the binding or find nothing (EF purge).
+		Assert.Null(await ProbeAsync(async () =>
+			await harness.Storage.GetClientStore(realm).FindClientByIdAsync("del-client", default)));
+		Assert.Null(await ProbeAsync(async () =>
+		{
+			var resources = await harness.Storage.GetResourceStore(realm)
+				.FindResourcesByScopeAsync(["contract:del-scope"], onlyEnabled: false, default);
+			return resources.IdentityScopes.FirstOrDefault(s => s.Name == "contract:del-scope");
+		}));
+		Assert.Null(await ProbeAsync(async () =>
+			await harness.Storage.GetKeyStore(realm).GetKeyAsync("del-key", default)));
+		Assert.Null(await ProbeAsync(async () =>
+			await harness.Storage.GetAccessTokenStore(realm).GetAsync("del-jti", default)));
+		Assert.Null(await ProbeAsync(async () =>
+			await harness.Storage.GetRefreshTokenStore(realm).GetAsync("del-handle", default)));
+		Assert.Null(await ProbeAsync(async () =>
+			await harness.Storage.GetAuthorizationCodeStore(realm).GetAuthorizationCodeAsync(code.Code, default)));
+		Assert.Null(await ProbeAsync(async () =>
+			await harness.Storage.GetUserConsentStore(realm).GetUserConsentAsync("del-subject", "del-client", default)));
+		Assert.Null(await ProbeAsync(async () =>
+			await harness.Storage.GetUserSessionStore(realm).FindByIdAsync("del-sid", default)));
+	}
+
+	// ArgumentException is the fake's current binding-refusal signal. It is an accepted observable effect of
+	// DF20, but not required from a synchronous EF accessor; returning no data after purge is equally valid.
+	// Any other exception is an infrastructure failure and fails the test.
+	private static async Task<T?> ProbeAsync<T>(Func<Task<T?>> read) where T : class
+	{
 		try
 		{
-			survivor = await harness.Storage.GetAuthorizationCodeStore(realm)
-				.GetAuthorizationCodeAsync(code.Code, default);
+			return await read();
 		}
 		catch (ArgumentException)
 		{
-			// binding refusal is an accepted observable effect
+			return null;
 		}
-		Assert.Null(survivor);
 	}
 
 	// ── Plano 2 acceptance (registered, NOT tested against the transitional fake — ADR-018/DF20): ──

@@ -1,10 +1,10 @@
 # Plan: Baseline dos contratos de storage do IdP (`plan-data-storage-baseline`)
 
-## Status: EM EXECUÇÃO - Fases 1-4 de 5 concluídas
+## Status: CONCLUÍDO - 5 de 5 fases
 
 ## Progresso
 
-`████░` **80%** - 4 de 5 fases concluídas
+`█████` **100%** - 5 de 5 fases concluídas
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Classificação por ciclo de vida e fronteira | Concluida |
 | Fase 3 - Contract tests reutilizáveis | Concluida |
 | Fase 4 - Seeds, dados globais e dependências entre stores | Concluida |
-| Fase 5 - Paridade obrigatória e ordem de migração | Pendente |
+| Fase 5 - Paridade obrigatória e ordem de migração | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -781,25 +781,85 @@ risco. Nenhuma decisão de schema/provider entra aqui.
 
 **Tarefas:**
 
-- [ ] Aplicar DF15-DF25 a cada linha da matriz, detalhando as escolhas exigidas por store, campo, tipo e método.
-- [ ] Classificar cada comportamento como `preservar`, `descartar` ou `substituir`, com fonte e plano destino.
-- [ ] Remover/ajustar testes que tenham cristalizado comportamento descartado durante a caracterização.
-- [ ] Garantir teste provider-neutral para todo comportamento final marcado `preservar`.
-- [ ] Produzir lista explícita de mudanças públicas requeridas antes/durante os Planos 2/3, sem implementá-las.
-- [ ] Ordenar stores de configuração e operacionais respeitando dependências e o bloqueio de DF22.
-- [ ] Definir o gate que permite ao Plano 4 trocar o backing default e remover acessos ao fake.
-- [ ] Atualizar `plan-data-macro.md`, `plans-roadmap-02.md`, backlog e AGENTS.md com o resultado real quando concluído.
-- [ ] Executar a suíte completa e registrar contagens, skips e limitações.
+- [x] Aplicar DF15-DF25 a cada linha da matriz, detalhando as escolhas exigidas por store, campo, tipo e método.
+- [x] Classificar cada comportamento como `preservar`, `descartar` ou `substituir`, com fonte e plano destino.
+- [x] Remover/ajustar testes que tenham cristalizado comportamento descartado durante a caracterização.
+- [x] Garantir teste provider-neutral para todo comportamento final marcado `preservar`.
+- [x] Produzir lista explícita de mudanças públicas requeridas antes/durante os Planos 2/3, sem implementá-las.
+- [x] Ordenar stores de configuração e operacionais respeitando dependências e o bloqueio de DF22.
+- [x] Definir o gate que permite ao Plano 4 trocar o backing default e remover acessos ao fake.
+- [x] Atualizar `plan-data-macro.md`, `plans-roadmap-02.md`, backlog e AGENTS.md com o resultado real quando concluído.
+- [x] Executar a suíte completa e registrar contagens, skips e limitações.
 
-**Critérios de aceite:** zero perguntas abertas; toda linha do catálogo tem classificação final, teste ou justificativa
-de descarte, owner e plano destino; ordem de migração não contém dependência circular; Planos 2/3/4 conseguem usar o
-artefato sem inferir semântica; suíte completa verde.
+**Critérios de aceite:** zero semânticas de storage abertas; toda linha do catálogo tem classificação final, teste ou
+justificativa de descarte, owner e plano destino; escolhas de desenho interno ou de produto que pertencem aos planos
+executores ficam nomeadas e não são confundidas com decisões do baseline; ordem de migração não contém dependência
+circular; Planos 2/3/4 conseguem usar o artefato sem inferir semântica de storage; suíte completa verde.
 
 **Testes:** contract suite focada; `dotnet build RoyalIdentity.sln`; `dotnet test RoyalIdentity.sln`.
 
 ### Resultado da Fase 5
 
-*a preencher*
+**Concluída em 2026-07-22.** A [matriz](plan-data-storage-matrix.md) ganhou a seção
+"Paridade final e ordem de migração — Fase 5", que fecha o baseline:
+
+- **Zero `avaliar` restantes.** Políticas transversais fechadas com fonte: comparadores Ordinal por campo,
+  com a única exceção de `Realm.Domain` (DNS case-insensitive — lowercase normalizado uma única vez na borda
+  de escrita, comparação Ordinal; collation nunca define a regra); ausência por família de método (lookups →
+  `null`; remoções/revogações idempotentes com contagem/`false` quando o contrato expõe; keys lançam
+  `ArgumentException` como exceção de paridade); duplicidade por semântica (upsert somente em
+  `IRealmStore.SaveAsync` e consent; todas as emissões de artefato gerado são create-only com reject no
+  provider); expiração lida sem filtro no Operational (validação nos consumidores; a tolerância de refresh
+  exige ler consumido) com bordas inclusivas fechadas para keys; ordens contratuais apenas em KY-02/03/05.
+- **Fechamento por linha** (tabela ID → classe final → decisões → teste/justificativa) cobrindo as 62 linhas
+  + RR; a seção da Fase 5 prevalece sobre a "classe inicial" histórica do inventário. `GetAllResourcesAsync`
+  (RS-01, sem caller) ficou `descartar`, candidata a remoção no redesign.
+- **Mudanças públicas MP-1..MP-10** registradas sem implementar (DF1): remoção do `GetByPath` síncrono,
+  consumo atômico de code, transição condicional de refresh, correção da provisão de keys, TTL/particionamento
+  de authorize parameters, cleanup por tipo, tombstone/reserva de realm, normalização de domain e duas
+  candidatas não requeridas (remoção de RS-01; lookup de sessão por subject).
+- **Ordem de migração sem ciclo:** P2 — ServerOptions → Realms/Options → Clients → Keys (resources ficam
+  fora por DF22, com ponte transitória em memória na composição do adapter); P3 — access tokens → consents →
+  sessões → codes (atômico) → refresh (condicional) → authorize parameters + cleanup. Gate do P4 ampliado:
+  além do gate da Fase 4, a contract suite precisa estar verde nas fixtures EF e os aceites `substituir`
+  implementados.
+- **Suíte ajustada ao alvo em três rodadas:** +8 cenários (ausência de domain, exceção de key ausente,
+  leituras de registros logicamente expirados/consumidos em AT/RT/AC/CN/SS, fail-closed do message store) e
+  2 reforçados (ordem da requisição em `GetKeysAsync`; idempotência do `EndAsync`); depois, na revisão,
+  +7 cenários (bordas inclusivas de keys em `NotBefore == now`/`Expires == now`; casing Ordinal em realm
+  path/domain, client id, jti, handle de refresh, par de consent e sid) e o cenário de exclusão de realm
+  reformulado para semear e sondar os oito accessors realm-bound. Nenhum cenário removido — nenhum teste
+  assertava comportamento fechado como `descartar`. Após o fechamento residual, +8 cenários cobrem KY-03 e
+  os identificadores/colunas Ordinal ainda não falsificados; total: 101 cenários verdes.
+- **Documentos atualizados com o resultado real:** `plan-data-macro.md` (Plano 1 concluído),
+  `plans-roadmap-02.md` (baseline no Concluído; próximo passo = Plano 2), `backlog-001.md` (nova entrada:
+  replay cache com proteção real) e `AGENTS.md` (plano concluído, `Tests.Storage` na suíte).
+
+**Revisão pós-conclusão (2026-07-22):** uma análise externa apontou cinco achados substantivos e um de
+documentação, todos confirmados e aplicados: (1) as decisões de authorize parameters que haviam sido
+delegadas ao P3 foram fechadas no baseline — alvo realm-bound (MP-5, contrato), TTL absoluto gravado na
+escrita com janela configurável por realm (o valor default é decisão de produto do P3, pois
+[RFC 9126 §2.2](https://www.rfc-editor.org/rfc/rfc9126.html#section-2.2)
+não define um valor obrigatório e o estado interno atravessa login+consent), leitura fail-closed de expirado,
+cleanup lazy+purge e regeneração de handle em colisão (seção "Fechamento de `IAuthorizeParametersStore`" na
+matriz); (2) MP-1 foi reescrita como executável — `Configure` de cookie options é síncrono por assinatura da
+infraestrutura, então o P2 recebe as alternativas arquiteturais (snapshot/cache assíncrono, reformulação por
+realm resolvido, ou redesign) em vez de um "migrar para async" impossível; (3) a normalização lowercase de
+`Realm.Domain` foi reclassificada como comportamento novo (`substituir`, MP-10): o `RealmManager` é a borda
+canônica, consultas normalizam antes do store e o adapter EF rejeita `SaveAsync` direto com domain não
+canônico; (4) regras fechadas ganharam falsificação — bordas
+inclusivas de keys, casing Ordinal em seis stores e a exclusão de realm sondando os oito accessors
+ST-04..ST-11; (5) o sinal observável dos rejects create-only foi definido (falha visível, nunca
+overwrite/sucesso silencioso; tipo de exceção não é contrato) e todos os rejects + AP entraram na tabela de
+aceites; (6) os comentários da suíte que ainda tratavam a Fase 5 como futura foram atualizados.
+
+Validação final: `dotnet test Tests.Storage` — 101 aprovados, 0 falhas; `dotnet test RoyalIdentity.sln` —
+665 aprovados, 0 falhas, 1 ignorado (PostgreSQL opt-in preexistente de `Tests.UserAccounts`). Limitações
+registradas: os rejects de create-only, as operações atômicas de DF15, o tombstone/reserva de realm, o
+realm-binding/TTL de authorize parameters, a normalização de domain nas bordas, a propagação de
+`CancellationToken` e o disposal real do adapter não são falsificáveis contra o fake transitório (ADR-018)
+e vivem como testes de aceite dos Planos 2/3 na tabela da matriz. Todos os critérios globais de conclusão
+do plano foram atendidos.
 
 ---
 

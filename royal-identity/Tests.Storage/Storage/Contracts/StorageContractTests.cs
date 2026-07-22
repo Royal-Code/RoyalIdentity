@@ -15,11 +15,11 @@ namespace Tests.Storage.Contracts;
 ///     (<c>InMemory</c> today; the EF providers add their own without rewriting scenarios — DF2/DF13).
 /// </para>
 /// <para>
-///     Scenarios only lock behaviors already decided (`preservar` lines of plan-data-storage-matrix.md) or
-///     load-bearing observed behavior explicitly annotated as pending final semantics (Fase 5 / DF25).
-///     Behaviors classified `substituir` (atomic code consumption, refresh-token conditional transition,
-///     tombstone path/domain reservation) are acceptance requirements of Planos 2/3 and are NOT tested against
-///     the transitional fake (ADR-018).
+///     Scenarios lock only behaviors with a final `preservar` classification in the Fase 5 closure of
+///     plan-data-storage-matrix.md ("Paridade final e ordem de migração"). Behaviors classified
+///     `substituir` (atomic code consumption, refresh-token conditional transition, tombstone path/domain
+///     reservation, create-only duplicate rejects, authorize-parameters realm binding/TTL) are acceptance
+///     requirements of Planos 2/3 and are NOT tested against the transitional fake (ADR-018).
 /// </para>
 /// </summary>
 public abstract class StorageContractTests
@@ -28,6 +28,24 @@ public abstract class StorageContractTests
 	protected static readonly DateTime Start = StorageContractHarness.Start;
 
 	protected abstract Task<StorageContractHarness> CreateHarnessAsync();
+
+	/// <summary>Returns the same opaque identifier with the casing of its first letter changed.</summary>
+	protected static string WithDifferentLetterCase(string value)
+	{
+		var chars = value.ToCharArray();
+		for (var i = 0; i < chars.Length; i++)
+		{
+			if (!char.IsLetter(chars[i]))
+				continue;
+
+			chars[i] = char.IsUpper(chars[i])
+				? char.ToLowerInvariant(chars[i])
+				: char.ToUpperInvariant(chars[i]);
+			return new string(chars);
+		}
+
+		throw new InvalidOperationException("The identifier must contain at least one letter.");
+	}
 
 	// ─── Model builders (contract-level data; no live-reference or identity assumptions — DF17) ───
 
@@ -50,10 +68,11 @@ public abstract class StorageContractTests
 
 	protected static AccessToken NewAccessToken(
 		Realm realm, string jti, string clientId, string? subjectId = null,
-		AccessTokenType accessTokenType = AccessTokenType.Jwt)
+		AccessTokenType accessTokenType = AccessTokenType.Jwt,
+		DateTime? creationTime = null, int lifetime = 3600)
 	{
-		var token = new AccessToken(clientId, "https://issuer.contract.test", accessTokenType, Start, 3600, jti,
-			"Bearer")
+		var token = new AccessToken(clientId, "https://issuer.contract.test", accessTokenType,
+			creationTime ?? Start, lifetime, jti, "Bearer")
 		{
 			RealmId = realm.Id,
 		};
@@ -64,24 +83,31 @@ public abstract class StorageContractTests
 		return token;
 	}
 
-	protected static RefreshToken NewRefreshToken(Realm realm, string handle, string subjectId, string clientId)
+	protected static RefreshToken NewRefreshToken(
+		Realm realm, string handle, string subjectId, string clientId,
+		DateTime? creationTime = null, int lifetime = 3600)
 		=> new(subjectId, $"sid-{handle}", $"jti-{handle}", ["openid"], clientId, "https://issuer.contract.test",
-			Start, 3600, handle)
+			creationTime ?? Start, lifetime, handle)
 		{
 			RealmId = realm.Id,
 		};
 
-	protected static AuthorizationCode NewAuthorizationCode(Realm realm, string clientId, string subjectId)
+	protected static AuthorizationCode NewAuthorizationCode(
+		Realm realm, string clientId, string subjectId, DateTime? creationTime = null, int lifetime = 300)
 	{
 		var subject = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", subjectId)], "contract"));
-		return new AuthorizationCode(clientId, subject, "session-state", Start, 300, new RequestedResources(),
-			"https://client.contract.test/callback")
+		return new AuthorizationCode(clientId, subject, "session-state", creationTime ?? Start, lifetime,
+			new RequestedResources(), "https://client.contract.test/callback")
 		{
 			RealmId = realm.Id,
 		};
 	}
 
 	protected static Consent NewConsent(Realm realm, string subjectId, string clientId, params string[] scopes)
+		=> NewConsent(realm, subjectId, clientId, expiration: null, scopes);
+
+	protected static Consent NewConsent(
+		Realm realm, string subjectId, string clientId, DateTime? expiration, params string[] scopes)
 	{
 		var consent = new Consent
 		{
@@ -89,12 +115,14 @@ public abstract class StorageContractTests
 			ClientId = clientId,
 			RealmId = realm.Id,
 			CreationTime = Start,
+			Expiration = expiration,
 		};
 		consent.AddScopes(scopes.Select(s => new ConsentedScope { Scope = s, CreationTime = Start }));
 		return consent;
 	}
 
-	protected static UserSession NewSession(string sessionId, string subjectId, bool isActive = true) => new()
+	protected static UserSession NewSession(
+		string sessionId, string subjectId, bool isActive = true, DateTime? expiresAt = null) => new()
 	{
 		Id = sessionId,
 		SubjectId = subjectId,
@@ -103,6 +131,7 @@ public abstract class StorageContractTests
 		StartedAt = Start,
 		LastSeenAt = Start,
 		IsActive = isActive,
+		ExpiresAt = expiresAt,
 	};
 
 	protected static IdentityScope NewIdentityScope(string name, bool enabled = true)

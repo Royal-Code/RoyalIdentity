@@ -30,13 +30,19 @@ migrations for `.Sqlite`/`.PostgreSql` replacing `EnsureCreated`, PostgreSQL one
 validated against a real ephemeral PostgreSQL 17 via Podman; single reusable
 module seed, `Tests.UserAccounts/UserAccountsModuleSeed.cs`, linked into
 `Tests.Integration`, replacing duplicated Alice/Bob seeding, plus an expanded
-opt-in OIDC regression). Treat each as the implemented target architecture
-before changing the area it covers.
+opt-in OIDC regression), and `.ai/plans/plan-data-storage-baseline.md` (5/5
+phases: full inventory of the IdP storage contracts in
+`.ai/plans/plan-data-storage-matrix.md` — ownership, seeds, per-operation
+semantics closed via DF15-DF25, public changes MP-1..MP-10, and the per-store
+migration order — plus the provider-neutral contract suite `Tests.Storage`,
+which future EF providers reuse by adding fixtures only). Treat each as the
+implemented target architecture before changing the area it covers.
 
 No active plan right now. `.ai/plans/plans-roadmap-02.md` (supersedes
-`plans-roadmap-01.md`) maps what comes next — the recommended next step is the
-first sub-plan of `.ai/plans/plan-data-macro.md` (`plan-data-storage-baseline.md`,
-not yet created).
+`plans-roadmap-01.md`) maps what comes next — the recommended next step is
+sub-plan 2 of `.ai/plans/plan-data-macro.md` (`plan-data-configuration-storage.md`,
+not yet created), which must consume the storage matrix without re-inferring
+semantics.
 
 Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:
@@ -144,6 +150,9 @@ When adding storage operations:
 1. Add the method to the relevant interface under `RoyalIdentity/Contracts/Storage/`.
 2. Implement it in `RoyalIdentity.Storage.InMemory`.
 3. Update tests with in-memory storage; tests should not require an external DB.
+4. Add or update the provider-neutral contract tests in `Tests.Storage` (scenarios
+   never reference fake types; only the fixture/harness does) and record the
+   semantics in `.ai/plans/plan-data-storage-matrix.md`.
 
 Cross-realm data access is an architectural bug. Preserve these invariants:
 

@@ -6,8 +6,10 @@ Inventário estático produzido na Fase 1 de
 [plan-data-storage-baseline.md](plan-data-storage-baseline.md), em 2026-07-21.
 
 Esta versão descreve o código existente; não transforma automaticamente comportamento do fake em contrato durável.
-As classificações marcadas `avaliar` serão fechadas até a Fase 5, conforme DF3. As classificações `preservar`,
-`descartar` e `substituir` abaixo já possuem fonte normativa ou decisão fechada.
+As tabelas do inventário (Fases 1-2) registram a "classe inicial", incluindo os `avaliar` da época; **todas as
+classificações foram fechadas na seção "Paridade final e ordem de migração — Fase 5"**, que prevalece sobre a
+classe inicial em caso de divergência. As classificações `preservar`, `descartar` e `substituir` possuem fonte
+normativa ou decisão fechada.
 
 ## Escopo e contagem
 
@@ -432,9 +434,9 @@ Regras aplicadas na suíte:
   (DF17/DF18/DF24; tempo via `FakeClock`). Em particular, o update de realm (RL-06) salva uma instância nova
   com o mesmo id — a asserção não é satisfeita por mutação da referência já retida pelo backing — e RT-03
   ficou sem cenário porque o fake não consegue falsificar persistência explícita (ver aceites abaixo).
-- A recusa de binding pós-exclusão de realm aceita somente `ArgumentException` (o sinal atual de
-  ST-04..ST-11); qualquer outra exceção de infraestrutura reprova o teste. Se a Fase 5 (DF25) redefinir o
-  sinal de recusa, o catch acompanha a decisão.
+- A indisponibilidade pós-exclusão aceita o `ArgumentException` do fake como sinal de binding recusado ou
+  uma leitura vazia após o purge do provider EF; qualquer outra exceção de infraestrutura reprova o teste.
+  O contrato observável é não expor dados do realm excluído, não exigir consulta síncrona ao banco no accessor.
 - Comportamentos `avaliar` exercitados por serem load-bearing para consumidores atuais (lookups ausentes →
   `null`, remoções idempotentes, upsert de consent, no-ops de sessão ausente) estão anotados nos cenários com
   a linha da matriz e a decisão pendente (DF16/DF19/DF25); a Fase 5 pode ajustá-los sem quebrar o desenho.
@@ -453,6 +455,11 @@ Regras aplicadas na suíte:
 | Propagação de `CancellationToken` em todo I/O real | DF23 | Planos 2/3 | O fake não simula cancelamento de I/O inexistente; os providers EF devem encaminhar `ct` a queries, enumerações e `SaveChangesAsync`, com cenário de aceite próprio. |
 | Disposal real de `IStorageSession` (context/conexão) | SP-03 / DF21 | Plano 2 | Nada é assertado pós-dispose contra o fake no-op. |
 | Check+add atômico de replay | RC-01/RC-02 | plano próprio | Sem teste contra o default no-cache. |
+| Reject de duplicidade nas escritas create-only (índice único; falha visível, nunca overwrite ou sucesso silencioso) | KY-01 / AT-01, RT-01, AC-01, SS-01 / DF16 | Plano 2 (keys) / Plano 3 (operacionais) | O fake sobrescreve ou ignora silenciosamente (`descartar`); sem cenário na suíte. |
+| Regeneração interna do handle de authorize parameters em colisão | AP-01 / DF16 | Plano 3 | Handle é gerado pelo store; nunca sobrescrever nem falhar por azar de geração. |
+| Authorize parameters realm-bound + TTL absoluto + leitura fail-closed de expirado + purge de abandonados | ST-03, AP-01..AP-03 / DF6, DF19 (MP-5) | Plano 3 | Fake permanece global e sem TTL (ADR-018); semânticas fechadas na seção de fechamento de AP. |
+| Normalização lowercase de `Realm.Domain` (escrita + consulta), recusa de `SaveAsync` direto não canônico e unicidade sobre o valor normalizado | RL-04 / DF18 (MP-10) | Plano 2 | Comportamento novo; o store compara Ordinal (coberto na suíte); manager, adapter EF e consultas têm aceites próprios. |
+| Índices únicos de path/domain de realm | RL-01/RL-04 / DF16 | Plano 2 | Hoje a unicidade é premissa do caller (`RealmManager`); vira constraint do provider. |
 
 ## Seeds, dados globais e acessos diretos — Fase 4
 
@@ -546,8 +553,9 @@ estado interno, mas é acoplamento de composição ao fake: o P4 deve fornecer e
 ### Dependências mínimas de seed (ordem falsificável)
 
 1. `ServerOptions` existe antes de qualquer realm (as `RealmOptions` derivam dele).
-2. Realm salvo (`IRealmStore.SaveAsync`) antes de qualquer store realm-bound — o binding falha para realm
-   desconhecido (ST-04..ST-11).
+2. Realm salvo (`IRealmStore.SaveAsync`) antes de qualquer store realm-bound — realm desconhecido ou excluído
+   nunca pode expor dados (ST-04..ST-11); o fake recusa o binding, enquanto o EF pode materializar um store
+   cujas consultas retornam vazio após o purge.
 3. Configuração do realm antes dos fluxos que a consomem: clients (authorize/token), identity
    scopes/resource servers (discovery/grants; shape bloqueado por DF22), keys (assinatura — via
    `AddKeyAsync` ou `FirstKeyJob`).
@@ -581,6 +589,216 @@ fixture. Os acessos de `CharacterizationSeed` além de seed devem ser resolvidos
 as leituras de conta viram comportamento observável, a mutação de conta ganha rota pelo módulo ou hook test-only,
 e `FindSession` passa a capturar o `sid` no próprio fluxo e consultar a sessão por `FindByIdAsync`.
 
+## Paridade final e ordem de migração — Fase 5
+
+Fechamento produzido em 2026-07-22. Esta seção resolve todos os `avaliar` do inventário aplicando DF15-DF25;
+onde houver divergência com a "classe inicial" das tabelas acima, **esta seção prevalece** (as tabelas do
+inventário são o registro histórico das Fases 1-2). Nenhuma semântica foi inferida do fake: cada fechamento
+cita a decisão DF e a fonte normativa ou a regra protocolar/negocial que o sustenta.
+
+### Políticas transversais fechadas
+
+- **Comparadores (DF18):** todos os identificadores do catálogo comparam **Ordinal** (case-sensitive, byte a
+  byte), sem normalização no store: realm id, realm path (segmento de URL — RFC 3986), client_id (RFC 6749,
+  string opaca), jti, handle de refresh token, code, subject id (OIDC `sub` é case-sensitive), session id,
+  nomes de scope, key id, resource URI (comparação literal — RFC 8707/ADR-012) e handle de authorize
+  parameters. **Única exceção de regra:** `Realm.Domain` — DNS é case-insensitive (RFC 4343); a regra é
+  normalizar para lowercase e comparar Ordinal sobre o valor normalizado. **Essa normalização é
+  comportamento novo, não paridade preservada** (`substituir` — MP-10): hoje nem o modelo nem o fake
+  normalizam. O `RealmManager` é a borda canônica de escrita e as bordas de leitura por domain normalizam o
+  valor consultado antes de chamar o store; para que chamadas diretas ao contrato público não persistam um
+  valor não canônico, o adapter EF **rejeita** `SaveAsync` quando `Domain` não estiver em lowercase. Seeds e
+  migrações também entregam o valor já normalizado. O store **sempre** compara Ordinal. Nenhum
+  campo depende de collation do provider; collation apenas implementa a regra (índices dos providers devem
+  ser case-sensitive/binários), e a suíte cobre identificadores que diferem apenas por casing.
+- **Ausência (DF25), por família de método:** lookups `Find*`/`Get*`/`Read*` de registro retornam `null`
+  (RL-01/03/04, CL-01/02, AT-02, RT-02, AC-02, CN-02, SS-02, AP-02, MS-02); remoções e revogações são
+  idempotentes — ausência é no-op sem erro (AT-03/04, RT-04, AC-03, CN-03, AP-03), retornam contagem
+  efetiva quando o contrato a expõe (RT-05, SS-06 — repetição retorna 0) ou `false` (RL-07 para realm
+  inexistente); no-ops de sessão ausente preservados (SS-03/05, `EndAsync` retorna `null`). **Exceção
+  decidida:** `GetKeyAsync`/`GetKeysAsync` (KY-04/05) **lançam** em ausência — os ids vêm das próprias
+  listagens do store e ausência indica inconsistência, não fluxo normal; o tipo permanece o atual
+  (`ArgumentException`) como critério de paridade.
+- **Duplicidade (DF16), por semântica do método:** `IRealmStore.SaveAsync` (RL-06) e
+  `StoreUserConsentAsync` (CN-01) são **upsert** — é a semântica documentada/consumida do método
+  (`RealmManager`, `DefaultConsentService`). Todas as demais escritas persistem artefatos de identificador
+  **gerado** e são **create-only**: `AddKeyAsync` (KY-01), `StoreAsync` de access/refresh token
+  (AT-01/RT-01), `StoreAuthorizationCodeAsync` (AC-01), `CreateAsync` de sessão (SS-01) e `WriteAsync` de
+  authorize parameters (AP-01). Nelas, colisão de id é falha de integridade: o alvo é **reject** (índice
+  único do provider); os comportamentos silenciosos do fake (`TryAdd` ignorado, overwrite por indexação)
+  são `descartar` e não recebem cenário — o reject é aceite dos Planos 2/3. **Sinal observável do reject
+  fechado:** a operação falha visivelmente (exceção); o contrato **não** fixa um tipo de exceção — colisão
+  de identificador gerado com entropia adequada é falha de integridade/infraestrutura, não fluxo de negócio;
+  a garantia contratual é **nunca sobrescrever e nunca reportar sucesso silencioso**. **Exceção — AP-01:**
+  o handle é gerado pelo próprio store, então em colisão o store **regenera o handle** (retry interno) em
+  vez de falhar ou sobrescrever.
+- **Expiração (DF19), por tipo:** nenhuma leitura individual Operational filtra expiração ou consumo — o
+  registro logicamente expirado/consumido é devolvido e a validação pertence ao consumidor (token
+  validator, `LoadCode`, consent service, session service); a tolerância de refresh token **exige** ler o
+  registro consumido. As únicas leituras com janela temporal contratual são KY-02/KY-03, com bordas
+  **inclusivas** fechadas: key é corrente quando `NotBefore <= now && now <= Expires` (limite `null` =
+  sem restrição); histórica quando `NotBefore <= now` (expirada incluída, futura excluída). Retenção
+  necessária ao fluxo, expiração lógica e **remoção física (TTL/purge)** são dimensões separadas — o
+  cleanup físico por tipo é requisito do P3. **Exceção fechada — authorize parameters (AP-02):** a leitura é
+  fail-closed — registro logicamente expirado é ausente (`null`), porque retomar um authorize abandonado é
+  risco de segurança, não feature; ver o fechamento de AP abaixo.
+- **Ordem (DF24):** ordens contratuais são somente KY-02/KY-03 (cronológica por `Created`) e KY-05 (ordem
+  dos ids solicitados — correspondência à requisição). Todas as demais listagens/enumerações são conjuntos.
+- **Mutabilidade (DF17):** persistência somente por operação explícita; toda leitura pode materializar nova
+  instância; todas as live references do fake são `descartar`.
+- **Cancelamento (DF23):** operações assíncronas propagam `ct` no provider EF (aceite registrado); in-memory
+  não simula cancelamento; RL-02 é a única API síncrona e é `substituir`.
+
+### Fechamento por linha
+
+| ID(s) | Classe final | Fechamento aplicado | Teste / justificativa |
+|---|---|---|---|
+| ST-01 | preservar (accessor) / descartar (instância mutável compartilhada) | DF17 | usado por toda a fixture (`CreateRealmAsync`); sem cenário dedicado |
+| ST-02 | preservar | facade global de realms | `RealmStoreContractTests` |
+| ST-03 | preservar (facade) / substituir (binding global → realm-bound, MP-5) | o alvo particiona authorize parameters por realm | `AuthorizeParametersStoreContractTests` + aceite P3 |
+| ST-04..ST-11 | preservar | binding realm-bound obrigatório; realm desconhecido/excluído nunca expõe dados. O `ArgumentException` do fake é sinal aceito, não exigência do accessor EF síncrono; leitura vazia após purge também satisfaz o contrato | cenários DF6 `Same*_InTwoRealms` + indisponibilidade pós-delete |
+| RL-01 | preservar | `null` em ausência; path Ordinal; unicidade de path vira índice único P2 (elimina a "ordem incidental de duplicidade") | `Save_NewRealm…`, `GetByPath_Unknown…` |
+| RL-02 | substituir | DF23 — API síncrona removida em favor de lookup async | mudança pública MP-1 |
+| RL-03 | preservar | `null`; id Ordinal | testes de realm |
+| RL-04 | preservar (`null` em ausência; Ordinal no store) / **substituir** (normalização lowercase — comportamento novo, MP-10) | normalização no `RealmManager` e nas bordas de consulta; `SaveAsync` direto rejeita domain não canônico no adapter EF; unicidade sobre o valor normalizado (aceite P2) | `Save_NewRealm…`, `GetByDomain_Unknown…`, casing → `null` no store + aceites P2 |
+| RL-05 | preservar | enumeração completa como conjunto; ordem `descartar` | `GetAll_ContainsSavedRealms` |
+| RL-06 | preservar (upsert) / descartar (init de backing do fake; live reference) | DF16 — upsert é a semântica do método | `Save_ExistingRealm…` |
+| RL-07 | preservar (recusa interno; `false` ausente) / substituir (hard delete → tombstone + purge, DF20) | DF25 fechado: ausência → `false` idempotente | testes de delete + aceites P2/P3 |
+| CL-01/CL-02 | preservar | `null`; Ordinal; disabled só na API enabled | `ClientStoreContractTests` |
+| RS-01 | descartar | sem caller de produção ou teste; **candidata a remoção do contrato no redesign** (não requerida pelos Planos 2/3) | justificativa de descarte |
+| RS-02..RS-05 | preservar (comportamento) — persistência bloqueada por DF22 | ADR-010/012, RFC 8707 | `ResourceStoreContractTests` (13 cenários) |
+| RR-01/02/05/06/07 | preservar | coerência do resultado | via cenários RS-05 |
+| RR-03/RR-04 | descartar (texto/conteúdo exato) | mensagens podem evoluir; os **códigos** de erro OAuth são o contrato (RR-02) | não assertar texto |
+| KY-01 | preservar (escrita pela facade) / descartar (replace silencioso) | DF16 create-only; duplicidade → reject (aceite P2) | `AddKey_ThenGetKey…` |
+| KY-02/KY-03 | preservar | bordas inclusivas fechadas (acima); ordem por `Created` | `ListAllCurrentKeysIds…`, `ListAllKeysIds…`, `KeyListings_AreOrderedByCreation` |
+| KY-04 | preservar | ausência **lança** `ArgumentException` (exceção de paridade — ver política de ausência) | `GetKey_UnknownKeyId_Throws…` (novo) |
+| KY-05 | preservar | resultado na ordem dos ids solicitados; ausência propaga a exceção de KY-04 | `GetKeys_ReturnsKeysInRequestedOrder` (reforçado) |
+| AT-01 | preservar (emissão) / descartar (`TryAdd` silencioso) | create-only; reject é aceite P3 | `Store_ThenGetByJti…` |
+| AT-02 | preservar | `null`; leitura não filtra expiração (DF19) | `Get_UnknownJti…`, `Get_ReturnsLogicallyExpiredToken` (novo) |
+| AT-03/AT-04 | preservar | remoção/revogação idempotente; filtro exato Reference+subject+client Ordinal | testes existentes |
+| RT-01 | preservar (emissão) / descartar (`TryAdd` silencioso) | create-only; reject aceite P3 | `Store_ThenGet…` |
+| RT-02 | preservar | `null`; leitura devolve consumido/expirado — requisito da tolerância (product) | `Get_UnknownHandle…`, `Get_ReturnsExpiredAndConsumedToken` (novo) |
+| RT-03 | substituir | DF15/DF17 — transição condicional/atômica + persistência por instância rematerializada | aceite P3 (MP-3) |
+| RT-04/RT-05 | preservar | idempotência; contagem efetiva; Ordinal; nunca cross-realm | testes existentes |
+| AC-01 | preservar (emissão) / descartar (overwrite por indexação) | create-only; reject aceite P3 | `Store_ThenGet…` |
+| AC-02 | preservar (leitura) / substituir (get+remove como consumo) | `null`; sem filtro de expiração na leitura (validação no consumidor); consumo atômico é MP-2 | `Get_UnknownCode…`, `Get_ReturnsLogicallyExpiredCode` (novo) |
+| AC-03 | preservar (remoção administrativa idempotente) / substituir (papel de consumo) | DF15 | testes existentes |
+| CN-01 | preservar (upsert por identidade realm+subject+client) / descartar (chave concatenada `subject.client` — colisão com `.`) | DF16; provider usa chave composta real (aceite P3) | `Store_ThenGet…`, `Store_SameSubjectAndClient…` |
+| CN-02 | preservar | `null`; leitura não filtra `Expiration` (consent service decide) | `Get_UnknownSubjectClientPair…`, `Get_ReturnsLogicallyExpiredConsent` (novo) |
+| CN-03 | preservar | idempotente | teste existente |
+| SS-01 | preservar (persistência) / descartar (overwrite por indexação) | create-only; reject aceite P3 | `Create_ThenFindById…` |
+| SS-02 | preservar | `null`; leitura devolve sessão expirada/inativa (regra de validade é do service — ADR-017) | `FindById_Unknown…`, `FindById_ReturnsLogicallyExpiredSession` (novo) |
+| SS-03..SS-06 | preservar | dedup por client; no-ops de ausência; `EndAsync` idempotente (repetição devolve inativa); touch explícito; revogação por subject com contagem | testes existentes + `End` reforçado |
+| AP-01 | preservar (estado server-side; handle aleatório ≥128 bits não adivinhável) / substituir (colisão silenciosa → **regeneração interna do handle**; escrita grava expiração absoluta) | DF14/DF16/DF19 — fechamentos de AP abaixo | `Write_ThenRead…`, `Write_TwoEntries…` + aceites P3 |
+| AP-02 | preservar (leitura repetível; `null` em ausência) / substituir (**fail-closed para expirado**: registro vencido é ausente) | DF19 por tipo; live reference `descartar` | testes existentes + aceite P3 (fake não tem TTL) |
+| AP-03 | preservar (cleanup idempotente do callback) / substituir (TTL + purge de abandonados — MP-5/MP-6) | DF19 | teste existente + aceite P3 |
+| MS-01/MS-02 | preservar (roundtrip; fail-closed → `null` em id ilegível — regra de segurança) / descartar (formato do id como contrato) | DF14/DF25 | roundtrip + `Read_UnreadableId_ReturnsNull` (novo) |
+| MS-03 | descartar (como critério de paridade) | efeito do delete é da implementação; semântica definitiva acompanha o futuro store persistente (backlog PAR) | delete de id escrito apenas completa |
+| RC-01/RC-02 | substituir | check+add atômico com proteção real — plano próprio; default no-cache documentado como sem proteção | aceite registrado |
+| SP-01..SP-03 | preservar (seam DF21) / substituir (implementação no adapter EF) / descartar (dispose no-op) | DF21 | `StorageSessionContractTests` + aceite P2 |
+
+Não resta nenhuma semântica de storage marcada `avaliar` ou `a definir`: os fechamentos derivam de
+DF15-DF25 e das fontes citadas. Decisões de desenho interno que pertencem aos planos executores permanecem
+nomeadas como tal — MP-1 no P2 — e o valor numérico da janela de interação é uma opção de produto do P3,
+não uma semântica inventada por este baseline.
+
+### Fechamento de `IAuthorizeParametersStore` (decisões antes delegadas ao P3)
+
+O contrato atual é global e não expressa realm, instante nem expiração. O baseline fecha a semântica alvo; o
+P3 implementa sem novas decisões de comportamento:
+
+1. **Binding:** o alvo é **realm-bound** (`substituir` o estado global). Fonte: isolamento por realm é a
+   fronteira de dados do produto (product.md/DF6); o handle não adivinhável é defesa em profundidade, não
+   fronteira de isolamento. Mudança contratual (MP-5): o accessor global `IStorage.AuthorizeParameters` dá
+   lugar a um accessor realm-bound (ex.: `GetAuthorizeParametersStore(realm)`), com particionamento por realm
+   no schema.
+2. **Expiração:** a escrita grava validade absoluta = `now + janela de interação do authorize`, com a janela
+   configurável por realm (nova option em `RealmOptions.Authentication`; hoje não existe essa option).
+   O baseline não fixa um default numérico sem fonte: o P3 deve documentar a decisão de produto antes de
+   implementar. Como referência adjacente, [RFC 9126 §2.2](https://www.rfc-editor.org/rfc/rfc9126.html#section-2.2)
+   deixa o lifetime de PAR a critério do authorization
+   server e cita 5–600 segundos como faixa tipicamente curta; essa faixa não é transplantada automaticamente
+   para este estado interno, que atravessa login e consent. Owner do relógio: o `TimeProvider` da composição
+   (mesmo padrão do session store), nunca relógio de parede do provider.
+3. **Leitura:** fail-closed — `ReadAsync` de registro expirado retorna `null` (retomar authorize abandonado é
+   risco, não feature). A leitura continua repetível dentro da validade (fluxo atual).
+4. **Cleanup:** lazy na leitura (expirado ⇒ ausente) **e** purge físico periódico junto ao MP-6; o delete do
+   callback permanece o caminho feliz (AP-03).
+5. **Colisão de handle:** o handle é gerado pelo store; em colisão o store regenera internamente — nunca
+   sobrescreve, nunca falha por azar de geração.
+
+O fake não recebe TTL/particionamento (ADR-018); os itens 1-5 são testes de aceite do P3 na tabela abaixo.
+
+### Mudanças públicas requeridas (registradas, não implementadas — DF1)
+
+| # | Mudança | Linha/decisão | Plano |
+|---|---|---|---|
+| MP-1 | Remover `IRealmStore.GetByPath` síncrono. O consumidor (`ConfigureRealmCookieAuthenticationOptions`) implementa `IConfigureNamedOptions<CookieAuthenticationOptions>.Configure`, que é **síncrono por assinatura da infraestrutura de options** — "migrar para async" não é executável diretamente. A semântica está fechada (não fazer I/O síncrono); o desenho interno é decisão explícita do P2 entre: (a) snapshot/cache de realms carregado assincronamente (startup + invalidação em `SaveAsync`), com `Configure` lendo somente do cache; (b) reformular a configuração das cookie options para derivar do realm já resolvido pelo `UseRealmDiscovery` (repensando o ciclo de vida das named options, que hoje são cacheadas por scheme); ou (c) outro redesign que preserve a mesma restrição. A remoção do método síncrono só ocorre após o consumidor migrar. | RL-02 / DF23 | P2 (design interno, não semântica de storage) |
+| MP-2 | Operação atômica de consumo single-use de authorization code (substitui o par get+remove no fluxo de token) | AC-02/AC-03 / DF15 | P3 |
+| MP-3 | Transição condicional/atômica de refresh token (consumo/rotação; substitui o `UpdateAsync` CAS-trivial) | RT-03 / DF15 | P3 |
+| MP-4 | Correção do lifecycle de provisão de keys: `FirstKeyJob` idempotente por realm (sem `return` prematuro) e provisão na criação de realm em runtime | lacuna Fase 4 | P2 (job/orquestração; sem mudança de contrato de storage) |
+| MP-5 | Authorize parameters: contrato global → realm-bound (accessor por realm), TTL absoluto gravado na escrita com janela configurável por realm (default numérico é decisão de produto documentada pelo P3), leitura fail-closed de expirado, purge de abandonados e regeneração de handle em colisão — semânticas de storage fechadas na seção "Fechamento de `IAuthorizeParametersStore`" | ST-03, AP-01..AP-03 / DF6, DF19 | P3 |
+| MP-6 | Cleanup físico/TTL por tipo Operational (tokens, codes, consents, sessões), separado da leitura lógica | DF19 | P3 |
+| MP-7 | Semântica de exclusão de realm: tombstone Configuration + purge Operational + reserva de path/domain (não muda assinatura de `DeleteAsync`) | RL-07 / DF20 | P2/P3; seam cross-family em ADR própria futura |
+| MP-8 | Candidata (não requerida): remoção de `IResourceStore.GetAllResourcesAsync` sem caller | RS-01 | redesign de resources |
+| MP-9 | Candidata (não requerida): lookup de sessão por subject — somente se o P3 decidir; os testes capturam o `sid` do fluxo | Fase 4 (`FindSession`) | P3, se necessário |
+| MP-10 | Normalização lowercase de `Realm.Domain` no `RealmManager` (escrita) e nas bordas de consulta por domain; o adapter EF rejeita `SaveAsync` direto com domain não canônico; unicidade sobre o valor normalizado — comportamento novo, não paridade | RL-04 / DF18 | P2 |
+
+Os rejects de create-only (KY-01, AT-01, RT-01, AC-01, SS-01) não mudam contrato público — são constraints
+do provider (índice único; falha visível, nunca overwrite/sucesso silencioso) com testes de aceite nos
+Planos 2/3; em AP-01 o equivalente é a regeneração interna do handle. Todos constam da tabela de aceites.
+
+### Ordem de migração por store
+
+Sem dependência circular: Operational depende de Configuration apenas pelo binding de realm; nenhuma
+migração exige transação cross-família (DF21).
+
+**Plano 2 — Configuration (nesta ordem):**
+
+1. `ServerOptions` (base de tudo; materialização sem instância compartilhada);
+2. Realms + `RealmOptions` (inclui tombstone, índices únicos de path/domain e reserva — MP-7; e MP-1);
+3. Clients (inclui a write facade/seed test-only exigida pelo gate do P4);
+4. Keys (persistência do `AddKeyAsync` + reject de duplicidade + MP-4).
+
+**Resources/scopes não entram no P2** (DF22): o adapter EF compõe uma ponte transitória para RS-*
+(implementação em memória semeada por composição), sem persistir o shape instável; a persistência real
+espera o redesign.
+
+**Plano 3 — Operational (nesta ordem, crescendo em risco):**
+
+1. Access tokens (CRUD mais simples; reject AT-01);
+2. Consents (chave composta real; upsert CN-01);
+3. Sessões (integração com service/revogação ADR-017; reject SS-01);
+4. Authorization codes (consumo atômico — MP-2);
+5. Refresh tokens (transição condicional — MP-3; revogação por subject);
+6. Authorize parameters (MP-5: TTL + particionamento) e MP-6 (cleanup por tipo).
+
+**Plano 4 — troca de backing:** gate da Fase 4 **mais** os seguintes: contract suite `Tests.Storage` verde
+nas fixtures EF (Sqlite; PostgreSQL opt-in) para todas as linhas `preservar`, e testes de aceite dos
+`substituir` (tabela de aceites) verdes nos providers. Só então os testes de fluxo migram por grupos e o
+fake perde o papel de default (ADR-018 atualizada com o estado real).
+
+### Ajustes na suíte durante a Fase 5
+
+Aplicando o fechamento acima, a suíte foi ajustada ao alvo (sem cristalizar descartes), em três rodadas:
+
+- **Primeira rodada:** +8 cenários (`GetByDomain_Unknown…`, `GetKey_UnknownKeyId_Throws…`, leituras de
+  registros logicamente expirados/consumidos em AT/RT/AC/CN/SS, `Read_UnreadableId_ReturnsNull` do message
+  store) e 2 reforçados (`GetKeys` asserta a ordem da requisição; `End` de sessão asserta idempotência).
+- **Segunda rodada (revisão):** +7 cenários falsificando as regras fechadas — bordas inclusivas de keys com
+  `NotBefore == now` e `Expires == now`; identificadores que diferem apenas por casing devolvem ausência
+  (realm path/domain, client id, jti, handle de refresh, par subject+client de consent, sid) — crítico para
+  a paridade SQLite×PostgreSQL sob DF18; e o cenário de exclusão de realm passou a semear e sondar **todos
+  os oito accessors realm-bound** (ST-04..ST-11), não apenas o de authorization codes.
+- **Terceira rodada (fechamento residual):** +8 cenários cobrem a borda inclusiva de KY-03 e casing Ordinal
+  de key id, authorization code, authorize-parameters handle, scope/resource URI, scopes de consent e campos
+  de sessão (client, subject e sid excetuado); os cenários de realm id e revogações AT/RT também foram
+  reforçados. O teste pós-delete foi alinhado ao contrato observável comum: binding recusado ou leitura vazia,
+  mas nunca dados do realm excluído.
+
+Nenhum cenário existente precisou ser removido: nenhum teste asserta comportamento classificado `descartar`.
+Total: 101 cenários verdes contra a fixture `MemoryStorage`.
+
 ## Handoff para as próximas fases
 
 - **Fase 2:** confirmar exatamente um owner por linha, detalhar dependências Configuration×Operational e manter
@@ -589,5 +807,8 @@ e `FindSession` passa a capturar o `sid` no próprio fluxo e consultar a sessão
   "Contract tests provider-neutral — Fase 3" e a tabela de aceites futuros registrados.
 - **Fase 4 (concluída):** seeds, composições e as 56 referências diretas decompostas com destino por
   categoria; ver a seção "Seeds, dados globais e acessos diretos — Fase 4" e o gate do Plano 4.
-- **Fase 5:** resolver todos os `avaliar`, atribuir política de duplicidade, comparadores, expiração e ausência por
-  operação, e produzir a ordem final de migração.
+- **Fase 5 (concluída):** todos os `avaliar` resolvidos, políticas de duplicidade/comparadores/expiração/
+  ausência fechadas por operação, mudanças públicas MP-1..MP-10 listadas e ordem de migração produzida; ver
+  "Paridade final e ordem de migração — Fase 5". O baseline está encerrado; os consumidores deste artefato
+  são `plan-data-configuration-storage.md` (P2), `plan-data-operational-storage.md` (P3) e
+  `plan-data-test-migration.md` (P4).

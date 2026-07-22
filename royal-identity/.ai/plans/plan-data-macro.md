@@ -1,6 +1,6 @@
 # Macro-plano: Persistência de dados do IdP e aposentadoria do fake
 
-## Status: PLANEJADO
+## Status: EM EXECUÇÃO — Planos 0 e 1 concluídos; próximo: Plano 2
 
 Este documento organiza os próximos planos de dados após:
 
@@ -29,8 +29,8 @@ com SQLite/PostgreSQL, preservando as fronteiras da ADR-013:
 
 | Ordem | Plano a criar | Propósito |
 |---|---|---|
-| 0 | `plan-users-accounts-sqlite-hardening.md` | Fechar retry, migrations e seed do módulo `UserAccounts`. |
-| 1 | `plan-data-storage-baseline.md` | Caracterizar contratos atuais e comportamento do `MemoryStorage`. |
+| 0 | `plan-users-accounts-sqlite-hardening.md` | Fechar retry, migrations e seed do módulo `UserAccounts`. **CONCLUÍDO.** |
+| 1 | `plan-data-storage-baseline.md` | Caracterizar contratos atuais e comportamento do `MemoryStorage`. **CONCLUÍDO (2026-07-22, 5/5 fases).** |
 | 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais do IdP. |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real. |
@@ -60,22 +60,19 @@ resolver pendências internas do módulo.
 
 ## Plano 1 - `plan-data-storage-baseline.md`
 
-**Escopo:** mapear e travar o comportamento que será migrado.
+**CONCLUÍDO em 2026-07-22 (5/5 fases).** Saída entregue:
 
-Fases sugeridas:
+- [plan-data-storage-matrix.md](plan-data-storage-matrix.md) — catálogo completo (62 operações + suporte),
+  ownership Configuration×Operational×Adapter, seeds/acessos diretos classificados e a seção
+  "Paridade final e ordem de migração — Fase 5" com todas as semânticas fechadas (DF15-DF25),
+  mudanças públicas MP-1..MP-10 e a ordem de migração por store para os Planos 2/3;
+- `Tests.Storage` — contract suite provider-neutral (101 cenários verdes contra o fake) que os providers EF
+  reutilizam adicionando apenas fixtures, mais a tabela de testes de aceite `substituir` (atômicos DF15,
+  tombstone/reserva DF20, rejects create-only, authorize parameters realm-bound/TTL, normalização de domain,
+  propagação de `CancellationToken`, disposal do adapter);
+- gate do Plano 4 definido (o que precisa existir antes de trocar o backing default dos testes).
 
-1. Inventariar todas as facades sob `RoyalIdentity/Contracts/Storage`.
-2. Mapear quais stores são configuração e quais são operacionais.
-3. Criar/organizar testes de caracterização para `MemoryStorage`.
-4. Identificar seeds atuais, dados globais e dependências entre stores.
-5. Definir critérios de paridade para a implementação EF.
-
-Saída esperada:
-
-- matriz de contratos e operações;
-- lista de comportamentos obrigatórios;
-- gaps conhecidos do fake que não devem ser preservados;
-- decisão sobre ordem de migração por store.
+Os Planos 2 e 3 devem ser criados consumindo a matriz sem re-inferir semântica.
 
 ---
 

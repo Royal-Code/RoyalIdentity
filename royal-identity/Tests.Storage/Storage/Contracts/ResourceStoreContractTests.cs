@@ -56,6 +56,24 @@ public abstract class ResourceStoreContractTests : StorageContractTests
 		Assert.DoesNotContain(inB.IdentityScopes, s => s.Name == "contract:iso-scope");
 	}
 
+	// DF18: scope names and resource URIs compare literally/Ordinal; provider collation must not turn
+	// differently-cased protocol values into matches.
+	[Fact]
+	public async Task FindRequestedResources_ScopeOrResourceDifferingOnlyByCase_IsNotResolved()
+	{
+		await using var harness = await CreateHarnessAsync();
+		await harness.SeedIdentityScopeAsync(harness.RealmA, NewIdentityScope("contract:case-scope"));
+		var server = NewResourceServer("contract:case-server");
+		server.ProtectedResources = [new ProtectedResource("https://contract-case.api.test/Resource")];
+		await harness.SeedResourceServerAsync(harness.RealmA, server);
+
+		var resources = await harness.Storage.GetResourceStore(harness.RealmA).FindRequestedResourcesAsync(
+			["CONTRACT:CASE-SCOPE"], ["https://contract-case.api.test/resource"], onlyEnabled: true, default);
+
+		Assert.Contains("CONTRACT:CASE-SCOPE", resources.MissingScopes);
+		Assert.Contains("https://contract-case.api.test/resource", resources.InvalidTargets);
+	}
+
 	// DF6: the same scope name in two realms resolves to each realm's own configuration.
 	[Fact]
 	public async Task SameScopeName_InTwoRealms_ResolvesToEachRealmsOwnConfiguration()

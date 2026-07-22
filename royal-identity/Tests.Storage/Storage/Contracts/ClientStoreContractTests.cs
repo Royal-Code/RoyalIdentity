@@ -49,8 +49,8 @@ public abstract class ClientStoreContractTests : StorageContractTests
 		Assert.Equal("contract-enabled", client.Id);
 	}
 
-	// CL-01: absent lookup returns null. Load-bearing for LoadClient/token validation error paths;
-	// final absence/comparator semantics close in Fase 5 (DF18/DF25).
+	// CL-01 (Fase 5/DF25 closed): absent lookup returns null. Load-bearing for LoadClient/token
+	// validation error paths.
 	[Fact]
 	public async Task FindClientById_UnknownClient_ReturnsNull()
 	{
@@ -58,6 +58,20 @@ public abstract class ClientStoreContractTests : StorageContractTests
 
 		var client = await harness.Storage.GetClientStore(harness.RealmA)
 			.FindClientByIdAsync("contract-unknown-client", default);
+
+		Assert.Null(client);
+	}
+
+	// DF18 (Fase 5): client_id comparison is Ordinal — an id differing only by casing is another client
+	// (never provider collation; parity between SQLite and PostgreSQL).
+	[Fact]
+	public async Task FindClientById_DifferingOnlyByCase_ReturnsNull()
+	{
+		await using var harness = await CreateHarnessAsync();
+		await harness.SeedClientAsync(NewClient(harness.RealmA, "contract-case-client"));
+
+		var client = await harness.Storage.GetClientStore(harness.RealmA)
+			.FindClientByIdAsync("CONTRACT-CASE-CLIENT", default);
 
 		Assert.Null(client);
 	}

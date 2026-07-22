@@ -5,8 +5,11 @@ namespace Tests.Storage.Contracts;
 
 /// <summary>
 /// Contract of <c>IAuthorizeParametersStore</c> (matrix AP-01..AP-03): server-side operational state between
-/// the authorize redirect and the callback (`preservar` — DF14). The store is global in the current contract
-/// (no realm binding — Fase 2); partitioning/expiration decisions belong to Plano 3.
+/// the authorize redirect and the callback (`preservar` — DF14). The store is global in the current contract;
+/// Fase 5 closed the target semantics (realm-bound accessor, absolute TTL written at store time, fail-closed
+/// read of expired records, handle regeneration on collision — matrix section "Fechamento de
+/// IAuthorizeParametersStore"), all implemented and acceptance-tested by Plano 3 (MP-5); the fake stays
+/// global and TTL-less (ADR-018), so these scenarios lock only the behavior common to both worlds.
 /// </summary>
 public abstract class AuthorizeParametersStoreContractTests : StorageContractTests
 {
@@ -51,13 +54,28 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
 		Assert.NotNull(second);
 	}
 
-	// AP-02: absent handle returns null (final absence semantics — Fase 5, DF25).
+	// AP-02 (Fase 5/DF25 closed): absent handle returns null. The expired-read fail-closed rule and the
+	// realm-bound/TTL target are P3 acceptances (MP-5) — the fake has no TTL to exercise.
 	[Fact]
 	public async Task Read_UnknownHandle_ReturnsNull()
 	{
 		await using var harness = await CreateHarnessAsync();
 
 		var read = await harness.Storage.AuthorizeParameters.ReadAsync("contract-unknown-handle", default);
+
+		Assert.Null(read);
+	}
+
+	// DF18: authorize-parameters handles are opaque and compare Ordinal in both the current global store and
+	// the future realm-bound provider.
+	[Fact]
+	public async Task Read_HandleDifferingOnlyByCase_ReturnsNull()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.AuthorizeParameters;
+		var handle = await store.WriteAsync(NewParameters("contract-client"), default);
+
+		var read = await store.ReadAsync(WithDifferentLetterCase(handle), default);
 
 		Assert.Null(read);
 	}

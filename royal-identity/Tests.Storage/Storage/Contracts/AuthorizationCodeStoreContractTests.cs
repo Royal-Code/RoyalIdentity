@@ -27,7 +27,7 @@ public abstract class AuthorizationCodeStoreContractTests : StorageContractTests
 	}
 
 	// AC-02: absent lookup returns null. Load-bearing for the invalid_grant path of the code flow;
-	// final absence semantics close in Fase 5 (DF25).
+	// closed in Fase 5 (DF25): lookups return null on absence.
 	[Fact]
 	public async Task Get_UnknownCode_ReturnsNull()
 	{
@@ -37,6 +37,36 @@ public abstract class AuthorizationCodeStoreContractTests : StorageContractTests
 			.GetAuthorizationCodeAsync("contract-unknown-code", default);
 
 		Assert.Null(found);
+	}
+
+	// DF18: authorization-code handles are opaque and compare Ordinal.
+	[Fact]
+	public async Task Get_CodeDifferingOnlyByCase_ReturnsNull()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
+		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
+		await store.StoreAuthorizationCodeAsync(code, default);
+
+		var found = await store.GetAuthorizationCodeAsync(WithDifferentLetterCase(code.Code), default);
+
+		Assert.Null(found);
+	}
+
+	// AC-02 (Fase 5/DF19): the read does not filter logical expiration — LoadCode owns the expiration
+	// rule; the atomic consume of Plano 3 may combine the check (P3 decision).
+	[Fact]
+	public async Task Get_ReturnsLogicallyExpiredCode()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
+		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a",
+			creationTime: Start.AddHours(-1), lifetime: 60);
+		await store.StoreAuthorizationCodeAsync(code, default);
+
+		var found = await store.GetAuthorizationCodeAsync(code.Code, default);
+
+		Assert.NotNull(found);
 	}
 
 	// AC-03: after removal the code is no longer retrievable — the storage half of today's single-use
@@ -54,7 +84,7 @@ public abstract class AuthorizationCodeStoreContractTests : StorageContractTests
 		Assert.Null(await store.GetAuthorizationCodeAsync(code.Code, default));
 	}
 
-	// AC-03: removing an absent code completes without error (final idempotency policy — Fase 5, DF16/DF25).
+	// AC-03 (Fase 5/DF16/DF25 closed): removing an absent code is an idempotent no-op (administrative removal).
 	[Fact]
 	public async Task Remove_UnknownCode_CompletesWithoutError()
 	{

@@ -41,11 +41,19 @@ definida em `../analisys/`.
 
   Era também o **Plano 0** do `plan-data-macro.md` abaixo — suas três fases eram pré-requisito para o plano de
   dados do IdP não herdar pendências internas do módulo `UserAccounts`; pré-requisito agora satisfeito.
+- [plan-data-storage-baseline.md](plan-data-storage-baseline.md) — CONCLUÍDO (2026-07-22), 5/5 fases. Sub-plano 1
+  do `plan-data-macro.md`: inventário completo dos contratos de storage do IdP (62 operações),
+  classificação Configuration×Operational×Adapter, contract suite provider-neutral `Tests.Storage`
+  (101 cenários, reutilizável pelos providers EF), seeds/acessos diretos ao fake classificados com destino, e
+  fechamento de todas as semânticas por operação (comparadores, duplicidade, expiração, ausência, ordem) na
+  [plan-data-storage-matrix.md](plan-data-storage-matrix.md), com mudanças públicas MP-1..MP-10, ordem de
+  migração por store e gates para os Planos 2/3/4.
 
 ## Em andamento
 
-Nenhum plano ativo no momento. Próximo passo recomendado: iniciar o sub-plano 1 do `plan-data-macro.md`
-(`plan-data-storage-baseline.md`, ainda não criado) — ver "Próximos planos" abaixo.
+Nenhum plano ativo no momento. Próximo passo recomendado: criar o sub-plano 2 do `plan-data-macro.md`
+(`plan-data-configuration-storage.md`), consumindo a matriz do baseline sem re-inferir semântica — ver
+"Próximos planos" abaixo.
 
 ## Próximos planos
 
@@ -59,7 +67,7 @@ que nenhum deles fique grande demais:
 | Ordem | Sub-plano | Propósito | Status |
 |---|---|---|---|
 | 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | Concluído (ver acima) |
-| 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | Não criado |
+| 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | Concluído (ver acima) |
 | 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (realms/clients/resources/scopes/keys/options) | Não criado |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | Não criado |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | Não criado |
@@ -157,9 +165,9 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 ## Ordem recomendada
 
 1. ~~Concluir `plan-users-accounts-sqlite-hardening.md` (Fases 1-3).~~ CONCLUÍDO.
-2. Criar e executar os sub-planos 1-4 do `plan-data-macro.md` (storage-baseline → configuration-storage →
-   operational-storage → test-migration); avaliar caching e audit-outbox (5-6) depois, só se ainda fizerem
-   sentido no momento.
+2. ~~Criar e executar o sub-plano 1 do `plan-data-macro.md` (storage-baseline).~~ CONCLUÍDO. Criar e executar
+   os sub-planos 2-4 (configuration-storage → operational-storage → test-migration); avaliar caching e
+   audit-outbox (5-6) depois, só se ainda fizerem sentido no momento.
 3. Evoluir administração de sessões por dispositivo.
 4. Criar API/UI administrativa.
 5. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.

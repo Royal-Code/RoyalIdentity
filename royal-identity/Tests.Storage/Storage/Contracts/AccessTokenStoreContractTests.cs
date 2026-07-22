@@ -5,7 +5,9 @@ namespace Tests.Storage.Contracts;
 
 /// <summary>
 /// Contract of <c>IAccessTokenStore</c> (matrix AT-01..AT-04): realm-bound operational store keyed by jti.
-/// Duplicate-write and expiration-read policies close in Fase 5 (DF16/DF19) and are not locked here.
+/// Fase 5 closed the policies: emission is create-only (duplicate = provider reject, an EF acceptance —
+/// not asserted against the fake), reads do not filter logical expiration, comparisons are Ordinal and
+/// removals are idempotent.
 /// </summary>
 public abstract class AccessTokenStoreContractTests : StorageContractTests
 {
@@ -25,8 +27,8 @@ public abstract class AccessTokenStoreContractTests : StorageContractTests
 		Assert.Equal(harness.RealmA.Id, found.RealmId);
 	}
 
-	// AT-02: absent lookup returns null. Load-bearing for reference-token validation (invalid token path);
-	// final absence semantics close in Fase 5 (DF25).
+	// AT-02 (Fase 5/DF25 closed): absent lookup returns null. Load-bearing for reference-token validation
+	// (invalid token path).
 	[Fact]
 	public async Task Get_UnknownJti_ReturnsNull()
 	{
@@ -35,6 +37,34 @@ public abstract class AccessTokenStoreContractTests : StorageContractTests
 		var found = await harness.Storage.GetAccessTokenStore(harness.RealmA).GetAsync("contract-unknown", default);
 
 		Assert.Null(found);
+	}
+
+	// DF18 (Fase 5): jti comparison is Ordinal — a jti differing only by casing is another token.
+	[Fact]
+	public async Task Get_JtiDifferingOnlyByCase_ReturnsNull()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetAccessTokenStore(harness.RealmA);
+		await store.StoreAsync(NewAccessToken(harness.RealmA, "contract-case-jti", "client-a"), default);
+
+		var found = await store.GetAsync("CONTRACT-CASE-JTI", default);
+
+		Assert.Null(found);
+	}
+
+	// AT-02 (Fase 5/DF19): the read does not filter logical expiration — the record is returned and the
+	// token validator owns the expiration rule; physical cleanup/TTL is a separate P3 dimension.
+	[Fact]
+	public async Task Get_ReturnsLogicallyExpiredToken()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetAccessTokenStore(harness.RealmA);
+		await store.StoreAsync(NewAccessToken(harness.RealmA, "contract-expired", "client-a",
+			creationTime: Start.AddHours(-2), lifetime: 60), default);
+
+		var found = await store.GetAsync("contract-expired", default);
+
+		Assert.NotNull(found);
 	}
 
 	// AT-03: removal makes the token unavailable.
@@ -51,8 +81,8 @@ public abstract class AccessTokenStoreContractTests : StorageContractTests
 		Assert.Null(found);
 	}
 
-	// AT-03: removing an absent token completes without error (revocation is tolerant today;
-	// idempotency policy per operation closes in Fase 5 — DF16/DF25).
+	// AT-03 (Fase 5/DF16/DF25 closed): removing an absent token is an idempotent no-op — revocation is
+	// tolerant by rule.
 	[Fact]
 	public async Task Remove_UnknownJti_CompletesWithoutError()
 	{
@@ -75,6 +105,10 @@ public abstract class AccessTokenStoreContractTests : StorageContractTests
 			AccessTokenType.Reference), default);
 		await store.StoreAsync(NewAccessToken(harness.RealmA, "jti-ref-other-client", "client-b", "subject-a",
 			AccessTokenType.Reference), default);
+		await store.StoreAsync(NewAccessToken(harness.RealmA, "jti-ref-subject-case", "client-a", "SUBJECT-A",
+			AccessTokenType.Reference), default);
+		await store.StoreAsync(NewAccessToken(harness.RealmA, "jti-ref-client-case", "CLIENT-A", "subject-a",
+			AccessTokenType.Reference), default);
 
 		await store.RemoveReferenceTokensAsync("subject-a", "client-a", default);
 
@@ -82,6 +116,8 @@ public abstract class AccessTokenStoreContractTests : StorageContractTests
 		Assert.NotNull(await store.GetAsync("jti-jwt-same-pair", default));
 		Assert.NotNull(await store.GetAsync("jti-ref-other-subject", default));
 		Assert.NotNull(await store.GetAsync("jti-ref-other-client", default));
+		Assert.NotNull(await store.GetAsync("jti-ref-subject-case", default));
+		Assert.NotNull(await store.GetAsync("jti-ref-client-case", default));
 	}
 
 	// DF6: the same jti in two realms is two independent records; removing in one realm keeps the other.

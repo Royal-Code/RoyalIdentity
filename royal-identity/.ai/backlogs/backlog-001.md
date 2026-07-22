@@ -255,3 +255,18 @@ alternativas ainda não decididas: `IPushedAuthorizationRequestStore` específic
 `IAuthorizationRequestStore` com operações distintas para continuação interna e PAR. Uma futura
 `PersistentDataMessageStore` continua válida para mensagens transitórias, mas o `IMessageStore` atual não expressa
 realm, client, TTL nem consumo atômico e não deve ser assumido como store de PAR sem redesign.
+
+---
+
+## Replay cache com proteção real (check+add atômico)
+
+**Área:** Segurança / `private_key_jwt` / Infraestrutura adjacente de storage
+**Deferral:** O default DI é `DefaultReplayNoCache`, que não oferece proteção contra replay de `jti` (sempre
+responde "não visto"); a implementação opcional sobre `IDistributedCache` existe, mas o padrão check+add do
+caller (`PrivateKeyJwtSecretEvaluator`) não é atômico. O baseline de storage (Fase 5) classificou RC-01/RC-02
+como `substituir` e deliberadamente não criou contract test para não cristalizar o no-op.
+**Quando revisitar:** Quando `private_key_jwt` for exposto em ambiente onde replay importa (produção
+multi-instância) ou junto ao plano de caching (`plan-data-caching.md`), que introduz backing distribuído.
+**Nota de design:** A operação alvo é um `TryAddAsync` atômico (add-if-absent com expiração) substituindo o
+par `ExistsAsync`+`AddAsync`; a API atual também não recebe `CancellationToken` (DF23). Ver
+`plan-data-storage-matrix.md`, linhas RC-01/RC-02 e tabela de aceites.

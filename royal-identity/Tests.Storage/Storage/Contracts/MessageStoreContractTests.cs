@@ -8,9 +8,10 @@ namespace Tests.Storage.Contracts;
 
 /// <summary>
 /// Contract of <c>IMessageStore</c> (matrix MS-01..MS-03), adjacent infrastructure (DF14 — not `Data.*`).
-/// Only the identifier roundtrip is locked: whatever the implementation (self-contained protected payload
-/// today, a possible persistent store later), the id returned by write must read back the same message.
-/// The current no-op delete and fail-closed read remain `avaliar` (Fase 5) and are not asserted as contract.
+/// Fase 5 closed the semantics: the id returned by write reads back the same message (roundtrip), an
+/// unreadable/tampered id reads back as null (fail-closed — asserted below), and the delete effect is
+/// implementation-defined (`descartar` as parity criterion; definitive semantics follow the future
+/// persistent message store — PAR backlog).
 /// </summary>
 public abstract class MessageStoreContractTests
 {
@@ -34,8 +35,21 @@ public abstract class MessageStoreContractTests
 		Assert.Equal(message.Data, read.Data);
 	}
 
-	// MS-03: deleting a previously written id completes without error. The semantics for an unknown id
-	// remain `avaliar` (DF25/Fase 5) and are deliberately not asserted here.
+	// MS-02 (Fase 5/DF25): an unreadable/tampered id reads back as null — fail-closed as absence is a
+	// security rule of the message store contract.
+	[Fact]
+	public async Task Read_UnreadableId_ReturnsNull()
+	{
+		var store = CreateStore();
+
+		var read = await store.ReadAsync<ContractPayload>("contract-not-a-valid-protected-payload", default);
+
+		Assert.Null(read);
+	}
+
+	// MS-03 (Fase 5): deleting a previously written id completes without error. The delete effect is
+	// implementation-defined (`descartar` as a parity criterion); the definitive semantics follow the
+	// future persistent message store (PAR backlog).
 	[Fact]
 	public async Task Delete_OfWrittenId_CompletesWithoutError()
 	{

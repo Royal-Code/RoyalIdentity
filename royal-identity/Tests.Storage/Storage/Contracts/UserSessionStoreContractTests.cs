@@ -23,13 +23,26 @@ public abstract class UserSessionStoreContractTests : StorageContractTests
 		Assert.True(found.IsActive);
 	}
 
-	// SS-02: absent sid returns null (`preservar` — ADR-014 pure lookup; final absence semantics DF25/Fase 5).
+	// SS-02 (Fase 5/DF25 closed): absent sid returns null (`preservar` — ADR-014 pure lookup).
 	[Fact]
 	public async Task FindById_UnknownSid_ReturnsNull()
 	{
 		await using var harness = await CreateHarnessAsync();
 
 		var found = await harness.Storage.GetUserSessionStore(harness.RealmA).FindByIdAsync("contract-unknown");
+
+		Assert.Null(found);
+	}
+
+	// DF18 (Fase 5): sid comparison is Ordinal — a sid differing only by casing is another session.
+	[Fact]
+	public async Task FindById_SidDifferingOnlyByCase_ReturnsNull()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetUserSessionStore(harness.RealmA);
+		await store.CreateAsync(NewSession("contract-case-sid", "subject-a"));
+
+		var found = await store.FindByIdAsync("CONTRACT-CASE-SID");
 
 		Assert.Null(found);
 	}
@@ -59,7 +72,26 @@ public abstract class UserSessionStoreContractTests : StorageContractTests
 		Assert.Equal(lastSeen, entry.LastSeenAt);
 	}
 
-	// SS-03: recording a client on an absent session completes without error (no-op today; DF25/Fase 5).
+	// DF18: client ids recorded in a session compare Ordinal for deduplication.
+	[Fact]
+	public async Task RecordClient_ClientIdDifferingOnlyByCase_CreatesDistinctEntries()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetUserSessionStore(harness.RealmA);
+		await store.CreateAsync(NewSession("contract-case-client-sid", "subject-a"));
+
+		await store.RecordClientAsync("contract-case-client-sid", "client-a");
+		await store.RecordClientAsync("contract-case-client-sid", "CLIENT-A");
+
+		var session = await store.FindByIdAsync("contract-case-client-sid");
+
+		Assert.NotNull(session);
+		Assert.Equal(2, session.Clients.Count);
+		Assert.Contains(session.Clients, client => client.ClientId == "client-a");
+		Assert.Contains(session.Clients, client => client.ClientId == "CLIENT-A");
+	}
+
+	// SS-03 (Fase 5/DF25 closed): recording a client on an absent session is an idempotent no-op.
 	[Fact]
 	public async Task RecordClient_UnknownSession_CompletesWithoutError()
 	{
@@ -68,9 +100,10 @@ public abstract class UserSessionStoreContractTests : StorageContractTests
 		await harness.Storage.GetUserSessionStore(harness.RealmA).RecordClientAsync("contract-unknown", "client-a");
 	}
 
-	// SS-04 `preservar` (ADR-014/017): ending a session marks it inactive, observable by a later read.
+	// SS-04 `preservar` (ADR-014/017): ending a session marks it inactive, observable by a later read;
+	// repeating the call is idempotent and returns the already-inactive session (Fase 5/DF25).
 	[Fact]
-	public async Task End_MarksSessionInactive()
+	public async Task End_MarksSessionInactive_AndRepeatingIsIdempotent()
 	{
 		await using var harness = await CreateHarnessAsync();
 		var store = harness.Storage.GetUserSessionStore(harness.RealmA);
@@ -78,10 +111,29 @@ public abstract class UserSessionStoreContractTests : StorageContractTests
 
 		var ended = await store.EndAsync("contract-sid");
 		var reloaded = await store.FindByIdAsync("contract-sid");
+		var endedAgain = await store.EndAsync("contract-sid");
 
 		Assert.NotNull(ended);
 		Assert.NotNull(reloaded);
 		Assert.False(reloaded.IsActive);
+		Assert.NotNull(endedAgain);
+		Assert.False(endedAgain.IsActive);
+	}
+
+	// SS-02 (Fase 5/DF19): the read returns the session even when logically expired — the session-validity
+	// rule belongs to the session service (ADR-017); physical cleanup is a P3 dimension.
+	[Fact]
+	public async Task FindById_ReturnsLogicallyExpiredSession()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetUserSessionStore(harness.RealmA);
+		await store.CreateAsync(NewSession("contract-expired-sid", "subject-a",
+			expiresAt: Start.AddHours(-1)));
+
+		var found = await store.FindByIdAsync("contract-expired-sid");
+
+		Assert.NotNull(found);
+		Assert.Equal(Start.AddHours(-1), found.ExpiresAt);
 	}
 
 	// SS-04: ending an absent session returns null.
@@ -114,7 +166,7 @@ public abstract class UserSessionStoreContractTests : StorageContractTests
 		Assert.Equal(expiresAt, session.ExpiresAt);
 	}
 
-	// SS-05: touching an absent session completes without error (no-op today; DF25/Fase 5).
+	// SS-05 (Fase 5/DF25 closed): touching an absent session is an idempotent no-op.
 	[Fact]
 	public async Task Touch_UnknownSid_CompletesWithoutError()
 	{
@@ -147,6 +199,23 @@ public abstract class UserSessionStoreContractTests : StorageContractTests
 		Assert.False((await store.FindByIdAsync("sid-other-1"))!.IsActive);
 		Assert.False((await store.FindByIdAsync("sid-other-2"))!.IsActive);
 		Assert.True((await store.FindByIdAsync("sid-other-subject"))!.IsActive);
+	}
+
+	// DF18: both the subject filter and excepted sid are Ordinal. A differently-cased subject is untouched;
+	// a differently-cased excepted sid does not exempt the stored session.
+	[Fact]
+	public async Task EndSessionsForSubject_UsesOrdinalSubjectAndExceptedSid()
+	{
+		await using var harness = await CreateHarnessAsync();
+		var store = harness.Storage.GetUserSessionStore(harness.RealmA);
+		await store.CreateAsync(NewSession("sid-case", "subject-case"));
+		await store.CreateAsync(NewSession("sid-other", "SUBJECT-CASE"));
+
+		var ended = await store.EndSessionsForSubjectAsync("subject-case", "SID-CASE");
+
+		Assert.Equal(1, ended);
+		Assert.False((await store.FindByIdAsync("sid-case"))!.IsActive);
+		Assert.True((await store.FindByIdAsync("sid-other"))!.IsActive);
 	}
 
 	// DF6: the same sid in two realms is two independent sessions; ending in one realm keeps the other active.
