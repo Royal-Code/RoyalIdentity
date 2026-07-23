@@ -1,6 +1,6 @@
 # Macro-plano: Persistência de dados do IdP e aposentadoria do fake
 
-## Status: EM EXECUÇÃO — Planos 0 e 1 concluídos; Plano 2 em rascunho, com decisões fechadas e pronto para execução
+## Status: EM EXECUÇÃO — Planos 0, 1 e 2 concluídos; Plano 3 é o próximo e ainda não foi criado
 
 Este documento organiza os próximos planos de dados após:
 
@@ -31,7 +31,7 @@ com SQLite/PostgreSQL, preservando as fronteiras da ADR-013:
 |---|---|---|
 | 0 | `plan-users-accounts-sqlite-hardening.md` | Fechar retry, migrations e seed do módulo `UserAccounts`. **CONCLUÍDO.** |
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos atuais e comportamento do `MemoryStorage`. **CONCLUÍDO (2026-07-22, 5/5 fases).** |
-| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. **RASCUNHO (0/7, Q1-Q18 fechadas).** |
+| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. **CONCLUÍDO (2026-07-22, 7/7 fases).** |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais do IdP. |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real. |
 | 5 | `plan-data-caching.md` | Adicionar cache sobre os stores EF quando a semântica estiver estável. |
@@ -72,13 +72,18 @@ resolver pendências internas do módulo.
   propagação de `CancellationToken`, disposal do adapter);
 - gate do Plano 4 definido (o que precisa existir antes de trocar o backing default dos testes).
 
-O Plano 2 foi criado consumindo a matriz sem re-inferir semântica; o Plano 3 deve seguir a mesma regra.
+O Plano 2 foi concluído consumindo a matriz sem re-inferir semântica; o Plano 3 deve seguir a mesma regra.
 
 ---
 
 ## Plano 2 - `plan-data-configuration-storage.md`
 
-**CRIADO em 2026-07-22 (rascunho, 0/7 fases, Q1-Q18 fechadas; pronto para execução).**
+**CONCLUÍDO em 2026-07-22 (7/7 fases, Q1-Q18/DF1-DF28 implementadas).**
+
+Saída entregue: modelo Configuration puro, mappings/migrations SQLite e PostgreSQL, stores EF de
+ServerOptions/realms/clients/keys, snapshot assíncrono defensivo, protectors explícitos, runner/seed/SQL separado
+do host e paridade P2 validada contra PostgreSQL 17 real. O host padrão permanece in-memory e o adapter não
+registra um `IStorage` parcial; a composição produtiva completa continua bloqueada pelo Plano 3.
 
 **Escopo:** dados de configuração duráveis e de baixa rotatividade.
 

@@ -48,12 +48,16 @@ definida em `../analisys/`.
   fechamento de todas as semânticas por operação (comparadores, duplicidade, expiração, ausência, ordem) na
   [plan-data-storage-matrix.md](plan-data-storage-matrix.md), com mudanças públicas MP-1..MP-10, ordem de
   migração por store e gates para os Planos 2/3/4.
+- [plan-data-configuration-storage.md](plan-data-configuration-storage.md) — CONCLUÍDO (2026-07-22), 7/7 fases.
+  Sub-plano 2 do `plan-data-macro.md`: persistência Configuration EF para ServerOptions, realms/options, clients
+  e signing keys em SQLite/PostgreSQL, snapshot assíncrono, protectors explícitos, runner/seed/SQL separado do
+  host e contract suite P2 validada contra PostgreSQL 17 real. Resources/scopes continuam voláteis e o host
+  padrão continua in-memory até os Planos 3/4.
 
 ## Em andamento
 
-[plan-data-configuration-storage.md](plan-data-configuration-storage.md) — RASCUNHO, 0/7 fases, com Q1-Q18/DF1-DF28
-fechadas e pronto para execução. É o sub-plano 2 do `plan-data-macro.md`; persiste ServerOptions, realms/options, clients e
-signing keys, mantendo resources/scopes voláteis pela DF22 do baseline e o host padrão in-memory até os Planos 3/4.
+Nenhum plano de implementação está ativo. O próximo item do macro-plano é criar
+`plan-data-operational-storage.md` sem reabrir as semânticas fechadas na matriz do baseline.
 
 ## Próximos planos
 
@@ -68,7 +72,7 @@ que nenhum deles fique grande demais:
 |---|---|---|---|
 | 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | Concluído (ver acima) |
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | Concluído (ver acima) |
-| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; resources/scopes continuam voláteis) | Rascunho — decisões fechadas, pronto para execução (0/7) |
+| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; resources/scopes continuam voláteis) | Concluído (2026-07-22, 7/7) |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | Não criado |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | Não criado |
 | 5 | `plan-data-caching.md` | Cache sobre os stores EF, quando a semântica estiver estável | Não criado (pode ficar fora do primeiro corte) |

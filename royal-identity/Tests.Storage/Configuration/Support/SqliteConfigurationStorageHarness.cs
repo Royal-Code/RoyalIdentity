@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Scopes;
@@ -22,13 +23,14 @@ using Tests.Storage.Support;
 namespace Tests.Storage.Configuration.Support;
 
 /// <summary>
-/// Configuration-EF fixture for the provider-neutral contracts. Only Configuration operations use SQLite;
+/// Shared Configuration-EF fixture for the provider-neutral contracts. Only Configuration operations use EF;
 /// Operational members are isolated in test-local dictionaries so no partial production <see cref="IStorage"/>
 /// is registered (plan DF20).
 /// </summary>
-internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
+internal abstract class ConfigurationStorageHarness<TContext> : StorageContractHarness
+	where TContext : ConfigurationDbContext
 {
-	private readonly SqliteConfigurationDatabase database;
+	private readonly IAsyncDisposable database;
 	private readonly ServiceProvider services;
 	private readonly AsyncServiceScope scope;
 	private readonly MutableConfigurationResourceSource resourceSource;
@@ -37,23 +39,16 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 	private Realm realmB = null!;
 	private Realm internalRealm = null!;
 
-	private SqliteConfigurationStorageHarness(
-		SqliteConfigurationDatabase database,
-		ServiceProvider services,
-		AsyncServiceScope scope,
-		MutableConfigurationResourceSource resourceSource,
-		ClientMaterializer clientMaterializer,
-		ConfigurationCompositeStorage storage,
-		FakeClock clock)
+	protected ConfigurationStorageHarness(HarnessState state)
 	{
-		this.database = database;
-		this.services = services;
-		this.scope = scope;
-		this.resourceSource = resourceSource;
-		this.clientMaterializer = clientMaterializer;
-		Storage = storage;
-		Provider = new TestStorageProvider(storage);
-		Clock = clock;
+		database = state.Database;
+		services = state.Services;
+		scope = state.Scope;
+		resourceSource = state.ResourceSource;
+		clientMaterializer = state.ClientMaterializer;
+		Storage = state.Storage;
+		Provider = new TestStorageProvider(state.Storage);
+		Clock = state.Clock;
 	}
 
 	public override IStorage Storage { get; }
@@ -68,25 +63,23 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 
 	public override Realm InternalRealm => internalRealm;
 
-	internal ConfigurationSqliteDbContext DbContext
-		=> scope.ServiceProvider.GetRequiredService<ConfigurationSqliteDbContext>();
+	internal TContext DbContext => scope.ServiceProvider.GetRequiredService<TContext>();
 
 	internal IConfigurationStoreFactory ConfigurationStores
 		=> scope.ServiceProvider.GetRequiredService<IConfigurationStoreFactory>();
 
-	public static async Task<StorageContractHarness> CreateAsync()
-		=> await CreateConcreteAsync();
-
-	internal static async Task<SqliteConfigurationStorageHarness> CreateConcreteAsync()
+	protected static async Task<THarness> CreateCoreAsync<THarness>(
+		IAsyncDisposable database,
+		Action<ServiceCollection> configureProvider,
+		Func<HarnessState, THarness> createHarness)
+		where THarness : ConfigurationStorageHarness<TContext>
 	{
-		var database = await SqliteConfigurationDatabase.CreateMigratedAsync();
 		var clock = new FakeClock(Start);
 		var resourceSource = new MutableConfigurationResourceSource();
 		var collection = new ServiceCollection();
 		collection.AddSingleton<TimeProvider>(clock);
 		collection.AddSingleton<IConfigurationResourceSource>(resourceSource);
-		collection.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(database.Connection));
-		collection.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
+		configureProvider(collection);
 		collection.AddAesKeyMaterialProtector(options => options.Key = TestProtectorKey.ToArray());
 
 		var services = collection.BuildServiceProvider(new ServiceProviderOptions
@@ -101,7 +94,7 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			var serverSerializer = scope.ServiceProvider.GetRequiredService<ServerOptionsPayloadSerializer>();
 			var realmSerializer = scope.ServiceProvider.GetRequiredService<RealmOptionsPayloadSerializer>();
 			var clientMaterializer = scope.ServiceProvider.GetRequiredService<ClientMaterializer>();
-			var context = scope.ServiceProvider.GetRequiredService<ConfigurationSqliteDbContext>();
+			var context = scope.ServiceProvider.GetRequiredService<TContext>();
 			var serverOptions = new ServerOptions();
 			var serverPayload = serverSerializer.Serialize(serverOptions);
 			context.ServerOptions.Add(new ServerOptionsEntity
@@ -127,14 +120,14 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			var storage = new ConfigurationCompositeStorage(factory, serverOptions, clock);
 			storage.EnsureRealm(internalRealm.Id);
 
-			var harness = new SqliteConfigurationStorageHarness(
+			var harness = createHarness(new HarnessState(
 				database,
 				services,
 				scope,
 				resourceSource,
 				clientMaterializer,
 				storage,
-				clock);
+				clock));
 
 			harness.internalRealm = internalRealm;
 			harness.realmA = await harness.CreateRealmAsync("a");
@@ -149,6 +142,15 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			throw;
 		}
 	}
+
+	protected sealed record HarnessState(
+		IAsyncDisposable Database,
+		ServiceProvider Services,
+		AsyncServiceScope Scope,
+		MutableConfigurationResourceSource ResourceSource,
+		ClientMaterializer ClientMaterializer,
+		ConfigurationCompositeStorage Storage,
+		FakeClock Clock);
 
 	public override async Task SeedClientAsync(Client client)
 	{
@@ -192,7 +194,7 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			OptionsJson = payload.Json,
 		};
 
-	private static ReadOnlySpan<byte> TestProtectorKey
+	protected static ReadOnlySpan<byte> TestProtectorKey
 		=>
 		[
 			0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
@@ -201,7 +203,7 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20,
 		];
 
-	private sealed class MutableConfigurationResourceSource : IConfigurationResourceSource
+	protected sealed class MutableConfigurationResourceSource : IConfigurationResourceSource
 	{
 		private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, IdentityScope>> identityScopes = new();
 		private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ResourceServer>> resourceServers = new();
@@ -219,7 +221,7 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 			=> resourceServers.GetOrAdd(realmId, _ => new(StringComparer.Ordinal))[server.Name] = server;
 	}
 
-	private sealed class ConfigurationCompositeStorage : IStorage
+	protected sealed class ConfigurationCompositeStorage : IStorage
 	{
 		private readonly IConfigurationStoreFactory configuration;
 		private readonly ConcurrentDictionary<string, RealmOperationalData> realmData = new(StringComparer.Ordinal);
@@ -330,5 +332,30 @@ internal sealed class SqliteConfigurationStorageHarness : StorageContractHarness
 		public void Dispose()
 		{
 		}
+	}
+}
+
+/// <summary>SQLite specialization of the shared Configuration contract harness.</summary>
+internal sealed class SqliteConfigurationStorageHarness
+	: ConfigurationStorageHarness<ConfigurationSqliteDbContext>
+{
+	private SqliteConfigurationStorageHarness(HarnessState state) : base(state)
+	{
+	}
+
+	public static async Task<StorageContractHarness> CreateAsync()
+		=> await CreateConcreteAsync();
+
+	internal static async Task<SqliteConfigurationStorageHarness> CreateConcreteAsync()
+	{
+		var database = await SqliteConfigurationDatabase.CreateMigratedAsync();
+		return await CreateCoreAsync(
+			database,
+			services =>
+			{
+				services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(database.Connection));
+				services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
+			},
+			state => new SqliteConfigurationStorageHarness(state));
 	}
 }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Configuration;
+using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
@@ -16,15 +17,18 @@ namespace Tests.Storage.Configuration;
 /// and is fail-closed when the singleton server-options row is missing. It reads through the scoped context
 /// accessor, never through <c>IStorage</c>.
 /// </summary>
-public class ConfigurationSnapshotSourceSqliteTests
+public abstract class ConfigurationSnapshotSourceProviderTests<TContext>
+	where TContext : ConfigurationDbContext
 {
 	private static readonly ServerOptionsPayloadSerializer ServerSerializer = new();
 	private static readonly RealmOptionsPayloadSerializer RealmSerializer = new();
 
+	private protected abstract Task<IConfigurationTestDatabase<TContext>> CreateDatabaseAsync();
+
 	[Fact]
 	public async Task LoadAsync_MaterializesServerOptionsAndLiveRealms_ExcludingTombstones()
 	{
-		await using var database = await SqliteConfigurationDatabase.CreateMigratedAsync();
+		await using var database = await CreateDatabaseAsync();
 		var serverOptions = new ServerOptions { IssuerUri = "https://issuer.test", DispatchEvents = true };
 
 		await using (var context = database.NewContext())
@@ -49,16 +53,16 @@ public class ConfigurationSnapshotSourceSqliteTests
 	[Fact]
 	public async Task LoadAsync_WhenServerOptionsRowMissing_FailsClosed()
 	{
-		await using var database = await SqliteConfigurationDatabase.CreateMigratedAsync();
+		await using var database = await CreateDatabaseAsync();
 
 		await Assert.ThrowsAsync<InvalidOperationException>(() => LoadAsync(database).AsTask());
 	}
 
-	private static async ValueTask<ConfigurationSnapshotData> LoadAsync(SqliteConfigurationDatabase database)
+	private static async ValueTask<ConfigurationSnapshotData> LoadAsync(
+		IConfigurationTestDatabase<TContext> database)
 	{
 		var services = new ServiceCollection();
-		services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(database.Connection));
-		services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
+		database.AddStorage(services);
 		services.AddEntityFrameworkConfigurationSnapshotSource();
 
 		await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
@@ -96,4 +100,12 @@ public class ConfigurationSnapshotSourceSqliteTests
 			DeletedAtUtc = deleted ? new DateTime(2026, 7, 22, 12, 0, 0, DateTimeKind.Utc) : null,
 		};
 	}
+}
+
+public sealed class ConfigurationSnapshotSourceSqliteTests
+	: ConfigurationSnapshotSourceProviderTests<ConfigurationSqliteDbContext>
+{
+	private protected override async Task<IConfigurationTestDatabase<ConfigurationSqliteDbContext>>
+		CreateDatabaseAsync()
+		=> await SqliteConfigurationDatabase.CreateMigratedAsync();
 }

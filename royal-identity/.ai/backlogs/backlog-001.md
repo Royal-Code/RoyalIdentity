@@ -113,10 +113,17 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 ## Persistência de Dados (EFCore: Postgres/Sqlite) e Caching
 
 **Área:** Storage / Persistência
-**Deferral:** Hoje o único storage é `RoyalIdentity.Storage.InMemory` (fake/referência para dev/test/integração/demo). A produção precisa de módulos de dados com EFCore atrás das *facades* `IStorage.GetXStore(realm)`. Decidido em `an-users-arch.md` (arquitetura modular) — exige a própria ADR (ADR-013) e plano (`plan-data-persistence`). Era a seção "Planos futuros" do `plan-users-edge-session.md`.
-**Quando revisitar:** Quando a persistência real (Postgres) virar requisito, ou para substituir o in-memory por Sqlite nos testes.
+**Deferral:** Parcialmente entregue pelo [plan-data-configuration-storage.md](../plans/plan-data-configuration-storage.md)
+(7/7): Configuration já possui EFCore SQLite/PostgreSQL, migrations, runner/SQL e stores de leitura do IdP.
+Continuam diferidos Operational, o gateway EF completo, a migração do backing padrão dos testes e caching.
+**Quando revisitar:** Ao criar `plan-data-operational-storage.md` (Plano 3 do macro-plano); depois, executar o Plano 4
+para substituir o backing in-memory dos testes.
 **Nota de design:**
-- Projetos: `RoyalIdentity.Data.Configuration` (realms/clients/resources/keys/options) e `RoyalIdentity.Data.Operational` (sessions/tokens/codes/consents) — **dados puros, NÃO dependem do core**; `RoyalIdentity.Storage.EntityFramework` (+ `.PostgreSql`/`.Sqlite`, mapeamentos/migrations por provedor); `RoyalIdentity.Storage.Caching`.
+- Entregues: `RoyalIdentity.Data.Configuration`, `RoyalIdentity.Storage.EntityFramework`, providers
+  `.PostgreSql`/`.Sqlite` e `RoyalIdentity.Migrations`. Resources/scopes permanecem voláteis por DF22; não são
+  entidades de `Data.Configuration`.
+- Pendentes: `RoyalIdentity.Data.Operational` (sessions/tokens/codes/consents), composição do gateway completo,
+  migração dos testes e `RoyalIdentity.Storage.Caching`.
 - Só `Storage.EntityFramework` implementa as facades do IdP; `Data.*` contêm DbContext/entidades/queries. Divisão config × operacional por ciclo de vida/volume (TTL/cache no operacional).
 - Esboço de fases: entidades/DbContext → mapeamentos por provedor → impl. das facades → cache → migração in-memory→Sqlite nos testes.
 
@@ -125,7 +132,7 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 ## Aspire e orquestração de ambiente
 
 **Área:** Host / Operação / Developer Experience
-**Deferral:** O [plan-data-configuration-storage.md](../plans/plan-data-configuration-storage.md) cria o executável
+**Deferral:** O [plan-data-configuration-storage.md](../plans/plan-data-configuration-storage.md) entregou o executável
 geral `RoyalIdentity.Migrations`, separado dos hosts. A solução ainda não possui projetos Aspire nem composição de
 containers para todos os hosts e dependências.
 **Quando revisitar:** Depois dos Planos 2 e 3 do `plan-data-macro.md`, quando Configuration e Operational possuírem

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Scopes;
@@ -14,13 +15,18 @@ using Tests.Storage.Support;
 
 namespace Tests.Storage.Configuration;
 
-/// <summary>Provider-specific acceptance tests required by plan Phase 4; these deliberately do not run on the fake.</summary>
-public class ConfigurationStoreSqliteTests
+/// <summary>Provider acceptance tests required by plan Phase 4; these deliberately do not run on the fake.</summary>
+public abstract class ConfigurationStoreProviderTests<TContext>
+	where TContext : ConfigurationDbContext
 {
+	private protected abstract Task<ConfigurationStorageHarness<TContext>> CreateHarnessAsync();
+
+	private protected abstract void AddProviderStorage(ServiceCollection services);
+
 	[Fact]
 	public async Task ServerOptions_ReadsAuthoritativeRow_AndReturnsIndependentGraphs()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 
 		var first = await harness.ConfigurationStores.GetServerOptionsAsync();
 		first.IssuerUri = "https://mutated.test";
@@ -33,7 +39,7 @@ public class ConfigurationStoreSqliteTests
 	[Fact]
 	public async Task ClientStore_MaterializesCompleteIndependentGraph()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		var source = ConfigurationTestData.BuildFullyPopulatedClient(harness.RealmA, "store-full-client");
 		await harness.SeedClientAsync(source);
 
@@ -64,7 +70,7 @@ public class ConfigurationStoreSqliteTests
 	[Fact]
 	public async Task DeleteRealm_PreservesConfigurationRows_AndReservesPathAndDomain()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		var realm = await harness.CreateRealmAsync("tombstone");
 		await harness.SeedClientAsync(new Client
 		{
@@ -126,7 +132,7 @@ public class ConfigurationStoreSqliteTests
 	[Fact]
 	public async Task RealmStore_RejectsNonCanonicalDomain()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		var realm = new Realm(
 			"mixed-domain",
 			"Mixed.Contract.Test",
@@ -144,7 +150,7 @@ public class ConfigurationStoreSqliteTests
 	[Fact]
 	public async Task RealmClientAndResourceReads_PropagateCancellation()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		using var cancellation = new CancellationTokenSource();
 		await cancellation.CancelAsync();
 
@@ -161,7 +167,7 @@ public class ConfigurationStoreSqliteTests
 	[Fact]
 	public async Task ResourceBridge_ReturnsIndependentGraphs()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		await harness.SeedIdentityScopeAsync(
 			harness.RealmA,
 			new IdentityScope(ScopeVisibility.Public, "custom", "Custom", "Custom scope", ["sub"]));
@@ -196,11 +202,24 @@ public class ConfigurationStoreSqliteTests
 		Assert.Contains(demoSource.GetResourceServers("demo-realm"), server => server.Name == "apiserver");
 	}
 
-	private static ServiceCollection CreateResourceServices()
+	private ServiceCollection CreateResourceServices()
 	{
 		var services = new ServiceCollection();
+		AddProviderStorage(services);
+		return services;
+	}
+}
+
+public sealed class ConfigurationStoreSqliteTests
+	: ConfigurationStoreProviderTests<ConfigurationSqliteDbContext>
+{
+	private protected override async Task<ConfigurationStorageHarness<ConfigurationSqliteDbContext>>
+		CreateHarnessAsync()
+		=> await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+
+	private protected override void AddProviderStorage(ServiceCollection services)
+	{
 		services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite("Data Source=:memory:"));
 		services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
-		return services;
 	}
 }

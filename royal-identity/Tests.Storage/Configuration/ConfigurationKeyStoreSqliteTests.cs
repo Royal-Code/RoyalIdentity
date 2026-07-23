@@ -1,18 +1,23 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Security.Keys;
 using RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
+using RoyalIdentity.Storage.EntityFramework.Sqlite;
 using Tests.Storage.Configuration.Support;
 using Tests.Storage.Support;
 
 namespace Tests.Storage.Configuration;
 
-public class ConfigurationKeyStoreSqliteTests
+public abstract class ConfigurationKeyStoreProviderTests<TContext>
+	where TContext : ConfigurationDbContext
 {
+	private protected abstract Task<ConfigurationStorageHarness<TContext>> CreateHarnessAsync();
+
 	[Fact]
 	public async Task AddKey_ProtectsMaterial_AndReturnsIndependentGraphs()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		var key = NewKey("protected-key", "highly-sensitive-key-material");
 		var store = harness.Storage.GetKeyStore(harness.RealmA);
 
@@ -32,7 +37,7 @@ public class ConfigurationKeyStoreSqliteTests
 	[Fact]
 	public async Task AddKey_DuplicateIdFails_AndDoesNotOverwriteOriginal()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		var store = harness.Storage.GetKeyStore(harness.RealmA);
 		await store.AddKeyAsync(NewKey("duplicate", "original-material"), default);
 
@@ -46,7 +51,7 @@ public class ConfigurationKeyStoreSqliteTests
 	[Fact]
 	public async Task GetKey_CorruptedCiphertextFailsClosed_WithoutMaterialInException()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		var key = NewKey("corrupted", "material-not-for-error-message");
 		var store = harness.Storage.GetKeyStore(harness.RealmA);
 		await store.AddKeyAsync(key, default);
@@ -68,7 +73,7 @@ public class ConfigurationKeyStoreSqliteTests
 	[Fact]
 	public async Task KeyOperations_PropagateCancellation()
 	{
-		await using var harness = await SqliteConfigurationStorageHarness.CreateConcreteAsync();
+		await using var harness = await CreateHarnessAsync();
 		var store = harness.Storage.GetKeyStore(harness.RealmA);
 		using var cancellation = new CancellationTokenSource();
 		await cancellation.CancelAsync();
@@ -90,4 +95,12 @@ public class ConfigurationKeyStoreSqliteTests
 			KeyEncoding.Plain,
 			material,
 			StorageContractHarness.Start);
+}
+
+public sealed class ConfigurationKeyStoreSqliteTests
+	: ConfigurationKeyStoreProviderTests<ConfigurationSqliteDbContext>
+{
+	private protected override async Task<ConfigurationStorageHarness<ConfigurationSqliteDbContext>>
+		CreateHarnessAsync()
+		=> await SqliteConfigurationStorageHarness.CreateConcreteAsync();
 }

@@ -1,5 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using RoyalIdentity.Storage.EntityFramework.Extensions;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 
 namespace Tests.Storage.Configuration.Support;
@@ -10,7 +12,7 @@ namespace Tests.Storage.Configuration.Support;
 /// <c>:memory:</c> database survives between contexts; each <see cref="NewContext"/> is an independent unit of
 /// work over the same schema, letting round-trip tests prove materialized graphs are independent.
 /// </summary>
-internal sealed class SqliteConfigurationDatabase : IAsyncDisposable
+internal sealed class SqliteConfigurationDatabase : IConfigurationTestDatabase<ConfigurationSqliteDbContext>
 {
 	private readonly SqliteConnection connection;
 
@@ -39,6 +41,12 @@ internal sealed class SqliteConfigurationDatabase : IAsyncDisposable
 			.Options;
 
 		return new ConfigurationSqliteDbContext(options);
+	}
+
+	public void AddStorage(ServiceCollection services)
+	{
+		services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(connection));
+		services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
 	}
 
 	public async ValueTask DisposeAsync() => await connection.DisposeAsync();

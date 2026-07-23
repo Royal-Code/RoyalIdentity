@@ -1,10 +1,10 @@
 # Plan: Persistência EF dos dados de configuração do IdP (`plan-data-configuration-storage`)
 
-## Status: EM EXECUÇÃO - Fase 6 de 7 concluída
+## Status: CONCLUÍDO - 7 de 7 fases
 
 ## Progresso
 
-`██████░` **86%** - 6 de 7 fases
+`███████` **100%** - 7 de 7 fases
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - ServerOptions, realms, clients e bridge de resources | Concluida |
 | Fase 5 - Proteção e persistência de signing keys | Concluida |
 | Fase 6 - PostgreSQL, migrations, runner e seeds | Concluida |
-| Fase 7 - Paridade, integração e fechamento | Pendente |
+| Fase 7 - Paridade, integração e fechamento | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -810,15 +810,15 @@ Validação: `dotnet ef migrations has-pending-model-changes` — sem mudanças 
 
 **Tarefas:**
 
-- [ ] Executar todos os IDs P2 da matriz contra SQLite e os mesmos cenários contra PostgreSQL opt-in.
-- [ ] Cobrir create-only de keys, tombstone/reserva, domain lowercase, CT, materialização independente, snapshot e disposal real.
-- [ ] Verificar que resources continuam bridge volátil e que nenhuma superfície Operational ganhou persistência acidental.
-- [ ] Executar testes de arquitetura para todos os novos projetos e os contexts customizados SQLite/PostgreSQL com refinamentos completos.
-- [ ] Executar solução completa e registrar contagens/skips/limitações no resultado da fase.
-- [ ] Confirmar por busca que `RoyalIdentity.Server`/core não chamam `EnsureCreated`, `Migrate` ou `MigrateAsync`.
-- [ ] Confirmar que o host padrão continua `AddInMemoryStorage` e não requer banco.
-- [ ] Atualizar macro-plano, roadmap, AGENTS e backlog com o estado real e o gate do Plano 3; preservar na matriz do baseline a anotação já feita de que MP-4 foi superada por DF19/DF27/DF28.
-- [ ] Registrar no handoff que a ativação produtiva do gateway aguarda Operational, API administrativa e migração do backing padrão.
+- [x] Executar todos os IDs P2 da matriz contra SQLite e os mesmos cenários contra PostgreSQL opt-in.
+- [x] Cobrir create-only de keys, tombstone/reserva, domain lowercase, CT, materialização independente, snapshot e disposal real.
+- [x] Verificar que resources continuam bridge volátil e que nenhuma superfície Operational ganhou persistência acidental.
+- [x] Executar testes de arquitetura para todos os novos projetos e os contexts customizados SQLite/PostgreSQL com refinamentos completos.
+- [x] Executar solução completa e registrar contagens/skips/limitações no resultado da fase.
+- [x] Confirmar por busca que `RoyalIdentity.Server`/core não chamam `EnsureCreated`, `Migrate` ou `MigrateAsync`.
+- [x] Confirmar que o host padrão continua `AddInMemoryStorage` e não requer banco.
+- [x] Atualizar macro-plano, roadmap, AGENTS e backlog com o estado real e o gate do Plano 3; preservar na matriz do baseline a anotação já feita de que MP-4 foi superada por DF19/DF27/DF28.
+- [x] Registrar no handoff que a ativação produtiva do gateway aguarda Operational, API administrativa e migração do backing padrão.
 
 **Critérios de aceite:** todos os critérios globais estão atendidos; contract suite Configuration verde em SQLite e PostgreSQL real validado; host padrão continua executável sem DB; zero perguntas/semânticas Configuration abertas; documentação não afirma que o adapter parcial é produção completa.
 
@@ -826,7 +826,41 @@ Validação: `dotnet ef migrations has-pending-model-changes` — sem mudanças 
 
 ### Resultado da Fase 7
 
-*a preencher*
+**Concluída em 2026-07-22.** O Plano 2 foi fechado com paridade Configuration comprovada nos dois providers,
+sem promover o adapter parcial a gateway produtivo nem alterar o backing padrão do host.
+
+- **Uma suíte, dois providers:** o harness Configuration foi extraído para uma base compartilhada e ganhou
+  especializações SQLite/PostgreSQL. Os mesmos 42 cenários provider-neutral de realms, clients, keys e resource
+  bridge são executados nos dois bancos; a fixture PostgreSQL cria um database isolado por cenário e o remove
+  com `DROP DATABASE ... WITH (FORCE)`, permitindo paralelismo sem estado compartilhado.
+- **Aceites P2 equivalentes:** os mesmos métodos de teste cobrem em SQLite/PostgreSQL ServerOptions e grafos
+  independentes, materialização completa de client, tombstone permanente e reserva de path/domain, recusa de
+  domain não canônico, propagação de CT, resource bridge defensiva, key create-only/protegida, corrupção
+  fail-closed e snapshot sem tombstones/fail-closed. O lifecycle composto test-only mantém os dois testes de
+  scope/disposal real; não existe registration produtiva parcial.
+- **PostgreSQL real:** o script Podman executou 8 grupos opt-in verdes no PostgreSQL 17, incluindo migration/
+  seed/SQL da Fase 6, os 42 contratos e 13 aceites compartilhados. A última execução usou a porta dinâmica
+  `41217`; cada database de cenário e o container foram removidos, mantendo apenas a machine compartilhada.
+- **Fronteiras preservadas:** o model continua restrito às sete entidades Configuration; resources/scopes não
+  possuem tabelas e continuam na bridge volátil; nenhuma entidade/store Operational foi criada. Os 36 testes de
+  arquitetura confirmam referências de projetos e equivalência de mappings para contexts padrão/customizados.
+  Buscas finais não encontraram `EnsureCreated`, `Migrate` ou `MigrateAsync` no host/core; `HostServices`
+  continua usando somente `AddInMemoryStorage`.
+- **Handoff:** macro-plano, roadmap, `AGENTS.md` e backlog registram o Plano 2 como concluído. A ativação
+  produtiva aguarda o ainda não criado `plan-data-operational-storage.md`, a composição do gateway completo e o
+  `plan-data-test-migration.md`; writes administrativos e KMS/rotação continuam nos planos próprios.
+
+Critérios globais atendidos: zero semânticas Configuration abertas; migrations/SQL/runner separados do host;
+seeds e keys fail-fast; paridade SQLite/PostgreSQL real; host executável sem banco; resources e Operational fora
+do schema; nenhuma registration de `IStorage`/`IStorageProvider` EF parcial em produção.
+
+Validação final: `dotnet build RoyalIdentity.sln --no-restore` — êxito, 0 erros e 5 warnings preexistentes;
+`dotnet test Tests.Storage` — 217 aprovados, 0 falhas e 8 PostgreSQL opt-in ignorados;
+`dotnet test Tests.Architecture` — 36 aprovados; `dotnet test Tests.Integration` — 227 aprovados;
+`dotnet test RoyalIdentity.sln --no-build --no-restore` — 806 aprovados, 0 falhas e 9 ignorados
+(8 Configuration PostgreSQL opt-in + 1 UserAccounts PostgreSQL opt-in);
+`scripts/Test-ConfigurationPostgreSql.ps1` — 8 grupos aprovados contra PostgreSQL 17 real;
+`git diff --check` — sem erros.
 
 ---
 
@@ -893,12 +927,12 @@ Validação: `dotnet ef migrations has-pending-model-changes` — sem mudanças 
 | Snapshot fica obsoleto | refresh falha ou intervalo é excessivo | configuração antiga continua ativa | intervalo obrigatório (`Validate()`), idade observável (`LoadedAtUtc`/`LastRefreshFailureUtc`) e last-known-good explícito (`TryRefreshAsync`) | Mitigado (Fase 3) |
 | Snapshot expõe mutabilidade | caller altera `ServerOptions`/`Realm` retornado | configuração publicada muda fora do refresh | grafo interno inacessível, cópia defensiva (copy ctor de `ServerOptions`/clone de `Realm`) e teste de mutação | Mitigado (Fase 3) |
 | Cookie mantém named options antigas | snapshot renova após scheme já materializado | autenticação continua com cookie/rotas anteriores | `TryRemove` do default e união dos schemes anterior/novo após publicação válida; testado mesmo nome e preservação de scheme externo | Mitigado (Fase 3) |
-| Data Protection não compartilha key ring | nós usam rings distintos ou efêmeros | signing key persistida não pode ser aberta | documentação/acceptance multi-instância; configuração pertence ao consumidor | Aberto |
-| Chave AES fraca/exposta | options recebe tamanho inválido ou segredo aparece em log | perda de confidencialidade das signing keys | validação AES-GCM; redaction; testes negativos | Aberto |
-| Plain vira default acidental | DI resolve Plain sem opt-in | segredo em texto claro | sem default + warning + teste de registration | Aberto |
-| Remoção do `FirstKeyJob` quebra dev/test | fixture não semeia key antes do startup | servidor não inicia | seed explícito in-memory/runner e startup test | Aberto |
-| Validação aceita key inutilizável | startup verifica apenas id/período e ignora decrypt/algoritmo | primeira assinatura falha após o host iniciar | validar pelo caminho completo do key manager; testes de ciphertext, protector e algoritmo | Aberto |
-| Adapter parcial é usado como produção | consumidor ativa P2 antes do Operational | operações OAuth sem backing durável/coerente | não registrar no host padrão; documentação e guard de composição | Aberto |
+| Data Protection não compartilha key ring | nós usam rings distintos ou efêmeros | signing key persistida não pode ser aberta | documentação/acceptance multi-instância; configuração pertence ao consumidor | Mitigado (Fases 5/6; implantação configura o ring) |
+| Chave AES fraca/exposta | options recebe tamanho inválido ou segredo aparece em log | perda de confidencialidade das signing keys | validação AES-GCM; redaction; testes negativos | Mitigado (Fases 5/6) |
+| Plain vira default acidental | DI resolve Plain sem opt-in | segredo em texto claro | sem default + warning + teste de registration | Mitigado (Fases 5/6) |
+| Remoção do `FirstKeyJob` quebra dev/test | fixture não semeia key antes do startup | servidor não inicia | seed explícito in-memory/runner e startup test | Mitigado (Fases 5/6) |
+| Validação aceita key inutilizável | startup verifica apenas id/período e ignora decrypt/algoritmo | primeira assinatura falha após o host iniciar | validar pelo caminho completo do key manager; testes de ciphertext, protector e algoritmo | Mitigado (Fase 5) |
+| Adapter parcial é usado como produção | consumidor ativa P2 antes do Operational | operações OAuth sem backing durável/coerente | não registrar no host padrão; documentação e guard de composição | Mitigado por guard até o Plano 3 |
 | Collation diverge SQLite/PostgreSQL | índice usa default do provider | casing produz lookup/unique diferente | collation/comparação explícita + mesmos ids em dois casings/providers | Mitigado (Fases 2/6) |
 | SQL versionado diverge das migrations | model muda sem regenerar script | implantação manual incompleta | teste pending model changes e verificação de scripts na Fase 6 | Mitigado (Fase 6) |
 | Seed mistura produto e demo | runner padrão insere URLs/segredos locais | configuração insegura em produção | perfis separados; demo exige opt-in explícito | Mitigado (Fase 6) |
