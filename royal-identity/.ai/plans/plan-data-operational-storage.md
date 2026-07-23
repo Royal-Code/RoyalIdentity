@@ -70,6 +70,10 @@
   registro alterado.
 - [Transactions — EF Core](https://learn.microsoft.com/en-us/ef/core/saving/transactions) — atomicidade de
   múltiplos comandos e limitações de transações entre contexts/providers.
+- [Custom Migrations History Table — EF Core](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/history-table)
+  — separação explícita da linha evolutiva Operational quando duas famílias usam o mesmo banco.
+- [Unmapped JSON members — System.Text.Json](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/missing-members)
+  — compatibilidade de payload Configuration aditivo com propriedades ausentes/desconhecidas.
 
 ### Estado atual do código (verificado em 2026-07-23)
 
@@ -115,8 +119,23 @@
 - O default numérico da janela de authorize parameters foi deliberadamente deixado ao Plano 3.
 - DF19/MP-6 separaram expiração lógica, retenção e purge físico, mas não decidiram os períodos de retenção nem quem
   agenda a limpeza.
+- A opção de janela de authorize interaction entra em `RealmOptions.Authentication`, portanto altera o grafo
+  Configuration concluído no Plano 2. A mudança é aditiva no payload JSON e não requer migration relacional, mas
+  precisa provar leitura de payload v1 anterior sem a propriedade e round-trip novo sem bump de versão.
+- EF usa `__EFMigrationsHistory` por default. Como Configuration e Operational podem compartilhar o mesmo banco,
+  as duas famílias precisam configurar sua history explicitamente. PostgreSQL usa
+  `configuration.__EFMigrationsHistory` e `operational.__EFMigrationsHistory`; SQLite, que não possui schemas, usa
+  `__ConfigurationMigrationsHistory` e `__OperationalMigrationsHistory`. O schema das entidades PostgreSQL não
+  configura automaticamente o schema da history table.
 - Configuration e Operational podem usar bancos distintos. Portanto, Operational não pode depender de FK ou
   transação com `configuration.realms`/`configuration.clients`; realm/client são vínculos lógicos por valor.
+- Dentro da própria família Operational, ainda é necessário decidir quais relações são FKs e quais permanecem
+  vínculos lógicos. Em especial, `session_id` pode ser ausente em client credentials, e
+  `refresh_token.access_token_id` atravessa lifecycles diferentes.
+- O fluxo atual persiste também access tokens JWT e o refresh recupera o access token original por
+  `AccessTokenId`. Logo, cleanup não pode apagar um access token apenas por sua expiração enquanto existir refresh
+  token ainda observável que dependa dele. Carregar no refresh todo o snapshot necessário seria redesign do fluxo,
+  fora deste plano.
 - O purge Operational após tombstone de realm é requisito fechado, mas o seam de orquestração cross-family foi
   deliberadamente adiado.
 - O comportamento atual de repetição tolerada de refresh token precisa ser confrontado explicitamente com o
@@ -182,9 +201,9 @@
 > Remova esta seção quando não houver perguntas abertas. Nenhuma recomendação abaixo é decisão enquanto o autor não
 > responder.
 
-- **Q1 — Modelagem dos grafos operacionais:** como os campos consultáveis e os grafos de claims/coleções devem ser
-  persistidos?
-  - **Opções:**
+- **Q1 — Modelagem dos grafos e relações internas:** como os campos consultáveis, os grafos de claims/coleções e
+  os vínculos dentro da família Operational devem ser persistidos? Responder as duas partes.
+  - **Parte 1 — projeção dos grafos:**
     - **A)** Modelo híbrido: colunas/tabelas para identidade, realm, client, subject, sid, tipo e timestamps
       consultados; payload JSON versionado para claims e grafos não consultados. Consultas, revogações e cleanup
       permanecem indexáveis, com round-trip/versionamento rigorosos. **Recomendada.**
@@ -192,14 +211,28 @@
       Maximiza a consultabilidade, mas aumenta o custo de mapping/escrita de dados transitórios.
     - **C)** Payload quase opaco: somente chave, realm e timestamps em colunas. Simplifica o schema, mas impede
       índices eficientes de subject/client/sid.
-  - **Impacto se não decidir:** bloqueia entidades, mappings, migrations e materializadores da Fase 1.
+  - **Parte 2 — integridade relacional interna:**
+    - **A)** FKs somente para ownership estrutural com lifecycle comum, como
+      `user_session_clients → user_sessions`; referências entre agregados/lifecycles, como
+      `token.session_id` e `refresh_token.access_token_id`, permanecem vínculos lógicos indexados. Evita que
+      cleanup independente seja governado por cascade/restrict sem perder integridade dos children. **Recomendada.**
+    - **B)** FKs para toda relação interna representável, nullable quando necessário. Aumenta a integridade do
+      banco, mas acopla ordem de escrita, retenção e purge de access tokens/refresh tokens/sessões.
+    - **C)** Nenhuma FK interna; toda correlação é por valor. Maximiza independência de lifecycle, mas perde a
+      proteção relacional até para tabelas filhas estruturalmente dependentes.
+  - **Impacto se não decidir:** bloqueia entidades, mappings, migrations, materializadores, ordem de escrita e
+    estratégia de cleanup da Fase 1. Formato de resposta sugerido: `Q1: Parte 1 A; Parte 2 A`.
   - **Status:** Aberta.
 
 - **Q2 — Persistência de handles bearer/opaques:** qual representação deve ser usada como chave de lookup?
+  Esta pergunta não decide se JWTs são persistidos: AT-01 e o refresh flow exigem persistir todos os access tokens
+  emitidos atualmente. Para access tokens, o desenho deve distinguir a identidade `jti` do valor bearer apresentado
+  quando houver token de referência, sem alterar silenciosamente a semântica AT-02.
   - **Opções:**
     - **A)** Digest criptográfico para authorization code, refresh token, authorize-parameters handle e
-      identificador bearer de access token `Reference`; o valor bruto não é persistido como chave. Reduz
-      reutilização após leitura indevida do banco. **Recomendada.**
+      identificador bearer de access token `Reference`; `jti` continua projetado e todos os JWTs continuam
+      persistidos. O valor bruto não é persistido como chave. Reduz reutilização após leitura indevida do banco.
+      **Recomendada.**
     - **B)** Valor bruto como PK/índice. Simplifica a implementação, mas uma leitura do banco expõe credenciais
       reutilizáveis.
     - **C)** HMAC determinístico com chave operacional. Protege também contra enumeração de entradas de baixa
@@ -210,9 +243,11 @@
 - **Q3 — Proteção de payloads sensíveis em repouso:** o adapter deve aplicar proteção autenticada em nível de
   aplicação?
   - **Opções:**
-    - **A)** Proteção substituível: índices relacionais em claro e payload sensível protegido por seam próprio com
-      `Plain` explícito, Data Protection e AES-GCM, sem default silencioso. Aumenta a defesa contra leitura do banco,
-      com custo de CPU e gestão de chaves. **Recomendada.**
+    - **A)** Proteção substituível: extrair/reusar os componentes genéricos já comprovados pelo Plano 2
+      (envelope versionado, AES-GCM, Data Protection, resolução por protector id, redaction e leitores anteriores),
+      mas expor um seam Operational próprio, com purpose/contexto autenticado por tipo de registro. Índices
+      relacionais ficam em claro; `Plain` é explícito e nunca default silencioso. Evita duplicação sem acoplar
+      payload operacional ao lifecycle semântico de signing keys. **Recomendada.**
     - **B)** Somente proteção da infraestrutura. Reduz o adapter, mas uma leitura lógica do banco expõe claims e
       tokens.
     - **C)** Proteção seletiva por tipo. Reduz parte do custo, mas cria política mais complexa e sujeita a
@@ -234,6 +269,9 @@
 
 - **Q5 — Contrato de transição do refresh token (MP-3):** como representar consumo, conflito e atualização do
   token reutilizável?
+  A resposta deve distinguir perder a transição de aplicar a política de tolerância: um conflito nunca vira sucesso
+  por si só. Se Q10 preservar a tolerância, o caller só pode avaliá-la sobre estado consumido rematerializado depois
+  do conflito, tornando observável que houve outra transição vencedora.
   - **Opções:**
     - **A)** Estado + versão condicional: leitura traz versão; `TryConsume` distingue vencedor, conflito e já
       consumido; atualização posterior exige versão esperada. Preserva a tolerância como política do caller e torna
@@ -254,10 +292,13 @@
   - **Status:** Aberta.
 
 - **Q7 — Retenção após estado terminal:** quando cada tipo se torna elegível ao purge físico?
+  Independentemente da opção, um access token referenciado pelo refresh flow permanece observável enquanto existir
+  refresh token válido/tolerado que dependa dele; expiração isolada do access token não basta para removê-lo. Um
+  redesign que copie todo o snapshot necessário para o refresh está fora deste corte.
   - **Opções:**
     - **A)** Elegibilidade imediata após deixar de ser semanticamente observável: code consumido é apagado; demais
-      tipos após expiração/estado terminal; refresh respeita tolerância e expiração. Não preserva histórico
-      operacional. **Recomendada.**
+      tipos após expiração/estado terminal e depois de encerradas suas dependências observáveis; refresh respeita
+      tolerância e expiração. Não preserva histórico operacional. **Recomendada.**
     - **B)** Grace configurável por tipo. Suporta diagnóstico limitado, mas aumenta PII, volume e defaults.
     - **C)** Grace único global. Simplifica configuração, mas ignora lifecycles diferentes.
   - **Impacto se não decidir:** bloqueia queries de cleanup, colunas terminais e critérios de purge. Se B for
@@ -323,7 +364,10 @@
   modelos/contratos do IdP. Fonte: ADR-013/architecture.
 - **DF2 — Separação combinável:** Configuration e Operational possuem DbContexts e conexões próprias, podendo
   apontar para bancos distintos ou para o mesmo banco. Mappings ficam em extensões públicas, permitindo context
-  combinado de terceiros sem fornecê-lo no produto. Fonte: DF2/DF3 do Plano 2.
+  combinado de terceiros sem fornecê-lo no produto. O gateway padrão cria um DbContext e uma instância de
+  `DbConnection` por família mesmo quando as connection strings apontam para o mesmo banco; o pooling continua a
+  cargo do provider, sem compartilhamento explícito de conexão/transação. Fonte: DF2/DF3 do Plano 2 e documentação
+  EF de transações cross-context.
 - **DF3 — Lifecycle:** DbContexts, factories e stores são scoped. `IStorageProvider.CreateSession()` cria um scope
   real e `IStorageSession.Dispose()` o encerra; sessão não é transação global. Fonte: DF6/DF20 do Plano 2 e DF21 do
   baseline.
@@ -348,9 +392,12 @@
 - **DF11 — Authorization code:** o consumo no fluxo do token é single-use e atômico; apenas um concorrente pode
   obter sucesso. A remoção administrativa continua idempotente. A assinatura aguarda Q4. Fonte: DF15/MP-2.
 - **DF12 — Refresh token:** a primeira transição de consumo e atualizações de estado são condicionais/atômicas; o
-  CAS trivial atual não é alvo. A tolerância é política separada. A assinatura aguarda Q5. Fonte: DF15/MP-3.
-- **DF13 — Access token:** remoção por reference token usa tipo + subject + client Ordinal e é idempotente.
-  Fonte: AT-01..AT-04.
+  CAS trivial atual não é alvo. A tolerância é política separada: conflito não é sucesso e somente estado consumido
+  rematerializado pode ser submetido à tolerância pelo caller. A assinatura aguarda Q5. Fonte: DF15/MP-3.
+- **DF13 — Access token:** todos os access tokens emitidos pelo fluxo atual, inclusive JWTs, são persistidos conforme
+  AT-01..AT-04; remoção por reference token usa tipo + subject + client Ordinal e é idempotente. Um access token
+  necessário ao refresh permanece retido enquanto existir refresh token ainda observável que o referencia.
+  Fonte: AT-01..AT-04 e `RefreshTokenHandler`.
 - **DF14 — Consent:** scopes permanecem dentro do consent, preservando casing; ausência/removal são
   null/idempotente e upsert torna a última escrita efetiva. Fonte: CN-01..CN-03.
 - **DF15 — Sessão:** create-only; record-client deduplica por client Ordinal, preserva `FirstSeenAt` e atualiza
@@ -360,7 +407,9 @@
   pelo `TimeProvider`; read é repetível dentro da janela e fail-closed depois; delete é idempotente; handle possui
   ao menos 128 bits de entropia e colisão é regenerada internamente. Tipo/default aguardam Q6/Q12. Fonte: MP-5.
 - **DF17 — Cleanup separado:** validação lógica não depende da execução do purge. Cleanup físico é por tipo, em
-  batches e idempotente, com lazy cleanup de AP na leitura. Retenção/agendamento aguardam Q7/Q8. Fonte: DF19/MP-6.
+  batches e idempotente, com lazy cleanup de AP na leitura. A elegibilidade respeita dependências observáveis entre
+  tipos, especialmente refresh → access token. Retenção/agendamento aguardam Q7/Q8. Fonte: DF19/MP-6 e fluxo de
+  refresh atual.
 - **DF18 — Realm deletion:** Configuration conserva tombstone/path/domain e Operational apaga fisicamente seus
   dados. Esta fase entrega o purge isolado; coordenação com Configuration/UserAccounts continua futura. O seam
   aguarda Q9. Fonte: DF20/MP-7.
@@ -375,7 +424,15 @@
   síncrono; realms/clients/keys vêm das portas Configuration; resources usam o bridge volátil DF22. Fonte:
   Plano 2.
 - **DF23 — Migrations:** o host nunca executa `EnsureCreated`, `Migrate` ou seed. Migrations ficam nos providers,
-  SQL é versionado e o runner geral aceita Configuration, Operational ou ambas. Fonte: DF11/DF16/DF21 do Plano 2.
+  SQL é versionado e o runner geral aceita Configuration, Operational ou ambas. Cada família configura
+  `MigrationsHistoryTable` explicitamente em todos os pontos que constroem options para migrations:
+  `configuration.__EFMigrationsHistory` e `operational.__EFMigrationsHistory` no PostgreSQL;
+  `__ConfigurationMigrationsHistory` e `__OperationalMigrationsHistory` no SQLite. Em banco já migrado pelo Plano 2,
+  o runner executa um bootstrap idempotente **antes** de qualquer `MigrateAsync`: se a history legada default existe
+  e a nova de Configuration não existe, move/renomeia a tabela preservando todas as linhas; se ambas existem, valida
+  e falha fechado diante de ambiguidade, sem merge/delete automático; banco vazio cria diretamente as histories
+  novas. SQL manual versionado oferece a mesma transição. Fonte: DF11/DF16/DF21 do Plano 2 e documentação EF de
+  migrations history.
 - **DF24 — Sem seed Operational:** dados operacionais nascem dos fluxos; runner não cria tokens, codes, consents ou
   sessões demo. Fixtures escrevem pelo data layer/store apropriado. Fonte: natureza da família e macro-plan.
 - **DF25 — Fake transitório:** não adicionar TTL, particionamento, payload protection, cleanup ou testes de
@@ -387,6 +444,11 @@
 - **DF28 — Logs:** handles bearer, payloads, claims, subjects, connection strings e material de proteção não
   aparecem em logs/erros. Telemetria usa tipo, resultado agregado e contagens. Fonte: requisitos OAuth e
   precedentes de segurança do Plano 2.
+- **DF29 — Evolução aditiva de RealmOptions:** a janela de authorize interaction altera a família Configuration,
+  mas não o schema relacional. A propriedade possui default retrocompatível; payload v1 anterior sem o membro
+  materializa esse default, payload novo faz round-trip e `RealmOptionsPayloadSerializer.CurrentVersion` permanece
+  `1`. Qualquer mudança que não satisfaça esses testes exige reabrir a decisão de versão antes de implementar.
+  Fonte: Q6/Q12, Plano 2 DF5/DF25 e comportamento de membros JSON ausentes.
 
 ---
 
@@ -411,6 +473,8 @@ As escolhas marcadas `[Qn]` não são design aprovado; mostram somente onde a re
 - MP-2 entra como operação/capability de consumo de authorization code; a assinatura final depende de Q4/Q11.
 - MP-3 entra como operação/capability de transição de refresh token; assinatura/resultado dependem de Q5/Q11.
 - A janela de authorize interaction vive em `RealmOptions.Authentication`; type/nome/default dependem de Q6/Q12.
+  Essa é uma alteração aditiva da família Configuration: mantém payload version `1`, não gera migration relacional
+  e exige teste de payload v1 anterior sem a propriedade além do round-trip novo (DF29).
 - A manutenção de cleanup/purge não vira CRUD administrativo nem transação cross-family; sua exposição depende de
   Q8/Q9.
 - O gateway EF completo compõe:
@@ -442,6 +506,7 @@ operational.refresh_tokens
   state_version                            [Q5]
   payload_version + payload                [Q1/Q3]
   index (realm_id, subject_id)
+  index para access_token_id/dependência de cleanup conforme Q1/Q7/Q8
 
 operational.authorization_codes
   realm_id + handle_key                    PK [Q2]
@@ -466,7 +531,7 @@ operational.user_sessions
 operational.user_session_clients
   realm_id + session_id + client_id        PK
   first_seen_at_utc, last_seen_at_utc
-  FK somente para user_sessions da mesma família
+  FK para user_sessions quando Q1 selecionar ownership estrutural
 
 operational.authorize_parameters
   realm_id + handle_key                    PK [Q2]
@@ -478,9 +543,21 @@ operational.authorize_parameters
 - `expires_at_utc` é persistido para não recalcular validade com configuração alterada.
 - Retenção pode exigir `ended_at_utc`/outro marcador terminal depois de Q7; não adicionar colunas sem essa decisão.
 - Não há FK para realm/client/subject em outras famílias.
+- FKs internas e vínculos lógicos seguem a Parte 2 de Q1. Nenhuma relação é inferida apenas porque duas colunas
+  carregam o mesmo identificador.
+- Todos os access tokens emitidos atualmente são persistidos, inclusive JWTs; `AccessTokenType` não é filtro de
+  escrita. O payload conserva o token JWT necessário ao fluxo atual, protegido conforme Q3.
+- Enquanto o refresh flow depender de `AccessTokenId`, cleanup de access token usa `NOT EXISTS`/estratégia
+  equivalente contra refresh tokens ainda observáveis; não basta testar `access_tokens.expires_at_utc`.
+- Índices de cleanup são definidos depois de Q7/Q8 sobre os predicados reais. Cleanup global começa pelo estado/
+  timestamp terminal; cleanup realm-bound pode começar por `realm_id`. Os model tests comprovam a forma escolhida
+  antes da migration SQLite inicial, evitando índice especulativo e migration corretiva.
 - Claims precisam preservar `Type`, `Value`, `ValueType`, `Issuer`, `OriginalIssuer` e `Properties` quando usados;
   nenhuma desserialização pode produzir grafo parcial silencioso.
 - Payloads, se escolhidos, possuem envelope/versionamento explícito e falham fechado quando ilegíveis.
+- Se Q3=A, a infraestrutura criptográfica genérica comprovada em Configuration é extraída/reusada, mas contratos,
+  purposes e contexto autenticado Operational permanecem próprios; `IKeyMaterialProtector` não é reutilizado como
+  interface de payload operacional.
 - Collections retornam comparadores equivalentes aos modelos do core; não herdam comportamento da collation.
 
 ### Arquitetura alvo
@@ -566,7 +643,8 @@ Nenhum código do produto coordena commit entre ambos.
 - AP expirado é ausente na leitura mesmo que o purge nunca rode; uma leitura pode remover preguiçosamente sem
   transformar falha de cleanup em falha do protocolo.
 - Access token/code/consent/session/refresh seguem a elegibilidade definida em Q7 e nunca são filtrados antes disso
-  por um lookup comum.
+  por um lookup comum. A elegibilidade de access token inclui a ausência de refresh token ainda observável que
+  dependa dele.
 - Purge de realm remove todas as tabelas Operational e children no realm alvo, é repetível e não observa outro
   realm com ids colidentes.
 - Cleanup e purge não registram handles, subjects ou payloads.
@@ -576,12 +654,24 @@ Nenhum código do produto coordena commit entre ambos.
 - `RoyalIdentity.Server` continua com `AddInMemoryStorage()` neste plano.
 - A registration EF completa é opt-in e exige as duas famílias; não existe modo produtivo “Operational EF +
   Configuration ausente”.
+- O gateway padrão resolve um DbContext/conexão por família. Connection strings iguais podem reutilizar o pool do
+  provider, mas o produto não compartilha instância de `DbConnection` ou `DbTransaction`; context combinado de
+  terceiro permanece opt-in.
 - A fixture EF completa substitui o composite test-only do Plano 2 para a contract suite, mas os testes HTTP só
   migram no Plano 4.
 - O fake recebe apenas o mínimo necessário para compilar o accessor realm-bound de AP e o mecanismo Q11; seu
   dicionário continua global, sem TTL, e não executa os aceites EF.
-- Migrations Operational possuem assembly/history próprios por context. Quando duas famílias usam o mesmo banco,
-  ambas são aplicadas sequencialmente pelo runner, sem transação distribuída.
+- Migrations Configuration e Operational mantêm assemblies/contexts próprios e usam a topologia exata da DF23. No
+  PostgreSQL, o mesmo nome `__EFMigrationsHistory` é isolado pelos schemas `configuration`/`operational`; no SQLite,
+  os nomes são distintos por não existir schema. Quando duas famílias usam o mesmo banco, o runner primeiro conclui
+  o bootstrap da history legada e depois aplica ambas sequencialmente, sem transação distribuída e sem misturar suas
+  linhas evolutivas.
+- O bootstrap de history é infraestrutura do runner, não migration de domínio: ele roda por conexão/família antes
+  de o EF consultar sua history. Scripts manuais equivalentes ficam em
+  `scripts/sql/migration-history/{sqlite,postgresql}/`.
+- Migrations Configuration já geradas não são reescritas; design-time factories, runner e scripts idempotentes são
+  reconfigurados/regenerados para a nova history. O bootstrap preserva os migration ids existentes e não cria uma
+  migration de domínio artificial apenas para mover metadata do EF.
 - SQL fica em `scripts/sql/operational/{sqlite,postgresql}/`.
 - O runner aceita executar somente Configuration, somente Operational ou ambas. Seed continua exclusivo de
   Configuration.
@@ -614,7 +704,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - contratos, fronteiras e modelo Operational
 
-**Depende de:** Q1–Q6 e Q10–Q12 respondidas.
+**Depende de:** Q1–Q12 respondidas.
 
 **Escopo:** criar o projeto puro, mappings neutros, modelo completo, seams do adapter e mudanças públicas antes de
 implementar stores.
@@ -623,23 +713,31 @@ implementar stores.
 
 - Adicionar `RoyalIdentity.Data.Operational` à solução, referenciando somente EF Core/BCL.
 - Criar `OperationalDbContext`, `OperationalModelOptions` e extensão pública de mapping fora do context.
-- Modelar todas as entidades e índices mínimos conforme Q1–Q3, sem FK cross-family.
+- Modelar todas as entidades, relações internas e índices mínimos conforme Q1–Q3/Q7/Q8, sem FK cross-family.
 - Criar accessor genérico `TContext : DbContext` no adapter; stores não dependem do context concreto.
 - Fechar/implementar os contratos MP-2, MP-3 e MP-5 conforme Q4/Q5/Q11.
 - Adicionar a opção de authorize interaction conforme Q6/Q12, incluindo copy constructor e cobertura do serializer
-  de Configuration.
+  de Configuration; tratar a mudança como aditiva sobre payload v1, sem migration relacional/bump automático.
 - Criar serializers/materializers versionados com round-trip completo e falha fechada.
+- Se Q3=A, extrair/reusar primitivas genéricas de envelope/proteção do Plano 2 sem reutilizar
+  `IKeyMaterialProtector` como contrato Operational.
+- Centralizar os nomes/schemas de migrations history definidos pela DF23 para que runner, design-time factories e
+  fixtures não possam divergir.
 - Adicionar regras de arquitetura para impedir referências proibidas.
 
 **Tarefas:**
 
 - [ ] Atualizar solution/csproj e dependências.
 - [ ] Criar entidades, DbSets, mappings, constraints e índices provider-neutral.
+- [ ] Fixar FKs internas/vínculos lógicos da Parte 2 de Q1 e índices coerentes com as queries de cleanup de Q7/Q8.
 - [ ] Criar `IOperationalStoreFactory` e seam de `DbContext` genérico.
 - [ ] Alterar interfaces/consumidores somente até o ponto em que compilam; manter o comportamento nas fases por
   store.
 - [ ] Aplicar a estratégia de compatibilidade Q11 sem dar aceites novos ao fake.
 - [ ] Criar testes de model metadata, payload version e round-trip por tipo.
+- [ ] Cobrir payload Configuration v1 anterior sem a nova option, default retrocompatível e round-trip novo ainda
+  em version `1`.
+- [ ] Fixar em teste a topologia das quatro histories da DF23 sem abrir conexão.
 - [ ] Criar teste de context combinado de prova, inicialmente com mappings neutros.
 
 **Critérios de aceite:**
@@ -648,7 +746,8 @@ implementar stores.
 - Toda entidade possui realm na chave/índice aplicável e nenhuma FK cross-family.
 - Um `DbContext` arbitrário aplica o mapping sem herdar de `OperationalDbContext`.
 - Contratos MP-2/MP-3 não prometem atomicidade por uma implementação default não atômica.
-- Realm options continuam round-trip após a nova opção.
+- Realm options continuam round-trip após a nova opção; payload v1 anterior materializa o default sem migration ou
+  bump de versão.
 - Todo payload inválido/version desconhecida falha sem materialização parcial.
 
 **Testes:**
@@ -675,6 +774,11 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 
 - Criar extensão pública `ApplyRoyalIdentityOperationalSqliteMappings` e context/design-time factory.
 - Gerar migration inicial Operational SQLite sobre o model completo.
+- Configurar uma migrations history table exclusiva para Operational no SQLite; não reutilizar a history padrão de
+  Configuration quando as famílias compartilham o arquivo/banco. Configuration passa a usar
+  `__ConfigurationMigrationsHistory` e Operational usa `__OperationalMigrationsHistory`.
+- Implementar o bootstrap SQLite da history Configuration legada `__EFMigrationsHistory` antes do primeiro
+  `MigrateAsync` configurado com o novo nome.
 - Implementar access-token store realm-bound create-only, lookup, remoção e remoção de reference tokens.
 - Implementar consent store com upsert atômico por `(realm, subject, client)`.
 - Criar harness SQLite Operational com migrations reais, nunca `EnsureCreated`.
@@ -683,6 +787,11 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 **Tarefas:**
 
 - [ ] Aplicar collation/índices SQLite compatíveis com comparação Ordinal.
+- [ ] Configurar e testar as histories SQLite de Configuration/Operational, inclusive no mesmo banco.
+- [ ] Atualizar runner, design-time factories e fixtures SQLite para consumir a mesma configuração centralizada de
+  history.
+- [ ] Testar bootstrap SQLite: banco vazio; somente history legada; somente history nova; histories legada e nova
+  simultâneas/ambíguas; repetição idempotente.
 - [ ] Implementar materialização completa de `AccessToken` e `Consent`.
 - [ ] Mapear expiration como dado, sem query filter.
 - [ ] Implementar remove em lote com contagem/efeito definido pela matriz.
@@ -693,6 +802,9 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 **Critérios de aceite:**
 
 - Duplicidade de access-token id no mesmo realm falha e não sobrescreve; em realm diferente é aceita.
+- JWT e reference token seguem AT-01..AT-04; `AccessTokenType.Jwt` não deixa de ser persistido.
+- SQLite registra migrations Configuration/Operational apenas nas histories nomeadas da DF23; banco legado é
+  realocado antes de o EF avaliar pending migrations, sem perder/duplicar ids.
 - Lookup devolve token/consent expirado até cleanup explícito.
 - Reference-token removal não remove JWT nem outro subject/client/realm.
 - Consent concorrente não cria duas linhas; a última operação concluída é a efetiva.
@@ -837,6 +949,10 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 
 - Exatamente uma request observa a transição inicial `null → ConsumedTime`.
 - Conflito não é convertido em sucesso silencioso.
+- Quando Q10 preservar tolerância, eventual repetição tolerada usa estado consumido rematerializado depois do
+  conflito; a perda do CAS isoladamente nunca autoriza emissão.
+- A transição condicional nunca usa como estado esperado a mesma instância já mutada que será gravada; uma instância
+  rematerializada ou versão persistida anterior deve falsificar o CAS trivial.
 - Tolerância finita usa o timestamp persistido e `TimeProvider`, sem relógio do banco/processo divergente.
 - Remove-by-subject retorna contagem efetiva e repetição retorna zero.
 - Falha anterior à transição não cria token novo; falha posterior tem comportamento documentado e testado.
@@ -867,6 +983,8 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 - Gerar handle com ao menos 128 bits, persistir conforme Q2 e regenerar colisões por generator injetável/testável.
 - Gravar `CreatedAt`/`ExpiresAt` absolutos; read repetível dentro da validade e `null` depois.
 - Implementar cleanup em batches por tipo conforme Q7 e o modo de execução Q8.
+- Implementar a retenção refresh → access token: access token expirado não é elegível enquanto houver refresh token
+  ainda observável que dependa dele.
 - Implementar purge por realm pelo seam Q9.
 - Compor um `IStorage` EF completo sobre Configuration EF + Operational SQLite + resources bridge.
 
@@ -876,6 +994,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 - [ ] Cobrir clone/round-trip de `NameValueCollection`, inclusive chaves repetidas se suportadas pelo shape atual.
 - [ ] Injetar handle generator em teste para forçar colisão.
 - [ ] Criar opções de cleanup validadas (intervalo, batch, retenções escolhidas).
+- [ ] Implementar e testar índices alinhados aos predicados reais de cleanup global/realm-bound definidos por Q7/Q8.
 - [ ] Implementar lazy AP cleanup sem transformar delete falho em retorno de payload expirado.
 - [ ] Semear todas as tabelas em dois realms, purgar um e provar isolamento.
 - [ ] Criar `EntityFrameworkStorage`/provider/session e testes de scope/disposal com dois DbContexts.
@@ -886,6 +1005,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 - Alterar o TTL do realm não muda a expiração já gravada.
 - Colisão nunca sobrescreve nem escapa como falha aleatória.
 - Cleanup nunca remove refresh token ainda observável pela tolerância escolhida.
+- Cleanup nunca remove access token necessário a refresh token ainda observável.
 - Purge é idempotente, abrange todas as tabelas Operational e não toca Configuration/UserAccounts.
 - `IStorageSession` descarta ambos os contexts, sem commit/transação global.
 
@@ -914,6 +1034,10 @@ provider produtivo.
 
 - Criar extensão pública `ApplyRoyalIdentityOperationalPostgreSqlMappings`, context e design-time factory.
 - Usar schema `operational` e tipos/refinamentos equivalentes ao SQLite.
+- Configurar explicitamente `configuration.__EFMigrationsHistory` e `operational.__EFMigrationsHistory`; o schema
+  das entidades não é considerado configuração implícita suficiente.
+- Implementar o bootstrap PostgreSQL que move a history Configuration legada do schema default para
+  `configuration` antes de qualquer `MigrateAsync`.
 - Gerar migration inicial Operational PostgreSQL e scripts SQL revisáveis/idempotentes conforme o padrão P2.
 - Estender `RoyalIdentity.Migrations` para selecionar famílias e aceitar uma ou duas conexões.
 - Quando ambas apontam ao mesmo banco, aplicar Configuration e Operational sequencialmente; quando distintas,
@@ -924,9 +1048,17 @@ provider produtivo.
 **Tarefas:**
 
 - [ ] Testar context separado e context combinado PostgreSQL.
+- [ ] Testar histories distintas ao executar Configuration + Operational no mesmo banco SQLite e PostgreSQL.
+- [ ] Atualizar runner, design-time factories e fixtures PostgreSQL para consumir a mesma configuração centralizada
+  de history.
+- [ ] Testar bootstrap PostgreSQL: banco vazio; somente history legada; somente history nova; ambas presentes/
+  ambíguas; repetição idempotente e preservação integral dos migration ids.
 - [ ] Implementar estratégia provider-specific de MP-2/MP-3 com a mesma semântica SQLite.
 - [ ] Testar migration from-empty, pending model changes e SQL versionado.
+- [ ] Regenerar/revalidar os scripts idempotentes Configuration contra a nova history e versionar os scripts de
+  bootstrap sem alterar migrations de domínio já geradas.
 - [ ] Testar runner: Configuration-only, Operational-only, ambas/mesmo banco e ambas/bancos distintos.
+- [ ] Confirmar que o gateway com mesmo banco mantém dois DbContexts/conexões sem compartilhar transação.
 - [ ] Garantir que Operational rejeita seed.
 - [ ] Criar/estender script de PostgreSQL efêmero reutilizando o precedente local.
 - [ ] Validar logs/erros redigidos.
@@ -935,6 +1067,10 @@ provider produtivo.
 
 - SQLite/PostgreSQL concordam em casing, duplicidade, ausência, TTL, contagens e concorrência.
 - Migrations não dependem da ordem de conexão entre famílias além da aplicação explícita do runner.
+- PostgreSQL usa `configuration.__EFMigrationsHistory`/`operational.__EFMigrationsHistory`; SQLite usa
+  `__ConfigurationMigrationsHistory`/`__OperationalMigrationsHistory`.
+- History Configuration legada é realocada antes de o EF consultar pending migrations; ambiguidade falha fechado e
+  nunca causa reaplicação de migrations ou merge/delete silencioso.
 - SQL manual cria o mesmo model sem rodar host.
 - Gateway completo resolve todos os membros de `IStorage`.
 - Nenhuma extension de runtime chama migrate/seed.
@@ -1018,15 +1154,15 @@ git diff --check
 
 | Objetivo | Fase(s) | Decisão(ões) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Persistir Operational | 1–7 | DF1–DF10 | schema/model/materialização equivalentes | contracts SQLite/PostgreSQL |
-| Access token + consent | 2, 7 | DF7/DF8/DF13/DF14 | AT/CN completos, duplicidade/upsert/realm | contract + provider acceptances |
+| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
+| Access token + consent | 2, 6, 7 | DF7/DF8/DF13/DF14/DF17 | AT/CN completos, duplicidade/upsert/realm e retenção para refresh | contract + provider acceptances |
 | Sessões | 3, 7 | DF15/DF27 | SS-01..SS-06, touch/revogação concorrentes | session contracts + ADR-017 regressions |
 | Code single-use | 1, 4, 7 | DF11 + Q4/Q11 | um vencedor concorrente | atomic code acceptance |
 | Refresh conditional | 1, 5, 7 | DF12 + Q5/Q10/Q11 | transição/versão/tolerância explícitas | atomic refresh acceptance |
-| AP realm-bound + TTL | 1, 6, 7 | DF16 + Q2/Q3/Q6/Q12 | realm, expiração, colisão, fail-closed | AP acceptances |
+| AP realm-bound + TTL | 1, 6, 7 | DF16/DF29 + Q2/Q3/Q6/Q12 | realm, expiração, colisão, fail-closed e payload Configuration compatível | AP acceptances |
 | Cleanup/purge | 6, 7 | DF17/DF18 + Q7–Q9 | batch por tipo e purge isolado | cleanup/purge acceptances |
 | Gateway/lifecycle | 6–8 | DF3/DF21/DF22 | todos os membros, scopes reais, sem UoW global | StorageSession/full harness |
-| Migrations/operação | 7, 8 | DF4/DF23/DF24 | runner/SQL separados, uma/duas conexões | migration/runner/Podman |
+| Migrations/operação | 2, 7, 8 | DF4/DF23/DF24 | histories por família, bootstrap legado, runner/SQL separados e uma/duas conexões | migration/runner/Podman |
 | Handoff Plano 4 | 8 | DF21/DF25 | EF completo sem alterar default | solução + OIDC opt-in |
 
 ---
@@ -1037,24 +1173,28 @@ git diff --check
 2. Somente `RoyalIdentity.Storage.EntityFramework` traduz entidades Operational para modelos do core.
 3. Toda operação é realm-bound; nenhuma chave/consulta/mutação cruza realm.
 4. Configuration e Operational podem residir em bancos diferentes e nunca exigem FK/transação conjunta.
-5. Authorization code é single-use sob concorrência real.
-6. Refresh transition nunca usa o CAS trivial “valor esperado = mesma instância mutada”.
-7. A tolerância pós-consumo não é confundida com a primitiva de concorrência.
-8. Access/refresh/code/consent/session expirados continuam legíveis até purge; AP expirado falha fechado.
-9. Create-only nunca sobrescreve; consent upsert nunca duplica.
-10. Removals/no-ops/counts seguem exatamente a matriz.
-11. Materialização é independente e completa; nenhuma referência viva do EF escapa.
-12. Comparadores são Ordinal, não defaults de collation.
-13. Sessão preserva `SecurityStamp`, expiração, clients e semântica ADR-017.
-14. Cleanup não é requisito para correção lógica de expiração.
-15. Purge de realm não apaga tombstone/configuração nem chama UserAccounts.
-16. `IStorageSession` é lifetime, não UoW global.
-17. Todo I/O EF é async e propaga `CancellationToken`.
-18. Host não executa migrations/seed e permanece in-memory por default neste plano.
-19. Resources/scopes continuam no bridge volátil.
-20. Fake não ganha TTL, protection, cleanup ou paridade atômica.
-21. Handles bearer, payloads, claims e subjects não aparecem em logs.
-22. PAR, messages e replay cache não são assimilados por AP.
+5. O gateway padrão usa um DbContext/conexão por família mesmo no mesmo banco; não compartilha conexão/transação.
+6. Authorization code é single-use sob concorrência real.
+7. Refresh transition nunca usa o CAS trivial “valor esperado = mesma instância mutada”.
+8. A tolerância pós-consumo não é confundida com a primitiva de concorrência.
+9. Access/refresh/code/consent/session expirados continuam legíveis até purge; AP expirado falha fechado.
+10. Access token ainda necessário a refresh token observável não é removido por expiração isolada.
+11. Create-only nunca sobrescreve; consent upsert nunca duplica.
+12. Removals/no-ops/counts seguem exatamente a matriz.
+13. Materialização é independente e completa; nenhuma referência viva do EF escapa.
+14. Comparadores são Ordinal, não defaults de collation.
+15. Sessão preserva `SecurityStamp`, expiração, clients e semântica ADR-017.
+16. Cleanup não é requisito para correção lógica de expiração.
+17. Purge de realm não apaga tombstone/configuração nem chama UserAccounts.
+18. `IStorageSession` é lifetime, não UoW global.
+19. Todo I/O EF é async e propaga `CancellationToken`.
+20. Host não executa migrations/seed e permanece in-memory por default neste plano.
+21. PostgreSQL usa histories `configuration.__EFMigrationsHistory`/`operational.__EFMigrationsHistory`; SQLite usa
+    `__ConfigurationMigrationsHistory`/`__OperationalMigrationsHistory`, com bootstrap legado antes do EF.
+22. Resources/scopes continuam no bridge volátil.
+23. Fake não ganha TTL, protection, cleanup ou paridade atômica.
+24. Handles bearer, payloads, claims e subjects não aparecem em logs.
+25. PAR, messages e replay cache não são assimilados por AP.
 
 ---
 
@@ -1067,7 +1207,8 @@ git diff --check
 - MP-2/MP-3 são atômicos sob requests concorrentes com DbContexts independentes.
 - MP-5/MP-6 e o purge Operational de MP-7 estão completos.
 - Gateway EF completo resolve todos os membros sem I/O síncrono oculto e sem transação cross-family.
-- Runner/SQL suportam uma ou duas famílias; host não migra.
+- Runner/SQL suportam uma ou duas famílias, com a topologia exata de histories da DF23 e bootstrap legado seguro;
+  host não migra.
 - PostgreSQL 17 real validado ou a fase permanece incompleta.
 - `dotnet build RoyalIdentity.sln` e `dotnet test RoyalIdentity.sln` verdes.
 - `git diff --check` sem erros.
@@ -1079,6 +1220,7 @@ git diff --check
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
 | Payload perde propriedade/claim | serializer não cobre grafo completo | token/consent/code muda ao ler | versionamento + property/round-trip tests conforme Q1/Q3 | Aberto |
+| Option aditiva quebra payload Configuration v1 | serializer/default não materializa ausência | realms existentes falham ou mudam de comportamento | DF29 + fixture de payload v1 anterior sem a propriedade | Aberto |
 | Bearer handle vaza pelo banco | valor bruto vira PK/log | credencial reutilizável | Q2 + redaction DF28 | Aberto |
 | Protection inviabiliza rotação | payload antigo não abre | outage após troca de chave | envelope/purpose/version + testes multi-key conforme Q3 | Aberto |
 | Code é consumido duas vezes | get/remove ou transação fraca | emissão duplicada | MP-2 + teste com connections independentes | Aberto |
@@ -1088,6 +1230,7 @@ git diff --check
 | Lost update no refresh reutilizável | concorrência muda AccessTokenId | ponteiro incorreto | versão condicional Q5 | Aberto |
 | Session client/touch perdem update | JSON/replace do agregado concorrente | logout/idle incorretos | tabela filha + operações condicionais | Aberto |
 | Cleanup remove dado observável | eligibility ignora tolerância/lifecycle | refresh/diagnóstico quebrado | política Q7 + fake clock tests | Aberto |
+| Cleanup remove access token expirado ainda usado por refresh | varredura considera apenas expiry do access token | refresh válido passa a falhar | retenção DF13/DF17 + teste com lifetimes AT < RT | Aberto |
 | Cleanup nunca roda | modo externo sem scheduler | crescimento ilimitado | decisão Q8 + observabilidade | Aberto |
 | Dois workers disputam cleanup | múltiplos nós | locks/carga | batches idempotentes e índices de expiry | Aberto |
 | Purge cruza realm | filtro incompleto/cascade | incidente multi-tenant | realm em PK/FK + cenário abrangente | Aberto |
@@ -1095,6 +1238,8 @@ git diff --check
 | SQLite passa, PostgreSQL falha | estratégia atômica/provider difere | falso sinal de produção | aceites reais PostgreSQL 17 | Aberto |
 | Fake aparenta garantia EF | fallback não documentado | testes/default escondem corrida | Q11 + assert de que EF não usa fallback | Aberto |
 | Runner sugere atomicidade conjunta | duas conexões falham parcialmente | operação confusa | resultado por família + sem transação distribuída | Aberto |
+| Histories de migrations se misturam | providers dependem da history default ou configuram somente Operational | diagnóstico/rollback/scripts acoplados | topologia explícita da DF23 para ambas as famílias + teste same-database | Aberto |
+| Mudança da history reaplica migrations Configuration | EF consulta o novo local antes de realocar a history legada | tentativa de recriar tabelas/indisponibilidade | bootstrap pré-`MigrateAsync`, preservação de ids, casos legado/novo/ambíguo e SQL manual | Aberto |
 | SQL diverge da migration | model muda sem regenerar | deploy manual incompleto | pending-model/script tests | Aberto |
 
 ---
@@ -1138,6 +1283,8 @@ git diff --check
 - [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html).
 - [EF Core — ExecuteUpdate/ExecuteDelete](https://learn.microsoft.com/en-us/ef/core/saving/execute-insert-update-delete).
 - [EF Core — Transactions](https://learn.microsoft.com/en-us/ef/core/saving/transactions).
+- [EF Core — Custom Migrations History Table](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/history-table).
+- [System.Text.Json — unmapped members](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/missing-members).
 - `RoyalIdentity/Contracts/Storage/*.cs`.
 - `RoyalIdentity/Users/Contracts/IUserSessionStore.cs`.
 - `RoyalIdentity/Contexts/Decorators/LoadCode.cs`.
