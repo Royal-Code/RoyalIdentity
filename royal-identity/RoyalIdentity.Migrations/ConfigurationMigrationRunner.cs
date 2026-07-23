@@ -14,6 +14,9 @@ public static class ConfigurationMigrationRunner
 	public static async Task RunAsync(MigrationRunnerOptions options, CancellationToken ct = default)
 	{
 		ArgumentNullException.ThrowIfNull(options);
+		if (options.Seed.HasFlag(ConfigurationSeedMode.Product))
+			options.ProductSeed.Validate();
+
 		await using var context = CreateContext(options);
 		await context.Database.MigrateAsync(ct);
 
@@ -28,7 +31,8 @@ public static class ConfigurationMigrationRunner
 				new RealmOptionsPayloadSerializer(),
 				new ClientMaterializer(),
 				protector,
-				TimeProvider.System);
+				TimeProvider.System,
+				options.ProductSeed);
 			await seed.ApplyAsync(context, options.Seed, ct);
 		}
 		finally

@@ -17,6 +17,10 @@ public class PostgreSqlConfigurationMigrationTests
 			ConfigurationConnection = ConfigurationPostgreSqlTestEnvironment.ConnectionString,
 			Seed = ConfigurationSeedMode.Product,
 			KeyProtector = ConfigurationKeyProtector.Plain,
+			ProductSeed = new ConfigurationProductSeedOptions
+			{
+				ServerAdminRedirectUris = ["https://admin.example.test/callback"],
+			},
 		};
 
 		await ConfigurationMigrationRunner.RunAsync(options);

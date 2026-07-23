@@ -24,9 +24,16 @@ dotnet run --project RoyalIdentity.Migrations -- `
   --configuration-provider postgresql `
   --configuration-connection-env ROYALIDENTITY_CONFIGURATION_DB `
   --seed product `
+  --server-admin-redirect-uri https://admin.example.com/signin-oidc `
+  --server-admin-redirect-uri https://admin.example.com/callback `
   --key-protector aes `
   --aes-key-env ROYALIDENTITY_CONFIGURATION_AES_KEY
 ```
+
+O seed `product` (e, por consequência, `all`) exige ao menos um
+`--server-admin-redirect-uri`. A opção é repetível, aceita qualquer URI absoluta suportada pelo cliente e não
+possui default implícito: redirects são dados do ambiente e precisam ser escolhidos pelo operador. URLs
+localhost permanecem somente no seed `demo` deste runner.
 
 Também estão disponíveis `--key-protector plain` (opt-in inseguro, com warning) e
 `--key-protector data-protection`, que exige `--data-protection-key-ring` e aceita
@@ -35,6 +42,10 @@ protegido em repouso.
 
 `--seed demo` adiciona apenas o realm/clients demo; `--seed all` combina produto e demo. A segunda execução é
 idempotente. O runner retorna `64` para uso inválido, `1` para falha de migration/seed e `0` para sucesso.
+
+Os protectors são selecionáveis no provisionamento. Trocar o protector de uma base que já contém signing keys
+exige uma migração/reproteção própria; o runner não converte material persistido entre protectors. Essa rotação
+pertence ao futuro plano de KMS.
 
 Para produção, os scripts revisáveis em `scripts/sql/configuration/` são o caminho preferido. O futuro Aspire
 executará este runner como workload/container separado dos hosts, conforme `.ai/backlogs/backlog-001.md`.

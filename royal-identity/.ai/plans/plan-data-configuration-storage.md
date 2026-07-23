@@ -107,7 +107,7 @@
 - **DF1 — Ownership:** `RoyalIdentity.Data.Configuration` contém somente entidades persistentes, mappings neutros, context e queries; não referencia o core. Fonte: ADR-013/architecture.
 - **DF2 — Bancos independentes e combináveis:** Configuration e Operational possuem DbContexts e connection strings próprios, que podem apontar para bancos distintos ou para o mesmo banco físico. Fonte: Q1.
 - **DF3 — Mappings fora do DbContext:** mappings neutros são aplicados por extensão pública de `ModelBuilder`; cada provider expõe outra extensão pública que aplica os mappings neutros e seus refinamentos. Stores aceitam `TContext : DbContext`, sem exigir o context concreto, permitindo context combinado de terceiros com o model completo do provider escolhido. Fonte: Q1 e revisão do plano.
-- **DF4 — Fonte de verdade:** depois do seed inicial, o banco é autoritativo para `ServerOptions` e demais dados de Configuration; configuração do processo fornece conexão, snapshot, proteção e entradas do seed, sem merge em runtime. Fonte: Q2.
+- **DF4 — Fonte de verdade:** depois do seed inicial, o banco é autoritativo para `ServerOptions` e demais dados de Configuration; configuração do processo fornece conexão, snapshot, proteção e entradas do seed, sem merge em runtime. O seed de produto não embute redirects de ambiente: exige ao menos um redirect explícito para `server_admin`. Fonte: Q2 e ajuste pós-revisão.
 - **DF5 — Modelo híbrido:** identidades, bindings, campos consultados e coleções com unicidade são relacionais; grafos de options não consultados por campo são payloads JSON versionados. Fonte: Q3.
 - **DF6 — Lifecycle EF:** `DbContext` e portas do adapter são scoped. No Plano 2, o composite test-only cria um escopo por `IStorageSession` e `Dispose()` o encerra; o mesmo modelo será usado pela composição produtiva do Plano 3. `IDbContextFactory` só pode ser usado por consumidor excepcional documentado que não comporte scope. Fonte: Q4/DF21 do baseline e DF20.
 - **DF7 — Snapshot sem I/O síncrono e sem ciclo de bootstrap:** cookies e demais consumidores síncronos leem `IConfigurationSnapshot`, que nunca expõe seu grafo mutável interno e devolve cópias defensivas. A carga inicial e o refresh são assíncronos por `IConfigurationSnapshotSource.LoadAsync(ct)`, sem depender de `IStorage.ServerOptions`; fake e adapter EF fornecem implementações próprias da source. O intervalo periódico é configuração obrigatória e validada em toda composição que registre o loader. Após publicação bem-sucedida, o loader usa `IOptionsMonitorCache<CookieAuthenticationOptions>.TryRemove` para invalidar somente o scheme default e a união dos schemes de realm dos snapshots anterior/novo; cookie schemes alheios ao RoyalIdentity não são removidos. A política de falha posterior é DF26. Fonte: Q5/MP-1/DF23, código atual e documentação de options do ASP.NET Core.
@@ -115,7 +115,7 @@
 - **DF9 — AES autenticado:** a implementação AES usa AES-GCM, nonce aleatório por escrita, tag de autenticação e envelope versionado; a options fornece a chave e não define como ela é obtida. Fonte: Q6 e documentação `AesGcm`.
 - **DF10 — Plain explícito:** `Plain` nunca é escolhido implicitamente e deve produzir warning de segurança; é opção consciente para desenvolvimento/teste ou cenário aceito pelo operador. Fonte: Q6.
 - **DF11 — Migrations fora do host:** migrations nunca rodam no `RoyalIdentity.Server`; são aplicadas pelo runner, testes ou SQL manual. Fonte: Q7/Q10.
-- **DF12 — Seed opcional:** o runner pode, após migrar, executar seed idempotente de produto; demo é opt-in separado. Migrations não embutem dados de ambiente. Fonte: Q7.
+- **DF12 — Seed opcional:** o runner pode, após migrar, executar seed idempotente de produto; demo é opt-in separado. Migrations não embutem dados de ambiente, e `product`/`all` exigem redirects absolutos explícitos e repetíveis para `server_admin`, sem default localhost. Fonte: Q7 e ajuste pós-revisão.
 - **DF13 — Runtime Configuration somente leitura:** o IdP lê Configuration; futuras modificações administrativas usam outra camada de acesso, semelhante ao `UserAccounts`. O destino dos writes legados é DF28. Fonte: Q8/Q11.
 - **DF14 — Clients sem write facade nova:** `IClientStore` continua somente leitura; runner/test fixture escrevem pelo data layer, não por uma API pública administrativa antecipada. Fonte: Q8.
 - **DF15 — Bridge volátil de resources:** `Storage.EntityFramework` fornece bridge interna, realm-bound e em memória para RS-02..RS-05; cada binding de realm recebe os standard identity scopes da configuração de produto do bridge e demo continua opt-in. Nenhuma tabela de resource/scope é criada. Fonte: Q9/DF22 do baseline.
@@ -744,7 +744,7 @@ Validação: `dotnet build RoyalIdentity.sln --no-restore` — êxito (0 erros; 
 - [x] Criar migration PostgreSQL equivalente ao model SQLite e conferir snapshot/model diff.
 - [x] Implementar `RoyalIdentity.Migrations` com seleção explícita de provider/conexão, migrate e seed opcional.
 - [x] Fazer o runner aceitar futuramente conexões Configuration/Operational separadas sem exigir que sejam bancos diferentes.
-- [x] Implementar seed de produto idempotente para `ServerOptions`, realms internos, `server_admin` e uma signing key protegida/utilizável para cada realm habilitado; não tentar persistir standard scopes.
+- [x] Implementar seed de produto idempotente para `ServerOptions`, realms internos, `server_admin` com redirects fornecidos explicitamente pelo operador e uma signing key protegida/utilizável para cada realm habilitado; não tentar persistir standard scopes.
 - [x] Implementar seed demo separado e opt-in, incluindo key própria se o realm demo nascer habilitado; não copiar URLs/segredos demo para seed de produto.
 - [x] Fazer segunda execução de migrate/seed resultar em zero duplicatas e estado equivalente.
 - [x] Gerar e versionar SQL SQLite e PostgreSQL; gerar PostgreSQL idempotente e validar que não há `EnsureCreated`.
@@ -775,7 +775,9 @@ contra PostgreSQL 17 real.
   `configuration-*` preserva o seam para uma futura conexão Operational, que poderá apontar para o mesmo banco
   ou para outro. Migrate não implica seed; seed exige perfil e protector explícitos.
 - **Seeds:** `product`, `demo` e `all` são transacionais e idempotentes. Produto cria `ServerOptions`, os três
-  realms internos, `server_admin` e key utilizável para cada realm habilitado; demo permanece opt-in e separado.
+  realms internos, `server_admin` e key utilizável para cada realm habilitado; os redirects do cliente
+  administrativo são entradas obrigatórias e repetíveis do runner, sem localhost implícito. Demo permanece
+  opt-in e separado.
   Standard scopes não são persistidos. Uma segunda execução não cria duplicatas e uma key existente corrente
   precisa ser desprotegível/materializável pelo protector selecionado antes de o seed prosseguir.
 - **Protectors e operação segura:** o runner suporta `plain`, `aes` por variável de ambiente e ASP.NET Data
@@ -861,6 +863,12 @@ Validação final: `dotnet build RoyalIdentity.sln --no-restore` — êxito, 0 e
 (8 Configuration PostgreSQL opt-in + 1 UserAccounts PostgreSQL opt-in);
 `scripts/Test-ConfigurationPostgreSql.ps1` — 8 grupos aprovados contra PostgreSQL 17 real;
 `git diff --check` — sem erros.
+
+**Ajuste pós-revisão em 2026-07-22:** o seed `product`/`all` deixou de embutir redirects localhost e passou a
+exigir `--server-admin-redirect-uri` explícito e repetível, validado antes de abrir o banco. Os testes verificam
+o conteúdo funcional do `server_admin`, a validação da CLI e a ausência de mutação quando a entrada obrigatória
+falta. Revalidação: build com 0 erros; suíte completa com 808 aprovados e 9 ignorados; 8 grupos PostgreSQL verdes
+contra PostgreSQL 17 real na porta dinâmica 33135; ambos os providers sem mudanças de model pendentes.
 
 ---
 

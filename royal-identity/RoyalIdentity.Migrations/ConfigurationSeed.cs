@@ -20,7 +20,8 @@ public sealed class ConfigurationSeed(
 	RealmOptionsPayloadSerializer realmSerializer,
 	ClientMaterializer clientMaterializer,
 	IKeyMaterialProtector protector,
-	TimeProvider clock)
+	TimeProvider clock,
+	ConfigurationProductSeedOptions productOptions)
 {
 	public async Task ApplyAsync(
 		ConfigurationDbContext db,
@@ -30,6 +31,8 @@ public sealed class ConfigurationSeed(
 		ArgumentNullException.ThrowIfNull(db);
 		if (mode is ConfigurationSeedMode.None)
 			return;
+		if (mode.HasFlag(ConfigurationSeedMode.Product))
+			productOptions.Validate();
 
 		await using var transaction = await db.Database.BeginTransactionAsync(ct);
 		var serverOptions = await EnsureServerOptionsAsync(db, ct);
@@ -42,7 +45,7 @@ public sealed class ConfigurationSeed(
 		await db.SaveChangesAsync(ct);
 
 		if (mode.HasFlag(ConfigurationSeedMode.Product))
-			await EnsureClientAsync(db, BuildServerAdmin(serverOptions), ct);
+			await EnsureClientAsync(db, BuildServerAdmin(serverOptions, productOptions), ct);
 		if (mode.HasFlag(ConfigurationSeedMode.Demo))
 		{
 			foreach (var client in BuildDemoClients(serverOptions))
@@ -252,14 +255,16 @@ public sealed class ConfigurationSeed(
 		_ = key.CreateSigningCredentials();
 	}
 
-	private static Client BuildServerAdmin(ServerOptions serverOptions)
+	private static Client BuildServerAdmin(
+		ServerOptions serverOptions,
+		ConfigurationProductSeedOptions productOptions)
 	{
 		var realm = ProductRealm(
 			Server.Realms.ServerRealm,
 			Server.Realms.ServerDomain,
 			Server.Realms.ServerDisplayName,
 			serverOptions);
-		return new Client
+		var client = new Client
 		{
 			Realm = realm,
 			Id = "server_admin",
@@ -268,8 +273,11 @@ public sealed class ConfigurationSeed(
 			AllowOfflineAccess = true,
 			AllowedIdentityScopes = { "openid", "profile" },
 			AllowedResponseTypes = { "code" },
-			RedirectUris = { "http://localhost:5200/**", "https://localhost:7200/**" },
 		};
+		foreach (var redirectUri in productOptions.ServerAdminRedirectUris)
+			client.RedirectUris.Add(redirectUri);
+
+		return client;
 	}
 
 	private static IEnumerable<Client> BuildDemoClients(ServerOptions serverOptions)

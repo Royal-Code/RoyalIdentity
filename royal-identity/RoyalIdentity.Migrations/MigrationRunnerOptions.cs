@@ -28,6 +28,7 @@ public sealed class MigrationRunnerOptions
 		"Usage: RoyalIdentity.Migrations --configuration-provider <sqlite|postgresql> " +
 		"(--configuration-connection <value> | --configuration-connection-env <name>) " +
 		"[--seed <none|product|demo|all>] " +
+		"[--server-admin-redirect-uri <absolute-uri> ...] " +
 		"[--key-protector <plain|aes|data-protection>] " +
 		"[--aes-key-env <name>] " +
 		"[--data-protection-key-ring <directory>] " +
@@ -40,6 +41,8 @@ public sealed class MigrationRunnerOptions
 	public ConfigurationSeedMode Seed { get; init; }
 
 	public ConfigurationKeyProtector? KeyProtector { get; init; }
+
+	public ConfigurationProductSeedOptions ProductSeed { get; init; } = new();
 
 	public string? AesKeyEnvironmentVariable { get; init; }
 
@@ -62,15 +65,13 @@ public sealed class MigrationRunnerOptions
 			};
 		}
 
-		var values = ParsePairs(args);
+		var values = ParseValues(args);
 		var provider = ParseProvider(Required(values, "--configuration-provider"));
 		var connection = ResolveConnection(values);
-		var seed = values.TryGetValue("--seed", out var seedValue)
-			? ParseSeed(seedValue)
-			: ConfigurationSeedMode.None;
-		ConfigurationKeyProtector? protector = values.TryGetValue("--key-protector", out var protectorValue)
-			? ParseProtector(protectorValue)
-			: null;
+		var seedValue = Optional(values, "--seed");
+		var seed = seedValue is null ? ConfigurationSeedMode.None : ParseSeed(seedValue);
+		var protectorValue = Optional(values, "--key-protector");
+		ConfigurationKeyProtector? protector = protectorValue is null ? null : ParseProtector(protectorValue);
 
 		if (seed is not ConfigurationSeedMode.None && protector is null)
 			throw new MigrationRunnerUsageException("--key-protector is required when --seed is enabled.");
@@ -79,6 +80,19 @@ public sealed class MigrationRunnerOptions
 		var dataProtectionKeyRing = Optional(values, "--data-protection-key-ring");
 		var dataProtectionApplicationName = Optional(values, "--data-protection-app-name")
 			?? "RoyalIdentity.Configuration";
+		var serverAdminRedirectUris = Many(values, "--server-admin-redirect-uri");
+
+		if (seed.HasFlag(ConfigurationSeedMode.Product) && serverAdminRedirectUris.Count is 0)
+		{
+			throw new MigrationRunnerUsageException(
+				"--server-admin-redirect-uri is required at least once for the product seed.");
+		}
+		if (!seed.HasFlag(ConfigurationSeedMode.Product) && serverAdminRedirectUris.Count is not 0)
+		{
+			throw new MigrationRunnerUsageException(
+				"--server-admin-redirect-uri can only be used with the product or all seed.");
+		}
+		ValidateServerAdminRedirectUris(serverAdminRedirectUris);
 
 		if (protector is ConfigurationKeyProtector.Aes && string.IsNullOrWhiteSpace(aesKeyEnvironmentVariable))
 			throw new MigrationRunnerUsageException("--aes-key-env is required for the AES protector.");
@@ -92,13 +106,17 @@ public sealed class MigrationRunnerOptions
 			ConfigurationConnection = connection,
 			Seed = seed,
 			KeyProtector = protector,
+			ProductSeed = new ConfigurationProductSeedOptions
+			{
+				ServerAdminRedirectUris = serverAdminRedirectUris,
+			},
 			AesKeyEnvironmentVariable = aesKeyEnvironmentVariable,
 			DataProtectionKeyRing = dataProtectionKeyRing,
 			DataProtectionApplicationName = dataProtectionApplicationName,
 		};
 	}
 
-	private static Dictionary<string, string> ParsePairs(string[] args)
+	private static Dictionary<string, List<string>> ParseValues(string[] args)
 	{
 		var known = new HashSet<string>(StringComparer.Ordinal)
 		{
@@ -106,12 +124,17 @@ public sealed class MigrationRunnerOptions
 			"--configuration-connection",
 			"--configuration-connection-env",
 			"--seed",
+			"--server-admin-redirect-uri",
 			"--key-protector",
 			"--aes-key-env",
 			"--data-protection-key-ring",
 			"--data-protection-app-name",
 		};
-		var values = new Dictionary<string, string>(StringComparer.Ordinal);
+		var repeatable = new HashSet<string>(StringComparer.Ordinal)
+		{
+			"--server-admin-redirect-uri",
+		};
+		var values = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
 		for (var index = 0; index < args.Length; index += 2)
 		{
@@ -120,14 +143,23 @@ public sealed class MigrationRunnerOptions
 				throw new MigrationRunnerUsageException($"Unknown option '{name}'.");
 			if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
 				throw new MigrationRunnerUsageException($"Option '{name}' requires a value.");
-			if (!values.TryAdd(name, args[index + 1]))
+			if (!values.TryGetValue(name, out var optionValues))
+			{
+				optionValues = [];
+				values.Add(name, optionValues);
+			}
+			else if (!repeatable.Contains(name))
+			{
 				throw new MigrationRunnerUsageException($"Option '{name}' was specified more than once.");
+			}
+
+			optionValues.Add(args[index + 1]);
 		}
 
 		return values;
 	}
 
-	private static string ResolveConnection(IReadOnlyDictionary<string, string> values)
+	private static string ResolveConnection(IReadOnlyDictionary<string, List<string>> values)
 	{
 		var direct = Optional(values, "--configuration-connection");
 		var environmentName = Optional(values, "--configuration-connection-env");
@@ -174,12 +206,39 @@ public sealed class MigrationRunnerOptions
 			_ => throw new MigrationRunnerUsageException("Unsupported key protector."),
 		};
 
-	private static string Required(IReadOnlyDictionary<string, string> values, string name)
+	private static string Required(IReadOnlyDictionary<string, List<string>> values, string name)
 		=> Optional(values, name)
 			?? throw new MigrationRunnerUsageException($"Option '{name}' is required.");
 
-	private static string? Optional(IReadOnlyDictionary<string, string> values, string name)
-		=> values.TryGetValue(name, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
+	private static string? Optional(IReadOnlyDictionary<string, List<string>> values, string name)
+		=> values.TryGetValue(name, out var optionValues)
+			&& optionValues.Count is 1
+			&& !string.IsNullOrWhiteSpace(optionValues[0])
+				? optionValues[0]
+				: null;
+
+	private static IReadOnlyList<string> Many(
+		IReadOnlyDictionary<string, List<string>> values,
+		string name)
+		=> values.TryGetValue(name, out var optionValues) ? optionValues.ToArray() : [];
+
+	private static void ValidateServerAdminRedirectUris(IReadOnlyList<string> redirectUris)
+	{
+		var unique = new HashSet<string>(StringComparer.Ordinal);
+		foreach (var redirectUri in redirectUris)
+		{
+			if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out _))
+			{
+				throw new MigrationRunnerUsageException(
+					"--server-admin-redirect-uri must contain an absolute URI.");
+			}
+			if (!unique.Add(redirectUri))
+			{
+				throw new MigrationRunnerUsageException(
+					"--server-admin-redirect-uri cannot contain duplicate values.");
+			}
+		}
+	}
 }
 
 public sealed class MigrationRunnerUsageException(string message) : Exception(message);

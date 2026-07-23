@@ -10,6 +10,11 @@ namespace Tests.Storage.Configuration;
 public class ConfigurationMigrationRunnerTests
 {
 	private static readonly byte[] AesKey = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray();
+	private static readonly string[] ProductRedirectUris =
+	[
+		"https://admin.example.test/signin-oidc",
+		"https://admin.example.test/callback",
+	];
 
 	[Fact]
 	public async Task ProductSeed_Twice_IsIdempotent_AndCreatesUsableProtectedKeys()
@@ -28,7 +33,37 @@ public class ConfigurationMigrationRunnerTests
 				Assert.Single(context.ServerOptions);
 				Assert.Equal(3, await context.Realms.CountAsync());
 				Assert.Equal(3, await context.Realms.CountAsync(realm => realm.Internal));
-				Assert.Equal(1, await context.Clients.CountAsync(client => client.ClientId == "server_admin"));
+				var serverAdmin = await context.Clients.SingleAsync(client => client.ClientId == "server_admin");
+				Assert.Equal("server", serverAdmin.RealmId);
+				Assert.True(serverAdmin.Enabled);
+				Assert.True(serverAdmin.RequirePkce);
+				Assert.False(serverAdmin.RequireClientSecret);
+				Assert.True(serverAdmin.AllowOfflineAccess);
+				Assert.Empty(await context.ClientSecrets.Where(secret => secret.ClientId == "server_admin").ToListAsync());
+
+				var stringValues = await context.ClientStringValues
+					.Where(value => value.ClientId == "server_admin")
+					.ToListAsync();
+				Assert.Equal(
+					ProductRedirectUris.Order(StringComparer.Ordinal),
+					stringValues
+						.Where(value => value.Kind == ClientStringValueKinds.RedirectUri)
+						.Select(value => value.Value)
+						.Order(StringComparer.Ordinal));
+				Assert.Equal(
+					["openid", "profile"],
+					stringValues
+						.Where(value => value.Kind == ClientStringValueKinds.AllowedIdentityScope)
+						.Select(value => value.Value)
+						.Order(StringComparer.Ordinal));
+				Assert.Contains(
+					stringValues,
+					value => value.Kind == ClientStringValueKinds.AllowedGrantType
+						&& value.Value == "authorization_code");
+				Assert.Contains(
+					stringValues,
+					value => value.Kind == ClientStringValueKinds.AllowedResponseType
+						&& value.Value == "code");
 				Assert.Equal(3, await context.SigningKeys.CountAsync());
 				Assert.False(await context.Realms.AnyAsync(realm => realm.Id == "demo_realm"));
 				Assert.Empty(await context.Database.GetPendingMigrationsAsync());
@@ -66,6 +101,7 @@ public class ConfigurationMigrationRunnerTests
 				ConfigurationConnection = $"Data Source={databasePath};Pooling=False",
 				Seed = ConfigurationSeedMode.All,
 				KeyProtector = ConfigurationKeyProtector.Plain,
+				ProductSeed = ProductSeedOptions(),
 			};
 			await ConfigurationMigrationRunner.RunAsync(options);
 			await ConfigurationMigrationRunner.RunAsync(options);
@@ -98,6 +134,69 @@ public class ConfigurationMigrationRunnerTests
 			["--configuration-provider", "unknown", "--configuration-connection", "redacted"]));
 	}
 
+	[Fact]
+	public void Options_RequireExplicitProductRedirectUris_AndAcceptRepeatedValues()
+	{
+		var baseArguments = new[]
+		{
+			"--configuration-provider", "sqlite",
+			"--configuration-connection", "Data Source=test.db",
+			"--seed", "product",
+			"--key-protector", "plain",
+		};
+
+		Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(baseArguments));
+		Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
+			[.. baseArguments, "--server-admin-redirect-uri", "relative/callback"]));
+		Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
+			[
+				.. baseArguments,
+				"--server-admin-redirect-uri", ProductRedirectUris[0],
+				"--server-admin-redirect-uri", ProductRedirectUris[0],
+			]));
+		Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
+			[
+				"--configuration-provider", "sqlite",
+				"--configuration-connection", "Data Source=test.db",
+				"--seed", "demo",
+				"--key-protector", "plain",
+				"--server-admin-redirect-uri", ProductRedirectUris[0],
+			]));
+
+		var options = MigrationRunnerOptions.Parse(
+			[
+				.. baseArguments,
+				"--server-admin-redirect-uri", ProductRedirectUris[0],
+				"--server-admin-redirect-uri", ProductRedirectUris[1],
+			]);
+
+		Assert.Equal(ProductRedirectUris, options.ProductSeed.ServerAdminRedirectUris);
+	}
+
+	[Fact]
+	public async Task ProductSeed_WithoutRedirectUris_FailsBeforeOpeningDatabase()
+	{
+		var databasePath = Path.Combine(Path.GetTempPath(), $"royalidentity-config-{Guid.NewGuid():N}.db");
+		try
+		{
+			var options = new MigrationRunnerOptions
+			{
+				ConfigurationProvider = ConfigurationDatabaseProvider.Sqlite,
+				ConfigurationConnection = $"Data Source={databasePath};Pooling=False",
+				Seed = ConfigurationSeedMode.Product,
+				KeyProtector = ConfigurationKeyProtector.Plain,
+			};
+
+			await Assert.ThrowsAsync<InvalidOperationException>(() => ConfigurationMigrationRunner.RunAsync(options));
+			Assert.False(File.Exists(databasePath));
+		}
+		finally
+		{
+			if (File.Exists(databasePath))
+				File.Delete(databasePath);
+		}
+	}
+
 	private static MigrationRunnerOptions Options(
 		string databasePath,
 		ConfigurationSeedMode seed,
@@ -108,8 +207,12 @@ public class ConfigurationMigrationRunnerTests
 			ConfigurationConnection = $"Data Source={databasePath};Pooling=False",
 			Seed = seed,
 			KeyProtector = ConfigurationKeyProtector.Aes,
+			ProductSeed = ProductSeedOptions(),
 			AesKeyEnvironmentVariable = keyVariable,
 		};
+
+	private static ConfigurationProductSeedOptions ProductSeedOptions()
+		=> new() { ServerAdminRedirectUris = ProductRedirectUris };
 
 	private static ConfigurationSqliteDbContext Context(string databasePath)
 		=> new(new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
