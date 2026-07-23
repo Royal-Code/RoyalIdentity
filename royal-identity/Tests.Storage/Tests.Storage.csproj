@@ -8,6 +8,8 @@
 		<ProjectReference Include="..\RoyalIdentity.Data.Configuration\RoyalIdentity.Data.Configuration.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework\RoyalIdentity.Storage.EntityFramework.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.Sqlite\RoyalIdentity.Storage.EntityFramework.Sqlite.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.PostgreSql\RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Migrations\RoyalIdentity.Migrations.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

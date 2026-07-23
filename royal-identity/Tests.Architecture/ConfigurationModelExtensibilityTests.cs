@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Data.Configuration.Entities;
@@ -53,7 +54,7 @@ public class ConfigurationModelExtensibilityTests
 			.UseSqlite("Data Source=:memory:")
 			.Options;
 		using var context = new CombinedSqliteDbContext(options);
-		return context.Model;
+		return context.GetService<IDesignTimeModel>().Model;
 	}
 
 	private static IModel BuildCombinedPostgreSqlModel()
@@ -62,7 +63,16 @@ public class ConfigurationModelExtensibilityTests
 			.UseNpgsql("Host=model-only;Database=model-only")
 			.Options;
 		using var context = new CombinedPostgreSqlDbContext(options);
-		return context.Model;
+		return context.GetService<IDesignTimeModel>().Model;
+	}
+
+	private static IModel BuildDefaultPostgreSqlModel()
+	{
+		var options = new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
+			.UseNpgsql("Host=model-only;Database=model-only")
+			.Options;
+		using var context = new ConfigurationPostgreSqlDbContext(options);
+		return context.GetService<IDesignTimeModel>().Model;
 	}
 
 	[Fact]
@@ -80,6 +90,7 @@ public class ConfigurationModelExtensibilityTests
 		var payload = model.FindEntityType(typeof(ServerOptionsEntity))!
 			.FindProperty(nameof(ServerOptionsEntity.PayloadJson))!;
 		Assert.Equal("TEXT", payload.GetColumnType());
+		Assert.Equal("BINARY", realms.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
 	}
 
 	[Fact]
@@ -101,6 +112,32 @@ public class ConfigurationModelExtensibilityTests
 		var optionsJson = model.FindEntityType(typeof(RealmEntity))!
 			.FindProperty(nameof(RealmEntity.OptionsJson))!;
 		Assert.Equal("jsonb", optionsJson.GetColumnType());
+		Assert.Equal("C", realms.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
+	}
+
+	[Fact]
+	public void DefaultAndCustomPostgreSqlContexts_ApplyTheSameProviderRefinements()
+	{
+		var defaultModel = BuildDefaultPostgreSqlModel();
+		var customModel = BuildCombinedPostgreSqlModel();
+
+		foreach (var entityType in ConfigurationEntityTypes)
+		{
+			var defaultEntity = defaultModel.FindEntityType(entityType)!;
+			var customEntity = customModel.FindEntityType(entityType)!;
+
+			Assert.Equal(customEntity.GetTableName(), defaultEntity.GetTableName());
+			Assert.Equal(customEntity.GetSchema(), defaultEntity.GetSchema());
+		}
+
+		var defaultRealm = defaultModel.FindEntityType(typeof(RealmEntity))!;
+		var customRealm = customModel.FindEntityType(typeof(RealmEntity))!;
+		Assert.Equal(
+			customRealm.FindProperty(nameof(RealmEntity.OptionsJson))!.GetColumnType(),
+			defaultRealm.FindProperty(nameof(RealmEntity.OptionsJson))!.GetColumnType());
+		Assert.Equal(
+			customRealm.FindProperty(nameof(RealmEntity.Domain))!.GetCollation(),
+			defaultRealm.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
 	}
 
 	[Fact]

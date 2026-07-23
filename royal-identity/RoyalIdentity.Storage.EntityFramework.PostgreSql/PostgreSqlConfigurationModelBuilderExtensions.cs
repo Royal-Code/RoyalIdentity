@@ -25,6 +25,49 @@ public static class PostgreSqlConfigurationModelBuilderExtensions
 		modelBuilder.Entity<ServerOptionsEntity>().Property(e => e.PayloadJson).HasColumnType("jsonb");
 		modelBuilder.Entity<RealmEntity>().Property(e => e.OptionsJson).HasColumnType("jsonb");
 
+		// PostgreSQL's database default is deployment-defined. Pin identifier keys and unique values to the
+		// built-in byte-wise C collation so Ordinal semantics do not drift with database locale (plan DF23).
+		modelBuilder.Entity<RealmEntity>(entity =>
+		{
+			entity.Property(e => e.Id).UseCollation(Ordinal);
+			entity.Property(e => e.Path).UseCollation(Ordinal);
+			entity.Property(e => e.Domain).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientStringValueEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+			entity.Property(e => e.Kind).UseCollation(Ordinal);
+			entity.Property(e => e.ComparisonKey).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientClaimEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<ClientSecretEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.ClientId).UseCollation(Ordinal);
+		});
+
+		modelBuilder.Entity<SigningKeyEntity>(entity =>
+		{
+			entity.Property(e => e.RealmId).UseCollation(Ordinal);
+			entity.Property(e => e.KeyId).UseCollation(Ordinal);
+		});
+
 		return modelBuilder;
 	}
+
+	private const string Ordinal = "C";
 }

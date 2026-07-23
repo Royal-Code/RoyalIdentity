@@ -1,10 +1,10 @@
 # Plan: Persistência EF dos dados de configuração do IdP (`plan-data-configuration-storage`)
 
-## Status: EM EXECUÇÃO - Fase 5 de 7 concluída
+## Status: EM EXECUÇÃO - Fase 6 de 7 concluída
 
 ## Progresso
 
-`█████░░` **71%** - 5 de 7 fases
+`██████░` **86%** - 6 de 7 fases
 
 | Fase | Estado |
 |---|---|
@@ -13,7 +13,7 @@
 | Fase 3 - Adapter, lifecycle e snapshot assíncrono | Concluida |
 | Fase 4 - ServerOptions, realms, clients e bridge de resources | Concluida |
 | Fase 5 - Proteção e persistência de signing keys | Concluida |
-| Fase 6 - PostgreSQL, migrations, runner e seeds | Pendente |
+| Fase 6 - PostgreSQL, migrations, runner e seeds | Concluida |
 | Fase 7 - Paridade, integração e fechamento | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -739,18 +739,18 @@ Validação: `dotnet build RoyalIdentity.sln --no-restore` — êxito (0 erros; 
 
 **Tarefas:**
 
-- [ ] Implementar `ConfigurationPostgreSqlDbContext`, schema `configuration`, `jsonb`, collations/índices e design-time factory.
-- [ ] Fazer o context PostgreSQL padrão e um context customizado chamarem a mesma extensão pública `ApplyRoyalIdentityConfigurationPostgreSqlMappings`.
-- [ ] Criar migration PostgreSQL equivalente ao model SQLite e conferir snapshot/model diff.
-- [ ] Implementar `RoyalIdentity.Migrations` com seleção explícita de provider/conexão, migrate e seed opcional.
-- [ ] Fazer o runner aceitar futuramente conexões Configuration/Operational separadas sem exigir que sejam bancos diferentes.
-- [ ] Implementar seed de produto idempotente para `ServerOptions`, realms internos, `server_admin` e uma signing key protegida/utilizável para cada realm habilitado; não tentar persistir standard scopes.
-- [ ] Implementar seed demo separado e opt-in, incluindo key própria se o realm demo nascer habilitado; não copiar URLs/segredos demo para seed de produto.
-- [ ] Fazer segunda execução de migrate/seed resultar em zero duplicatas e estado equivalente.
-- [ ] Gerar e versionar SQL SQLite e PostgreSQL; gerar PostgreSQL idempotente e validar que não há `EnsureCreated`.
-- [ ] Criar `scripts/Test-ConfigurationPostgreSql.ps1` seguindo o precedente: verificar Podman, iniciar machine se necessário, usar PostgreSQL 17 efêmero em porta dinâmica não padrão e limpar em `finally`.
-- [ ] Executar runner/testes contra PostgreSQL real e verificar schema, migrations, seed, indexes Ordinal, JSONB e protectors compatíveis.
-- [ ] Documentar exemplos sem connection strings reais e garantir exit code não zero em provider/configuração/migration/seed inválidos.
+- [x] Implementar `ConfigurationPostgreSqlDbContext`, schema `configuration`, `jsonb`, collations/índices e design-time factory.
+- [x] Fazer o context PostgreSQL padrão e um context customizado chamarem a mesma extensão pública `ApplyRoyalIdentityConfigurationPostgreSqlMappings`.
+- [x] Criar migration PostgreSQL equivalente ao model SQLite e conferir snapshot/model diff.
+- [x] Implementar `RoyalIdentity.Migrations` com seleção explícita de provider/conexão, migrate e seed opcional.
+- [x] Fazer o runner aceitar futuramente conexões Configuration/Operational separadas sem exigir que sejam bancos diferentes.
+- [x] Implementar seed de produto idempotente para `ServerOptions`, realms internos, `server_admin` e uma signing key protegida/utilizável para cada realm habilitado; não tentar persistir standard scopes.
+- [x] Implementar seed demo separado e opt-in, incluindo key própria se o realm demo nascer habilitado; não copiar URLs/segredos demo para seed de produto.
+- [x] Fazer segunda execução de migrate/seed resultar em zero duplicatas e estado equivalente.
+- [x] Gerar e versionar SQL SQLite e PostgreSQL; gerar PostgreSQL idempotente e validar que não há `EnsureCreated`.
+- [x] Criar `scripts/Test-ConfigurationPostgreSql.ps1` seguindo o precedente: verificar Podman, iniciar machine se necessário, usar PostgreSQL 17 efêmero em porta dinâmica não padrão e limpar em `finally`.
+- [x] Executar runner/testes contra PostgreSQL real e verificar schema, migrations, seed, indexes Ordinal, JSONB e protectors compatíveis.
+- [x] Documentar exemplos sem connection strings reais e garantir exit code não zero em provider/configuração/migration/seed inválidos.
 
 **Critérios de aceite:** runner é o único executável que aplica migration fora de testes; host não contém chamada de migration; SQLite/PostgreSQL chegam ao mesmo comportamento; SQL revisável existe; seed é opcional/idempotente e todo realm habilitado semeado passa pela validação completa de DF27; teste PostgreSQL não conflita com porta 5432 e sempre limpa o container.
 
@@ -758,7 +758,45 @@ Validação: `dotnet build RoyalIdentity.sln --no-restore` — êxito (0 erros; 
 
 ### Resultado da Fase 6
 
-*a preencher*
+**Concluída em 2026-07-22.** O caminho operacional de Configuration agora possui provider PostgreSQL,
+migrations versionadas nos dois providers, runner/seed separado do host, scripts SQL revisáveis e validação
+contra PostgreSQL 17 real.
+
+- **Provider PostgreSQL:** `ConfigurationPostgreSqlDbContext` e sua design-time factory aplicam a mesma extensão
+  pública usada por contexts combinados. O modelo usa schema `configuration`, payloads `jsonb` e collation
+  byte-wise `C` nos identificadores/valores únicos, equivalente ao `BINARY` do SQLite. Testes de arquitetura
+  comparam contexto padrão e customizado, incluindo schema, JSON e collation.
+- **Migrations e SQL:** a migration inicial PostgreSQL e o snapshot foram gerados com EF CLI 10.0.10; os dois
+  providers reportam zero model changes pendentes. Foram versionados
+  `scripts/sql/configuration/sqlite/0001_initial_configuration.sql` e o PostgreSQL idempotente equivalente.
+  O script SQLite cria um banco vazio em teste; o PostgreSQL foi executado duas vezes sobre o banco já migrado.
+- **Runner dedicado:** `RoyalIdentity.Migrations` exige provider e conexão Configuration explícitos, aceita a
+  conexão diretamente ou pelo nome de uma variável de ambiente e nunca é referenciado pelo host. O prefixo
+  `configuration-*` preserva o seam para uma futura conexão Operational, que poderá apontar para o mesmo banco
+  ou para outro. Migrate não implica seed; seed exige perfil e protector explícitos.
+- **Seeds:** `product`, `demo` e `all` são transacionais e idempotentes. Produto cria `ServerOptions`, os três
+  realms internos, `server_admin` e key utilizável para cada realm habilitado; demo permanece opt-in e separado.
+  Standard scopes não são persistidos. Uma segunda execução não cria duplicatas e uma key existente corrente
+  precisa ser desprotegível/materializável pelo protector selecionado antes de o seed prosseguir.
+- **Protectors e operação segura:** o runner suporta `plain`, `aes` por variável de ambiente e ASP.NET Data
+  Protection com key ring explícito. A documentação não contém credenciais reais, recomenda conexão/segredo por
+  ambiente e registra o requisito de key ring persistente/compartilhado. Exit codes verificados: `0` em sucesso/
+  ajuda, `64` em uso inválido e `1` em falha operacional; connection string e chave AES são redigidas.
+- **PostgreSQL efêmero:** `scripts/Test-ConfigurationPostgreSql.ps1` verifica/inicia a Podman machine, sobe
+  `postgres:17-alpine` em porta host dinâmica distinta de 5432 e remove o container em `finally` (a machine fica
+  ligada por poder ser compartilhada). O ensaio real passou na porta `44723`, verificando migrations/seed em
+  duas execuções, schema, `jsonb`, índice/collation Ordinal e SQL idempotente; nenhum container ficou residual.
+
+Critérios de aceite verificados: somente o runner aplica migrations fora dos testes; `RoyalIdentity.Server`
+continua sem referência ao data stack e registra `AddInMemoryStorage`; não há `EnsureCreated` nem chamada de
+migration no host/core; SQL manual existe; seeds são opcionais/idempotentes e todo realm habilitado semeado
+recebe key que passa pela validação completa.
+
+Validação: `dotnet ef migrations has-pending-model-changes` — sem mudanças em SQLite/PostgreSQL;
+`dotnet build RoyalIdentity.sln --no-restore` — êxito, 0 erros e 19 warnings preexistentes;
+`dotnet test RoyalIdentity.sln --no-build --no-restore` — 806 aprovados, 0 falhas e 2 ignorados
+(os testes PostgreSQL opt-in de UserAccounts e Configuration); `scripts/Test-ConfigurationPostgreSql.ps1` —
+1 aprovado contra PostgreSQL 17 real; `git diff --check` — sem erros.
 
 ---
 
@@ -851,7 +889,7 @@ Validação: `dotnet build RoyalIdentity.sln --no-restore` — êxito (0 erros; 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
 | Payload JSON perde opção nova | propriedade pública de options/client não entra no round-trip | configuração silenciosamente alterada | teste de cobertura de propriedades de `Client` + payload versionado + `GetOnlyCollectionModifier` (clear-then-add fiel a remoções em coleções get-only das options) | Mitigado (Fase 2) |
-| Context combinado é apenas teórico | store exige `ConfigurationDbContext` concreto ou perde refinamentos do provider | terceiros não conseguem unificar contexts com model equivalente | registration genérica + `CombinedTestDbContext` SQLite na Fase 2 e PostgreSQL na Fase 6 | Aberto |
+| Context combinado é apenas teórico | store exige `ConfigurationDbContext` concreto ou perde refinamentos do provider | terceiros não conseguem unificar contexts com model equivalente | registration genérica + `CombinedTestDbContext` SQLite na Fase 2 e PostgreSQL na Fase 6 | Mitigado (Fases 2/6) |
 | Snapshot fica obsoleto | refresh falha ou intervalo é excessivo | configuração antiga continua ativa | intervalo obrigatório (`Validate()`), idade observável (`LoadedAtUtc`/`LastRefreshFailureUtc`) e last-known-good explícito (`TryRefreshAsync`) | Mitigado (Fase 3) |
 | Snapshot expõe mutabilidade | caller altera `ServerOptions`/`Realm` retornado | configuração publicada muda fora do refresh | grafo interno inacessível, cópia defensiva (copy ctor de `ServerOptions`/clone de `Realm`) e teste de mutação | Mitigado (Fase 3) |
 | Cookie mantém named options antigas | snapshot renova após scheme já materializado | autenticação continua com cookie/rotas anteriores | `TryRemove` do default e união dos schemes anterior/novo após publicação válida; testado mesmo nome e preservação de scheme externo | Mitigado (Fase 3) |
@@ -861,9 +899,9 @@ Validação: `dotnet build RoyalIdentity.sln --no-restore` — êxito (0 erros; 
 | Remoção do `FirstKeyJob` quebra dev/test | fixture não semeia key antes do startup | servidor não inicia | seed explícito in-memory/runner e startup test | Aberto |
 | Validação aceita key inutilizável | startup verifica apenas id/período e ignora decrypt/algoritmo | primeira assinatura falha após o host iniciar | validar pelo caminho completo do key manager; testes de ciphertext, protector e algoritmo | Aberto |
 | Adapter parcial é usado como produção | consumidor ativa P2 antes do Operational | operações OAuth sem backing durável/coerente | não registrar no host padrão; documentação e guard de composição | Aberto |
-| Collation diverge SQLite/PostgreSQL | índice usa default do provider | casing produz lookup/unique diferente | collation/comparação explícita + mesmos ids em dois casings/providers | Aberto |
-| SQL versionado diverge das migrations | model muda sem regenerar script | implantação manual incompleta | teste pending model changes e verificação de scripts na Fase 6 | Aberto |
-| Seed mistura produto e demo | runner padrão insere URLs/segredos locais | configuração insegura em produção | perfis separados; demo exige opt-in explícito | Aberto |
+| Collation diverge SQLite/PostgreSQL | índice usa default do provider | casing produz lookup/unique diferente | collation/comparação explícita + mesmos ids em dois casings/providers | Mitigado (Fases 2/6) |
+| SQL versionado diverge das migrations | model muda sem regenerar script | implantação manual incompleta | teste pending model changes e verificação de scripts na Fase 6 | Mitigado (Fase 6) |
+| Seed mistura produto e demo | runner padrão insere URLs/segredos locais | configuração insegura em produção | perfis separados; demo exige opt-in explícito | Mitigado (Fase 6) |
 | Admin futura reutiliza writes legados | facade parece CRUD disponível | concorrência/validação insuficientes | DF13/DF17; camada administrativa própria e redesign contratual | Mitigado |
 
 ---

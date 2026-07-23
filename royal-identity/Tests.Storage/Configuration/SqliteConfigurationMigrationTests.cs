@@ -68,4 +68,32 @@ public class SqliteConfigurationMigrationTests
 
 		Assert.Equal(19, exception.SqliteErrorCode); // SQLITE_CONSTRAINT
 	}
+
+	[Fact]
+	public async Task GeneratedSqlScript_ExecutesAgainstEmptyDatabase()
+	{
+		var scriptPath = Path.Combine(
+			FindRepositoryRoot(),
+			"scripts", "sql", "configuration", "sqlite", "0001_initial_configuration.sql");
+		var script = await File.ReadAllTextAsync(scriptPath);
+		await using var connection = new SqliteConnection("Data Source=:memory:");
+		await connection.OpenAsync();
+		await using var command = connection.CreateCommand();
+		command.CommandText = script;
+
+		await command.ExecuteNonQueryAsync();
+
+		command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'signing_keys';";
+		Assert.Equal(1L, await command.ExecuteScalarAsync());
+	}
+
+	private static string FindRepositoryRoot()
+	{
+		var directory = new DirectoryInfo(AppContext.BaseDirectory);
+		while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "RoyalIdentity.sln")))
+			directory = directory.Parent;
+
+		return directory?.FullName
+			?? throw new InvalidOperationException("Could not locate the repository root.");
+	}
 }
