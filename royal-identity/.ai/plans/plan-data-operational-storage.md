@@ -1,6 +1,6 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: RASCUNHO - Q1-Q10 fechadas; aguardando Q11/Q12
+## Status: RASCUNHO - Q1-Q12 fechadas; aguardando aprovação para implementação
 
 ## Progresso
 
@@ -8,14 +8,14 @@
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - contratos, fronteiras e modelo Operational | Bloqueada |
-| Fase 2 - access tokens e consents sobre SQLite | Bloqueada |
-| Fase 3 - sessões SSO sobre SQLite | Bloqueada |
-| Fase 4 - authorization codes e consumo atômico | Bloqueada |
-| Fase 5 - refresh tokens e transições condicionais | Bloqueada |
-| Fase 6 - authorize parameters, cleanup e purge de realm | Bloqueada |
-| Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Bloqueada |
-| Fase 8 - paridade, fluxos e fechamento | Bloqueada |
+| Fase 1 - contratos, fronteiras e modelo Operational | Não iniciada |
+| Fase 2 - access tokens e consents sobre SQLite | Não iniciada |
+| Fase 3 - sessões SSO sobre SQLite | Não iniciada |
+| Fase 4 - authorization codes e consumo atômico | Não iniciada |
+| Fase 5 - refresh tokens e transições condicionais | Não iniciada |
+| Fase 6 - authorize parameters, cleanup e purge de realm | Não iniciada |
+| Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Não iniciada |
+| Fase 8 - paridade, fluxos e fechamento | Não iniciada |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -23,9 +23,9 @@
 > Antes de fechar uma fase, confirme que decisões, critérios de aceite, testes e invariantes relacionados foram
 > aplicados.
 
-> **Bloqueio atual:** as Fases 1–8 não devem ser iniciadas antes de Q11/Q12 serem respondidas e convertidas em
-> decisões fechadas. A matriz do baseline é normativa para as semânticas já resolvidas; este plano não as
-> reinfere nem as altera implicitamente.
+> **Gate de planejamento concluído:** Q1–Q12 foram respondidas e convertidas em decisões fechadas. A implementação
+> permanece não iniciada até aprovação explícita. A matriz do baseline é normativa para as semânticas já resolvidas;
+> este plano não as reinfere nem as altera implicitamente.
 
 ---
 
@@ -121,14 +121,15 @@
 
 - O modelo híbrido, a tabela compartilhada `operation.protocol_artifacts` e as FKs exclusivas de ownership
   estrutural foram decididos em Q1. Handles e predicados de cleanup foram fechados em Q2/Q7.
-- Authorization codes, refresh tokens e authorize parameters contêm handles bearer ou equivalentes. O baseline
-  não decidiu se o banco guarda esses valores, seus digests ou payload protegido.
-- MP-2 e MP-3 exigem atomicidade, mas não fecharam as assinaturas públicas nem o resultado observável de conflito.
-- O fake permanece default até o Plano 4, mas MP-2/MP-3 não podem obrigar nova paridade no fake. É necessário um
-  caminho de compatibilidade explícito e temporário.
-- O default numérico da janela de authorize parameters foi deliberadamente deixado ao Plano 3.
-- DF19/MP-6 separaram expiração lógica, retenção e purge físico, mas não decidiram os períodos de retenção nem quem
-  agenda a limpeza.
+- Authorization codes, refresh tokens, reference access tokens e authorize parameters persistem somente os digests
+  definidos na DF38; valores bearer brutos não entram no banco.
+- MP-2 e MP-3 usam os contratos atômicos das DF11/DF12 e as capability interfaces/fallback transitório da DF39.
+- O fake permanece default até o Plano 4 sem ganhar paridade: o core usa o fallback legado somente quando a
+  capability não existe; o adapter EF é obrigado a fornecê-la.
+- A janela de authorize parameters usa `AuthorizationInteractionLifetime` inteiro em segundos, default 600,
+  conforme DF16/DF40.
+- Cleanup não possui grace histórica, segue os predicados por lifecycle da DF17 e suporta os modos
+  `Hosted`/`External`.
 - A opção de janela de authorize interaction entra em `RealmOptions.Authentication`, portanto altera o grafo
   Configuration concluído no Plano 2. A mudança é aditiva no payload JSON e não requer migration relacional, mas
   precisa provar leitura de payload v1 anterior sem a propriedade e round-trip novo sem bump de versão.
@@ -210,33 +211,6 @@
 
 ---
 
-## Perguntas ao humano
-
-> Remova esta seção quando não houver perguntas abertas. Nenhuma recomendação abaixo é decisão enquanto o autor não
-> responder.
-
-- **Q11 — Compatibilidade temporária com o fake:** como MP-2/MP-3 coexistem com o backing default até o Plano 4?
-  - **Opções:**
-    - **A)** Capability interfaces implementadas pelo EF, com fallback legado explicitamente transitório no core.
-      O fake não cresce; o adapter EF nunca pode usar o fallback. **Recomendada.**
-    - **B)** Default interface methods não atômicos. Reduz adaptação, mas a assinatura aparenta uma garantia que o
-      default não entrega.
-    - **C)** Implementar locks/CAS no fake. Uniformiza o comportamento, mas contraria ADR-018.
-  - **Impacto se não decidir:** bloqueia mudanças públicas e mantém incompatibilidade entre o Plano 3 e o host
-    in-memory.
-  - **Status:** Aberta.
-
-- **Q12 — Shape da janela de authorize interaction:** qual tipo público deve entrar em `AuthenticationOptions`?
-  - **Opções:**
-    - **A)** `TimeSpan`, com unidade explícita e validação `> 0`; nome sugerido
-      `AuthorizationInteractionLifetime`. **Recomendada.**
-    - **B)** Segundos como `int`, seguindo os lifetimes atuais de `Client`.
-    - **C)** Minutos como `int`, seguindo `SessionOptions`, com menor granularidade.
-  - **Impacto se não decidir:** bloqueia contrato público, serialização Configuration e options de AP.
-  - **Status:** Aberta.
-
----
-
 ## Decisões fechadas
 
 - **DF1 — Ownership:** `RoyalIdentity.Data.Operational` contém entidades persistentes, context padrão, mappings
@@ -290,8 +264,10 @@
   contam apenas mudanças efetivas. Fonte: SS-01..SS-06/ADR-017.
 - **DF16 — Authorize parameters:** o accessor passa a ser realm-bound; write grava expiração absoluta calculada
   pelo `TimeProvider`; read é repetível dentro da janela e fail-closed depois; delete é idempotente; handle possui
-  ao menos 128 bits de entropia e colisão é regenerada internamente. O lifetime default por realm é 10 minutos; o
-  tipo público aguarda Q12. Fonte: MP-5 e Q6=A.
+  ao menos 128 bits de entropia e colisão é regenerada internamente. O lifetime por realm é
+  `AuthenticationOptions.AuthorizationInteractionLifetime`, inteiro em segundos, com default `600` e validação
+  `> 0`. A expiração persistida é `now + lifetime seconds`; alterar a opção não reinterpreta registros existentes.
+  Fonte: MP-5, Q6=A e Q12=B.
 - **DF17 — Cleanup separado:** validação lógica não depende da execução do purge. Cleanup físico é por tipo, em
   batches e idempotente, sem grace de retenção histórica. Authorization code consumido é removido pela própria
   operação atômica; code abandonado, access token e authorize parameters tornam-se elegíveis ao expirar. Refresh
@@ -394,6 +370,16 @@
   access token e JWT segue exclusivamente a DF31. O desenho mantém o precedente do IS4 para grants e o estende a
   authorize parameters; HMAC não é introduzido porque os handles gerados têm alta entropia e não justificam
   distribuição/rotação de uma chave no caminho crítico. Fonte: Q2=A e comparação com IS4.
+- **DF39 — Compatibilidade transitória por capability:** MP-2 e MP-3 são expostos por capability interfaces
+  distintas dos contratos CRUD legados e implementadas obrigatoriamente pelo adapter EF. Enquanto o host default
+  permanecer in-memory, o core detecta a ausência da capability e usa explicitamente o fluxo legado não atômico; o
+  fake não implementa locks, CAS, TTL ou nova paridade. A composição EF falha na validação se alguma capability
+  estiver ausente e nunca pode alcançar o fallback. O fallback e a detecção desaparecem no Plano 4 junto da troca do
+  backing default. Fonte: Q11=A e ADR-018.
+- **DF40 — Unidade do lifetime de interação:** `AuthorizationInteractionLifetime` é um `int` em segundos dentro de
+  `AuthenticationOptions`, seguindo os lifetimes atuais de `Client`. O default é `600`, seu copy constructor e
+  payload Configuration preservam o valor, e zero/negativo falha na validação. Payload RealmOptions v1 anterior
+  materializa `600` sem bump de versão ou migration relacional. Fonte: Q12=B, Q6=A e DF29.
 
 ---
 
@@ -422,14 +408,14 @@
 - **Client:** `Client.UpdateAccessTokenClaimsOnRefresh` é removido, sem override/precedência por client. A coluna
   Configuration correspondente recebe migrations novas; o novo default `Current` é intencional.
 
-### 2026-07-24 — Q2 e Q4-Q10
+### 2026-07-24 — Q2 e Q4-Q12
 
 - **Q4:** escolhida **A**. O consume de authorization code inclui handle, client e redirect esperados na operação
   atômica; retorna o code ou `null`, sem diferenciar externamente ausência, consumo anterior ou vínculo inválido.
 - **Q5:** escolhida **A**. Refresh token passa a ter estado + versão; consumo distingue vencedor, conflito e estado
   já consumido, e updates posteriores também exigem a versão esperada.
-- **Q6:** escolhida **A**. Authorize parameters têm lifetime default de 10 minutos por realm; Q12 ainda decide o
-  tipo público da opção.
+- **Q6:** escolhida **A**. Authorize parameters têm lifetime default de 10 minutos por realm, posteriormente
+  expresso como `600` segundos pela Q12.
 - **Q8:** escolhida **C**. A mesma manutenção suporta hosted worker e job/comando externo, com um único modo
   explicitamente habilitado em cada composição.
 - **Q9:** escolhida **A**. Purge Operational por realm é exposto por porta de manutenção no adapter EF, fora do
@@ -441,13 +427,16 @@
 - **Q7:** escolhida **A** após comparação com o IS4. Não existe grace histórica: cada tipo é elegível ao deixar de
   ser semanticamente observável, com refresh respeitando sua tolerância pós-consumo e consents sem expiry
   preservados até remoção explícita/purge.
+- **Q11:** escolhida **A**. EF implementa capabilities atômicas obrigatórias; o core mantém fallback legado apenas
+  para o fake default até o Plano 4, sem ampliar a implementação in-memory.
+- **Q12:** escolhida **B**. `AuthenticationOptions.AuthorizationInteractionLifetime` usa `int` em segundos, default
+  `600`, seguindo os lifetimes atuais de `Client`.
 
 ---
 
 ## Design alvo
 
-As escolhas marcadas com perguntas ainda abertas não são design aprovado; mostram somente onde a resposta altera o
-desenho.
+O design abaixo materializa as decisões Q1–Q12 já fechadas; nenhuma alternativa de pergunta permanece pendente.
 
 ### Contratos e bordas
 
@@ -455,12 +444,10 @@ desenho.
   token, authorization code, consent, sessão e authorize parameters.
 - `IStorage.AuthorizeParameters` é substituído por accessor realm-bound, alinhado aos demais stores. O nome exato
   deve seguir o padrão existente (`GetAuthorizeParametersStore(Realm)`).
-- MP-2 entra como operação/capability de consumo condicional de authorization code conforme DF11; a estratégia
-  temporária de compatibilidade depende de Q11.
-- MP-3 entra como operação/capability de transição versionada de refresh token conforme DF12; a estratégia
-  temporária de compatibilidade depende de Q11.
-- A janela de authorize interaction vive em `RealmOptions.Authentication`, com default de 10 minutos; type/nome
-  dependem de Q12.
+- MP-2 entra como capability de consumo condicional de authorization code conforme DF11/DF39.
+- MP-3 entra como capability de transição versionada de refresh token conforme DF12/DF39.
+- A janela de authorize interaction vive em `RealmOptions.Authentication` como
+  `int AuthorizationInteractionLifetime`, em segundos e com default `600`, conforme DF16/DF40.
   Essa é uma alteração aditiva da família Configuration: mantém payload version `1`, não gera migration relacional
   e exige teste de payload v1 anterior sem a propriedade além do round-trip novo (DF29).
 - `RealmOptions.OperationalStorage` contém `PayloadProtectionProfile` e `JwtAccessTokenPersistence`; ambos são
@@ -669,8 +656,8 @@ Nenhum código do produto coordena commit entre ambos.
   terceiro permanece opt-in.
 - A fixture EF completa substitui o composite test-only do Plano 2 para a contract suite, mas os testes HTTP só
   migram no Plano 4.
-- O fake recebe apenas o mínimo necessário para compilar o accessor realm-bound de AP e o mecanismo Q11; seu
-  dicionário continua global, sem TTL, e não executa os aceites EF.
+- O fake recebe apenas o mínimo necessário para compilar o accessor realm-bound de AP; não implementa as
+  capabilities da DF39, seu dicionário continua global, sem TTL, e não executa os aceites EF.
 - Migrations Configuration e Operational mantêm assemblies/contexts próprios e usam a topologia exata da DF23. No
   PostgreSQL, o mesmo nome `__EFMigrationsHistory` é isolado pelos schemas `configuration`/`operation`; no SQLite,
   os nomes são distintos por não existir schema. Quando duas famílias usam o mesmo banco, o runner primeiro conclui
@@ -720,7 +707,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - contratos, fronteiras e modelo Operational
 
-**Depende de:** Q11/Q12 respondidas.
+**Depende de:** aprovação explícita deste plano para iniciar.
 
 **Escopo:** criar o projeto puro, mappings neutros, modelo completo, seams do adapter e mudanças públicas antes de
 implementar stores.
@@ -732,10 +719,10 @@ implementar stores.
 - Modelar `protocol_artifacts`, consents, sessions/session-clients e authorize parameters conforme DF34–DF36, com
   digests/índices finais conforme DF17/DF38 e sem FK cross-family.
 - Criar accessor genérico `TContext : DbContext` no adapter; stores não dependem do context concreto.
-- Implementar os contratos MP-2 e MP-3 conforme DF11/DF12 e a compatibilidade temporária de Q11.
-- Adicionar a opção de authorize interaction com default de 10 minutos conforme DF16/Q12, incluindo copy
-  constructor e cobertura do serializer
-  de Configuration; tratar a mudança como aditiva sobre payload v1, sem migration relacional/bump automático.
+- Implementar os contratos MP-2 e MP-3 conforme DF11/DF12 e a compatibilidade transitória da DF39.
+- Adicionar `AuthorizationInteractionLifetime` como `int` em segundos, default `600`, conforme DF16/DF40,
+  incluindo copy constructor e cobertura do serializer de Configuration; tratar a mudança como aditiva sobre
+  payload v1, sem migration relacional/bump automático.
 - Adicionar `OperationalStorageOptions` e `RefreshTokenOptions` a `RealmOptions`, com defaults/clone/serialização
   definidos pelas DF29–DF32.
 - Remover `Client.UpdateAccessTokenClaimsOnRefresh` do core e do materializador Configuration; preparar a migration
@@ -758,7 +745,9 @@ implementar stores.
 - [ ] Criar `IOperationalStoreFactory` e seam de `DbContext` genérico.
 - [ ] Alterar interfaces/consumidores somente até o ponto em que compilam; manter o comportamento nas fases por
   store.
-- [ ] Aplicar a estratégia de compatibilidade Q11 sem dar aceites novos ao fake.
+- [ ] Implementar as capability interfaces e o fallback transitório da DF39 sem dar aceites novos ao fake.
+- [ ] Validar que `AuthorizationInteractionLifetime` é positivo, usa segundos e materializa `600` quando ausente em
+  payload v1.
 - [ ] Criar testes de model metadata, payload version e round-trip por tipo.
 - [ ] Cobrir payload Configuration v1 anterior sem as novas options, defaults `Jwt=None`/`Claims=Current`, profile
   default e round-trip novo ainda em version `1`.
@@ -775,9 +764,10 @@ implementar stores.
 - `Data.Operational` não referencia core, adapter, providers, host ou Configuration.
 - Toda entidade possui realm na chave/índice aplicável e nenhuma FK cross-family.
 - Um `DbContext` arbitrário aplica o mapping sem herdar de `OperationalDbContext`.
-- Contratos MP-2/MP-3 não prometem atomicidade por uma implementação default não atômica.
-- Realm options continuam round-trip após as novas opções; payload v1 anterior materializa os defaults sem migration
-  relacional ou bump de payload version.
+- Contratos MP-2/MP-3 não possuem implementação default não atômica; somente o core aciona o fallback quando a
+  capability está ausente, e a registration EF valida sua presença.
+- Realm options continuam round-trip após as novas opções; payload v1 anterior materializa
+  `AuthorizationInteractionLifetime=600` e os demais defaults sem migration relacional ou bump de payload version.
 - Não resta opção de refresh claims no `Client`; somente o realm determina `Current`/`Snapshot`.
 - Nenhum secret de protector entra no payload Configuration; profile inexistente nunca cai para `Plain`.
 - Todo payload inválido/version desconhecida falha sem materialização parcial.
@@ -911,7 +901,7 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionServic
 
 ## Fase 4 - authorization codes e consumo atômico
 
-**Depende de:** Fases 1–3; Q11 fechada.
+**Depende de:** Fases 1–3.
 
 **Escopo:** implementar AC-01..AC-03, MP-2 e migrar o fluxo de token.
 
@@ -939,7 +929,7 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionServic
 - Invalid client/redirect não fornece oracle mais detalhado e, por não satisfazer o predicado condicional, não
   remove o code.
 - Falha de PKCE ocorre depois do consume e não permite segunda tentativa com o mesmo code.
-- Fake continua transitório pelo caminho Q11; aceite de atomicidade roda somente em EF.
+- Fake continua transitório pelo fallback da DF39; aceite de atomicidade roda somente em EF.
 
 **Testes:**
 
@@ -957,7 +947,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 
 ## Fase 5 - refresh tokens e transições condicionais
 
-**Depende de:** Fase 4; Q11 fechada.
+**Depende de:** Fase 4.
 
 **Escopo:** implementar RT-01..RT-05, MP-3 e reorganizar o handler para não emitir antes da transição exigida.
 
@@ -1032,7 +1022,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 
 ## Fase 6 - authorize parameters, cleanup e purge de realm
 
-**Depende de:** Fases 2–5; Q12 fechada.
+**Depende de:** Fases 2–5.
 
 **Escopo:** implementar MP-5/MP-6/parte Operational de MP-7 e completar o gateway SQLite.
 
@@ -1190,7 +1180,7 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalMigrationRunne
 - [ ] Rodar build/test focal e solução completa.
 - [ ] Rodar PostgreSQL real.
 - [ ] Inspecionar migrations e SQL por secrets/dados demo.
-- [ ] Confirmar que adapter EF nunca usa o fallback Q11.
+- [ ] Confirmar que o adapter EF nunca usa o fallback da DF39.
 - [ ] Confirmar que fake não recebeu paridade Operational nova.
 - [ ] Confirmar que `UpdateAccessTokenClaimsOnRefresh` e sua coluna não permanecem em core, entities,
   materializers, mappings, migrations novas ou código de runtime.
@@ -1229,12 +1219,12 @@ git diff --check
 
 | Objetivo | Fase(s) | Decisão(ões) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF38 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
+| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF40 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
 | Access token + consent | 2, 6, 7 | DF7/DF8/DF13/DF14/DF17/DF30/DF31/DF38 | AT/CN completos, digests, modos JWT, profiles e cleanup independente | contract + provider acceptances |
 | Sessões | 3, 7 | DF15/DF27 | SS-01..SS-06, touch/revogação concorrentes | session contracts + ADR-017 regressions |
-| Code single-use | 1, 4, 7 | DF11 + Q11 | um vencedor concorrente | atomic code acceptance |
-| Refresh conditional | 1, 5, 7 | DF12/DF32–DF34/DF37 + Q11 | transição/versão/tolerância, Current/Snapshot e sem dependência do AT | atomic refresh + claims-mode acceptance |
-| AP realm-bound + TTL | 1, 6, 7 | DF16/DF29/DF30/DF38 + Q12 | realm, digest, expiração, colisão, fail-closed e payload Configuration compatível | AP acceptances |
+| Code single-use | 1, 4, 7 | DF11/DF39 | um vencedor concorrente e fallback restrito ao fake | atomic code acceptance |
+| Refresh conditional | 1, 5, 7 | DF12/DF32–DF34/DF37/DF39 | transição/versão/tolerância, Current/Snapshot e sem dependência do AT | atomic refresh + claims-mode acceptance |
+| AP realm-bound + TTL | 1, 6, 7 | DF16/DF29/DF30/DF38/DF40 | realm, digest, expiração em segundos, colisão, fail-closed e payload Configuration compatível | AP acceptances |
 | Cleanup/purge | 6, 7 | DF17/DF18 | batch por tipo, um modo de execução e purge isolado | cleanup/purge acceptances |
 | Gateway/lifecycle | 6–8 | DF3/DF21/DF22 | todos os membros, scopes reais, sem UoW global | StorageSession/full harness |
 | Migrations/operação | 2, 7, 8 | DF4/DF23/DF24/DF33 | histories por família, drop da opção do client, runner/SQL separados e uma/duas conexões | migration/runner/Podman |
@@ -1284,6 +1274,10 @@ git diff --check
 34. Handles bearer/opaques cobertos pela DF38 nunca são persistidos em forma bruta; lookup usa digest separado por
     tipo e realm.
 35. Cleanup não conserva grace histórica nem remove dado ainda observável pela tolerância/lifecycle da DF17.
+36. O fake não implementa as capabilities atômicas; somente o core pode usar o fallback legado, e a composição EF
+    falha se alguma capability da DF39 estiver ausente.
+37. `AuthorizationInteractionLifetime` usa segundos, é sempre positivo e materializa `600` quando ausente no
+    payload Configuration v1.
 
 ---
 
@@ -1329,7 +1323,7 @@ git diff --check
 | Purge cruza realm | filtro incompleto/cascade | incidente multi-tenant | realm em PK/FK + cenário abrangente | Aberto |
 | Combined context diverge | mapping provider fica no context concreto | customização de terceiro quebra | extensões públicas + model tests | Aberto |
 | SQLite passa, PostgreSQL falha | estratégia atômica/provider difere | falso sinal de produção | aceites reais PostgreSQL 17 | Aberto |
-| Fake aparenta garantia EF | fallback não documentado | testes/default escondem corrida | Q11 + assert de que EF não usa fallback | Aberto |
+| Fake aparenta garantia EF | fallback não documentado | testes/default escondem corrida | DF39 + assert de que EF não usa fallback | Aberto |
 | Runner sugere atomicidade conjunta | duas conexões falham parcialmente | operação confusa | resultado por família + sem transação distribuída | Aberto |
 | Histories de migrations se misturam | providers dependem da history default ou configuram somente Operational | diagnóstico/rollback/scripts acoplados | topologia explícita da DF23 para ambas as famílias + teste same-database | Aberto |
 | Mudança da history reaplica migrations Configuration | EF consulta o novo local antes de realocar a history legada | tentativa de recriar tabelas/indisponibilidade | bootstrap pré-`MigrateAsync`, preservação de ids, casos legado/novo/ambíguo e SQL manual | Aberto |
