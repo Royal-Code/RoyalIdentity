@@ -1,6 +1,6 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: RASCUNHO - aguardando as questões ainda abertas de Q1-Q12
+## Status: RASCUNHO - Q1/Q3-Q6/Q8-Q10 fechadas; aguardando Q2/Q7/Q11/Q12
 
 ## Progresso
 
@@ -23,7 +23,7 @@
 > Antes de fechar uma fase, confirme que decisões, critérios de aceite, testes e invariantes relacionados foram
 > aplicados.
 
-> **Bloqueio atual:** as Fases 1–8 não devem ser iniciadas antes de Q1–Q12 serem respondidas e convertidas em
+> **Bloqueio atual:** as Fases 1–8 não devem ser iniciadas antes de Q2/Q7/Q11/Q12 serem respondidas e convertidas em
 > decisões fechadas. A matriz do baseline é normativa para as semânticas já resolvidas; este plano não as
 > reinfere nem as altera implicitamente.
 
@@ -56,8 +56,12 @@
   `RoyalIdentity/Handlers/RefreshTokenHandler.cs` e `RoyalIdentity/Pipes.cs` — pontos atuais de consumo e
   concorrência.
 - `old-is4/src/Storage/src/Stores/Serialization/ClaimLite.cs`,
-  `old-is4/src/Storage/src/Models/RefreshToken.cs` e stores default de persisted grants — precedente histórico
-  verificado para claims mínimas, JWT não persistido e snapshot de access token dentro do refresh token.
+  `old-is4/src/Storage/src/Models/RefreshToken.cs`,
+  `old-is4/src/IdentityServer4/src/Stores/Default/DefaultGrantStore.cs`,
+  `old-is4/src/IdentityServer4/src/Stores/Default/DistributedCacheAuthorizationParametersMessageStore.cs`,
+  e `old-is4/src/EntityFramework.Storage/src/TokenCleanup/TokenCleanupService.cs` — precedentes históricos
+  verificados para claims mínimas, JWT não persistido, snapshot de access token dentro do refresh token, digest de
+  handles de grants e cleanup por expiração.
 - `RoyalIdentity/Models/Tokens/*.cs`, `RoyalIdentity/Models/Consent.cs` e
   `RoyalIdentity/Users/UserSession*.cs` — grafos que precisam de round-trip completo.
 - `Tests.Storage/Storage/Contracts/*.cs` — suíte provider-neutral já criada pelo baseline.
@@ -115,9 +119,8 @@
 
 ### Lacunas, conflitos e restrições
 
-- O modelo híbrido de projeção relacional + payload versionado foi decidido, mas a topologia física entre uma tabela
-  compartilhada de protocol artifacts e tabelas tipadas, bem como as FKs internas, ainda depende das partes abertas
-  de Q1.
+- O modelo híbrido, a tabela compartilhada `operation.protocol_artifacts` e as FKs exclusivas de ownership
+  estrutural foram decididos em Q1. Índices finais ainda dependem dos predicados de handles/cleanup de Q2/Q7.
 - Authorization codes, refresh tokens e authorize parameters contêm handles bearer ou equivalentes. O baseline
   não decidiu se o banco guarda esses valores, seus digests ou payload protegido.
 - MP-2 e MP-3 exigem atomicidade, mas não fecharam as assinaturas públicas nem o resultado observável de conflito.
@@ -136,9 +139,9 @@
   configura automaticamente o schema da history table.
 - Configuration e Operational podem usar bancos distintos. Portanto, Operational não pode depender de FK ou
   transação com `configuration.realms`/`configuration.clients`; realm/client são vínculos lógicos por valor.
-- Dentro da própria família Operational, ainda é necessário decidir quais relações são FKs e quais permanecem
-  vínculos lógicos. Em especial, `session_id` pode ser ausente em client credentials; o alvo já elimina
-  `refresh_token.access_token_id` como dependência entre lifecycles.
+- Dentro da própria família Operational, somente `user_session_clients → user_sessions` usa FK de ownership.
+  Demais referências, inclusive `protocol_artifacts.session_id`, são vínculos lógicos; `session_id` pode ser ausente
+  em client credentials e `refresh_token.access_token_id` deixa de existir como dependência entre lifecycles.
 - O fluxo atual persiste também access tokens JWT e o refresh recupera o access token original por
   `AccessTokenId`. O alvo decidido elimina essa dependência: JWT persistence vira opção por realm; reference tokens
   continuam obrigatoriamente persistidos; refresh usa claims atuais ou snapshot próprio conforme a opção do realm.
@@ -199,7 +202,7 @@
 - Persistir `IMessageStore` ou redesenhar `IReplayCache`.
 - Cache geral sobre stores Operational — destino: plano de caching.
 - Auditoria durável, outbox ou histórico forense de tokens/sessões.
-- Sender-constrained tokens, DPoP/mTLS e famílias de refresh token, salvo se Q10 expandir expressamente este plano.
+- Sender-constrained tokens, DPoP/mTLS, famílias de refresh token e revogação automática por replay.
 - Executar migrations ou seed automaticamente no host.
 - Fornecer um `DbContext` combinado concreto; somente os mappings públicos que permitem ao consumidor criá-lo.
 - Adicionar lookup de sessão por subject (MP-9) sem um caller comprovado; revogação usa a operação em massa já
@@ -211,44 +214,6 @@
 
 > Remova esta seção quando não houver perguntas abertas. Nenhuma recomendação abaixo é decisão enquanto o autor não
 > responder.
-
-- **Q1 — Modelagem dos grafos, topologia física e relações internas:** como os campos consultáveis, os grafos de
-  claims/coleções, as tabelas e os vínculos dentro da família Operational devem ser persistidos? A Parte 1 está
-  respondida; responder as Partes 2 e 3.
-  - **Parte 1 — projeção dos grafos:**
-    - **A)** Modelo híbrido: colunas/tabelas para identidade, realm, client, subject, sid, tipo e timestamps
-      consultados; payload JSON versionado para claims e grafos não consultados. Consultas, revogações e cleanup
-      permanecem indexáveis, com round-trip/versionamento rigorosos. **Recomendada.**
-    - **B)** Modelo totalmente relacional: claims, scopes, audiences, properties e coleções em tabelas filhas.
-      Maximiza a consultabilidade, mas aumenta o custo de mapping/escrita de dados transitórios.
-    - **C)** Payload quase opaco: somente chave, realm e timestamps em colunas. Simplifica o schema, mas impede
-      índices eficientes de subject/client/sid.
-    - **Resposta:** **A**. Claims persistidas possuem somente `Type`, `Value` e `ValueType`; `Issuer`,
-      `OriginalIssuer` e `Claim.Properties` não pertencem ao contrato Operational. Metadados próprios de outros
-      modelos, como `AuthorizationCode.Properties`, continuam no payload do respectivo agregado.
-  - **Parte 2 — integridade relacional interna:**
-    - **A)** FKs somente para ownership estrutural com lifecycle comum, como
-      `user_session_clients → user_sessions`; referências entre agregados/lifecycles, como
-      `token.session_id`, permanecem vínculos lógicos indexados. Evita que cleanup independente seja governado por
-      cascade/restrict sem perder integridade dos children. **Recomendada.**
-    - **B)** FKs para toda relação interna representável, nullable quando necessário. Aumenta a integridade do
-      banco, mas acopla ordem de escrita, retenção e purge de access tokens/refresh tokens/sessões.
-    - **C)** Nenhuma FK interna; toda correlação é por valor. Maximiza independência de lifecycle, mas perde a
-      proteção relacional até para tabelas filhas estruturalmente dependentes.
-  - **Parte 3 — topologia física dos protocol artifacts:**
-    - **A)** Uma tabela `protocol_artifacts`, discriminada por tipo, para reference access tokens, refresh tokens,
-      authorization codes e JWT metadata/full quando habilitado pelo realm. Consents, sessões/session-clients e
-      authorize parameters permanecem em tabelas próprias. Preserva stores tipados e operações atômicas, reduz
-      migrations e acomoda extensões de lifecycle compatível sem nova tabela. Exige discriminator em toda operação,
-      constraints condicionais e índices por tipo. **Recomendada.**
-    - **B)** Tabelas distintas para access tokens, refresh tokens e authorization codes. Maximiza constraints e
-      isolamento de churn/cleanup, mas multiplica mappings/migrations e exige nova tabela para cada artifact novo.
-    - **C)** Uma tabela IS4-like incluindo também consents. Reduz tabelas, mas mistura a identidade natural/upsert e
-      retenção de consent com artifacts endereçados por handle/chave.
-  - **Impacto se não decidir:** as Partes 2 e 3 bloqueiam entidades, mappings, migrations, ordem de escrita, índices
-    e estratégia de cleanup da Fase 1. Formato de resposta sugerido:
-    `Q1: Parte 2 A; Parte 3 A`.
-  - **Status:** Parcialmente respondida — Parte 1=A; Partes 2/3 abertas.
 
 - **Q2 — Persistência de handles bearer/opaques:** qual representação deve ser usada como chave de lookup?
   Esta pergunta não decide se JWTs são persistidos: essa política já foi fechada por realm na DF31. Para access
@@ -263,43 +228,16 @@
       reutilizáveis.
     - **C)** HMAC determinístico com chave operacional. Protege também contra enumeração de entradas de baixa
       entropia, mas introduz distribuição e rotação de chave no caminho crítico.
+  - **Comparação com o IS4:** `DefaultGrantStore` devolvia o handle bruto ao caller, mas persistia e consultava
+    `SHA-256(handle + ":" + grantType)` para authorization codes, refresh tokens, reference access tokens e
+    consents. O tipo separava os domínios; não havia dimensão de realm. Authorize parameters usavam cache
+    distribuído com o handle bruto incorporado à chave, fora do persisted-grant store.
+  - **Como a opção A se compara:** preserva a mesma ideia do IS4 para grants, acrescenta `realm_id` à identidade e
+    torna a regra uniforme também para authorize parameters. Mantém o discriminator de tipo na entrada do digest,
+    evitando colisão semântica entre artifacts. É mais segura e consistente que o IS4 sem introduzir o
+    gerenciamento de chave da opção C; como os handles têm alta entropia, HMAC acrescentaria pouco contra
+    enumeração neste caso.
   - **Impacto se não decidir:** bloqueia chaves, índices, materialização e política de segurança do schema.
-  - **Status:** Aberta.
-
-- **Q4 — Contrato atômico de authorization code (MP-2):** qual operação pública substitui get+remove no fluxo?
-  - **Opções:**
-    - **A)** Consume condicional recebe handle e vínculos esperados de client/redirect, remove atomicamente e
-      retorna o code; `null` cobre ausente, já consumido ou vínculo inválido. Expiração/PKCE continuam no pipeline
-      após o consumo. **Recomendada.**
-    - **B)** O fluxo faz get/valida client/redirect e chama consume atômico somente por handle. Mantém duas idas e
-      exige verificar que o objeto consumido é o observado.
-    - **C)** Resultado discriminado (`Success`, `NotFound`, `ClientMismatch`, `RedirectMismatch`). Melhora o
-      diagnóstico interno, mas amplia a superfície e o risco de diferenciação indevida no erro OAuth.
-  - **Impacto se não decidir:** bloqueia o contrato MP-2, a refatoração do pipeline e os aceites concorrentes.
-  - **Status:** Aberta.
-
-- **Q5 — Contrato de transição do refresh token (MP-3):** como representar consumo, conflito e atualização do
-  token reutilizável?
-  A resposta deve distinguir perder a transição de aplicar a política de tolerância: um conflito nunca vira sucesso
-  por si só. Se Q10 preservar a tolerância, o caller só pode avaliá-la sobre estado consumido rematerializado depois
-  do conflito, tornando observável que houve outra transição vencedora.
-  - **Opções:**
-    - **A)** Estado + versão condicional: leitura traz versão; `TryConsume` distingue vencedor, conflito e já
-      consumido; atualização posterior exige versão esperada. Preserva a tolerância como política do caller e torna
-      perdas concorrentes observáveis. **Recomendada.**
-    - **B)** Somente `TryConsume`; a atualização posterior do estado/payload do refresh reutilizável continua
-      last-write-wins. Resolve a primeira transição, mas deixa RT-03 parcialmente desprotegido.
-    - **C)** Transação de redemption abrangente, incluindo consumo e tokens emitidos. Aumenta a atomicidade, mas
-      move emissão para a persistência ou cria UoW maior que o baseline.
-  - **Impacto se não decidir:** bloqueia modelo de versão, contrato MP-3, handler e testes de concorrência.
-  - **Status:** Aberta.
-
-- **Q6 — Default do TTL de authorize parameters:** qual janela por realm deve ser usada?
-  - **Opções:**
-    - **A)** 10 minutos. Limita o estado abandonado e normalmente comporta login/consent. **Recomendada.**
-    - **B)** 15 minutos. Tolera fluxos humanos mais longos, mantendo handles válidos por mais tempo.
-    - **C)** 5 minutos. Reduz retenção/exposição, com maior risco de expiração durante o fluxo.
-  - **Impacto se não decidir:** bloqueia o default público, validação de options e testes de TTL da Fase 6.
   - **Status:** Aberta.
 
 - **Q7 — Retenção após estado terminal:** quando cada tipo se torna elegível ao purge físico?
@@ -312,38 +250,19 @@
       tolerância e expiração. Não preserva histórico operacional. **Recomendada.**
     - **B)** Grace configurável por tipo. Suporta diagnóstico limitado, mas aumenta PII, volume e defaults.
     - **C)** Grace único global. Simplifica configuração, mas ignora lifecycles diferentes.
+  - **Comparação com o IS4:** `TokenCleanupService` removia persisted grants apenas quando
+    `Expiration < UtcNow`, ordenados por expiração e em batches; não distinguia tipo, `ConsumedTime` ou outro estado
+    terminal. Authorization code usado era removido sincronamente pelo store. Refresh token consumido podia
+    permanecer até expirar; consent sem expiração não era removido pelo cleanup. Authorize parameters ficavam no
+    cache distribuído e seguiam a expiração do cache. O worker era opcional, desabilitado por default, com intervalo
+    default de 3.600 segundos e batch default de 100.
+  - **Como a opção A se compara:** mantém o princípio do IS4 de não conservar histórico operacional, mas define a
+    elegibilidade por lifecycle. Code consumido é apagado na operação atômica; refresh respeita a janela
+    pós-consumo antes de deixar de ser observável; AP, sessão e demais tipos seguem seus próprios estados/expirações.
+    Portanto, evita tanto reter um refresh consumido inutilmente até o expiry quanto apagar dados que ainda
+    participam da tolerância ou de outra semântica observável.
   - **Impacto se não decidir:** bloqueia queries de cleanup, colunas terminais e critérios de purge. Se B for
     escolhida, os defaults por tipo também precisam ser respondidos antes da Fase 6.
-  - **Status:** Aberta.
-
-- **Q8 — Executor do cleanup periódico:** onde o agendamento deve viver?
-  - **Opções:**
-    - **A)** Hosted worker configurável sobre manutenção reutilizável, em batches idempotentes. Automatiza a
-      operação, mas adiciona escrita periódica aos deployments. **Recomendada.**
-    - **B)** Comando/job externo apenas. Dá controle operacional; sem scheduler, o banco cresce indefinidamente.
-    - **C)** Ambos, com exatamente um modo habilitado. Maximiza flexibilidade e aumenta configuração/testes.
-  - **Impacto se não decidir:** bloqueia lifecycle, options, registration e operação do cleanup.
-  - **Status:** Aberta.
-
-- **Q9 — Seam de purge Operational por realm:** qual superfície será exposta à futura orquestração administrativa?
-  - **Opções:**
-    - **A)** Porta de manutenção fora do core, em `Storage.EntityFramework`, usando primitivas. Não incha
-      `IStorage` nem cria dependência cross-family. **Recomendada.**
-    - **B)** Operação interna acessível somente por testes/runner até o plano administrativo. Reduz a API agora,
-      mas exige promoção/refatoração posterior.
-    - **C)** Método em `IStorage`. Facilita descoberta, mas mistura manutenção administrativa com runtime.
-  - **Impacto se não decidir:** bloqueia a parte Operational de MP-7 e os testes de purge.
-  - **Status:** Aberta.
-
-- **Q10 — Política de refresh-token replay:** o Plano 3 preserva o baseline ou incorpora hardening da RFC 9700?
-  - **Opções:**
-    - **A)** Preservar `RefreshTokenPostConsumedTimeTolerance`, tornando apenas as transições atômicas; famílias,
-      detecção/revogação de replay e sender constraint ficam para hardening próprio. Controla o escopo, mantendo a
-      divergência explicitamente documentada. **Recomendada para este corte.**
-    - **B)** Adicionar famílias/rotação agora. Aproxima o alvo da RFC 9700, mas amplia domínio, contratos, handlers,
-      cleanup e testes.
-    - **C)** Exigir sender-constrained refresh tokens via mTLS/DPoP. É mudança protocolar maior que o escopo atual.
-  - **Impacto se não decidir:** bloqueia semântica RT-03, modelo, handler, cleanup e critérios de segurança.
   - **Status:** Aberta.
 
 - **Q11 — Compatibilidade temporária com o fake:** como MP-2/MP-3 coexistem com o backing default até o Plano 4?
@@ -400,11 +319,15 @@
   claims seguem o contrato mínimo da DF34. Fonte: DF17 e Q1 Parte 1.
 - **DF10 — Comparadores:** identificadores operacionais, subject, client, sid, scope e handles usam comparação
   Ordinal/case-sensitive. Nenhuma collation default do provider redefine a semântica. Fonte: DF18.
-- **DF11 — Authorization code:** o consumo no fluxo do token é single-use e atômico; apenas um concorrente pode
-  obter sucesso. A remoção administrativa continua idempotente. A assinatura aguarda Q4. Fonte: DF15/MP-2.
-- **DF12 — Refresh token:** a primeira transição de consumo e atualizações de estado são condicionais/atômicas; o
-  CAS trivial atual não é alvo. A tolerância é política separada: conflito não é sucesso e somente estado consumido
-  rematerializado pode ser submetido à tolerância pelo caller. A assinatura aguarda Q5. Fonte: DF15/MP-3.
+- **DF11 — Authorization code:** o consumo no fluxo do token é single-use e atômico; recebe handle, client e
+  redirect URI esperados, remove e retorna o code para apenas um concorrente. `null` cobre ausente, já consumido ou
+  vínculo inválido sem revelar a causa. Expiração e PKCE continuam no pipeline depois do consumo; portanto, uma
+  tentativa que obteve o code mas falhou nessas validações não o torna reutilizável. A remoção administrativa
+  continua idempotente. Fonte: DF15/MP-2 e Q4=A.
+- **DF12 — Refresh token:** a materialização inclui `state_version`. `TryConsume` usa estado + versão esperada e
+  distingue transição vencedora, conflito concorrente e token já consumido; qualquer atualização posterior do
+  refresh reutilizável também exige a versão esperada. A tolerância é política separada: conflito nunca é sucesso e
+  somente estado consumido rematerializado pode ser submetido à tolerância pelo caller. Fonte: DF15/MP-3 e Q5=A.
 - **DF13 — Access token:** reference access tokens são sempre persistidos e seguem AT-01..AT-04; remoção em massa
   usa tipo + subject + client Ordinal e é idempotente. JWTs seguem `JwtAccessTokenPersistenceMode` do realm
   (`None`, `Metadata` ou `Full`, default `None`); somente `Full` conserva o compact JWT. Persistir/remover um JWT não
@@ -417,14 +340,18 @@
   contam apenas mudanças efetivas. Fonte: SS-01..SS-06/ADR-017.
 - **DF16 — Authorize parameters:** o accessor passa a ser realm-bound; write grava expiração absoluta calculada
   pelo `TimeProvider`; read é repetível dentro da janela e fail-closed depois; delete é idempotente; handle possui
-  ao menos 128 bits de entropia e colisão é regenerada internamente. Tipo/default aguardam Q6/Q12. Fonte: MP-5.
+  ao menos 128 bits de entropia e colisão é regenerada internamente. O lifetime default por realm é 10 minutos; o
+  tipo público aguarda Q12. Fonte: MP-5 e Q6=A.
 - **DF17 — Cleanup separado:** validação lógica não depende da execução do purge. Cleanup físico é por tipo, em
   batches e idempotente, com lazy cleanup de AP na leitura. Refresh conserva o grant/snapshot que seu modo exige e
-  nunca prolonga a retenção da linha do access token anterior; elegibilidade/retention/agendamento aguardam Q7/Q8.
-  Fonte: DF19/MP-6 e DF31/DF32.
+  nunca prolonga a retenção da linha do access token anterior; elegibilidade/retention aguarda Q7. A manutenção é
+  reutilizável e suporta dois modos de execução explicitamente selecionados: hosted worker ou comando/job externo;
+  exatamente um modo fica habilitado, nunca dois schedulers concorrentes pela configuração do produto. Fonte:
+  DF19/MP-6, DF31/DF32 e Q8=C.
 - **DF18 — Realm deletion:** Configuration conserva tombstone/path/domain e Operational apaga fisicamente seus
-  dados. Esta fase entrega o purge isolado; coordenação com Configuration/UserAccounts continua futura. O seam
-  aguarda Q9. Fonte: DF20/MP-7.
+  dados. Esta fase entrega o purge isolado por uma porta de manutenção em `Storage.EntityFramework`, expressa em
+  primitivas e fora de `IStorage`; coordenação com Configuration/UserAccounts continua futura. Fonte: DF20/MP-7 e
+  Q9=A.
 - **DF19 — I/O:** todo acesso EF é assíncrono, propaga `CancellationToken` até o provider e não abre conexão em API
   síncrona. Fonte: DF23.
 - **DF20 — Ordenação:** nenhuma listagem Operational recebe order implícito; só se adiciona ordem quando existir
@@ -489,6 +416,22 @@
   materializador cria a claim com issuer canônico/default. Metadados `Properties` de outros modelos continuam
   preservados. Uma futura dependência de metadata de claim exige nova versão explícita, nunca perda silenciosa.
   Fonte: Q1 Parte 1 e comparação com IS4.
+- **DF35 — Integridade relacional interna:** FKs existem somente para ownership estrutural com lifecycle comum.
+  `user_session_clients` referencia `user_sessions` no mesmo realm; referências entre agregados/lifecycles, como
+  `protocol_artifacts.session_id`, são vínculos lógicos indexados. Não há cascades/restrict entre artifacts,
+  consents e sessões que acoplem escrita, retenção ou cleanup independentes. Fonte: Q1 Parte 2=A.
+- **DF36 — Topologia física:** `operation.protocol_artifacts` é a tabela compartilhada e discriminada para reference
+  access tokens, refresh tokens, authorization codes e JWT metadata/full quando habilitado pelo realm. Consents,
+  user sessions, session-clients e authorize parameters permanecem em tabelas próprias: cinco tabelas Operational
+  de negócio no total. Stores continuam tipados; `artifact_type` integra toda PK/query/operação atômica e índices
+  específicos/condicionais evitam write amplification indevida. Novo artifact com uma chave principal, realm,
+  expiração e lifecycle compatível pode registrar discriminator/codec/version/policy sem nova tabela; necessidades
+  de campos consultáveis, múltiplas chaves ou relações próprias exigem evolução relacional explícita. Fonte:
+  Q1 Parte 3=A e comparação de performance/IS4.
+- **DF37 — Escopo de replay do refresh:** este plano preserva
+  `RefreshTokenPostConsumedTimeTolerance` e torna atômicas/observáveis somente as transições de estado. Famílias de
+  refresh token, detecção e revogação automática por replay e sender constraints ficam para um hardening próprio;
+  a tolerância existente não é descrita como mecanismo de detecção de replay. Fonte: Q10=A.
 
 ---
 
@@ -497,11 +440,15 @@
 > Ao responder Q1–Q12, registrar aqui as opções consideradas, a resposta, as considerações verificadas e a
 > conclusão antes de remover a pergunta de `Perguntas ao humano`.
 
-### 2026-07-23 — Q1 Parte 1, Q3 e políticas correlatas de token/refresh
+### 2026-07-23 — Q1, Q3 e políticas correlatas de token/refresh
 
 - **Q1 Parte 1:** escolhida **A**, modelo híbrido. Campos usados por lookup/revogação/cleanup ficam relacionais;
   grafos não consultados ficam em payload versionado. `ClaimPayload` foi reduzido a `Type`/`Value`/`ValueType`,
-  alinhado ao IS4 e ao comportamento atual do core/UserAccounts. Partes 2/3 permanecem abertas.
+  alinhado ao IS4 e ao comportamento atual do core/UserAccounts.
+- **Q1 Parte 2:** escolhida **A**. FKs somente para ownership estrutural; vínculos entre aggregates/lifecycles
+  permanecem lógicos e indexados.
+- **Q1 Parte 3:** escolhida **A**. `operation.protocol_artifacts` compartilha access/reference, refresh, code e JWT
+  opcional; consent, session, session-client e authorize parameters permanecem separados.
 - **Q3:** escolhida **A**, refinada para seleção por realm. O realm guarda somente um profile id; o host registra
   Data Protection/AES/Plain e seus secrets. Envelope guarda o protector usado, `Plain` nunca é fallback e profile
   ausente falha fechado.
@@ -513,11 +460,29 @@
 - **Client:** `Client.UpdateAccessTokenClaimsOnRefresh` é removido, sem override/precedência por client. A coluna
   Configuration correspondente recebe migrations novas; o novo default `Current` é intencional.
 
+### 2026-07-24 — Q4/Q5/Q6/Q8/Q9/Q10
+
+- **Q4:** escolhida **A**. O consume de authorization code inclui handle, client e redirect esperados na operação
+  atômica; retorna o code ou `null`, sem diferenciar externamente ausência, consumo anterior ou vínculo inválido.
+- **Q5:** escolhida **A**. Refresh token passa a ter estado + versão; consumo distingue vencedor, conflito e estado
+  já consumido, e updates posteriores também exigem a versão esperada.
+- **Q6:** escolhida **A**. Authorize parameters têm lifetime default de 10 minutos por realm; Q12 ainda decide o
+  tipo público da opção.
+- **Q8:** escolhida **C**. A mesma manutenção suporta hosted worker e job/comando externo, com um único modo
+  explicitamente habilitado em cada composição.
+- **Q9:** escolhida **A**. Purge Operational por realm é exposto por porta de manutenção no adapter EF, fora do
+  core e de `IStorage`.
+- **Q10:** escolhida **A**. A tolerância pós-consumo existente é preservada; famílias, revogação de replay e sender
+  constraints permanecem fora deste plano.
+- **Q2/Q7:** os precedentes do IS4 e a comparação com as opções A foram documentados nas perguntas; permanecem
+  abertas aguardando escolha explícita.
+
 ---
 
 ## Design alvo
 
-As escolhas marcadas `[Qn]` não são design aprovado; mostram somente onde a resposta altera o desenho.
+As escolhas marcadas com perguntas ainda abertas não são design aprovado; mostram somente onde a resposta altera o
+desenho.
 
 ### Contratos e bordas
 
@@ -525,9 +490,12 @@ As escolhas marcadas `[Qn]` não são design aprovado; mostram somente onde a re
   token, authorization code, consent, sessão e authorize parameters.
 - `IStorage.AuthorizeParameters` é substituído por accessor realm-bound, alinhado aos demais stores. O nome exato
   deve seguir o padrão existente (`GetAuthorizeParametersStore(Realm)`).
-- MP-2 entra como operação/capability de consumo de authorization code; a assinatura final depende de Q4/Q11.
-- MP-3 entra como operação/capability de transição de refresh token; assinatura/resultado dependem de Q5/Q11.
-- A janela de authorize interaction vive em `RealmOptions.Authentication`; type/nome/default dependem de Q6/Q12.
+- MP-2 entra como operação/capability de consumo condicional de authorization code conforme DF11; a estratégia
+  temporária de compatibilidade depende de Q11.
+- MP-3 entra como operação/capability de transição versionada de refresh token conforme DF12; a estratégia
+  temporária de compatibilidade depende de Q11.
+- A janela de authorize interaction vive em `RealmOptions.Authentication`, com default de 10 minutos; type/nome
+  dependem de Q12.
   Essa é uma alteração aditiva da família Configuration: mantém payload version `1`, não gera migration relacional
   e exige teste de payload v1 anterior sem a propriedade além do round-trip novo (DF29).
 - `RealmOptions.OperationalStorage` contém `PayloadProtectionProfile` e `JwtAccessTokenPersistence`; ambos são
@@ -538,8 +506,8 @@ As escolhas marcadas `[Qn]` não são design aprovado; mostram somente onde a re
   override por client.
 - O adapter expõe registration de profiles Operational nomeados. Exatamente um profile selecionado é usado para
   novas escritas de cada realm; o `protector_id` do envelope seleciona leitores legados.
-- A manutenção de cleanup/purge não vira CRUD administrativo nem transação cross-family; sua exposição depende de
-  Q8/Q9.
+- A manutenção de cleanup/purge não vira CRUD administrativo nem transação cross-family. O adapter expõe a porta
+  definida na DF18; hosted worker e job/comando externo reutilizam a mesma implementação conforme DF17.
 - O gateway EF completo compõe:
   - `IConfigurationSnapshot` para `ServerOptions`;
   - `IConfigurationStoreFactory` para realms, clients, keys e resources bridge;
@@ -550,12 +518,11 @@ As escolhas marcadas `[Qn]` não são design aprovado; mostram somente onde a re
 
 ### Modelo, dados e persistência
 
-Independentemente da topologia física ainda aberta em Q1 Parte 3, as operações exigem as seguintes projeções
-lógicas consultáveis. Se `protocol_artifacts` for escolhido, access/refresh/code compartilham a tabela e
-`artifact_type` integra toda PK/query; se forem escolhidas tabelas distintas, os mesmos campos/índices permanecem:
+O modelo físico aprovado usa `operation.protocol_artifacts` para access/reference, refresh, authorization code e
+JWT opcional. `artifact_type` integra toda PK/query/operação; as projeções por tipo são:
 
 ```text
-access-token artifact
+operation.protocol_artifacts [artifact_type = access_token]
   realm_id + lookup_key                    PK [Q2; digest quando bearer/reference]
   token_id/jti projetado quando necessário ao domínio
   subject_id, client_id, session_id
@@ -563,16 +530,16 @@ access-token artifact
   created_at_utc, expires_at_utc
   payload_version + protected_payload      [DF30/DF31; ausente para JWT mode None]
 
-refresh-token artifact
+operation.protocol_artifacts [artifact_type = refresh_token]
   realm_id + handle_key                    PK [Q2]
   subject_id, client_id, session_id
   created_at_utc, expires_at_utc, consumed_at_utc
-  state_version                            [Q5]
+  state_version                            [DF12]
   claims_mode
   payload_version + protected_payload      [grant mínimo Current ou snapshot próprio]
   index (realm_id, subject_id)
 
-authorization-code artifact
+operation.protocol_artifacts [artifact_type = authorization_code]
   realm_id + handle_key                    PK [Q2]
   client_id, redirect_uri
   created_at_utc, expires_at_utc
@@ -595,7 +562,7 @@ operation.user_sessions
 operation.user_session_clients
   realm_id + session_id + client_id        PK
   first_seen_at_utc, last_seen_at_utc
-  FK para user_sessions quando Q1 selecionar ownership estrutural
+  FK para user_sessions no mesmo realm
 
 operation.authorize_parameters
   realm_id + handle_key                    PK [Q2]
@@ -607,15 +574,15 @@ operation.authorize_parameters
 - `expires_at_utc` é persistido para não recalcular validade com configuração alterada.
 - Retenção pode exigir `ended_at_utc`/outro marcador terminal depois de Q7; não adicionar colunas sem essa decisão.
 - Não há FK para realm/client/subject em outras famílias.
-- FKs internas e vínculos lógicos seguem a Parte 2 de Q1. Nenhuma relação é inferida apenas porque duas colunas
-  carregam o mesmo identificador.
+- A única FK interna é `user_session_clients → user_sessions` no mesmo realm. Demais identificadores correlatos são
+  vínculos lógicos indexados; nenhuma relação adicional é inferida apenas porque duas colunas carregam o mesmo valor.
 - Reference access tokens sempre produzem artifact persistido. JWT produz nenhuma linha, metadata sem compact JWT ou
   payload completo conforme DF31; a policy efetiva é capturada na escrita e mudança posterior do realm não
   reinterpreta artifacts existentes.
 - Refresh nunca guarda `AccessTokenId` como dependência observável. `Current` conserva o grant mínimo e reconsulta
   sessão/UserAccounts/configuração; `Snapshot` conserva seu próprio snapshot. Ambos preservam subject/client/scopes/
   resources originalmente autorizados e nunca ampliam o grant a partir de configuração atual.
-- Índices de cleanup são definidos depois de Q7/Q8 sobre os predicados reais. Cleanup global começa pelo estado/
+- Índices de cleanup são definidos depois de Q7 sobre os predicados reais. Cleanup global começa pelo estado/
   timestamp terminal; cleanup realm-bound pode começar por `realm_id`. Os model tests comprovam a forma escolhida
   antes da migration SQLite inicial, evitando índice especulativo e migration corretiva.
 - Claims persistem somente `Type`, `Value` e `ValueType` conforme DF34; `Issuer`, `OriginalIssuer` e
@@ -711,6 +678,10 @@ Nenhum código do produto coordena commit entre ambos.
 
 - Toda operação de cleanup recebe `now`, batch size e `CancellationToken`; produção fornece `now` por
   `TimeProvider`.
+- A implementação de manutenção é independente do scheduler. `CleanupExecutionMode` seleciona explicitamente
+  `Hosted` ou `External`; no primeiro modo registra um hosted worker configurável, no segundo expõe o mesmo serviço
+  ao comando/job externo sem registrar worker. Configuração ausente, inválida ou que tente ativar ambos falha na
+  validação.
 - Cada batch retorna contagens por tipo, não os registros removidos.
 - AP expirado é ausente na leitura mesmo que o purge nunca rode; uma leitura pode remover preguiçosamente sem
   transformar falha de cleanup em falha do protocolo.
@@ -782,7 +753,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - contratos, fronteiras e modelo Operational
 
-**Depende de:** Q1–Q12 respondidas.
+**Depende de:** Q2/Q7/Q11/Q12 respondidas.
 
 **Escopo:** criar o projeto puro, mappings neutros, modelo completo, seams do adapter e mudanças públicas antes de
 implementar stores.
@@ -791,10 +762,12 @@ implementar stores.
 
 - Adicionar `RoyalIdentity.Data.Operational` à solução, referenciando somente EF Core/BCL.
 - Criar `OperationalDbContext`, `OperationalModelOptions` e extensão pública de mapping fora do context.
-- Modelar todas as entidades, relações internas e índices mínimos conforme Q1–Q3/Q7/Q8, sem FK cross-family.
+- Modelar `protocol_artifacts`, consents, sessions/session-clients e authorize parameters conforme DF34–DF36, com
+  índices finais alinhados a Q2/Q7 e sem FK cross-family.
 - Criar accessor genérico `TContext : DbContext` no adapter; stores não dependem do context concreto.
-- Fechar/implementar os contratos MP-2, MP-3 e MP-5 conforme Q4/Q5/Q11.
-- Adicionar a opção de authorize interaction conforme Q6/Q12, incluindo copy constructor e cobertura do serializer
+- Implementar os contratos MP-2 e MP-3 conforme DF11/DF12 e a compatibilidade temporária de Q11.
+- Adicionar a opção de authorize interaction com default de 10 minutos conforme DF16/Q12, incluindo copy
+  constructor e cobertura do serializer
   de Configuration; tratar a mudança como aditiva sobre payload v1, sem migration relacional/bump automático.
 - Adicionar `OperationalStorageOptions` e `RefreshTokenOptions` a `RealmOptions`, com defaults/clone/serialização
   definidos pelas DF29–DF32.
@@ -812,9 +785,9 @@ implementar stores.
 
 - [ ] Atualizar solution/csproj e dependências.
 - [ ] Criar entidades, DbSets, mappings, constraints e índices provider-neutral.
-- [ ] Fixar FKs internas/vínculos lógicos da Parte 2 de Q1 e índices coerentes com as queries de cleanup de Q7/Q8.
-- [ ] Fixar a topologia física da Parte 3 de Q1 e comprovar que todo store tipado inclui o discriminator quando
-  houver tabela compartilhada.
+- [ ] Implementar a FK estrutural session-client → session e manter os demais vínculos lógicos conforme DF35.
+- [ ] Implementar `operation.protocol_artifacts` conforme DF36 e comprovar que todo store tipado inclui
+  `artifact_type` em PK/query/mutação/cleanup.
 - [ ] Criar `IOperationalStoreFactory` e seam de `DbContext` genérico.
 - [ ] Alterar interfaces/consumidores somente até o ponto em que compilam; manter o comportamento nas fases por
   store.
@@ -873,8 +846,8 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
   `__ConfigurationMigrationsHistory` e Operational usa `__OperationalMigrationsHistory`.
 - Implementar o bootstrap SQLite da history Configuration legada `__EFMigrationsHistory` antes do primeiro
   `MigrateAsync` configurado com o novo nome.
-- Implementar access-token store realm-bound create-only, lookup, remoção e remoção de reference tokens sobre a
-  topologia escolhida em Q1.
+- Implementar access-token store realm-bound create-only, lookup, remoção e remoção de reference tokens sobre
+  `protocol_artifacts`.
 - Aplicar `JwtAccessTokenPersistenceMode` na emissão: reference sempre persiste; JWT `None` não escreve,
   `Metadata` omite compact JWT e `Full` preserva o grafo completo protegido pelo profile do realm.
 - Implementar consent store com upsert atômico por `(realm, subject, client)`.
@@ -971,17 +944,17 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionServic
 
 ## Fase 4 - authorization codes e consumo atômico
 
-**Depende de:** Fases 1–3; Q4/Q11 fechadas.
+**Depende de:** Fases 1–3; Q11 fechada.
 
 **Escopo:** implementar AC-01..AC-03, MP-2 e migrar o fluxo de token.
 
 **O que/como:**
 
 - Implementar create-only/get/remove administrativo no adapter SQLite.
-- Implementar a operação atômica Q4 sem filtrar expiração no lookup comum.
+- Implementar a operação atômica da DF11 sem filtrar expiração no lookup comum.
 - Refatorar `LoadCode`/pipeline para que somente o vencedor prossiga.
 - Preservar a ordem de segurança observável: vínculo client/redirect, consumo, expiração, PKCE e active-user
-  conforme a decisão Q4 e o comportamento atual documentado.
+  conforme a DF11 e o comportamento atual documentado.
 - Não introduzir status OAuth diferente para ausente/já usado/vínculo inválido.
 
 **Tarefas:**
@@ -996,9 +969,9 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionServic
 **Critérios de aceite:**
 
 - Nunca duas requests concorrentes chegam ao handler com o mesmo code.
-- Invalid client/redirect não fornece oracle mais detalhado nem consome indevidamente conforme Q4.
-- Falha de PKCE não permite segunda tentativa com o mesmo code se o comportamento consumptive atual for
-  preservado.
+- Invalid client/redirect não fornece oracle mais detalhado e, por não satisfazer o predicado condicional, não
+  remove o code.
+- Falha de PKCE ocorre depois do consume e não permite segunda tentativa com o mesmo code.
 - Fake continua transitório pelo caminho Q11; aceite de atomicidade roda somente em EF.
 
 **Testes:**
@@ -1017,14 +990,14 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 
 ## Fase 5 - refresh tokens e transições condicionais
 
-**Depende de:** Fase 4; Q5/Q10/Q11 fechadas.
+**Depende de:** Fase 4; Q11 fechada.
 
 **Escopo:** implementar RT-01..RT-05, MP-3 e reorganizar o handler para não emitir antes da transição exigida.
 
 **O que/como:**
 
 - Implementar create-only/get/remove/remove-by-subject.
-- Persistir versão/estado conforme Q5 e realizar CAS por predicado + linhas afetadas.
+- Persistir versão/estado conforme DF12 e realizar CAS por predicado + linhas afetadas.
 - Mover a primeira transição para antes de efeitos de emissão que não podem ser revertidos.
 - Separar claramente:
   1. lookup/materialização;
@@ -1042,12 +1015,12 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
   de tokens existentes.
 - Calcular `at_hash`, quando aplicável, sobre o novo access token devolvido na resposta; o compact JWT anterior não
   é requisito de refresh.
-- Se Q10=A, preservar exatamente os resultados atuais de tolerância sem chamar repetição tolerada de detecção de
-  replay.
+- Preservar exatamente os resultados atuais de tolerância sem chamar repetição tolerada de detecção de replay;
+  famílias/revogação automática por replay/sender constraints permanecem diferidas conforme DF37.
 
 **Tarefas:**
 
-- [ ] Criar tipo de resultado mínimo definido em Q5.
+- [ ] Criar o tipo de resultado mínimo da DF12.
 - [ ] Implementar concorrência com contexts independentes.
 - [ ] Tratar conflito sem retry cego de efeitos externos/emissão.
 - [ ] Modelar o grant mínimo de `Current` com subject/session/client/scopes/resource URIs e contexto protocolar
@@ -1066,7 +1039,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 
 - Exatamente uma request observa a transição inicial `null → ConsumedTime`.
 - Conflito não é convertido em sucesso silencioso.
-- Quando Q10 preservar tolerância, eventual repetição tolerada usa estado consumido rematerializado depois do
+- Eventual repetição tolerada usa estado consumido rematerializado depois do
   conflito; a perda do CAS isoladamente nunca autoriza emissão.
 - A transição condicional nunca usa como estado esperado a mesma instância já mutada que será gravada; uma instância
   rematerializada ou versão persistida anterior deve falsificar o CAS trivial.
@@ -1092,7 +1065,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 
 ## Fase 6 - authorize parameters, cleanup e purge de realm
 
-**Depende de:** Fases 2–5; Q2/Q6–Q9/Q12 fechadas.
+**Depende de:** Fases 2–5; Q2/Q7/Q12 fechadas.
 
 **Escopo:** implementar MP-5/MP-6/parte Operational de MP-7 e completar o gateway SQLite.
 
@@ -1101,10 +1074,10 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 - Tornar AP realm-bound em todos os callers.
 - Gerar handle com ao menos 128 bits, persistir conforme Q2 e regenerar colisões por generator injetável/testável.
 - Gravar `CreatedAt`/`ExpiresAt` absolutos; read repetível dentro da validade e `null` depois.
-- Implementar cleanup em batches por tipo conforme Q7 e o modo de execução Q8.
+- Implementar cleanup em batches por tipo conforme Q7 e os modos de execução da DF17.
 - Limpar access-token artifacts por seu próprio expiry/estado/grace, sem `NOT EXISTS` contra refresh tokens; o
   refresh já conserva grant/snapshot suficiente segundo DF32.
-- Implementar purge por realm pelo seam Q9.
+- Implementar purge por realm pela porta de manutenção da DF18.
 - Compor um `IStorage` EF completo sobre Configuration EF + Operational SQLite + resources bridge.
 
 **Tarefas:**
@@ -1112,8 +1085,10 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 - [ ] Migrar login, consent, resolver e callback para o accessor realm-bound.
 - [ ] Cobrir clone/round-trip de `NameValueCollection`, inclusive chaves repetidas se suportadas pelo shape atual.
 - [ ] Injetar handle generator em teste para forçar colisão.
-- [ ] Criar opções de cleanup validadas (intervalo, batch, retenções escolhidas).
-- [ ] Implementar e testar índices alinhados aos predicados reais de cleanup global/realm-bound definidos por Q7/Q8.
+- [ ] Criar opções de cleanup validadas (modo `Hosted`/`External`, intervalo, batch e retenções escolhidas).
+- [ ] Comprovar que `Hosted` registra um único worker, `External` não registra worker e ambos reutilizam a mesma
+  manutenção.
+- [ ] Implementar e testar índices alinhados aos predicados reais de cleanup global/realm-bound definidos por Q7.
 - [ ] Implementar lazy AP cleanup sem transformar delete falho em retorno de payload expirado.
 - [ ] Semear todas as tabelas em dois realms, purgar um e provar isolamento.
 - [ ] Criar `EntityFrameworkStorage`/provider/session e testes de scope/disposal com dois DbContexts.
@@ -1282,13 +1257,13 @@ git diff --check
 
 | Objetivo | Fase(s) | Decisão(ões) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF34 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
+| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF36 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
 | Access token + consent | 2, 6, 7 | DF7/DF8/DF13/DF14/DF17/DF30/DF31 | AT/CN completos, modos JWT, profiles e cleanup independente | contract + provider acceptances |
 | Sessões | 3, 7 | DF15/DF27 | SS-01..SS-06, touch/revogação concorrentes | session contracts + ADR-017 regressions |
-| Code single-use | 1, 4, 7 | DF11 + Q4/Q11 | um vencedor concorrente | atomic code acceptance |
-| Refresh conditional | 1, 5, 7 | DF12/DF32–DF34 + Q5/Q10/Q11 | transição/versão/tolerância, Current/Snapshot e sem dependência do AT | atomic refresh + claims-mode acceptance |
-| AP realm-bound + TTL | 1, 6, 7 | DF16/DF29/DF30 + Q2/Q6/Q12 | realm, expiração, colisão, fail-closed e payload Configuration compatível | AP acceptances |
-| Cleanup/purge | 6, 7 | DF17/DF18 + Q7–Q9 | batch por tipo e purge isolado | cleanup/purge acceptances |
+| Code single-use | 1, 4, 7 | DF11 + Q11 | um vencedor concorrente | atomic code acceptance |
+| Refresh conditional | 1, 5, 7 | DF12/DF32–DF34/DF37 + Q11 | transição/versão/tolerância, Current/Snapshot e sem dependência do AT | atomic refresh + claims-mode acceptance |
+| AP realm-bound + TTL | 1, 6, 7 | DF16/DF29/DF30 + Q2/Q12 | realm, expiração, colisão, fail-closed e payload Configuration compatível | AP acceptances |
+| Cleanup/purge | 6, 7 | DF17/DF18 + Q7 | batch por tipo, um modo de execução e purge isolado | cleanup/purge acceptances |
 | Gateway/lifecycle | 6–8 | DF3/DF21/DF22 | todos os membros, scopes reais, sem UoW global | StorageSession/full harness |
 | Migrations/operação | 2, 7, 8 | DF4/DF23/DF24/DF33 | histories por família, drop da opção do client, runner/SQL separados e uma/duas conexões | migration/runner/Podman |
 | Handoff Plano 4 | 8 | DF21/DF25 | EF completo sem alterar default | solução + OIDC opt-in |
@@ -1330,6 +1305,10 @@ git diff --check
     account/session/client.
 29. Claims Operational persistem apenas `Type`/`Value`/`ValueType`; qualquer expansão exige versão explícita.
 30. Não existe configuração ou override de origem das claims do refresh no `Client`.
+31. Access/reference, refresh, authorization code e JWT opcional usam `operation.protocol_artifacts`; nenhum store
+    tipado consulta ou muta uma linha sem fixar `artifact_type`.
+32. A única FK interna é session-client → session no mesmo realm; demais relações Operational são vínculos lógicos.
+33. Cleanup usa exatamente um modo configurado, `Hosted` ou `External`, sobre a mesma manutenção reutilizável.
 
 ---
 
@@ -1359,10 +1338,10 @@ git diff --check
 | Bearer handle vaza pelo banco | valor bruto vira PK/log | credencial reutilizável | Q2 + redaction DF28 | Aberto |
 | Protection/profile inviabiliza leitura | profile ausente, rotação remove leitor ou AAD diverge | outage por realm | DF30 + envelope/protector id + testes multi-profile/rotação | Aberto |
 | Code é consumido duas vezes | get/remove ou transação fraca | emissão duplicada | MP-2 + teste com connections independentes | Aberto |
-| Invalid request consome code | contrato atômico ignora vínculo/ordem | DoS contra fluxo legítimo | decisão Q4 + pipeline tests | Aberto |
+| Invalid request consome code | contrato atômico ignora vínculo/ordem | DoS contra fluxo legítimo | predicado client/redirect da DF11 + pipeline tests | Aberto |
 | Refresh emite antes de ganhar CAS | handler mantém ordem atual | tokens órfãos/duplicados | reorganizar Fase 5 | Aberto |
-| Refresh tolerance mascara replay | `TimeSpan.MaxValue`/janela ampla | divergência RFC 9700 | decisão Q10 + backlog explícito | Aberto |
-| Lost update no refresh reutilizável | concorrência muda estado/payload após consumo | grant/token subsequente incorreto | versão condicional Q5 | Aberto |
+| Refresh tolerance mascara replay | `TimeSpan.MaxValue`/janela ampla | divergência RFC 9700 | DF37 + backlog explícito | Aberto |
+| Lost update no refresh reutilizável | concorrência muda estado/payload após consumo | grant/token subsequente incorreto | versão condicional DF12 | Aberto |
 | Session client/touch perdem update | JSON/replace do agregado concorrente | logout/idle incorretos | tabela filha + operações condicionais | Aberto |
 | Cleanup remove dado observável | eligibility ignora tolerância/lifecycle | refresh/diagnóstico quebrado | política Q7 + fake clock tests | Aberto |
 | Refresh volta a depender do access token | handler conserva `AccessTokenId`/lookup legado | cleanup invalida refresh válido | DF32 + teste AT removido antes do refresh | Aberto |
@@ -1370,7 +1349,7 @@ git diff --check
 | Snapshot conserva claim revogada | modo escolhido reutiliza profile claim antiga | autorização obsoleta até expiração | default Current + escolha explícita/TTL do realm | Aberto |
 | Realm seleciona Full + Plain | JWT bearer fica legível no banco | reutilização após leak | opt-ins independentes + warning + DF30/DF31 | Aberto |
 | Drop da opção do client perde precedência implícita | clients antigos tinham valores divergentes | comportamento muda para Current | DF33 + migration/regressão/documentação explícita | Aberto |
-| Cleanup nunca roda | modo externo sem scheduler | crescimento ilimitado | decisão Q8 + observabilidade | Aberto |
+| Cleanup nunca roda | modo externo sem scheduler | crescimento ilimitado | seleção explícita DF17 + health/observabilidade operacional | Aberto |
 | Dois workers disputam cleanup | múltiplos nós | locks/carga | batches idempotentes e índices de expiry | Aberto |
 | Purge cruza realm | filtro incompleto/cascade | incidente multi-tenant | realm em PK/FK + cenário abrangente | Aberto |
 | Combined context diverge | mapping provider fica no context concreto | customização de terceiro quebra | extensões públicas + model tests | Aberto |
@@ -1394,7 +1373,7 @@ git diff --check
 - Persistent `IMessageStore` e redesign atômico de `IReplayCache`.
 - Cache Operational.
 - Auditoria/outbox/forense durável.
-- Refresh-token families, replay revocation e sender constraint se Q10=A.
+- Refresh-token families, replay revocation e sender constraint conforme DF37.
 - Aspire e agendamento/container de migrations/maintenance.
 - Lookup de sessão por subject (MP-9), enquanto não houver caller.
 
