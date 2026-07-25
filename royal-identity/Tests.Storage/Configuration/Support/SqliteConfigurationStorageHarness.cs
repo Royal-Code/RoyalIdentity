@@ -279,7 +279,9 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
             => new RefreshTokenStore(GetData(realm).RefreshTokens);
 
         public IAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm)
-            => new AuthorizationCodeStore(GetData(realm).AuthorizationCodes);
+            => operational is null
+                ? new AuthorizationCodeStore(GetData(realm).AuthorizationCodes)
+                : operational.GetAuthorizationCodeStore(realm);
 
         public IUserConsentStore GetUserConsentStore(Realm realm)
             => operational?.GetUserConsentStore(realm) ?? new UserConsentStore(GetData(realm).Consents);

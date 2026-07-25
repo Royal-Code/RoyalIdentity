@@ -1,17 +1,17 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-3 concluídas
+## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-4 concluídas
 
 ## Progresso
 
-`███░░░░░` **37,5%** - 3 de 8 fases
+`████░░░░` **50%** - 4 de 8 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contratos, fronteiras e modelo Operational | Concluida |
 | Fase 2 - access tokens e consents sobre SQLite | Concluida |
 | Fase 3 - sessões SSO sobre SQLite | Concluida |
-| Fase 4 - authorization codes e consumo atômico | Não iniciada |
+| Fase 4 - authorization codes e consumo atômico | Concluida |
 | Fase 5 - refresh tokens e transições condicionais | Não iniciada |
 | Fase 6 - authorize parameters, cleanup e purge de realm | Não iniciada |
 | Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Não iniciada |
@@ -1312,14 +1312,14 @@ git diff --check
 
 **Tarefas:**
 
-- [ ] Adicionar aceite “dois consumers simultâneos, exatamente um sucesso”.
-- [ ] Usar scopes/conexões independentes no teste.
-- [ ] Confirmar que code expirado ainda é materializado e é consumido/rejeitado pelo pipeline conforme alvo.
-- [ ] Manter remove administrativo ausente idempotente.
-- [ ] Atualizar testes do pipeline/token endpoint.
-- [ ] Fixar a mudança observável de redirect mismatch: `invalid_grant` permanece, mas a descrição deixa de ser
+- [x] Adicionar aceite “dois consumers simultâneos, exatamente um sucesso”.
+- [x] Usar scopes/conexões independentes no teste.
+- [x] Confirmar que code expirado ainda é materializado e é consumido/rejeitado pelo pipeline conforme alvo.
+- [x] Manter remove administrativo ausente idempotente.
+- [x] Atualizar testes do pipeline/token endpoint.
+- [x] Fixar a mudança observável de redirect mismatch: `invalid_grant` permanece, mas a descrição deixa de ser
   `Invalid redirect_uri` e passa à resposta genérica de code inválido conforme DF11.
-- [ ] Documentar que revogação de tokens já emitidos por reuse de code não é adicionada neste plano.
+- [x] Documentar que revogação de tokens já emitidos por reuse de code não é adicionada neste plano.
 
 **Critérios de aceite:**
 
@@ -1340,7 +1340,56 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 
 ### Resultado da Fase 4
 
-*a preencher*
+**Concluída em 2026-07-25.** `dotnet test RoyalIdentity.sln` verde: 1054 aprovados, 9 ignorados (PostgreSQL
+opt-in), 0 falhas. `git diff --check` sem erros.
+
+**Arquivos criados**
+
+- `RoyalIdentity.Storage.EntityFramework/Operational/Stores/EntityFrameworkAuthorizationCodeStore.cs` —
+  AC-01..AC-03 mais a primitiva single-use de MP-2.
+- Testes: `Tests.Storage/Operational/SqliteOperationalAuthorizationCodeTests` (13 aceites),
+  `SqliteOperationalAuthorizationCodeConcurrencyTests` (5, incluindo o aceite central de atomicidade) e
+  `Tests.Integration/Endpoints/CodeSingleUseTests` (5 regressões de fluxo).
+
+**Arquivos alterados**
+
+- `LoadCode` passou a consumir pelo seam `IAuthorizationCodeConsumer` em vez de `get` + checagens manuais +
+  `remove`. É a **primeira mudança de comportamento de fluxo** do plano.
+- `EntityFrameworkOperationalStoreFactory` devolve o code store; `ConfigurationCompositeStorage` o roteia.
+- `AuthorizationCodeStoreContractTests` ganhou a fixture `SqliteOperational` — os 8 contratos passaram sem
+  alteração.
+
+**Mudança observável (DF11)**
+
+Redirect mismatch deixou de responder `Invalid redirect_uri`. Ausente, já consumido, client divergente e
+redirect divergente agora compartilham **a mesma** descrição genérica de code inválido; o código OAuth continua
+`invalid_grant`. Há teste comparando as quatro respostas byte a byte para garantir que nenhuma vira oracle.
+
+**Decisões tomadas na execução**
+
+- **O consumo atômico é read → conditional delete, e o delete é o ponto de decisão.** O predicado inclui o
+  binding e a contagem de linhas afetadas decide o vencedor: quem lê a mesma linha mas perde o delete vê zero e
+  devolve `null`, indistinguível de ausente. Não precisa de transação explícita nem de SQL de provider.
+- **Expiração fica fora do predicado de propósito.** Um code expirado é consumido e só então rejeitado pelo
+  pipeline — se a expiração fizesse parte da condição, uma tentativa perdedora poderia retentar o mesmo code.
+- **Binding divergente não consome.** Como o predicado não casa, nenhuma linha é removida — então uma requisição
+  inválida não consegue negar a legítima. Coberto em aceite de storage e em corrida real (6 impostores
+  simultâneos não impedem o consumidor legítimo).
+- **PKCE continua depois do consumo.** Vencer o code e falhar PKCE não o torna reutilizável; há regressão de
+  fluxo com verifier errado seguido do verifier correto, e a segunda tentativa falha.
+- **Revogação de tokens já emitidos por reuse de code não foi adicionada** — permanece fora deste plano, junto
+  do hardening de replay da DF37.
+- **Verificado por mutação:** ignorando a contagem de linhas do delete, 2 aceites de atomicidade falham;
+  distinguindo o redirect mismatch no fallback, 2 regressões de fluxo falham.
+
+**Comandos executados**
+
+```powershell
+dotnet test Tests.Storage --filter "FullyQualifiedName~AuthorizationCode|FullyQualifiedName~Atomic"
+dotnet test Tests.Integration --filter "FullyQualifiedName~Code"
+dotnet test RoyalIdentity.sln
+git diff --check
+```
 
 ---
 
