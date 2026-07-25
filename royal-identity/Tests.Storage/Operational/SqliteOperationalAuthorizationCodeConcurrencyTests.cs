@@ -75,6 +75,38 @@ public class SqliteOperationalAuthorizationCodeConcurrencyTests
         Assert.Equal(0, await database.CountAsync("protocol_artifacts"));
     }
 
+    // The same acceptance with the interleaving pinned instead of hoped for: every consumer completes its read
+    // before any of them deletes, which is exactly the window where a primitive that ignored the affected-row
+    // count would hand the code to more than one caller.
+    [Fact]
+    public async Task ConcurrentConsumers_AllReadingBeforeAnyDeletes_StillProduceExactlyOneSuccess()
+    {
+        const int consumers = 4;
+        var interceptor = new ReadBeforeWriteInterceptor(consumers);
+        await using var database = await SqliteOperationalFileDatabase.CreateMigratedAsync(interceptor: interceptor);
+        var realm = SqliteOperationalFileDatabase.NewRealm();
+        var code = await SeedCodeAsync(database, realm);
+
+        var results = new AuthorizationCode?[consumers];
+        interceptor.Arm();
+
+        await SqliteOperationalFileDatabase.RunTogetherAsync(consumers, async (index, ready, release) =>
+        {
+            await using var scope = database.CreateScope();
+            var store = database.StoresOf(scope).GetAuthorizationCodeStore(realm);
+
+            ready.SetResult();
+            await release;
+
+            results[index] = await store.ConsumeAuthorizationCodeAsync(
+                code.Code, ClientId, RedirectUri, default);
+        });
+
+        Assert.True(interceptor.Interleaved, "every consumer must have read before any of them deleted");
+        Assert.Single(results, result => result is not null);
+        Assert.Equal(0, await database.CountAsync("protocol_artifacts"));
+    }
+
     // A concurrent request with the wrong binding must not be able to deny the legitimate one: it consumes
     // nothing, so the rightful consumer still gets the code.
     [Fact]

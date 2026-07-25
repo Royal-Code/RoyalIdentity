@@ -34,7 +34,7 @@ public class CodeSingleUseTests : IClassFixture<AppFactory>
     public CodeSingleUseTests(AppFactory factory) => this.factory = factory;
 
     private async Task<AuthorizationCode> SeedCodeAsync(
-        string? codeChallenge = null, string? codeChallengeMethod = null)
+        string? codeChallenge = null, string? codeChallengeMethod = null, DateTime? creationTime = null)
     {
         var storage = factory.Services.GetRequiredService<IStorage>();
         var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm)
@@ -45,7 +45,7 @@ public class CodeSingleUseTests : IClassFixture<AppFactory>
             SubjectFactory.CreateWithSession(
                 storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
             "session",
-            DateTime.UtcNow,
+            creationTime ?? DateTime.UtcNow,
             300,
             resources,
             RedirectUri)
@@ -121,23 +121,45 @@ public class CodeSingleUseTests : IClassFixture<AppFactory>
         Assert.Equal(HttpStatusCode.OK, legitimate.StatusCode);
     }
 
-    // DF11 (observable change): a redirect mismatch no longer answers "Invalid redirect_uri". It shares the
-    // single generic description with an absent or already-consumed code, so the response is no oracle about
-    // which codes exist or who they belong to. The OAuth code stays invalid_grant.
+    // DF11 (observable change): a redirect mismatch no longer answers "Invalid redirect_uri". All four ways a
+    // code exchange can be refused — never issued, already consumed, wrong client, wrong redirect URI — answer
+    // with the same error and the same description, so the response is no oracle about which codes exist or who
+    // they belong to. The OAuth code stays invalid_grant.
     [Fact]
-    public async Task RedirectMismatch_AndUnknownCode_AreIndistinguishable()
+    public async Task EveryRefusedExchange_AnswersIdentically()
     {
-        var code = await SeedCodeAsync();
+        var consumed = await SeedCodeAsync();
+        await ExchangeAsync(consumed.Code);
+        var bound = await SeedCodeAsync();
 
+        var unknownCode = await ReadErrorAsync(await ExchangeAsync("code-that-was-never-issued"));
+        var alreadyConsumed = await ReadErrorAsync(await ExchangeAsync(consumed.Code));
+        var clientMismatch = await ReadErrorAsync(await ExchangeAsync(bound.Code, clientId: OtherClientId));
         var redirectMismatch = await ReadErrorAsync(
-            await ExchangeAsync(code.Code, redirectUri: "http://localhost:5000/other-callback"));
-        var clientMismatch = await ReadErrorAsync(await ExchangeAsync(code.Code, clientId: OtherClientId));
+            await ExchangeAsync(bound.Code, redirectUri: "http://localhost:5000/other-callback"));
+
+        Assert.Equal("invalid_grant", unknownCode.Error);
+        Assert.Equal(unknownCode, alreadyConsumed);
+        Assert.Equal(unknownCode, clientMismatch);
+        Assert.Equal(unknownCode, redirectMismatch);
+        Assert.DoesNotContain("redirect", unknownCode.Description ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // DF11 end to end: an expired code is still consumed, and only then rejected — so the caller learns it
+    // expired, and a second attempt gets the generic refusal because the code is already gone.
+    [Fact]
+    public async Task AnExpiredCode_IsRejectedAsExpired_AndConsumedAllTheSame()
+    {
+        var code = await SeedCodeAsync(creationTime: DateTime.UtcNow.AddHours(-1));
+
+        var first = await ReadErrorAsync(await ExchangeAsync(code.Code));
+        var second = await ReadErrorAsync(await ExchangeAsync(code.Code));
         var unknownCode = await ReadErrorAsync(await ExchangeAsync("code-that-was-never-issued"));
 
-        Assert.Equal("invalid_grant", redirectMismatch.Error);
-        Assert.Equal(unknownCode, redirectMismatch);
-        Assert.Equal(unknownCode, clientMismatch);
-        Assert.DoesNotContain("redirect", redirectMismatch.Description ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("invalid_grant", first.Error);
+        Assert.Contains("expired", first.Description ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        // The expiry answer is only given once: the code was consumed, so the retry is the generic refusal.
+        Assert.Equal(unknownCode, second);
     }
 
     // DF11: PKCE is validated after the consumption, so a failed verifier does not hand the code back — a

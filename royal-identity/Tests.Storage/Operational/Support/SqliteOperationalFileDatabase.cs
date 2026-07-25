@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Models;
@@ -38,7 +39,12 @@ internal sealed class SqliteOperationalFileDatabase : IAsyncDisposable
     /// A controllable clock for scenarios that need to act at a precise point inside a store operation.
     /// Registered before the storage extension, whose <c>TryAdd</c> then leaves it in place.
     /// </param>
-    public static async Task<SqliteOperationalFileDatabase> CreateMigratedAsync(TimeProvider? clock = null)
+    /// <param name="interceptor">
+    /// An EF interceptor, for scenarios that must pin an interleaving between two commands of the same
+    /// operation instead of hoping the scheduler produces it.
+    /// </param>
+    public static async Task<SqliteOperationalFileDatabase> CreateMigratedAsync(
+        TimeProvider? clock = null, IInterceptor? interceptor = null)
     {
         var path = Path.Combine(Path.GetTempPath(), $"royalidentity-operational-{Guid.NewGuid():N}.db");
         var connectionString = $"Data Source={path};Pooling=False;Default Timeout=30";
@@ -50,7 +56,13 @@ internal sealed class SqliteOperationalFileDatabase : IAsyncDisposable
             collection.AddSingleton(clock);
 
         collection.AddDbContext<OperationalSqliteDbContext>(
-            options => options.UseSqlite(connectionString, sqlite => sqlite.UseOperationalMigrationsHistory()),
+            options =>
+            {
+                options.UseSqlite(connectionString, sqlite => sqlite.UseOperationalMigrationsHistory());
+
+                if (interceptor is not null)
+                    options.AddInterceptors(interceptor);
+            },
             ServiceLifetime.Scoped);
         collection.AddEntityFrameworkOperationalStorage<OperationalSqliteDbContext>();
         collection.AddOperationalAesGcmPayloadProtection(

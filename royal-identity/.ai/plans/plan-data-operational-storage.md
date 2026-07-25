@@ -1363,7 +1363,8 @@ opt-in), 0 falhas. `git diff --check` sem erros.
 
 Redirect mismatch deixou de responder `Invalid redirect_uri`. Ausente, já consumido, client divergente e
 redirect divergente agora compartilham **a mesma** descrição genérica de code inválido; o código OAuth continua
-`invalid_grant`. Há teste comparando as quatro respostas byte a byte para garantir que nenhuma vira oracle.
+`invalid_grant`. `CodeSingleUseTests.EveryRefusedExchange_AnswersIdentically` compara as quatro respostas
+(`error` + `error_description`) e exige que sejam semanticamente idênticas, para que nenhuma vire oracle.
 
 **Decisões tomadas na execução**
 
@@ -1379,8 +1380,24 @@ redirect divergente agora compartilham **a mesma** descrição genérica de code
   fluxo com verifier errado seguido do verifier correto, e a segunda tentativa falha.
 - **Revogação de tokens já emitidos por reuse de code não foi adicionada** — permanece fora deste plano, junto
   do hardening de replay da DF37.
-- **Verificado por mutação:** ignorando a contagem de linhas do delete, 2 aceites de atomicidade falham;
+- **Verificado por mutação:** ignorando a contagem de linhas do delete, os aceites de atomicidade falham;
   distinguindo o redirect mismatch no fallback, 2 regressões de fluxo falham.
+
+**Ajustes aplicados após revisão externa (2026-07-25)**
+
+- **A afirmação de cobertura no relatório era maior que o teste.** O teste comparava três respostas (inexistente,
+  client divergente, redirect divergente) e não a de code já consumido, e comparava campos desserializados — não
+  bytes. Corrigido nos dois sentidos: `EveryRefusedExchange_AnswersIdentically` passou a incluir o caso já
+  consumido, e o texto acima agora diz "semanticamente idênticas", que é o requisito real.
+- **Regressão de fluxo para code expirado.** O aceite de storage já provava consumo do expirado, mas faltava a
+  sequência ponta a ponta. `AnExpiredCode_IsRejectedAsExpired_AndConsumedAllTheSame` prova que a primeira troca
+  responde "expired" e a segunda cai na recusa genérica — ou seja, o code foi consumido mesmo expirado.
+- **A prova por mutação da atomicidade virou determinística.** A barreira liberava antes de
+  `ConsumeAuthorizationCodeAsync`, então nada garantia que todos os consumers ficassem entre o `SELECT` interno e
+  o `DELETE`; uma mutação podia escapar por agendamento. `ReadBeforeWriteInterceptor` (um `DbCommandInterceptor`)
+  segura cada participante após seu `SELECT` até que todos tenham lido, e só então libera os `DELETE`s. O novo
+  aceite ainda afirma `Interleaved`, então a janela é pré-condição do teste e não resultado de timing.
+  **Confirmado:** com a mutação, o teste falha nas 3 execuções seguidas.
 
 **Comandos executados**
 
