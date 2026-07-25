@@ -63,6 +63,8 @@ public class RealmOptions
         Account = new AccountOptions(other.Account);
         Session = new SessionOptions(other.Session);
         Branding = new RealmBrandingOptions(other.Branding);
+        OperationalStorage = new OperationalStorageOptions(other.OperationalStorage);
+        RefreshTokens = new RefreshTokenOptions(other.RefreshTokens);
         IssuerUri = other.IssuerUri;
         LowerCaseIssuerUri = other.LowerCaseIssuerUri;
         IncludeRealmPathToIssuerUri = other.IncludeRealmPathToIssuerUri;
@@ -149,6 +151,18 @@ public class RealmOptions
     /// Gets or sets the visual branding options for this realm.
     /// </summary>
     public RealmBrandingOptions Branding { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the operational storage policy of this realm: payload protection profile and JWT
+    /// access-token persistence (plan-data-operational-storage DF30/DF31).
+    /// </summary>
+    public OperationalStorageOptions OperationalStorage { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the refresh-token policy of this realm — the single source of the claims origin on
+    /// renewal (plan-data-operational-storage DF32).
+    /// </summary>
+    public RefreshTokenOptions RefreshTokens { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the unique name of this server/realm instance, e.g. https://myissuer.com or https://myissuer.com/myrealm.

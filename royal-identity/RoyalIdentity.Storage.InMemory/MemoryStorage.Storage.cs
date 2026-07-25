@@ -37,7 +37,14 @@ public partial class MemoryStorage : IStorage
 
     IRealmStore IStorage.Realms => new RealmStore(Realms, realmMemoryStore);
 
-    IAuthorizeParametersStore IStorage.AuthorizeParameters => new AuthorizeParametersStore(AuthorizeParameters);
+    /// <summary>
+    /// Satisfies the realm-bound accessor of MP-5 without partitioning the fake: the transitional in-memory
+    /// backing keeps its single global dictionary, with no TTL, no payload protection and no cleanup
+    /// (ADR-018 / plan-data-operational-storage DF25). Those are acceptances of the EF provider, never of
+    /// this fake, so the realm argument is deliberately ignored here.
+    /// </summary>
+    IAuthorizeParametersStore IStorage.GetAuthorizeParametersStore(Realm realm)
+        => new AuthorizeParametersStore(AuthorizeParameters);
 
     public IAccessTokenStore GetAccessTokenStore(Realm realm)
         => new AccessTokenStore(GetRealmMemoryStore(realm).AccessTokens);

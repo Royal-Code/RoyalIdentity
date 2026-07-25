@@ -22,10 +22,12 @@ public interface IStorage
     IRealmStore Realms { get; }
 
     /// <summary>
-    /// Gets the authorize parameters store.
+    /// Gets the authorize parameters store for the given realm (MP-5 /
+    /// plan-data-operational-storage DF16): the continuation of an authorize request is realm-bound data like
+    /// every other operational record, so it is reached through a realm accessor and never through global
+    /// state.
     /// </summary>
-    /// <value>The authorize parameters store.</value>
-    IAuthorizeParametersStore AuthorizeParameters { get; }
+    IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm);
 
     /// <summary>
     /// Gets the access token store for the given realm.

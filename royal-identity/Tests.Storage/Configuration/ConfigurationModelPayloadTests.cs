@@ -136,6 +136,99 @@ public class ConfigurationModelPayloadTests
 		Assert.False(restored.IncludeRealmPathToIssuerUri);
 	}
 
+	// plan-data-operational-storage DF29/DF40: the operational options are an additive change to the
+	// Configuration family. A payload written before they existed must materialize the closed defaults —
+	// without a relational migration and without bumping the payload version.
+	[Fact]
+	public void RealmOptions_PayloadWithoutTheOperationalOptions_MaterializesTheClosedDefaults()
+	{
+		var serverOptions = new ServerOptions();
+		const string legacyPayload = """{"IssuerUri":"https://realm.example","StoreAuthorizationParameters":true}""";
+
+		var restored = realmSerializer.Deserialize(
+			RealmOptionsPayloadSerializer.CurrentVersion, legacyPayload, serverOptions);
+
+		Assert.Equal(1, RealmOptionsPayloadSerializer.CurrentVersion);
+		Assert.Equal(600, restored.Authentication.AuthorizationInteractionLifetime);
+		Assert.Equal(
+			OperationalStorageOptions.DefaultPayloadProtectionProfile,
+			restored.OperationalStorage.PayloadProtectionProfile);
+		Assert.Equal(JwtAccessTokenPersistenceMode.None, restored.OperationalStorage.JwtAccessTokenPersistence);
+		Assert.Equal(RefreshTokenClaimsMode.Current, restored.RefreshTokens.ClaimsMode);
+		Assert.Empty(restored.Authentication.Validate());
+	}
+
+	[Fact]
+	public void RealmOptions_WithTheOperationalOptions_RoundTripsAtTheSameVersion()
+	{
+		var serverOptions = new ServerOptions();
+		var realmOptions = new RealmOptions(serverOptions);
+		realmOptions.Authentication.AuthorizationInteractionLifetime = 120;
+		realmOptions.OperationalStorage.PayloadProtectionProfile = "vault";
+		realmOptions.OperationalStorage.JwtAccessTokenPersistence = JwtAccessTokenPersistenceMode.Full;
+		realmOptions.RefreshTokens.ClaimsMode = RefreshTokenClaimsMode.Snapshot;
+
+		var (version, json) = realmSerializer.Serialize(realmOptions);
+		var restored = realmSerializer.Deserialize(version, json, serverOptions);
+		var (_, reserialized) = realmSerializer.Serialize(restored);
+
+		Assert.Equal(RealmOptionsPayloadSerializer.CurrentVersion, version);
+		Assert.Equal(json, reserialized);
+		Assert.Equal(120, restored.Authentication.AuthorizationInteractionLifetime);
+		Assert.Equal("vault", restored.OperationalStorage.PayloadProtectionProfile);
+		Assert.Equal(JwtAccessTokenPersistenceMode.Full, restored.OperationalStorage.JwtAccessTokenPersistence);
+		Assert.Equal(RefreshTokenClaimsMode.Snapshot, restored.RefreshTokens.ClaimsMode);
+	}
+
+	// The realm copy constructor is what the snapshot uses; the new options must be copied, not shared.
+	[Fact]
+	public void RealmOptions_Copy_ClonesTheOperationalOptions()
+	{
+		var original = new RealmOptions(new ServerOptions());
+		original.Authentication.AuthorizationInteractionLifetime = 90;
+		original.OperationalStorage.PayloadProtectionProfile = "vault";
+		original.OperationalStorage.JwtAccessTokenPersistence = JwtAccessTokenPersistenceMode.Metadata;
+		original.RefreshTokens.ClaimsMode = RefreshTokenClaimsMode.Snapshot;
+
+		var copy = new RealmOptions(original);
+		copy.OperationalStorage.PayloadProtectionProfile = "other";
+		copy.RefreshTokens.ClaimsMode = RefreshTokenClaimsMode.Current;
+		copy.Authentication.AuthorizationInteractionLifetime = 30;
+
+		Assert.NotSame(original.OperationalStorage, copy.OperationalStorage);
+		Assert.NotSame(original.RefreshTokens, copy.RefreshTokens);
+		Assert.Equal("vault", original.OperationalStorage.PayloadProtectionProfile);
+		Assert.Equal(JwtAccessTokenPersistenceMode.Metadata, copy.OperationalStorage.JwtAccessTokenPersistence);
+		Assert.Equal(RefreshTokenClaimsMode.Snapshot, original.RefreshTokens.ClaimsMode);
+		Assert.Equal(90, original.Authentication.AuthorizationInteractionLifetime);
+	}
+
+	// DF40: the lifetime is expressed in seconds and must be positive.
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-1)]
+	public void RealmOptions_NonPositiveInteractionLifetime_IsAConfigurationError(int lifetime)
+	{
+		var options = new RealmOptions(new ServerOptions());
+		options.Authentication.AuthorizationInteractionLifetime = lifetime;
+
+		Assert.Contains(
+			options.Authentication.Validate(),
+			error => error.Contains("AuthorizationInteractionLifetime", StringComparison.Ordinal));
+	}
+
+	// DF30: an empty profile id is a configuration error — it must never mean "no protection".
+	[Fact]
+	public void RealmOptions_EmptyProtectionProfile_IsAConfigurationError()
+	{
+		var options = new RealmOptions(new ServerOptions());
+		options.OperationalStorage.PayloadProtectionProfile = "  ";
+
+		Assert.Contains(
+			options.OperationalStorage.Validate(),
+			error => error.Contains("PayloadProtectionProfile", StringComparison.Ordinal));
+	}
+
 	[Fact]
 	public void RealmOptions_UnknownVersion_FailsClosed()
 	{

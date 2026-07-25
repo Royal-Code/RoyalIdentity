@@ -65,10 +65,13 @@ public class ConfigurationStorageBoundaryTests
 		var projectReferences = ProjectReferenceReader.ReadProjectReferences(
 			"RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj");
 
-		Assert.Equal(2, projectReferences.Count);
+		// The adapter is the only project that knows the core and both pure Data families.
+		Assert.Equal(3, projectReferences.Count);
 		Assert.Contains(projectReferences, r => r.EndsWith("RoyalIdentity/RoyalIdentity.csproj", StringComparison.Ordinal));
 		Assert.Contains(projectReferences, r => r.EndsWith(
 			"RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj", StringComparison.Ordinal));
+		Assert.Contains(projectReferences, r => r.EndsWith(
+			"RoyalIdentity.Data.Operational/RoyalIdentity.Data.Operational.csproj", StringComparison.Ordinal));
 	}
 
 	[Theory]
@@ -113,6 +116,7 @@ public class ConfigurationStorageBoundaryTests
 
 		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Storage.EntityFramework", StringComparison.Ordinal));
 		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Configuration", StringComparison.Ordinal));
+		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Operational", StringComparison.Ordinal));
 		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Migrations", StringComparison.Ordinal));
 	}
 
@@ -122,6 +126,7 @@ public class ConfigurationStorageBoundaryTests
 		var projectReferences = ProjectReferenceReader.ReadProjectReferences("RoyalIdentity/RoyalIdentity.csproj");
 
 		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Configuration", StringComparison.Ordinal));
+		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Operational", StringComparison.Ordinal));
 		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Storage.EntityFramework", StringComparison.Ordinal));
 
 		var refs = typeof(RoyalIdentity.Contracts.Storage.IStorage).Assembly

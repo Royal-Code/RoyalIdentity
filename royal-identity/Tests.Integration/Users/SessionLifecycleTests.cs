@@ -322,7 +322,7 @@ public class SessionLifecycleTests
 
         public IRealmStore Realms => throw new NotSupportedException();
 
-        public IAuthorizeParametersStore AuthorizeParameters => throw new NotSupportedException();
+        public IAuthorizeParametersStore GetAuthorizeParametersStore(RealmModel realm) => throw new NotSupportedException();
 
         public IAccessTokenStore GetAccessTokenStore(RealmModel realm) => throw new NotSupportedException();
 

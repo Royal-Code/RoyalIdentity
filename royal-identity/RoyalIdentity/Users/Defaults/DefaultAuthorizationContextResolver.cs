@@ -25,18 +25,19 @@ public sealed class DefaultAuthorizationContextResolver(
         var httpContext = httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("Resolving an authorization context requires an HTTP context.");
 
-        var realm = httpContext.GetRealmPath();
-        if (realm is null)
+        // MP-5: the authorize-parameters store is realm-bound, so the resolver needs the current realm, not
+        // only its path (plan-data-operational-storage DF16).
+        if (!httpContext.TryGetCurrentRealm(out var realm))
             throw new InvalidOperationException("Resolving an authorization context requires a realm context.");
 
-        if (returnUrl.IsValidReturnUrl(realm))
+        if (returnUrl.IsValidReturnUrl(realm.Path))
         {
             logger.LogDebug("returnUrl is valid");
 
             var parameters = returnUrl.ReadQueryStringAsNameValueCollection();
             if (parameters.TryGet(Oidc.Routes.Params.Authorization, out var messageStoreId))
             {
-                parameters = await storage.AuthorizeParameters.ReadAsync(messageStoreId, ct) ?? [];
+                parameters = await storage.GetAuthorizeParametersStore(realm).ReadAsync(messageStoreId, ct) ?? [];
             }
 
             var authorizationRequest = new AuthorizationValidationRequest

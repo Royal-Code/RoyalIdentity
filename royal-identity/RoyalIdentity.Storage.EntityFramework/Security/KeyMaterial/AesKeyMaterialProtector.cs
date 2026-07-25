@@ -1,26 +1,28 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Options;
+using RoyalIdentity.Storage.EntityFramework.Security.Cryptography;
 
 namespace RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 
-/// <summary>Protects signing-key material with authenticated AES-GCM and a fresh nonce per write.</summary>
+/// <summary>
+/// Protects signing-key material with authenticated AES-GCM and a fresh nonce per write, over the shared
+/// <see cref="AesGcmCipher"/> primitive. Signing-key material carries no authenticated context of its own, so
+/// no associated data is supplied here; the operational payload profiles bind theirs.
+/// </summary>
 public sealed class AesKeyMaterialProtector : IKeyMaterialProtector, IDisposable
 {
 	public const string Id = "aes-gcm";
-	private const int NonceSize = 12;
-	private const int TagSize = 16;
 
-	private readonly byte[] key;
+	private readonly AesGcmCipher cipher;
 
 	public AesKeyMaterialProtector(IOptions<AesKeyMaterialProtectorOptions> options)
 	{
 		ArgumentNullException.ThrowIfNull(options);
+
 		var configuredKey = options.Value.Key;
 		if (configuredKey.Length is not (16 or 24 or 32))
 			throw new InvalidOperationException("The AES-GCM signing-key protector requires a 16, 24 or 32 byte key.");
 
-		key = configuredKey.ToArray();
+		cipher = new AesGcmCipher(configuredKey);
 	}
 
 	public string ProtectorId => Id;
@@ -30,27 +32,7 @@ public sealed class AesKeyMaterialProtector : IKeyMaterialProtector, IDisposable
 		ArgumentException.ThrowIfNullOrEmpty(material);
 		ct.ThrowIfCancellationRequested();
 
-		var plaintext = Encoding.UTF8.GetBytes(material);
-		var nonce = RandomNumberGenerator.GetBytes(NonceSize);
-		var ciphertext = new byte[plaintext.Length];
-		var tag = new byte[TagSize];
-
-		try
-		{
-			using var aes = new AesGcm(key, TagSize);
-			aes.Encrypt(nonce, plaintext, ciphertext, tag);
-
-			var payload = new byte[NonceSize + TagSize + ciphertext.Length];
-			nonce.CopyTo(payload, 0);
-			tag.CopyTo(payload, NonceSize);
-			ciphertext.CopyTo(payload, NonceSize + TagSize);
-			return ValueTask.FromResult(new KeyMaterialEnvelope(ProtectorId, Convert.ToBase64String(payload)));
-		}
-		finally
-		{
-			CryptographicOperations.ZeroMemory(plaintext);
-			CryptographicOperations.ZeroMemory(ciphertext);
-		}
+		return ValueTask.FromResult(new KeyMaterialEnvelope(ProtectorId, cipher.Encrypt(material, default)));
 	}
 
 	public ValueTask<string> UnprotectAsync(KeyMaterialEnvelope envelope, CancellationToken ct = default)
@@ -58,38 +40,12 @@ public sealed class AesKeyMaterialProtector : IKeyMaterialProtector, IDisposable
 		ValidateEnvelope(envelope);
 		ct.ThrowIfCancellationRequested();
 
-		byte[] payload;
-		try
-		{
-			payload = Convert.FromBase64String(envelope.Payload);
-		}
-		catch (FormatException exception)
-		{
-			throw new CryptographicException("The AES-GCM signing-key material payload is invalid.", exception);
-		}
-
-		if (payload.Length <= NonceSize + TagSize)
-			throw new CryptographicException("The AES-GCM signing-key material payload is invalid.");
-
-		var plaintext = new byte[payload.Length - NonceSize - TagSize];
-		try
-		{
-			using var aes = new AesGcm(key, TagSize);
-			aes.Decrypt(
-				payload.AsSpan(0, NonceSize),
-				payload.AsSpan(NonceSize + TagSize),
-				payload.AsSpan(NonceSize, TagSize),
-				plaintext);
-			return ValueTask.FromResult(Encoding.UTF8.GetString(plaintext));
-		}
-		finally
-		{
-			CryptographicOperations.ZeroMemory(plaintext);
-			CryptographicOperations.ZeroMemory(payload);
-		}
+		// Cryptographic failures propagate as they are: a tampered ciphertext must stay observable as an
+		// AuthenticationTagMismatchException, not be flattened into a generic CryptographicException.
+		return ValueTask.FromResult(cipher.Decrypt(envelope.Payload, default));
 	}
 
-	public void Dispose() => CryptographicOperations.ZeroMemory(key);
+	public void Dispose() => cipher.Dispose();
 
 	private static void ValidateEnvelope(KeyMaterialEnvelope envelope)
 	{

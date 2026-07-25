@@ -55,6 +55,12 @@ public static partial class Constants
         public static readonly TimeSpan DefaultCookieTimeSpan = TimeSpan.FromHours(1);
         public const string JwtRequestClientKey = "roid.jwtrequesturi.client";
 
+        /// <summary>
+        /// Default of <see cref="AuthenticationOptions.AuthorizationInteractionLifetime"/>, in seconds
+        /// (plan-data-operational-storage DF40): ten minutes to go through login and consent.
+        /// </summary>
+        public const int DefaultAuthorizationInteractionLifetime = 600;
+
         public static class StandardScopes
         {
             public const string OpenId = "openid";

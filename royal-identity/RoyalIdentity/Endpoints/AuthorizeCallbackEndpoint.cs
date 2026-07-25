@@ -42,8 +42,9 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
             var messageStoreId = parameters[Oidc.Routes.Params.Authorization];
             if (messageStoreId is not null)
             {
-                parameters = await storage.AuthorizeParameters.ReadAsync(messageStoreId, httpContext.RequestAborted);
-                await storage.AuthorizeParameters.DeleteAsync(messageStoreId, httpContext.RequestAborted);
+                var authorizeParameters = storage.GetAuthorizeParametersStore(realm);
+                parameters = await authorizeParameters.ReadAsync(messageStoreId, httpContext.RequestAborted);
+                await authorizeParameters.DeleteAsync(messageStoreId, httpContext.RequestAborted);
             }
         }
 

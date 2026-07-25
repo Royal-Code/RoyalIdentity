@@ -1,14 +1,14 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: RASCUNHO - Q1-Q12 fechadas; aguardando aprovação para implementação
+## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fase 1 concluída
 
 ## Progresso
 
-`░░░░░░░░` **0%** - 0 de 8 fases
+`█░░░░░░░` **12,5%** - 1 de 8 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - contratos, fronteiras e modelo Operational | Não iniciada |
+| Fase 1 - contratos, fronteiras e modelo Operational | Concluida |
 | Fase 2 - access tokens e consents sobre SQLite | Não iniciada |
 | Fase 3 - sessões SSO sobre SQLite | Não iniciada |
 | Fase 4 - authorization codes e consumo atômico | Não iniciada |
@@ -828,28 +828,28 @@ implementar stores.
 
 **Tarefas:**
 
-- [ ] Atualizar solution/csproj e dependências.
-- [ ] Criar entidades, DbSets, mappings, constraints e índices provider-neutral.
-- [ ] Implementar a FK estrutural session-client → session e manter os demais vínculos lógicos conforme DF35.
-- [ ] Implementar `operation.protocol_artifacts` conforme DF36 e comprovar que todo store tipado inclui
+- [x] Atualizar solution/csproj e dependências.
+- [x] Criar entidades, DbSets, mappings, constraints e índices provider-neutral.
+- [x] Implementar a FK estrutural session-client → session e manter os demais vínculos lógicos conforme DF35.
+- [x] Implementar `operation.protocol_artifacts` conforme DF36 e comprovar que todo store tipado inclui
   `artifact_type` em PK/query/mutação/cleanup.
-- [ ] Criar `IOperationalStoreFactory` e seam de `DbContext` genérico.
-- [ ] Alterar interfaces/consumidores somente até o ponto em que compilam; manter o comportamento nas fases por
+- [x] Criar `IOperationalStoreFactory` e seam de `DbContext` genérico.
+- [x] Alterar interfaces/consumidores somente até o ponto em que compilam; manter o comportamento nas fases por
   store.
-- [ ] Adaptar explicitamente `MemoryStorage`, `SessionLifecycleTests.FakeSessionStorage` e
+- [x] Adaptar explicitamente `MemoryStorage`, `SessionLifecycleTests.FakeSessionStorage` e
   `SqliteConfigurationStorageHarness.ConfigurationCompositeStorage` ao accessor realm-bound de AP, sem atribuir ao
   fake TTL, particionamento real ou aceites de MP-5.
-- [ ] Implementar as capability interfaces e o fallback transitório da DF39 sem dar aceites novos ao fake.
-- [ ] Validar que `AuthorizationInteractionLifetime` é positivo, usa segundos e materializa `600` quando ausente em
+- [x] Implementar as capability interfaces e o fallback transitório da DF39 sem dar aceites novos ao fake.
+- [x] Validar que `AuthorizationInteractionLifetime` é positivo, usa segundos e materializa `600` quando ausente em
   payload v1.
-- [ ] Criar testes de model metadata, payload version e round-trip por tipo.
-- [ ] Cobrir payload Configuration v1 anterior sem as novas options, defaults `Jwt=None`/`Claims=Current`, profile
+- [x] Criar testes de model metadata, payload version e round-trip por tipo.
+- [x] Cobrir payload Configuration v1 anterior sem as novas options, defaults `Jwt=None`/`Claims=Current`, profile
   default e round-trip novo ainda em version `1`.
-- [ ] Testar profiles por realm: dois realms/protectors, rotação com leitor anterior, profile ausente, envelope/AAD
+- [x] Testar profiles por realm: dois realms/protectors, rotação com leitor anterior, profile ausente, envelope/AAD
   adulterado e `Plain` explicitamente registrado.
-- [ ] Testar `ClaimPayload` mínimo e provar que properties próprias de authorization code continuam preservadas.
-- [ ] Fixar em teste a topologia das quatro histories da DF23 sem abrir conexão.
-- [ ] Criar teste de context combinado de prova, inicialmente com mappings neutros.
+- [x] Testar `ClaimPayload` mínimo e provar que properties próprias de authorization code continuam preservadas.
+- [x] Fixar em teste a topologia das quatro histories da DF23 sem abrir conexão.
+- [x] Criar teste de context combinado de prova, inicialmente com mappings neutros.
 
 **Critérios de aceite:**
 
@@ -875,7 +875,83 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Concluída em 2026-07-24.** Build da solução e `dotnet test RoyalIdentity.sln` verdes: 900 aprovados, 9 ignorados
+(PostgreSQL opt-in), 0 falhas. `git diff --check` sem erros.
+
+**Arquivos criados**
+
+- `RoyalIdentity.Data.Operational/` — projeto puro (EF Core Relational apenas, sem `Microsoft.AspNetCore.App`, sem
+  project reference): `OperationalDataAssemblyMarker`, `OperationalModelOptions`, `OperationalDbContext`,
+  `OperationalModelBuilderExtensions` e `Entities/` (`ProtocolArtifactEntity`, `ProtocolArtifactTypes`,
+  `ConsentEntity`, `UserSessionEntity`, `UserSessionClientEntity`, `AuthorizeParametersEntity`).
+- `RoyalIdentity/Contracts/Storage/` — `ISingleUseAuthorizationCodeStore` (MP-2), `IVersionedRefreshTokenStore` +
+  `RefreshTokenTransition`/`RefreshTokenTransitionOutcome` (MP-3), `IAuthorizationCodeConsumer` e
+  `IRefreshTokenConsumer` (seams de detecção/fallback da DF39).
+- `RoyalIdentity/Contracts/Defaults/` — `DefaultAuthorizationCodeConsumer`, `DefaultRefreshTokenConsumer`.
+- `RoyalIdentity/Options/` — `OperationalStorageOptions`, `JwtAccessTokenPersistenceMode`, `RefreshTokenOptions`,
+  `RefreshTokenClaimsMode`.
+- `RoyalIdentity.Storage.EntityFramework/Migrations/StorageMigrationsHistory.cs` — topologia única das quatro
+  histories da DF23 (`StorageFamily` × `StorageProviderKind`) mais a legada, consumida por runner, design-time
+  factories e fixtures.
+- `RoyalIdentity.Storage.EntityFramework/Operational/` — `IOperationalDbContextAccessor` +
+  `OperationalDbContextAccessor<TContext>`, `Stores/IOperationalStoreFactory`, `Protection/` (contexto autenticado,
+  envelope versionado, resolver, profiles AES-GCM/Data Protection/Plain, exceção fail-closed) e `Materialization/`
+  (`OperationalRecordTypes`, `OperationalLookupDigest`, codec versionado, serializers de access token, refresh
+  token, authorization code, consent e authorize parameters, mais os DTOs de payload).
+- `RoyalIdentity.Storage.EntityFramework/Security/Cryptography/AesGcmCipher.cs` — primitiva genérica extraída,
+  agora compartilhada pelo protector de key material (Configuration) e pelo profile AES-GCM Operational.
+- `RoyalIdentity.Storage.EntityFramework/Extensions/OperationalServiceCollectionExtensions.cs` — registration do
+  seam scoped, dos serializers e dos profiles nomeados (nenhum profile é implícito).
+- Testes: `Tests.Architecture/OperationalStorageBoundaryTests.cs`,
+  `Tests.Architecture/OperationalModelExtensibilityTests.cs`, `Tests.Storage/Operational/` (`OperationalModelTests`,
+  `OperationalModelMigrationsHistoryTests`, `OperationalPayloadTests`, `OperationalPayloadProtectionTests`,
+  `OperationalContractsShapeTests`, `Support/OperationalTestData`).
+
+**Arquivos alterados**
+
+- `IStorage.AuthorizeParameters` → `IStorage.GetAuthorizeParametersStore(Realm)` (MP-5), com `LoginPageResult`,
+  `ConsentPageResult`, `AuthorizeCallbackEndpoint`, `DefaultAuthorizationContextResolver`, `MemoryStorage`,
+  `SessionLifecycleTests.FakeSessionStorage`, `SqliteConfigurationStorageHarness.ConfigurationCompositeStorage` e
+  `AuthorizeParametersStoreContractTests` adaptados. O resolver passou a obter o `Realm` atual
+  (`TryGetCurrentRealm`) em vez de apenas o path — mudança já prevista pela Fase 6, antecipada aqui porque é o
+  mínimo para compilar.
+- `RealmOptions` ganhou `OperationalStorage` e `RefreshTokens` (com clone no copy constructor);
+  `AuthenticationOptions` ganhou `AuthorizationInteractionLifetime` (int, segundos, default `600` em
+  `Constants.Server`) e `Validate()`.
+- `RefreshToken` ganhou `StateVersion` (propriedade do store, exigida pelo CAS da DF12).
+- `AuthorizationCode` ganhou um construtor de rematerialização que recebe o handle bruto; o construtor de emissão
+  continua gerando o code e agora delega a ele.
+- `AesKeyMaterialProtector` passou a usar `AesGcmCipher` preservando formato e exceções observáveis.
+- `Tests.Architecture/ConfigurationStorageBoundaryTests` reflete o adapter com três project references e proíbe
+  `Data.Operational` no core e no host.
+
+**Desvios e decisões tomadas na execução**
+
+- **`ResourceServer.Secrets` fica fora do payload de authorization code.** São credenciais de configuração do
+  resource server, sem nenhum leitor no core hoje (verificado: só o copy constructor as toca) e sem papel no
+  code exchange; copiá-las para cada linha operacional de vida curta espalharia segredo sem ganho. A omissão é
+  deliberada e documentada no próprio `ResourceServerPayload`, no mesmo espírito da DF34 — precisar delas depois
+  exige nova versão explícita de payload. **Pendente de registro formal no plano** (candidata a virar uma DF).
+- **`user_sessions` não tem `payload_version`/`protected_payload`.** O design marcava o par como "somente se
+  necessário"; todo campo do `UserSession` mapeia para coluna consultável e os clients são tabela filha, então
+  nada da sessão é opaco.
+- **`OperationalLookupDigest` não entra no digest com o realm.** O realm é parte da identidade da linha
+  (PK), não do hash: assim o mesmo handle em dois realms é linha diferente, e não hash diferente do mesmo valor.
+- Os seams `IAuthorizationCodeConsumer`/`IRefreshTokenConsumer` estão registrados no DI e cobertos por teste, mas
+  ainda **não** são chamados por `LoadCode`/`RefreshTokenHandler` — o plano manda o comportamento mudar nas Fases
+  4 e 5, e esta fase só fecha contrato e fallback.
+- Os profiles de proteção usam `IOperationalPayloadProtector`, contrato próprio; `IKeyMaterialProtector` não foi
+  reutilizado (DF30). Só a mecânica do AES-GCM é compartilhada.
+
+**Comandos executados**
+
+```powershell
+dotnet build RoyalIdentity.sln
+dotnet test Tests.Architecture
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQualifiedName~OperationalPayload|FullyQualifiedName~OperationalContractsShape"
+dotnet test RoyalIdentity.sln
+git diff --check
+```
 
 ---
 

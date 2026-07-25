@@ -63,6 +63,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ITokenValidator, DefaultTokenValidator>();
         services.AddSingleton<IMessageStore, ProtectedDataMessageStore>();
 
+        // Operational storage capability seams (MP-2/MP-3). They use the atomic primitive when the backing
+        // provides it and take the legacy path explicitly otherwise; both the fallback and the detection are
+        // transitional and go away with the default backing swap in Plano 4 (DF39).
+        services.AddScoped<IAuthorizationCodeConsumer, DefaultAuthorizationCodeConsumer>();
+        services.AddScoped<IRefreshTokenConsumer, DefaultRefreshTokenConsumer>();
+
         // Secret Evaluators
         services.AddTransient<IClientSecretEvaluator, BasicSecretEvaluator>();
         services.AddTransient<IClientSecretEvaluator, PostBodySecretEvaluator>();

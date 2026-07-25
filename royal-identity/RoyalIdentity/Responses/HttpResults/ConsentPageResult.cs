@@ -17,7 +17,8 @@ public class ConsentPageResult(IEndpointContextBase context) : IResult, IStatusC
         if (context.Realm.Options.StoreAuthorizationParameters)
         {
             var storage = httpContext.RequestServices.GetRequiredService<IStorage>();
-            var id = await storage.AuthorizeParameters.WriteAsync(context.Raw, httpContext.RequestAborted);
+            var id = await storage.GetAuthorizeParametersStore(context.Realm)
+                .WriteAsync(context.Raw, httpContext.RequestAborted);
             returnUrl = returnUrl.AddQueryString(Oidc.Routes.Params.Authorization, id);
         }
         else

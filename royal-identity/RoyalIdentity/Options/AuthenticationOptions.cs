@@ -28,6 +28,7 @@ public class AuthenticationOptions
         CheckSessionCookieDomain = other.CheckSessionCookieDomain;
         CheckSessionCookieSameSiteMode = other.CheckSessionCookieSameSiteMode;
         RequireCspFrameSrcForSignOut = other.RequireCspFrameSrcForSignOut;
+        AuthorizationInteractionLifetime = other.AuthorizationInteractionLifetime;
     }
 
     /// <summary>
@@ -70,4 +71,35 @@ public class AuthenticationOptions
     /// If set, will require frame-src CSP headers being emitting on the end session callback endpoint which renders iframes to clients for front-channel sign out notification.
     /// </summary>
     public bool RequireCspFrameSrcForSignOut { get; set; } = true;
+
+    /// <summary>
+    /// <para>
+    ///     Gets or sets how long, <b>in seconds</b>, a stored authorize request stays resumable while the user
+    ///     goes through the login and consent screens. The unit follows the existing <c>Client</c> lifetimes
+    ///     (plan-data-operational-storage DF40).
+    /// </para>
+    /// <para>
+    ///     The authorize-parameters store writes the absolute expiration at store time, so changing this value
+    ///     never reinterprets records that already exist; reading an expired record is fail-closed (DF16). It
+    ///     only applies when <see cref="RealmOptions.StoreAuthorizationParameters"/> is on — otherwise the
+    ///     parameters travel in the query string and no record is created.
+    /// </para>
+    /// </summary>
+    public int AuthorizationInteractionLifetime { get; set; } = Server.DefaultAuthorizationInteractionLifetime;
+
+    /// <summary>
+    /// Validates internal consistency of the authentication options.
+    /// </summary>
+    /// <returns>A list of configuration errors. Empty means valid.</returns>
+    public IReadOnlyList<string> Validate()
+    {
+        List<string> errors = [];
+
+        if (AuthorizationInteractionLifetime <= 0)
+        {
+            errors.Add("Authentication.AuthorizationInteractionLifetime must be greater than zero (seconds).");
+        }
+
+        return errors;
+    }
 }

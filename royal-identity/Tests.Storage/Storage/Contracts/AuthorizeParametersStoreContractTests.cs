@@ -5,11 +5,12 @@ namespace Tests.Storage.Contracts;
 
 /// <summary>
 /// Contract of <c>IAuthorizeParametersStore</c> (matrix AP-01..AP-03): server-side operational state between
-/// the authorize redirect and the callback (`preservar` — DF14). The store is global in the current contract;
-/// Fase 5 closed the target semantics (realm-bound accessor, absolute TTL written at store time, fail-closed
-/// read of expired records, handle regeneration on collision — matrix section "Fechamento de
-/// IAuthorizeParametersStore"), all implemented and acceptance-tested by Plano 3 (MP-5); the fake stays
-/// global and TTL-less (ADR-018), so these scenarios lock only the behavior common to both worlds.
+/// the authorize redirect and the callback (`preservar` — DF14). The accessor is already realm-bound (MP-5,
+/// plan-data-operational-storage Fase 1); the remaining target semantics — absolute TTL written at store
+/// time, fail-closed read of expired records, handle regeneration on collision (matrix section "Fechamento de
+/// IAuthorizeParametersStore") — are implemented and acceptance-tested by Plano 3 over the EF provider. The
+/// fake stays globally keyed and TTL-less behind the accessor (ADR-018), so these scenarios lock only the
+/// behavior common to both worlds.
 /// </summary>
 public abstract class AuthorizeParametersStoreContractTests : StorageContractTests
 {
@@ -26,7 +27,7 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
 	public async Task Write_ThenRead_ReturnsTheStoredParameters()
 	{
 		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.AuthorizeParameters;
+		var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
 
 		var handle = await store.WriteAsync(NewParameters("contract-client"), default);
 		var read = await store.ReadAsync(handle, default);
@@ -44,7 +45,7 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
 	public async Task Read_DoesNotConsumeTheEntry()
 	{
 		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.AuthorizeParameters;
+		var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
 		var handle = await store.WriteAsync(NewParameters("contract-client"), default);
 
 		var first = await store.ReadAsync(handle, default);
@@ -61,7 +62,7 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
 	{
 		await using var harness = await CreateHarnessAsync();
 
-		var read = await harness.Storage.AuthorizeParameters.ReadAsync("contract-unknown-handle", default);
+		var read = await harness.Storage.GetAuthorizeParametersStore(harness.RealmA).ReadAsync("contract-unknown-handle", default);
 
 		Assert.Null(read);
 	}
@@ -72,7 +73,7 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
 	public async Task Read_HandleDifferingOnlyByCase_ReturnsNull()
 	{
 		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.AuthorizeParameters;
+		var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
 		var handle = await store.WriteAsync(NewParameters("contract-client"), default);
 
 		var read = await store.ReadAsync(WithDifferentLetterCase(handle), default);
@@ -85,7 +86,7 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
 	public async Task Delete_ThenRead_ReturnsNull_AndDeletingAbsentCompletes()
 	{
 		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.AuthorizeParameters;
+		var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
 		var handle = await store.WriteAsync(NewParameters("contract-client"), default);
 
 		await store.DeleteAsync(handle, default);
@@ -99,7 +100,7 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
 	public async Task Write_TwoEntries_ProducesDistinctHandles_EachReadingItsOwnEntry()
 	{
 		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.AuthorizeParameters;
+		var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
 
 		var handleOne = await store.WriteAsync(NewParameters("client-one"), default);
 		var handleTwo = await store.WriteAsync(NewParameters("client-two"), default);

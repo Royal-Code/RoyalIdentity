@@ -48,4 +48,17 @@ public class RefreshToken: TokenBase
     /// The consumed time.
     /// </value>
     public DateTime? ConsumedTime { get; set; }
+
+    /// <summary>
+    /// <para>
+    ///     State version of the persisted token, owned by the store: materialization publishes the version the
+    ///     row had, and the conditional transitions of <see cref="Contracts.Storage.IVersionedRefreshTokenStore"/>
+    ///     use it as the expected value (plan-data-operational-storage DF12).
+    /// </para>
+    /// <para>
+    ///     A caller must never build the expected value from the same instance it already mutated: pass the
+    ///     version obtained from materialization, so a lost race is observable instead of trivially winning.
+    /// </para>
+    /// </summary>
+    public int StateVersion { get; set; }
 }

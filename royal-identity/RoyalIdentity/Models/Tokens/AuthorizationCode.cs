@@ -15,8 +15,20 @@ public class AuthorizationCode
     public AuthorizationCode(string clientId, ClaimsPrincipal subject, string sessionState,
         DateTime creationTime, int lifetime,
         RequestedResources scopes, string redirectUri)
+        : this(CryptoRandom.CreateUniqueId(), clientId, subject, sessionState, creationTime, lifetime, scopes, redirectUri)
     {
-        Code = CryptoRandom.CreateUniqueId();
+    }
+
+    /// <summary>
+    /// Rematerializes a persisted code from its raw handle. A store never keeps the raw code — the persisted
+    /// key is its digest (plan-data-operational-storage DF38) — so the handle comes back from the lookup
+    /// argument and this overload restores it instead of generating a new one.
+    /// </summary>
+    public AuthorizationCode(string code, string clientId, ClaimsPrincipal subject, string sessionState,
+        DateTime creationTime, int lifetime,
+        RequestedResources scopes, string redirectUri)
+    {
+        Code = code;
         ClientId = clientId;
         Subject = subject;
         SessionState = sessionState;

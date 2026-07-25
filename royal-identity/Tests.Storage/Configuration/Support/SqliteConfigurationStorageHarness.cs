@@ -236,14 +236,21 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
 			this.clock = clock;
 			ServerOptions = new ServerOptions(serverOptions);
 			Realms = new CoordinatedRealmStore(configuration.Realms, EnsureRealm, RemoveRealm);
-			AuthorizeParameters = new AuthorizeParametersStore(new ConcurrentDictionary<string, NameValueCollection>());
+			authorizeParameters = new AuthorizeParametersStore(new ConcurrentDictionary<string, NameValueCollection>());
 		}
 
 		public ServerOptions ServerOptions { get; }
 
 		public IRealmStore Realms { get; }
 
-		public IAuthorizeParametersStore AuthorizeParameters { get; }
+		private readonly IAuthorizeParametersStore authorizeParameters;
+
+		/// <summary>
+		/// The Configuration-only composite keeps the transitional in-memory authorize-parameters fake behind
+		/// the realm-bound accessor of MP-5, with no partitioning and no TTL: those are acceptances of the
+		/// Operational EF provider, not of this composite (plan-data-operational-storage DF25).
+		/// </summary>
+		public IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm) => authorizeParameters;
 
 		public IAccessTokenStore GetAccessTokenStore(Realm realm)
 			=> new AccessTokenStore(GetData(realm).AccessTokens);

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Pure Operational data project (ADR-013 §2.1, plan-data-operational-storage DF1): persistent
+		entities, neutral mappings, default context and data operations. MUST NOT reference the IdP core
+		(RoyalIdentity), the Configuration data project, the adapter, providers or ASP.NET. The global
+		Directory.Build.props adds the Microsoft.AspNetCore.App framework reference to every project, so it
+		is explicitly removed here.
+	-->
+	<ItemGroup>
+		<FrameworkReference Remove="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Relational APIs (ToTable/HasColumnName/composite keys) for the neutral mappings. -->
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+	</ItemGroup>
+
+</Project>

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.9.12009.208 insiders
+VisualStudioVersion = 18.9.12009.208
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{722691C4-EF38-489C-B03E-B53D3C941470}"
 EndProject
@@ -75,6 +75,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Storage.EntityFramework.PostgreSql", "RoyalIdentity.Storage.EntityFramework.PostgreSql\RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj", "{21F6F4E1-DA71-4993-AAC7-008220AEC6F5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Migrations", "RoyalIdentity.Migrations\RoyalIdentity.Migrations.csproj", "{26091A87-80BD-47CF-A524-36217C9E1968}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoyalIdentity.Data.Operational", "RoyalIdentity.Data.Operational\RoyalIdentity.Data.Operational.csproj", "{451A0D91-76B6-4D30-8C4E-AAE861476377}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -374,6 +376,18 @@ Global
 		{26091A87-80BD-47CF-A524-36217C9E1968}.Release|x64.Build.0 = Release|Any CPU
 		{26091A87-80BD-47CF-A524-36217C9E1968}.Release|x86.ActiveCfg = Release|Any CPU
 		{26091A87-80BD-47CF-A524-36217C9E1968}.Release|x86.Build.0 = Release|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Debug|x64.Build.0 = Debug|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Debug|x86.Build.0 = Debug|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Release|Any CPU.Build.0 = Release|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Release|x64.ActiveCfg = Release|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Release|x64.Build.0 = Release|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Release|x86.ActiveCfg = Release|Any CPU
+		{451A0D91-76B6-4D30-8C4E-AAE861476377}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -404,6 +418,7 @@ Global
 		{9D097D16-4654-411B-8F29-12D364A10F4F} = {722691C4-EF38-489C-B03E-B53D3C941470}
 		{21F6F4E1-DA71-4993-AAC7-008220AEC6F5} = {722691C4-EF38-489C-B03E-B53D3C941470}
 		{26091A87-80BD-47CF-A524-36217C9E1968} = {722691C4-EF38-489C-B03E-B53D3C941470}
+		{451A0D91-76B6-4D30-8C4E-AAE861476377} = {722691C4-EF38-489C-B03E-B53D3C941470}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A22735B7-0B63-4698-8CF5-359FC47E98DD}
