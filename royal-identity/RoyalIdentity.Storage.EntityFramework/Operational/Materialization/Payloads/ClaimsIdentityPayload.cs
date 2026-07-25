@@ -14,7 +14,7 @@ public sealed class ClaimsIdentityPayload
 
 	public string? RoleClaimType { get; set; }
 
-	public List<ClaimPayload> Claims { get; set; } = [];
+	public required List<ClaimPayload> Claims { get; set; }
 
 	public static ClaimsIdentityPayload From(ClaimsIdentity identity)
 	{

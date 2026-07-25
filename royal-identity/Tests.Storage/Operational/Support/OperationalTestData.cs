@@ -3,6 +3,7 @@ using System.Security.Claims;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Models.Tokens;
+using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 
 namespace Tests.Storage.Operational.Support;
 
@@ -14,6 +15,37 @@ namespace Tests.Storage.Operational.Support;
 internal static class OperationalTestData
 {
 	public static readonly DateTime CreationTime = new(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+
+	/// <summary>
+	/// The relational identity a store would read back for <see cref="NewReferenceAccessToken"/>. Building it
+	/// from the model's own values is what keeps the scenarios honest: the columns are the authoritative
+	/// source, so a round-trip must reproduce them without the payload carrying a second copy.
+	/// </summary>
+	public static AccessTokenIdentity IdentityOf(AccessToken token) => new(
+		token.Id,
+		token.RealmId!,
+		token.ClientId,
+		token.AccessTokenType,
+		token.CreationTime,
+		token.CreationTime.AddSeconds(token.Lifetime));
+
+	/// <inheritdoc cref="IdentityOf(AccessToken)"/>
+	public static RefreshTokenIdentity IdentityOf(RefreshToken token) => new(
+		token.Token,
+		token.RealmId!,
+		token.ClientId,
+		token.CreationTime,
+		token.CreationTime.AddSeconds(token.Lifetime));
+
+	/// <inheritdoc cref="IdentityOf(AccessToken)"/>
+	public static AuthorizationCodeIdentity IdentityOf(AuthorizationCode code) => new(
+		code.Code,
+		code.RealmId!,
+		code.ClientId,
+		code.RedirectUri,
+		code.SessionId,
+		code.CreationTime,
+		code.CreationTime.AddSeconds(code.Lifetime));
 
 	public static RequestedResources NewRequestedResources()
 	{
@@ -151,6 +183,18 @@ internal static class OperationalTestData
 			CodeChallengeMethod = "S256",
 			Properties = new Dictionary<string, string> { ["custom"] = "value" },
 		};
+	}
+
+	/// <summary>
+	/// A code whose resolved resource server carries a secret, so a scenario can prove the secret never
+	/// reaches the persisted payload (plan DF44).
+	/// </summary>
+	public static AuthorizationCode NewAuthorizationCodeWithResourceServerSecret(string secret)
+	{
+		var code = NewAuthorizationCode();
+		code.Scopes.ResourceServers.Single().Secrets.Add(new ClientSecret(secret, "resource server secret"));
+
+		return code;
 	}
 
 	public static Consent NewConsent()

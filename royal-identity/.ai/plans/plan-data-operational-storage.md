@@ -268,7 +268,9 @@
   expirado e retorna `null`. Fonte: B-DF19/B-DF25 e matriz.
 - **DF9 — Materialização:** toda leitura produz grafo independente; mutar o objeto devolvido não persiste sem
   operação explícita. Toda coleção e todo dado pertencente ao contrato Operational deve sobreviver ao round-trip;
-  claims seguem o contrato mínimo da DF34. Fonte: B-DF17 e Q1 Parte 1.
+  claims seguem o contrato mínimo da DF34 e credenciais de configuração seguem a exclusão da DF44. Fora dessas
+  duas exclusões nomeadas, nenhuma perda é aceitável — e cada uma exige versão nova de payload para ser
+  revertida. Fonte: B-DF17 e Q1 Parte 1.
 - **DF10 — Comparadores:** identificadores operacionais, subject, client, sid, scope e handles usam comparação
   Ordinal/case-sensitive. Nenhuma collation default do provider redefine a semântica. Fonte: B-DF18.
 - **DF11 — Authorization code:** o consumo no fluxo do token é single-use e atômico; recebe handle, client e
@@ -439,6 +441,30 @@
   foi comprovado; revogação continua pela operação em massa existente e testes capturam o `sid` do fluxo. A matriz
   registra MP-9 como diferida/não requerida pelo P3, reabrível somente junto de um caller futuro. Fonte: inventário
   da matriz e escopo decidido deste plano.
+- **DF44 — Credenciais de configuração fora do payload Operational:** `ResourceServer.Secrets`, alcançável pelo
+  grafo `RequestedResources` de um authorization code, não entra no payload persistido. São credenciais de
+  autenticação do resource server — configuração, não decisão de autorização —, não possuem nenhum leitor no
+  caminho de code exchange e replicá-las em cada linha operacional de vida curta espalharia segredo sem ganho
+  funcional. É uma exclusão nomeada da DF9, no mesmo formato da DF34: a coleção rematerializa vazia, o valor
+  nunca aparece no JSON e uma futura dependência exige versão explícita de payload, nunca perda silenciosa. A
+  exclusão é comprovada por teste que popula o segredo, verifica sua ausência no payload e a coleção vazia após
+  o round-trip. Fonte: revisão da Fase 1, inventário de leitores de `ResourceServer.Secrets` no core e DF28.
+- **DF45 — Coluna consultável é fonte única:** todo valor projetado em coluna relacional — realm, client,
+  redirect URI, tipo de access token, sessão do code e timestamps — não é repetido no payload; a materialização
+  o recebe da linha. Lookups, o consumo condicional da DF11 e os predicados de cleanup da DF17 avaliam as
+  colunas, então uma segunda cópia no payload permitiria ao banco validar um client/redirect/expiração enquanto
+  o objeto rematerializado carrega outro. Colunas que são projeção pura de conteúdo do payload — `subject_id` e
+  o `session_id` de tokens, ambos derivados das claims — são a exceção: existem para índice e remoção por
+  subject, são escritas da mesma origem e nunca são lidas de volta para o modelo. O lifetime deriva de
+  `created_at_utc`/`expires_at_utc` e expiração anterior à criação falha fechado. Fonte: revisão da Fase 1,
+  DF11/DF17/DF36.
+- **DF46 — Capabilities atômicas por construção no adapter EF:** o aceite "a registration EF valida a presença
+  das capabilities" é satisfeito em tempo de compilação: `IOperationalStoreFactory` devolve
+  `IOperationalAuthorizationCodeStore`/`IOperationalRefreshTokenStore`, que compõem o contrato CRUD com MP-2/MP-3.
+  Um store EF sem a capability não pode sequer ser devolvido pela factory, portanto o fallback transitório da
+  DF39 é inalcançável a partir do adapter por construção — garantia mais forte que uma checagem de runtime, que
+  poderia ser esquecida. Somente o fake, que nunca implementa as capabilities, alcança o fallback. Fonte:
+  revisão da Fase 1 e DF39.
 
 ---
 
@@ -848,6 +874,10 @@ implementar stores.
 - [x] Testar profiles por realm: dois realms/protectors, rotação com leitor anterior, profile ausente, envelope/AAD
   adulterado e `Plain` explicitamente registrado.
 - [x] Testar `ClaimPayload` mínimo e provar que properties próprias de authorization code continuam preservadas.
+- [x] Provar que nenhum payload duplica coluna consultável e que a materialização toma esses valores da linha
+  (DF45), inclusive falha fechada para timestamps incoerentes.
+- [x] Provar a exclusão da DF44: segredo de resource server ausente do payload e coleção vazia no round-trip.
+- [x] Cobrir coleção contratual omitida e explicitamente `null`, inclusive no grafo aninhado do code.
 - [x] Fixar em teste a topologia das quatro histories da DF23 sem abrir conexão.
 - [x] Criar teste de context combinado de prova, inicialmente com mappings neutros.
 
@@ -857,7 +887,12 @@ implementar stores.
 - Toda entidade possui realm na chave/índice aplicável e nenhuma FK cross-family.
 - Um `DbContext` arbitrário aplica o mapping sem herdar de `OperationalDbContext`.
 - Contratos MP-2/MP-3 não possuem implementação default não atômica; somente o core aciona o fallback quando a
-  capability está ausente, e a registration EF valida sua presença.
+  capability está ausente, e a composição EF garante sua presença por construção conforme DF46.
+- Nenhum payload duplica valor de coluna consultável; a materialização toma esses valores da linha e timestamps
+  incoerentes falham fechado (DF45).
+- Coleção contratual ausente ou explicitamente `null` no payload falha fechado; somente `Properties` do code e
+  `Scopes` do consent distinguem ausência de vazio, por serem nulláveis por contrato.
+- `ResourceServer.Secrets` não aparece no payload e rematerializa vazio (DF44).
 - Realm options continuam round-trip após as novas opções; payload v1 anterior materializa
   `AuthorizationInteractionLifetime=600` e os demais defaults sem migration relacional ou bump de payload version.
 - `ClaimsMode` está disponível e serializável, mas a propriedade do client e o comportamento atual permanecem
@@ -875,8 +910,9 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 
 ### Resultado da Fase 1
 
-**Concluída em 2026-07-24.** Build da solução e `dotnet test RoyalIdentity.sln` verdes: 900 aprovados, 9 ignorados
-(PostgreSQL opt-in), 0 falhas. `git diff --check` sem erros.
+**Concluída em 2026-07-24**, com os ajustes da revisão externa aplicados no mesmo dia. Build da solução e
+`dotnet test RoyalIdentity.sln` verdes: 920 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas.
+`git diff --check` sem erros.
 
 **Arquivos criados**
 
@@ -894,10 +930,12 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
   histories da DF23 (`StorageFamily` × `StorageProviderKind`) mais a legada, consumida por runner, design-time
   factories e fixtures.
 - `RoyalIdentity.Storage.EntityFramework/Operational/` — `IOperationalDbContextAccessor` +
-  `OperationalDbContextAccessor<TContext>`, `Stores/IOperationalStoreFactory`, `Protection/` (contexto autenticado,
-  envelope versionado, resolver, profiles AES-GCM/Data Protection/Plain, exceção fail-closed) e `Materialization/`
-  (`OperationalRecordTypes`, `OperationalLookupDigest`, codec versionado, serializers de access token, refresh
-  token, authorization code, consent e authorize parameters, mais os DTOs de payload).
+  `OperationalDbContextAccessor<TContext>`, `Stores/` (`IOperationalStoreFactory` e os contratos compostos
+  `IOperationalAuthorizationCodeStore`/`IOperationalRefreshTokenStore` da DF46), `Protection/` (contexto
+  autenticado, envelope versionado, resolver, profiles AES-GCM/Data Protection/Plain, exceção fail-closed) e
+  `Materialization/` (`OperationalRecordTypes`, `OperationalRecordIdentities`, `OperationalLookupDigest`, codec
+  versionado, serializers de access token, refresh token, authorization code, consent e authorize parameters,
+  mais os DTOs de payload).
 - `RoyalIdentity.Storage.EntityFramework/Security/Cryptography/AesGcmCipher.cs` — primitiva genérica extraída,
   agora compartilhada pelo protector de key material (Configuration) e pelo profile AES-GCM Operational.
 - `RoyalIdentity.Storage.EntityFramework/Extensions/OperationalServiceCollectionExtensions.cs` — registration do
@@ -927,11 +965,6 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 
 **Desvios e decisões tomadas na execução**
 
-- **`ResourceServer.Secrets` fica fora do payload de authorization code.** São credenciais de configuração do
-  resource server, sem nenhum leitor no core hoje (verificado: só o copy constructor as toca) e sem papel no
-  code exchange; copiá-las para cada linha operacional de vida curta espalharia segredo sem ganho. A omissão é
-  deliberada e documentada no próprio `ResourceServerPayload`, no mesmo espírito da DF34 — precisar delas depois
-  exige nova versão explícita de payload. **Pendente de registro formal no plano** (candidata a virar uma DF).
 - **`user_sessions` não tem `payload_version`/`protected_payload`.** O design marcava o par como "somente se
   necessário"; todo campo do `UserSession` mapeia para coluna consultável e os clients são tabela filha, então
   nada da sessão é opaco.
@@ -942,6 +975,31 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
   4 e 5, e esta fase só fecha contrato e fallback.
 - Os profiles de proteção usam `IOperationalPayloadProtector`, contrato próprio; `IKeyMaterialProtector` não foi
   reutilizado (DF30). Só a mecânica do AES-GCM é compartilhada.
+
+**Ajustes aplicados após revisão externa (2026-07-24)**
+
+- **DF45 — coluna consultável virou fonte única.** Os payloads duplicavam `ClientId`, realm, tipo, redirect URI,
+  sessão do code e timestamps, e a materialização confiava na cópia do payload enquanto lookups, o consumo
+  condicional da DF11 e o cleanup avaliam as colunas. Os payloads perderam esses campos; a materialização passa a
+  recebê-los por `AccessTokenIdentity`/`RefreshTokenIdentity`/`AuthorizationCodeIdentity`
+  (`Operational/Materialization/OperationalRecordIdentities.cs`), o lifetime deriva dos dois timestamps e
+  expiração anterior à criação falha fechado. Testes novos provam que nenhuma coluna consultável aparece no JSON
+  e que a materialização segue a linha mesmo quando ela diverge do que o modelo tinha na escrita.
+- **Falha fechada para coleção ausente completada.** As coleções contratuais passaram a `required` e o codec usa
+  `RespectNullableAnnotations`, então membro omitido **e** `null` explícito falham — antes só `null` explícito era
+  detectado, por guardas manuais, e a omissão virava coleção vazia silenciosa. Cobertura por teoria removendo e
+  anulando cada coleção, inclusive no grafo aninhado do authorization code. `Properties` do code e `Scopes` do
+  consent seguem nulláveis por contrato, porque neles ausência é distinta de vazio.
+- **DF46 — capabilities por construção.** `IOperationalStoreFactory` passou a devolver
+  `IOperationalAuthorizationCodeStore`/`IOperationalRefreshTokenStore`, que compõem CRUD + MP-2/MP-3. O aceite
+  "a registration EF valida a presença" é satisfeito pelo compilador: um store EF sem a capability não pode ser
+  devolvido, então o fallback da DF39 é inalcançável a partir do adapter.
+- **DF44 — exclusão de `ResourceServer.Secrets` formalizada.** Deixou de ser desvio e virou decisão fechada, com
+  DF9 emendada, invariante e teste dedicado.
+- **Indentação:** a revisão apontou os 11 arquivos novos do core como fora do padrão por usarem 4 espaços. O
+  achado é incorreto: o `.editorconfig` define apenas `indent_size = 4`, sem `indent_style`, e todo o projeto
+  `RoyalIdentity` usa espaços. Os arquivos foram mantidos como estavam. A linha "Use tabs with width 4" do
+  `AGENTS.md` contradiz o código e merece correção em separado.
 
 **Comandos executados**
 
@@ -1433,10 +1491,11 @@ git diff --check
 
 | Objetivo | Fase(s) | Decisão(ões) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF43 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
+| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF46 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
+| Payload sem duplicar coluna nem credencial | 1–7 | DF9/DF34/DF44/DF45 | nenhuma coluna consultável repetida no payload, exclusões nomeadas comprovadas e falha fechada para membro ausente/nulo | `OperationalPayloadTests` |
 | Access token + consent | 2, 6, 7 | DF7/DF8/DF13/DF14/DF17/DF30/DF31/DF38 | AT/CN completos, digests, modos JWT, profiles e cleanup independente | contract + provider acceptances |
 | Sessões | 3, 7 | DF15/DF27/DF43 | SS-01..SS-06, touch/revogação concorrentes e MP-9 diferida | session contracts + ADR-017 regressions |
-| Code single-use | 1, 4, 7 | DF11/DF39 | um vencedor concorrente e fallback restrito ao fake | atomic code acceptance |
+| Code single-use | 1, 4, 7 | DF11/DF39/DF46 | um vencedor concorrente e fallback restrito ao fake, inalcançável no adapter | atomic code acceptance + `OperationalContractsShapeTests` |
 | Refresh conditional | 1, 5, 7 | DF12/DF32–DF34/DF37/DF39/DF41/DF42 | transição/versão/tolerância, Current/Snapshot, sem `AccessTokenId` e `at_hash` correto | atomic refresh + claims-mode/at-hash acceptance |
 | AP realm-bound + TTL | 1, 6, 7 | DF16/DF29/DF30/DF38/DF40 | gate `StoreAuthorizationParameters`, realm, digest, expiração em segundos, colisão e fail-closed | AP acceptances |
 | Cleanup/purge | 6, 7 | DF17/DF18 | batch por tipo, um modo de execução e purge isolado | cleanup/purge acceptances |
@@ -1480,6 +1539,12 @@ git diff --check
 28. Refresh `Current` nunca amplia scopes/resources do grant original; `Snapshot` nunca dispensa validação de
     account/session/client.
 29. Claims Operational persistem apenas `Type`/`Value`/`ValueType`; qualquer expansão exige versão explícita.
+29a. `ResourceServer.Secrets` nunca entra em payload Operational; a coleção rematerializa vazia e reverter exige
+    versão explícita de payload (DF44).
+29b. Valor projetado em coluna consultável não é duplicado no payload; a materialização o toma da linha, e o
+    lifetime deriva dos dois timestamps autoritativos (DF45).
+29c. A factory EF só devolve stores que carregam MP-2/MP-3; o fallback da DF39 é inalcançável a partir do
+    adapter (DF46).
 30. Não existe configuração ou override de origem das claims do refresh no `Client`.
 31. Access/reference, refresh, authorization code e JWT opcional usam `operation.protocol_artifacts`; nenhum store
     tipado consulta ou muta uma linha sem fixar `artifact_type`.

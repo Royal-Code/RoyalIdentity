@@ -9,7 +9,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payl
 /// </summary>
 public sealed class ClaimsPrincipalPayload
 {
-	public List<ClaimsIdentityPayload> Identities { get; set; } = [];
+	public required List<ClaimsIdentityPayload> Identities { get; set; }
 
 	public static ClaimsPrincipalPayload From(ClaimsPrincipal principal)
 	{

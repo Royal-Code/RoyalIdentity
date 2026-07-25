@@ -30,4 +30,11 @@ public sealed class OperationalPayloadException : Exception
 	/// <summary>The payload is well-formed JSON but cannot produce a complete model.</summary>
 	public static OperationalPayloadException IncompletePayload(string payloadName, string detail)
 		=> new($"The persisted {payloadName} payload is incomplete: {detail}.");
+
+	/// <summary>
+	/// The relational identity of the record is self-contradictory, so no coherent model can be produced from
+	/// it — for example an expiration that precedes the creation instant.
+	/// </summary>
+	public static OperationalPayloadException IncoherentRecord(string payloadName, string detail)
+		=> new($"The persisted {payloadName} record is incoherent: {detail}.");
 }

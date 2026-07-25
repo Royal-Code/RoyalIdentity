@@ -25,17 +25,16 @@ public interface IOperationalStoreFactory
 	IAccessTokenStore GetAccessTokenStore(Realm realm);
 
 	/// <summary>
-	/// Creates the realm-bound refresh-token store. The instance also provides
-	/// <see cref="IVersionedRefreshTokenStore"/> (MP-3): the EF composition is required to supply the
-	/// capability and can never reach the transitional fallback (plan DF39).
+	/// Creates the realm-bound refresh-token store. Its return type carries the MP-3 capability, so this
+	/// adapter cannot produce a store without it and can never reach the transitional fallback (plan DF39).
 	/// </summary>
-	IRefreshTokenStore GetRefreshTokenStore(Realm realm);
+	IOperationalRefreshTokenStore GetRefreshTokenStore(Realm realm);
 
 	/// <summary>
-	/// Creates the realm-bound authorization-code store. The instance also provides
-	/// <see cref="ISingleUseAuthorizationCodeStore"/> (MP-2), under the same rule as above.
+	/// Creates the realm-bound authorization-code store, carrying the MP-2 capability under the same rule as
+	/// above.
 	/// </summary>
-	IAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm);
+	IOperationalAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm);
 
 	/// <summary>Creates the realm-bound user consent store.</summary>
 	IUserConsentStore GetUserConsentStore(Realm realm);

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json.Nodes;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 using Tests.Storage.Operational.Support;
@@ -7,10 +8,11 @@ namespace Tests.Storage.Operational;
 
 /// <summary>
 /// Versioned payload serialization of the Operational models (plan-data-operational-storage Fase 1, DF9/DF34):
-/// round-trips are complete and stable, materialization is independent, the raw handles never reach the
-/// payload (DF13/DF38), the persisted claim contract is the minimal one (DF34) — while the models' own
-/// properties keep round-tripping — and an unknown version or malformed JSON fails closed instead of
-/// returning a partial model.
+/// round-trips are complete and stable, materialization is independent, values that live in queryable columns
+/// are never duplicated in the payload (DF36), the raw handles never reach it either (DF13/DF38), the
+/// persisted claim contract is the minimal one (DF34) — while the models' own properties keep round-tripping
+/// — and an unknown version, malformed JSON, a missing contract member or an explicit null fails closed
+/// instead of returning a partial model.
 /// </summary>
 public class OperationalPayloadTests
 {
@@ -24,9 +26,10 @@ public class OperationalPayloadTests
 	public void AccessToken_RoundTrip_IsCompleteAndStable()
 	{
 		var token = OperationalTestData.NewReferenceAccessToken();
+		var identity = OperationalTestData.IdentityOf(token);
 
 		var (version, json) = accessTokens.Serialize(token);
-		var restored = accessTokens.Deserialize(version, json, token.Id);
+		var restored = accessTokens.Deserialize(version, json, identity);
 		var (_, reserialized) = accessTokens.Serialize(restored);
 
 		Assert.Equal(AccessTokenPayloadSerializer.CurrentVersion, version);
@@ -48,6 +51,103 @@ public class OperationalPayloadTests
 			restored.Claims.Select(c => (c.Type, c.Value, c.ValueType)).OrderBy(c => c.Type));
 	}
 
+	// DF9/DF36: whatever a column holds is authoritative and must not exist a second time in the payload —
+	// a divergence would let a lookup or a conditional consumption validate one value while the materialized
+	// object carried another.
+	[Fact]
+	public void Payloads_DoNotDuplicateAnyQueryableColumn()
+	{
+		var token = OperationalTestData.NewReferenceAccessToken();
+		var refreshToken = OperationalTestData.NewRefreshToken();
+		var code = OperationalTestData.NewAuthorizationCode();
+
+		var (_, tokenJson) = accessTokens.Serialize(token);
+		var (_, refreshJson) = refreshTokens.Serialize(refreshToken);
+		var (_, codeJson) = authorizationCodes.Serialize(code);
+
+		foreach (var json in new[] { tokenJson, refreshJson, codeJson })
+		{
+			Assert.DoesNotContain("\"ClientId\"", json, StringComparison.Ordinal);
+			Assert.DoesNotContain("\"RealmId\"", json, StringComparison.Ordinal);
+			Assert.DoesNotContain("\"CreationTime\"", json, StringComparison.Ordinal);
+			Assert.DoesNotContain("\"Lifetime\"", json, StringComparison.Ordinal);
+		}
+
+		Assert.DoesNotContain("\"AccessTokenType\"", tokenJson, StringComparison.Ordinal);
+		Assert.DoesNotContain("\"RedirectUri\"", codeJson, StringComparison.Ordinal);
+		Assert.DoesNotContain("\"SessionId\"", codeJson, StringComparison.Ordinal);
+	}
+
+	// The columns are the source, so the materialized object reflects them even when they disagree with what
+	// the model held at write time. This is the falsifiable form of the invariant above.
+	[Fact]
+	public void Materialization_TakesTheQueryableValuesFromTheColumns()
+	{
+		var token = OperationalTestData.NewReferenceAccessToken();
+		var (version, json) = accessTokens.Serialize(token);
+
+		var identity = new AccessTokenIdentity(
+			"other-jti",
+			"realm-b",
+			"client-two",
+			AccessTokenType.Jwt,
+			OperationalTestData.CreationTime.AddHours(1),
+			OperationalTestData.CreationTime.AddHours(3));
+
+		var restored = accessTokens.Deserialize(version, json, identity);
+
+		Assert.Equal("other-jti", restored.Id);
+		Assert.Equal("realm-b", restored.RealmId);
+		Assert.Equal("client-two", restored.ClientId);
+		Assert.Equal(AccessTokenType.Jwt, restored.AccessTokenType);
+		Assert.Equal(OperationalTestData.CreationTime.AddHours(1), restored.CreationTime);
+		Assert.Equal(7200, restored.Lifetime);
+	}
+
+	// The conditional consumption of DF11 matches client and redirect URI in the database; the object handed
+	// to the pipeline must carry exactly those values.
+	[Fact]
+	public void AuthorizationCode_TakesClientAndRedirectUriFromTheColumns()
+	{
+		var code = OperationalTestData.NewAuthorizationCode();
+		var (version, json) = authorizationCodes.Serialize(code);
+
+		var identity = new AuthorizationCodeIdentity(
+			"code-handle",
+			"realm-b",
+			"client-two",
+			"https://other.example/callback",
+			"session-two",
+			OperationalTestData.CreationTime,
+			OperationalTestData.CreationTime.AddMinutes(5));
+
+		var restored = authorizationCodes.Deserialize(version, json, identity);
+
+		Assert.Equal("client-two", restored.ClientId);
+		Assert.Equal("https://other.example/callback", restored.RedirectUri);
+		Assert.Equal("session-two", restored.SessionId);
+		Assert.Equal("realm-b", restored.RealmId);
+		Assert.Equal(300, restored.Lifetime);
+	}
+
+	// An expiration that precedes the creation instant cannot produce a coherent lifetime.
+	[Fact]
+	public void IncoherentTimestamps_FailClosed()
+	{
+		var token = OperationalTestData.NewReferenceAccessToken();
+		var (version, json) = accessTokens.Serialize(token);
+
+		var identity = new AccessTokenIdentity(
+			token.Id,
+			"realm-a",
+			token.ClientId,
+			token.AccessTokenType,
+			OperationalTestData.CreationTime,
+			OperationalTestData.CreationTime.AddSeconds(-1));
+
+		Assert.Throws<OperationalPayloadException>(() => accessTokens.Deserialize(version, json, identity));
+	}
+
 	// DF13/DF38: the reference bearer coincides with the jti, which is the lookup argument, so it is never
 	// copied into the payload; materialization restores both Id and Token from that argument.
 	[Fact]
@@ -56,7 +156,7 @@ public class OperationalPayloadTests
 		var token = OperationalTestData.NewReferenceAccessToken("reference-bearer-value");
 
 		var (version, json) = accessTokens.Serialize(token);
-		var restored = accessTokens.Deserialize(version, json, "reference-bearer-value");
+		var restored = accessTokens.Deserialize(version, json, OperationalTestData.IdentityOf(token));
 
 		Assert.DoesNotContain("reference-bearer-value", json, StringComparison.Ordinal);
 		Assert.Equal("reference-bearer-value", restored.Id);
@@ -72,7 +172,7 @@ public class OperationalPayloadTests
 		token.Token = "header.payload.signature";
 
 		var (version, json) = accessTokens.Serialize(token);
-		var restored = accessTokens.Deserialize(version, json, "jwt-jti");
+		var restored = accessTokens.Deserialize(version, json, OperationalTestData.IdentityOf(token));
 
 		Assert.Equal("jwt-jti", restored.Id);
 		Assert.Equal("header.payload.signature", restored.Token);
@@ -84,7 +184,7 @@ public class OperationalPayloadTests
 		var token = OperationalTestData.NewRefreshToken();
 
 		var (version, json) = refreshTokens.Serialize(token);
-		var restored = refreshTokens.Deserialize(version, json, token.Token);
+		var restored = refreshTokens.Deserialize(version, json, OperationalTestData.IdentityOf(token));
 		var (_, reserialized) = refreshTokens.Serialize(restored);
 
 		Assert.Equal(RefreshTokenPayloadSerializer.CurrentVersion, version);
@@ -124,7 +224,7 @@ public class OperationalPayloadTests
 		var code = OperationalTestData.NewAuthorizationCode();
 
 		var (version, json) = authorizationCodes.Serialize(code);
-		var restored = authorizationCodes.Deserialize(version, json, code.Code);
+		var restored = authorizationCodes.Deserialize(version, json, OperationalTestData.IdentityOf(code));
 		var (_, reserialized) = authorizationCodes.Serialize(restored);
 
 		Assert.Equal(AuthorizationCodePayloadSerializer.CurrentVersion, version);
@@ -149,9 +249,10 @@ public class OperationalPayloadTests
 	public void AuthorizationCode_DoesNotPersistItsHandle_AndIsRematerializedFromTheLookupArgument()
 	{
 		var code = OperationalTestData.NewAuthorizationCode();
+		var identity = OperationalTestData.IdentityOf(code) with { Code = "code-handle-value" };
 
 		var (version, json) = authorizationCodes.Serialize(code);
-		var restored = authorizationCodes.Deserialize(version, json, "code-handle-value");
+		var restored = authorizationCodes.Deserialize(version, json, identity);
 
 		Assert.DoesNotContain(code.Code, json, StringComparison.Ordinal);
 		Assert.Equal("code-handle-value", restored.Code);
@@ -164,7 +265,7 @@ public class OperationalPayloadTests
 		var code = OperationalTestData.NewAuthorizationCode();
 
 		var (version, json) = authorizationCodes.Serialize(code);
-		var restored = authorizationCodes.Deserialize(version, json, code.Code);
+		var restored = authorizationCodes.Deserialize(version, json, OperationalTestData.IdentityOf(code));
 
 		var original = code.Subject.Identities.Single();
 		var identity = restored.Subject.Identities.Single();
@@ -184,7 +285,7 @@ public class OperationalPayloadTests
 		var code = OperationalTestData.NewAuthorizationCode();
 
 		var (version, json) = authorizationCodes.Serialize(code);
-		var scopes = authorizationCodes.Deserialize(version, json, code.Code).Scopes;
+		var scopes = authorizationCodes.Deserialize(version, json, OperationalTestData.IdentityOf(code)).Scopes;
 
 		Assert.True(scopes.OfflineAccess);
 		Assert.Equal(code.Scopes.RequestedScopeNames, scopes.RequestedScopeNames);
@@ -225,6 +326,22 @@ public class OperationalPayloadTests
 		Assert.Equal(code.Scopes.GetAudiences().Order(), scopes.GetAudiences().Order());
 	}
 
+	// DF44: a resource server's own secrets are deliberately outside the operational contract. They never
+	// reach the payload, and materialization brings the collection back empty rather than inventing values.
+	[Fact]
+	public void AuthorizationCode_DoesNotPersistResourceServerSecrets()
+	{
+		var code = OperationalTestData.NewAuthorizationCodeWithResourceServerSecret("resource-server-secret");
+
+		var (version, json) = authorizationCodes.Serialize(code);
+		var scopes = authorizationCodes.Deserialize(version, json, OperationalTestData.IdentityOf(code)).Scopes;
+
+		Assert.DoesNotContain("resource-server-secret", json, StringComparison.Ordinal);
+		Assert.DoesNotContain("Secrets", json, StringComparison.Ordinal);
+		Assert.NotEmpty(code.Scopes.ResourceServers.Single().Secrets);
+		Assert.Empty(scopes.ResourceServers.Single().Secrets);
+	}
+
 	// DF34: claim metadata is deliberately outside the contract, but a model's own properties are not — the
 	// code's Properties survive the round-trip.
 	[Fact]
@@ -234,7 +351,7 @@ public class OperationalPayloadTests
 		code.Properties = new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" };
 
 		var (version, json) = authorizationCodes.Serialize(code);
-		var restored = authorizationCodes.Deserialize(version, json, code.Code);
+		var restored = authorizationCodes.Deserialize(version, json, OperationalTestData.IdentityOf(code));
 
 		Assert.NotNull(restored.Properties);
 		Assert.Equal("1", restored.Properties["a"]);
@@ -253,7 +370,7 @@ public class OperationalPayloadTests
 		token.Claims.Add(claim);
 
 		var (version, json) = accessTokens.Serialize(token);
-		var restored = accessTokens.Deserialize(version, json, token.Id);
+		var restored = accessTokens.Deserialize(version, json, OperationalTestData.IdentityOf(token));
 		var restoredClaim = restored.Claims.Single(c => c.Type == "custom");
 
 		Assert.DoesNotContain("https://custom-issuer.example", json, StringComparison.Ordinal);
@@ -271,7 +388,7 @@ public class OperationalPayloadTests
 		var token = OperationalTestData.NewReferenceAccessToken();
 
 		var (version, json) = accessTokens.Serialize(token);
-		var restored = accessTokens.Deserialize(version, json, token.Id);
+		var restored = accessTokens.Deserialize(version, json, OperationalTestData.IdentityOf(token));
 
 		Assert.Equal(
 			ClaimValueTypes.Integer64,
@@ -348,19 +465,20 @@ public class OperationalPayloadTests
 	public void Materialization_ProducesAnIndependentGraph()
 	{
 		var token = OperationalTestData.NewReferenceAccessToken();
+		var identity = OperationalTestData.IdentityOf(token);
 
 		var (version, json) = accessTokens.Serialize(token);
-		var first = accessTokens.Deserialize(version, json, token.Id);
+		var first = accessTokens.Deserialize(version, json, identity);
 		first.Audiences.Add("https://injected.example");
 		first.ResourceUris.Add("https://injected.example/resource");
-		var second = accessTokens.Deserialize(version, json, token.Id);
+		var second = accessTokens.Deserialize(version, json, identity);
 
 		Assert.DoesNotContain("https://injected.example", second.Audiences);
 		Assert.DoesNotContain("https://injected.example/resource", second.ResourceUris);
 		Assert.DoesNotContain("https://injected.example", token.Audiences);
 	}
 
-	public static TheoryData<string, Func<int, string, object>> UnknownVersionCases()
+	public static TheoryData<string, Func<int, string, object>> DeserializeCases()
 	{
 		var accessTokens = new AccessTokenPayloadSerializer();
 		var refreshTokens = new RefreshTokenPayloadSerializer();
@@ -368,74 +486,170 @@ public class OperationalPayloadTests
 		var consents = new ConsentPayloadSerializer();
 		var authorizeParameters = new AuthorizeParametersPayloadSerializer();
 
+		var created = OperationalTestData.CreationTime;
+		var expires = created.AddHours(1);
+
 		return new TheoryData<string, Func<int, string, object>>
 		{
-			{ "AccessToken", (version, json) => accessTokens.Deserialize(version, json, "jti") },
-			{ "RefreshToken", (version, json) => refreshTokens.Deserialize(version, json, "handle") },
-			{ "AuthorizationCode", (version, json) => authorizationCodes.Deserialize(version, json, "code") },
+			{
+				"AccessToken",
+				(version, json) => accessTokens.Deserialize(
+					version, json, new AccessTokenIdentity("jti", "realm", "client", AccessTokenType.Reference, created, expires))
+			},
+			{
+				"RefreshToken",
+				(version, json) => refreshTokens.Deserialize(
+					version, json, new RefreshTokenIdentity("handle", "realm", "client", created, expires))
+			},
+			{
+				"AuthorizationCode",
+				(version, json) => authorizationCodes.Deserialize(
+					version, json,
+					new AuthorizationCodeIdentity("code", "realm", "client", "https://c.example/cb", null, created, expires))
+			},
 			{
 				"Consent",
-				(version, json) => consents.Deserialize(version, json, "realm", "subject", "client", DateTime.UtcNow, null)
+				(version, json) => consents.Deserialize(version, json, "realm", "subject", "client", created, null)
 			},
 			{ "AuthorizeParameters", (version, json) => authorizeParameters.Deserialize(version, json) },
 		};
 	}
 
 	[Theory]
-	[MemberData(nameof(UnknownVersionCases))]
+	[MemberData(nameof(DeserializeCases))]
 	public void UnknownVersion_FailsClosed(string _, Func<int, string, object> deserialize)
 		=> Assert.Throws<OperationalPayloadException>(() => deserialize(99, "{}"));
 
 	[Theory]
-	[MemberData(nameof(UnknownVersionCases))]
+	[MemberData(nameof(DeserializeCases))]
 	public void MalformedJson_FailsClosed(string _, Func<int, string, object> deserialize)
 		=> Assert.Throws<OperationalPayloadException>(() => deserialize(1, "{ not json"));
 
-	// A well-formed payload missing a required member is incomplete, never a partially materialized model.
+	// A well-formed payload missing a required scalar is incomplete, never a partially materialized model.
 	[Fact]
 	public void MissingRequiredMember_FailsClosed()
-		=> Assert.Throws<OperationalPayloadException>(
-			() => accessTokens.Deserialize(AccessTokenPayloadSerializer.CurrentVersion, """{"Issuer":"x"}""", "jti"));
+		=> Assert.Throws<OperationalPayloadException>(() => Deserialize("""{"Issuer":"x"}"""));
 
-	[Fact]
-	public void NullCollection_FailsClosed()
+	// An omitted contract collection must fail closed too: silently materializing it as empty would drop
+	// audiences, resource URIs or claims without anyone noticing.
+	[Theory]
+	[InlineData("Audiences")]
+	[InlineData("AllowedSigningAlgorithms")]
+	[InlineData("ResourceUris")]
+	[InlineData("Claims")]
+	public void OmittedContractCollection_FailsClosed(string omittedMember)
 	{
-		const string json = """
-			{"ClientId":"c","Issuer":"i","TokenType":"Bearer","AccessTokenType":1,"Claims":null}
-			""";
+		var token = OperationalTestData.NewReferenceAccessToken();
+		var (_, json) = accessTokens.Serialize(token);
+
+		Assert.Throws<OperationalPayloadException>(() => Deserialize(WithoutMember(json, omittedMember)));
+	}
+
+	[Theory]
+	[InlineData("Audiences")]
+	[InlineData("AllowedSigningAlgorithms")]
+	[InlineData("ResourceUris")]
+	[InlineData("Claims")]
+	public void NullContractCollection_FailsClosed(string nulledMember)
+	{
+		var token = OperationalTestData.NewReferenceAccessToken();
+		var (_, json) = accessTokens.Serialize(token);
 
 		Assert.Throws<OperationalPayloadException>(
-			() => accessTokens.Deserialize(AccessTokenPayloadSerializer.CurrentVersion, json, "jti"));
+			() => Deserialize(WithMemberSetToNull(json, nulledMember)));
+	}
+
+	// The same rule applies inside the nested graph of an authorization code.
+	[Theory]
+	[InlineData("Identities")]
+	[InlineData("Claims")]
+	[InlineData("RequestedScopeNames")]
+	[InlineData("IdentityScopes")]
+	[InlineData("ResourceServers")]
+	[InlineData("UserClaims")]
+	public void OmittedNestedContractCollection_FailsClosed(string omittedMember)
+	{
+		var code = OperationalTestData.NewAuthorizationCode();
+		var (version, json) = authorizationCodes.Serialize(code);
+		var identity = OperationalTestData.IdentityOf(code);
+
+		Assert.Throws<OperationalPayloadException>(
+			() => authorizationCodes.Deserialize(version, WithoutMember(json, omittedMember), identity));
 	}
 
 	// DF9: an authorization code whose subject has no identity cannot produce an empty principal.
 	[Fact]
 	public void AuthorizationCode_WithoutASubjectIdentity_FailsClosed()
 	{
-		const string json = """
-			{
-				"ClientId":"c","RedirectUri":"https://client.example/cb","SessionState":"s",
-				"Subject":{"Identities":[]},"Scopes":{}
-			}
-			""";
+		var code = OperationalTestData.NewAuthorizationCode();
+		var (version, json) = authorizationCodes.Serialize(code);
 
-		Assert.Throws<OperationalPayloadException>(
-			() => authorizationCodes.Deserialize(AuthorizationCodePayloadSerializer.CurrentVersion, json, "code"));
+		var node = JsonNode.Parse(json)!;
+		node["Subject"]!["Identities"] = new JsonArray();
+
+		Assert.Throws<OperationalPayloadException>(() => authorizationCodes.Deserialize(
+			version, node.ToJsonString(), OperationalTestData.IdentityOf(code)));
 	}
 
 	// DF9: an identity scope with no user claims cannot be materialized — the model forbids it.
 	[Fact]
 	public void AuthorizationCode_WithAnIdentityScopeWithoutClaims_FailsClosed()
 	{
-		const string json = """
-			{
-				"ClientId":"c","RedirectUri":"https://client.example/cb","SessionState":"s",
-				"Subject":{"Identities":[{"Claims":[{"Type":"sub","Value":"one"}]}]},
-				"Scopes":{"IdentityScopes":[{"Name":"profile","DisplayName":"Profile","Description":"d","UserClaims":[]}]}
-			}
-			""";
+		var code = OperationalTestData.NewAuthorizationCode();
+		var (version, json) = authorizationCodes.Serialize(code);
 
-		Assert.Throws<OperationalPayloadException>(
-			() => authorizationCodes.Deserialize(AuthorizationCodePayloadSerializer.CurrentVersion, json, "code"));
+		var node = JsonNode.Parse(json)!;
+		node["Scopes"]!["IdentityScopes"]![0]!["UserClaims"] = new JsonArray();
+
+		Assert.Throws<OperationalPayloadException>(() => authorizationCodes.Deserialize(
+			version, node.ToJsonString(), OperationalTestData.IdentityOf(code)));
+	}
+
+	private AccessToken Deserialize(string json) => accessTokens.Deserialize(
+		AccessTokenPayloadSerializer.CurrentVersion,
+		json,
+		new AccessTokenIdentity(
+			"jti",
+			"realm-a",
+			"client-one",
+			AccessTokenType.Reference,
+			OperationalTestData.CreationTime,
+			OperationalTestData.CreationTime.AddHours(1)));
+
+	/// <summary>Removes a member from a serialized payload, wherever it appears in the graph.</summary>
+	private static string WithoutMember(string json, string member)
+		=> EditMembers(json, member, (obj, name) => obj.Remove(name));
+
+	/// <summary>Sets a member to an explicit JSON null, wherever it appears in the graph.</summary>
+	private static string WithMemberSetToNull(string json, string member)
+		=> EditMembers(json, member, (obj, name) =>
+		{
+			if (obj.ContainsKey(name))
+				obj[name] = null;
+		});
+
+	private static string EditMembers(string json, string member, Action<JsonObject, string> edit)
+	{
+		var node = JsonNode.Parse(json)!;
+		Visit(node);
+
+		return node.ToJsonString();
+
+		void Visit(JsonNode current)
+		{
+			switch (current)
+			{
+				case JsonObject obj:
+					edit(obj, member);
+					foreach (var child in obj.Select(pair => pair.Value).Where(value => value is not null).ToList())
+						Visit(child!);
+					break;
+
+				case JsonArray array:
+					foreach (var item in array.Where(value => value is not null).ToList())
+						Visit(item!);
+					break;
+			}
+		}
 	}
 }

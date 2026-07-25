@@ -231,14 +231,7 @@ convention, and precedence rules.
 
 ## Code Style
 
-- Target framework is `net10.0` (via `Directory.Build.props`).
-- Nullable and implicit usings are enabled globally.
-- Use tabs with width 4 for C# indentation.
-- Prefer file-scoped namespace style unless the surrounding file uses otherwise.
-- Primary constructors are preferred for simple cases.
-- Follow `.ai/rules/code-style.rules.md` for repository-specific style rules, including the preference for method-chain LINQ over query expression syntax.
-- Keep changes scoped to the task and follow nearby patterns.
-- For the `UserAccounts` module family, follow "External RoyalCode Libraries" above for library-specific patterns.
+- Read and follow the rules of `.ai/rules/code-style.rules.md`
 
 ## ADR
 

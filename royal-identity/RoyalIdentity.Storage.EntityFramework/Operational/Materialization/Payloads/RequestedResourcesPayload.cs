@@ -98,7 +98,7 @@ public sealed class IdentityScopePayload
 
 	public bool Emphasize { get; set; }
 
-	public List<string> UserClaims { get; set; } = [];
+	public required List<string> UserClaims { get; set; }
 
 	public static IdentityScopePayload From(IdentityScope scope) => new()
 	{
@@ -159,11 +159,11 @@ public sealed class ResourceServerPayload
 
 	public bool AllowScopeRequests { get; set; }
 
-	public List<ScopePayload> Scopes { get; set; } = [];
+	public required List<ScopePayload> Scopes { get; set; }
 
-	public List<ProtectedResourcePayload> ProtectedResources { get; set; } = [];
+	public required List<ProtectedResourcePayload> ProtectedResources { get; set; }
 
-	public List<string> AllowedAccessTokenSigningAlgorithms { get; set; } = [];
+	public required List<string> AllowedAccessTokenSigningAlgorithms { get; set; }
 
 	public static ResourceServerPayload From(ResourceServer server) => new()
 	{
@@ -201,21 +201,21 @@ public sealed class RequestedResourcesPayload
 {
 	public bool OfflineAccess { get; set; }
 
-	public List<string> RequestedScopeNames { get; set; } = [];
+	public required List<string> RequestedScopeNames { get; set; }
 
-	public List<string> MissingScopes { get; set; } = [];
+	public required List<string> MissingScopes { get; set; }
 
-	public List<string> RequestedResourceUris { get; set; } = [];
+	public required List<string> RequestedResourceUris { get; set; }
 
-	public List<string> InvalidTargets { get; set; } = [];
+	public required List<string> InvalidTargets { get; set; }
 
-	public List<IdentityScopePayload> IdentityScopes { get; set; } = [];
+	public required List<IdentityScopePayload> IdentityScopes { get; set; }
 
-	public List<ScopePayload> Scopes { get; set; } = [];
+	public required List<ScopePayload> Scopes { get; set; }
 
-	public List<ResourceServerPayload> ResourceServers { get; set; } = [];
+	public required List<ResourceServerPayload> ResourceServers { get; set; }
 
-	public List<ProtectedResourcePayload> ProtectedResources { get; set; } = [];
+	public required List<ProtectedResourcePayload> ProtectedResources { get; set; }
 
 	public static RequestedResourcesPayload From(RequestedResources resources)
 	{

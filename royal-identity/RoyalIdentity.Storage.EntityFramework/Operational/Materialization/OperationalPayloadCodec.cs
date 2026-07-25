@@ -5,8 +5,15 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 
 /// <summary>
 /// JSON codec shared by the operational payload serializers (plan DF9): one version per payload type, and
-/// every failure — unknown version, malformed JSON, a missing required member — raises
-/// <see cref="OperationalPayloadException"/> instead of producing a partially materialized payload.
+/// every failure raises <see cref="OperationalPayloadException"/> instead of producing a partially
+/// materialized payload.
+/// <para>
+/// Two options carry that guarantee for the whole family, so no serializer has to re-check member by member:
+/// <c>required</c> members make an omitted contract member a failure rather than a silently empty collection,
+/// and <see cref="JsonSerializerOptions.RespectNullableAnnotations"/> makes an explicit <c>null</c> on a
+/// non-nullable member a failure too. A member declared nullable — an authorization code's
+/// <c>Properties</c>, a consent's <c>Scopes</c> — keeps meaning "absent", which is distinct from empty.
+/// </para>
 /// </summary>
 /// <typeparam name="TPayload">The payload DTO.</typeparam>
 /// <param name="payloadName">The name used in diagnostics; never the data itself.</param>
@@ -16,6 +23,7 @@ internal sealed class OperationalPayloadCodec<TPayload>(string payloadName, int 
 	private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.General)
 	{
 		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+		RespectNullableAnnotations = true,
 	};
 
 	public string Serialize(TPayload payload) => JsonSerializer.Serialize(payload, options);

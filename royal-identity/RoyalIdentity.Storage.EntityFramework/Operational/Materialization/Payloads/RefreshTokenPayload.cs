@@ -3,31 +3,25 @@ using RoyalIdentity.Models.Tokens;
 namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payloads;
 
 /// <summary>
-/// The persisted graph of a <see cref="RefreshToken"/>. The raw handle is never here — it is the lookup
-/// argument, whose digest is the key (plan DF38) — and neither is any identifier of the previous access
-/// token: the row of that access token is not a dependency of a refresh (plan DF41).
+/// The persisted graph of a <see cref="RefreshToken"/> that has no queryable column of its own. Realm, client
+/// and the timestamps arrive through <see cref="RefreshTokenIdentity"/> (plan DF9/DF36); consumption state,
+/// state version and claims mode are columns too. The raw handle is the lookup argument and is never persisted
+/// (plan DF38), and no identifier of the previous access token exists here: its row is not a dependency of a
+/// refresh (plan DF41).
 /// </summary>
 public sealed class RefreshTokenPayload
 {
-	public required string ClientId { get; set; }
-
 	public required string Issuer { get; set; }
-
-	public DateTime CreationTime { get; set; }
-
-	public int Lifetime { get; set; }
-
-	public string? RealmId { get; set; }
 
 	public string? Confirmation { get; set; }
 
-	public List<string> RequestedScopes { get; set; } = [];
+	public required List<string> RequestedScopes { get; set; }
 
-	public List<string> ResourceUris { get; set; } = [];
+	public required List<string> ResourceUris { get; set; }
 
-	public List<string> Audiences { get; set; } = [];
+	public required List<string> Audiences { get; set; }
 
-	public List<string> AllowedSigningAlgorithms { get; set; } = [];
+	public required List<string> AllowedSigningAlgorithms { get; set; }
 
-	public List<ClaimPayload> Claims { get; set; } = [];
+	public required List<ClaimPayload> Claims { get; set; }
 }

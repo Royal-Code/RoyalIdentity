@@ -5,6 +5,7 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
+using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Users.Contracts;
 using Tests.Storage.Operational.Support;
@@ -57,6 +58,43 @@ public class OperationalContractsShapeTests
 	{
 		Assert.False(typeof(AuthorizationCodeStore).IsAssignableTo(typeof(ISingleUseAuthorizationCodeStore)));
 		Assert.False(typeof(RefreshTokenStore).IsAssignableTo(typeof(IVersionedRefreshTokenStore)));
+	}
+
+	// DF39: the EF composition must be unable to produce a store without the capability. The factory's own
+	// return types carry it, so the guarantee is enforced by the compiler and the transitional fallback is
+	// unreachable from this adapter by construction — no runtime check can be forgotten.
+	[Fact]
+	public void OperationalStoreFactory_ReturnsStoresThatCarryTheCapabilities()
+	{
+		var codeStore = typeof(IOperationalStoreFactory)
+			.GetMethod(nameof(IOperationalStoreFactory.GetAuthorizationCodeStore))!.ReturnType;
+		var refreshStore = typeof(IOperationalStoreFactory)
+			.GetMethod(nameof(IOperationalStoreFactory.GetRefreshTokenStore))!.ReturnType;
+
+		Assert.True(codeStore.IsAssignableTo(typeof(IAuthorizationCodeStore)));
+		Assert.True(codeStore.IsAssignableTo(typeof(ISingleUseAuthorizationCodeStore)));
+		Assert.True(refreshStore.IsAssignableTo(typeof(IRefreshTokenStore)));
+		Assert.True(refreshStore.IsAssignableTo(typeof(IVersionedRefreshTokenStore)));
+	}
+
+	// The consumers must therefore take the capability path for anything the EF factory produces.
+	[Fact]
+	public async Task Consumers_TakeTheCapabilityPath_ForEveryStoreTheEfFactoryCanProduce()
+	{
+		var code = OperationalTestData.NewAuthorizationCode();
+		var codeStore = new CapableAuthorizationCodeStore(code);
+		var refreshStore = new CapableRefreshTokenStore(OperationalTestData.NewRefreshToken());
+		var storage = new SingleStoreStorage { AuthorizationCodes = codeStore, RefreshTokens = refreshStore };
+
+		// Both fakes satisfy the factory's return types, which is what the EF stores will have to satisfy too.
+		Assert.True(codeStore is IOperationalAuthorizationCodeStore);
+		Assert.True(refreshStore is IOperationalRefreshTokenStore);
+
+		await new DefaultAuthorizationCodeConsumer(storage, NullLogger<DefaultAuthorizationCodeConsumer>.Instance)
+			.ConsumeAsync(Realm, code.Code, code.ClientId, code.RedirectUri);
+
+		Assert.Equal(1, codeStore.ConsumeCalls);
+		Assert.Equal(0, codeStore.GetCalls);
 	}
 
 	// MP-5: authorize parameters are reached through a realm accessor, never through global state.
@@ -208,8 +246,9 @@ public class OperationalContractsShapeTests
 		Assert.Equal(OperationalTestData.CreationTime, token.ConsumedTime);
 	}
 
-	private sealed class CapableAuthorizationCodeStore(AuthorizationCode code)
-		: IAuthorizationCodeStore, ISingleUseAuthorizationCodeStore
+	// Implements the very interface the EF factory must return, so this stand-in exercises the same shape the
+	// real store will have.
+	private sealed class CapableAuthorizationCodeStore(AuthorizationCode code) : IOperationalAuthorizationCodeStore
 	{
 		public int ConsumeCalls { get; private set; }
 
@@ -263,8 +302,8 @@ public class OperationalContractsShapeTests
 			=> Task.FromResult(authorizationCode.Code);
 	}
 
-	private sealed class CapableRefreshTokenStore(RefreshToken token)
-		: IRefreshTokenStore, IVersionedRefreshTokenStore
+	/// <inheritdoc cref="CapableAuthorizationCodeStore"/>
+	private sealed class CapableRefreshTokenStore(RefreshToken token) : IOperationalRefreshTokenStore
 	{
 		public RefreshTokenTransition? Result { get; set; }
 

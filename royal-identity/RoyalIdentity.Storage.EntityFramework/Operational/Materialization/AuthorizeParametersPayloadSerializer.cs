@@ -22,7 +22,7 @@ public sealed class AuthorizeParametersPayloadSerializer
 	{
 		ArgumentNullException.ThrowIfNull(parameters);
 
-		var payload = new AuthorizeParametersPayload();
+		var payload = new AuthorizeParametersPayload { Parameters = [] };
 
 		for (var index = 0; index < parameters.Count; index++)
 		{
@@ -43,15 +43,9 @@ public sealed class AuthorizeParametersPayloadSerializer
 	{
 		var payload = codec.Deserialize(version, json);
 
-		if (payload.Parameters is null)
-			throw OperationalPayloadException.IncompletePayload(PayloadName, "'Parameters' is null");
-
 		var parameters = new NameValueCollection();
 		foreach (var parameter in payload.Parameters)
 		{
-			if (parameter.Values is null)
-				throw OperationalPayloadException.IncompletePayload(PayloadName, "an entry has null values");
-
 			foreach (var value in parameter.Values)
 				parameters.Add(parameter.Name, value);
 		}

@@ -6,8 +6,9 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 
 /// <summary>
 /// Serializes the non-queryable graph of a <see cref="RefreshToken"/> to a versioned payload and back
-/// (plan DF9). Consumption state, state version and claims mode are relational columns, so they are not here;
-/// the raw handle is the lookup argument and is never persisted (plan DF38).
+/// (plan DF9). Realm, client and the timestamps come back from <see cref="RefreshTokenIdentity"/>, and
+/// consumption state, state version and claims mode are columns too, so nothing here can disagree with what a
+/// conditional transition evaluated. The raw handle is the lookup argument and is never persisted (plan DF38).
 /// </summary>
 public sealed class RefreshTokenPayloadSerializer
 {
@@ -23,11 +24,7 @@ public sealed class RefreshTokenPayloadSerializer
 
 		var payload = new RefreshTokenPayload
 		{
-			ClientId = token.ClientId,
 			Issuer = token.Issuer,
-			CreationTime = token.CreationTime,
-			Lifetime = token.Lifetime,
-			RealmId = token.RealmId,
 			Confirmation = token.Confirmation,
 			RequestedScopes = [.. token.RequestedScopes],
 			ResourceUris = [.. token.ResourceUris],
@@ -41,39 +38,37 @@ public sealed class RefreshTokenPayloadSerializer
 
 	/// <param name="version">The persisted payload version.</param>
 	/// <param name="json">The persisted payload.</param>
-	/// <param name="handle">The lookup argument; it rematerializes <see cref="TokenBase.Token"/>.</param>
-	public RefreshToken Deserialize(int version, string json, string handle)
+	/// <param name="identity">The authoritative relational identity of the row.</param>
+	public RefreshToken Deserialize(int version, string json, RefreshTokenIdentity identity)
 	{
-		ArgumentException.ThrowIfNullOrEmpty(handle);
+		ArgumentNullException.ThrowIfNull(identity);
 
 		var payload = codec.Deserialize(version, json);
-		var claims = Required(payload.Claims, nameof(payload.Claims));
 
 		var token = new RefreshToken(
-			ClaimValue(claims, JwtRegisteredClaimNames.Sub),
-			ClaimValue(claims, JwtRegisteredClaimNames.Sid),
-			ClaimValue(claims, JwtRegisteredClaimNames.Jti),
-			[.. Required(payload.RequestedScopes, nameof(payload.RequestedScopes))],
-			payload.ClientId,
+			ClaimValue(payload.Claims, JwtRegisteredClaimNames.Sub),
+			ClaimValue(payload.Claims, JwtRegisteredClaimNames.Sid),
+			ClaimValue(payload.Claims, JwtRegisteredClaimNames.Jti),
+			[.. payload.RequestedScopes],
+			identity.ClientId,
 			payload.Issuer,
-			payload.CreationTime,
-			payload.Lifetime,
-			handle)
+			identity.CreatedAtUtc,
+			identity.Lifetime,
+			identity.Handle)
 		{
-			RealmId = payload.RealmId,
+			RealmId = identity.RealmId,
 			Confirmation = payload.Confirmation,
-			Audiences = [.. Required(payload.Audiences, nameof(payload.Audiences))],
-			AllowedSigningAlgorithms =
-				[.. Required(payload.AllowedSigningAlgorithms, nameof(payload.AllowedSigningAlgorithms))],
+			Audiences = [.. payload.Audiences],
+			AllowedSigningAlgorithms = [.. payload.AllowedSigningAlgorithms],
 		};
 
 		// The constructor seeds sub/sid/jti; the persisted claim set is the authority, so it replaces them
 		// wholesale and the round-trip cannot gain or lose a claim.
 		token.Claims.Clear();
-		foreach (var claim in claims)
+		foreach (var claim in payload.Claims)
 			token.Claims.Add(claim.ToClaim());
 
-		foreach (var uri in Required(payload.ResourceUris, nameof(payload.ResourceUris)))
+		foreach (var uri in payload.ResourceUris)
 			token.ResourceUris.Add(uri);
 
 		return token;
@@ -82,7 +77,4 @@ public sealed class RefreshTokenPayloadSerializer
 	private static string ClaimValue(List<ClaimPayload> claims, string type)
 		=> claims.FirstOrDefault(claim => string.Equals(claim.Type, type, StringComparison.Ordinal))?.Value
 			?? string.Empty;
-
-	private static List<T> Required<T>(List<T>? values, string name)
-		=> values ?? throw OperationalPayloadException.IncompletePayload(nameof(RefreshToken), $"'{name}' is null");
 }

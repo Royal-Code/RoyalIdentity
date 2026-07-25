@@ -5,8 +5,13 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 
 /// <summary>
 /// Serializes the non-queryable graph of an <see cref="AuthorizationCode"/> to a versioned payload and back
-/// (plan DF9): the subject principal, the resolved resources and the code's own properties. Client, redirect
-/// URI and timestamps are relational columns, and the raw code is the lookup argument (plan DF38).
+/// (plan DF9): the subject principal, the resolved resources and the code's own properties.
+/// <para>
+/// Client, redirect URI, session and the timestamps come back from <see cref="AuthorizationCodeIdentity"/>,
+/// never from the payload. That is a correctness requirement, not a preference: the conditional consumption of
+/// DF11 matches the client and the redirect URI in the database, so the object handed to the pipeline must
+/// carry exactly the values that condition evaluated.
+/// </para>
 /// </summary>
 public sealed class AuthorizationCodePayloadSerializer
 {
@@ -22,15 +27,9 @@ public sealed class AuthorizationCodePayloadSerializer
 
 		var payload = new AuthorizationCodePayload
 		{
-			ClientId = code.ClientId,
-			RedirectUri = code.RedirectUri,
 			SessionState = code.SessionState,
-			CreationTime = code.CreationTime,
-			Lifetime = code.Lifetime,
-			RealmId = code.RealmId,
 			Nonce = code.Nonce,
 			StateHash = code.StateHash,
-			SessionId = code.SessionId,
 			CodeChallenge = code.CodeChallenge,
 			CodeChallengeMethod = code.CodeChallengeMethod,
 			Properties = code.Properties is null ? null : new Dictionary<string, string>(code.Properties),
@@ -43,27 +42,27 @@ public sealed class AuthorizationCodePayloadSerializer
 
 	/// <param name="version">The persisted payload version.</param>
 	/// <param name="json">The persisted payload.</param>
-	/// <param name="code">The lookup argument; it rematerializes <see cref="AuthorizationCode.Code"/>.</param>
-	public AuthorizationCode Deserialize(int version, string json, string code)
+	/// <param name="identity">The authoritative relational identity of the row.</param>
+	public AuthorizationCode Deserialize(int version, string json, AuthorizationCodeIdentity identity)
 	{
-		ArgumentException.ThrowIfNullOrEmpty(code);
+		ArgumentNullException.ThrowIfNull(identity);
 
 		var payload = codec.Deserialize(version, json);
 
 		return new AuthorizationCode(
-			code,
-			payload.ClientId,
+			identity.Code,
+			identity.ClientId,
 			payload.Subject.ToClaimsPrincipal(nameof(AuthorizationCode)),
 			payload.SessionState,
-			payload.CreationTime,
-			payload.Lifetime,
+			identity.CreatedAtUtc,
+			identity.Lifetime,
 			payload.Scopes.ToRequestedResources(nameof(AuthorizationCode)),
-			payload.RedirectUri)
+			identity.RedirectUri)
 		{
-			RealmId = payload.RealmId,
+			RealmId = identity.RealmId,
+			SessionId = identity.SessionId,
 			Nonce = payload.Nonce,
 			StateHash = payload.StateHash,
-			SessionId = payload.SessionId,
 			CodeChallenge = payload.CodeChallenge,
 			CodeChallengeMethod = payload.CodeChallengeMethod,
 			Properties = payload.Properties is null ? null : new Dictionary<string, string>(payload.Properties),
