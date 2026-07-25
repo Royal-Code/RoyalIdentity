@@ -203,8 +203,44 @@ public class OperationalPayloadTests
         Assert.Equal(
             token.Claims.Select(c => (c.Type, c.Value)).OrderBy(c => c.Type),
             restored.Claims.Select(c => (c.Type, c.Value)).OrderBy(c => c.Type));
+        Assert.Equal(
+            token.IdentityTokenClaims.Select(c => (c.Type, c.Value, c.ValueType)).OrderBy(c => c.Type),
+            restored.IdentityTokenClaims.Select(c => (c.Type, c.Value, c.ValueType)).OrderBy(c => c.Type));
         Assert.Equal("subject-one", restored.SubjectId);
         Assert.Equal("session-one", restored.SessionId);
+    }
+
+    [Fact]
+    public void RefreshToken_VersionOne_FailsClosed_InsteadOfMixingTokenClaimProvenance()
+    {
+        var token = OperationalTestData.NewRefreshToken();
+        var (_, json) = refreshTokens.Serialize(token);
+
+        Assert.Equal(2, RefreshTokenPayloadSerializer.CurrentVersion);
+        Assert.Throws<OperationalPayloadException>(() => refreshTokens.Deserialize(
+            1, json, OperationalTestData.IdentityOf(token)));
+    }
+
+    [Theory]
+    [InlineData("Claims")]
+    [InlineData("IdentityTokenClaims")]
+    public void RefreshToken_WithAnOmittedClaimCollection_FailsClosed(string omittedMember)
+    {
+        var token = OperationalTestData.NewRefreshToken();
+        var (version, json) = refreshTokens.Serialize(token);
+
+        Assert.Throws<OperationalPayloadException>(() => refreshTokens.Deserialize(
+            version, WithoutMember(json, omittedMember), OperationalTestData.IdentityOf(token)));
+    }
+
+    [Fact]
+    public void RefreshToken_WithANullIdentityClaimCollection_FailsClosed()
+    {
+        var token = OperationalTestData.NewRefreshToken();
+        var (version, json) = refreshTokens.Serialize(token);
+
+        Assert.Throws<OperationalPayloadException>(() => refreshTokens.Deserialize(
+            version, WithMemberSetToNull(json, "IdentityTokenClaims"), OperationalTestData.IdentityOf(token)));
     }
 
     // DF38: the refresh handle is the lookup argument, never persisted content.

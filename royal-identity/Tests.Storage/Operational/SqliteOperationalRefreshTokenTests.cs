@@ -39,6 +39,8 @@ public class SqliteOperationalRefreshTokenTests
         };
 
         token.ResourceUris.Add("https://api.example/orders");
+        if (claimsMode is RefreshTokenClaimsMode.Snapshot)
+            token.IdentityTokenClaims.Add(new Claim("website", "https://snapshot.example"));
 
         return token;
     }
@@ -118,7 +120,19 @@ public class SqliteOperationalRefreshTokenTests
             ? RefreshTokenClaimsMode.Snapshot
             : RefreshTokenClaimsMode.Current;
 
-        Assert.Equal(mode, (await harness.Storage.GetRefreshTokenStore(realm).GetAsync("rt-handle", default))!.ClaimsMode);
+        var restored = (await harness.Storage.GetRefreshTokenStore(realm).GetAsync("rt-handle", default))!;
+
+        Assert.Equal(mode, restored.ClaimsMode);
+        if (mode is RefreshTokenClaimsMode.Snapshot)
+        {
+            Assert.Equal(
+                "https://snapshot.example",
+                Assert.Single(restored.IdentityTokenClaims, claim => claim.Type == "website").Value);
+        }
+        else
+        {
+            Assert.Empty(restored.IdentityTokenClaims);
+        }
     }
 
     // DF12: the first transition succeeds and is observable; the state version moves with it.

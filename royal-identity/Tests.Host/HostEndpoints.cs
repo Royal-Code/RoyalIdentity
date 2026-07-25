@@ -153,20 +153,6 @@ public static class HostEndpoints
 
             var token = await tokenFactory.CreateAccessTokenAsync(accessTokenRequest, context.RequestAborted);
 
-            var refreshToken = default(RefreshToken);
-            if (requestedResources.OfflineAccess)
-            {
-                var refreshTokenRequest = new RefreshTokenRequest
-                {
-                    HttpContext = context,
-                    Subject = user,
-                    Client = client,
-                    AccessToken = token
-                };
-
-                refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, context.RequestAborted);
-            }
-
             var idToken = default(IdentityToken);
             if (requestedResources.IsOpenId)
             {
@@ -180,6 +166,21 @@ public static class HostEndpoints
                 };
 
                 idToken = await tokenFactory.CreateIdentityTokenAsync(idTokenRequest, context.RequestAborted);
+            }
+
+            var refreshToken = default(RefreshToken);
+            if (requestedResources.OfflineAccess)
+            {
+                var refreshTokenRequest = new RefreshTokenRequest
+                {
+                    HttpContext = context,
+                    Subject = user,
+                    Client = client,
+                    AccessToken = token,
+                    IdentityTokenClaims = idToken?.Claims,
+                };
+
+                refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, context.RequestAborted);
             }
 
             return Results.Ok(new

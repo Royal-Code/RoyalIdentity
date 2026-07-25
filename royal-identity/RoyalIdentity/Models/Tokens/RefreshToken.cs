@@ -1,4 +1,5 @@
 using RoyalIdentity.Options;
+using RoyalIdentity.Utils;
 using System.Security.Claims;
 
 namespace RoyalIdentity.Models.Tokens;
@@ -38,12 +39,21 @@ public class RefreshToken: TokenBase
     /// </para>
     /// <para>
     ///     <see cref="RefreshTokenClaimsMode.Current"/> keeps only the minimal grant here and re-runs issuance
-    ///     against the current claims; <see cref="RefreshTokenClaimsMode.Snapshot"/> keeps in
-    ///     <see cref="TokenBase.Claims"/> everything needed to reproduce the emitted claims. Neither depends on
-    ///     the row of the access token that was issued alongside it (DF41).
+    ///     against the current claims; <see cref="RefreshTokenClaimsMode.Snapshot"/> keeps the access-token
+    ///     snapshot in <see cref="TokenBase.Claims"/> and the identity-token snapshot in
+    ///     <see cref="IdentityTokenClaims"/>. Keeping the two provenances separate prevents access-only claims
+    ///     from entering a renewed identity token. Neither depends on the row of the access token that was
+    ///     issued alongside it (DF41).
     /// </para>
     /// </summary>
     public RefreshTokenClaimsMode ClaimsMode { get; set; } = RefreshTokenClaimsMode.Current;
+
+    /// <summary>
+    /// Subject claims originally emitted in the identity token when <see cref="ClaimsMode"/> is
+    /// <see cref="RefreshTokenClaimsMode.Snapshot"/>. Token-instance claims such as <c>iat</c>, <c>at_hash</c>,
+    /// <c>nonce</c>, <c>c_hash</c>, <c>sid</c> and <c>aud</c> are minted again and are not stored here.
+    /// </summary>
+    public HashSet<Claim> IdentityTokenClaims { get; } = new(new ClaimComparer());
 
     /// <summary>
     /// RFC 8707 protected resource URIs authorized for refresh-token renewal.

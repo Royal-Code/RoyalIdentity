@@ -283,6 +283,19 @@ public class DefaultTokenFactory : ITokenFactory
             ? request.AccessToken.Claims.Where(claim => !IsReissuedPerToken(claim.Type))
             : request.AccessToken.Claims.Where(claim => ProtocolContextClaims.Contains(claim.Type)));
 
+        if (claimsMode is RefreshTokenClaimsMode.Snapshot)
+        {
+            var includesIdentityToken = request.AccessToken.Scopes.Contains(Server.StandardScopes.OpenId);
+            if (includesIdentityToken && request.IdentityTokenClaims is null)
+            {
+                throw new InvalidOperationException(
+                    "Snapshot refresh tokens issued for an OpenID grant require the identity-token claims.");
+            }
+
+            refreshToken.IdentityTokenClaims.AddRange(
+                request.IdentityTokenClaims?.Where(claim => !IsIdentityTokenInstanceClaim(claim.Type)) ?? []);
+        }
+
         await storage.GetRefreshTokenStore(request.Client.Realm).StoreAsync(refreshToken, ct);
 
         return refreshToken;
@@ -311,4 +324,21 @@ public class DefaultTokenFactory : ITokenFactory
             or JwtRegisteredClaimNames.Iat
             or JwtRegisteredClaimNames.Exp
             or JwtRegisteredClaimNames.Nbf;
+
+    /// <summary>
+    /// Claims tied to one identity-token instance. Snapshot mode persists only subject/profile claims; these
+    /// values are recalculated for every renewed identity token.
+    /// </summary>
+    private static bool IsIdentityTokenInstanceClaim(string claimType)
+        => claimType is JwtRegisteredClaimNames.Sid
+            or JwtRegisteredClaimNames.Jti
+            or JwtRegisteredClaimNames.Iat
+            or JwtRegisteredClaimNames.Exp
+            or JwtRegisteredClaimNames.Nbf
+            or JwtRegisteredClaimNames.Aud
+            or JwtRegisteredClaimNames.Iss
+            or JwtRegisteredClaimNames.AtHash
+            or JwtRegisteredClaimNames.CHash
+            or JwtRegisteredClaimNames.Nonce
+            or Jwt.ClaimTypes.StateHash;
 }

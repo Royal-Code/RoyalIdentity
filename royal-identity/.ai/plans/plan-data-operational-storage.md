@@ -1505,7 +1505,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 ### Resultado da Fase 5
 
 **Concluída em 2026-07-25**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
-RoyalIdentity.sln` verde: 1098 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas. `git diff --check` sem
+RoyalIdentity.sln` verde: 1113 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas. `git diff --check` sem
 erros.
 
 **Arquivos criados**
@@ -1516,14 +1516,17 @@ erros.
   `scripts/sql/configuration/sqlite/0002_drop_update_access_token_claims_on_refresh.sql`.
 - Testes: `Tests.Storage/Operational/SqliteOperationalRefreshTokenTests` (17),
   `SqliteOperationalRefreshTokenConcurrencyTests` (5) e
-  `Tests.Integration/Endpoints/RefreshTokenClaimsModeTests` (6).
+  `Tests.Integration/Endpoints/RefreshTokenClaimsModeTests` (18).
 
 **Arquivos alterados**
 
-- `RefreshToken` perdeu `AccessTokenId`, o parâmetro de construtor e o claim `jti`; ganhou `ClaimsMode`.
+- `RefreshToken` perdeu `AccessTokenId`, o parâmetro de construtor e o claim `jti`; ganhou `ClaimsMode` e,
+  para `Snapshot`, snapshots distintos de access token (`Claims`) e identity token (`IdentityTokenClaims`).
 - `DefaultTokenFactory` captura o `ClaimsMode` do realm na emissão e escolhe o que persistir: `Current` guarda só
-  o contexto protocolar (`sub`/`sid`/`auth_time`/`idp`/`amr`), `Snapshot` guarda as claims emitidas menos as que
-  são reemitidas por token (`jti`/`iat`/`exp`/`nbf`).
+  o contexto protocolar (`sub`/`sid`/`auth_time`/`idp`/`amr`); `Snapshot` guarda separadamente as claims emitidas
+  para cada tipo de token, removendo de cada coleção apenas as claims que a nova instância reemite.
+- O payload protegido de refresh passou à versão 2 para carregar `IdentityTokenClaims`. A versão 1 defeituosa
+  falha fechada em vez de ser reinterpretada misturando claims de access token e identity token.
 - `RefreshTokenHandler` reescrito na ordem da fase: transição atômica **antes** de qualquer emissão, tolerância
   depois e sobre o estado rematerializado, emissão por último.
 - `Client.UpdateAccessTokenClaimsOnRefresh` removido de core, `ClientEntity`, mapping, materializers e fixtures.
@@ -1569,6 +1572,12 @@ erros.
   profile service, então o id_token trazia claims atuais ao lado de um access token montado do snapshot — duas
   visões do usuário na mesma resposta. `IdentityTokenRequest` ganhou `SnapshotClaims`, um seam explícito que o
   handler preenche só em `Snapshot`. **Verificado por mutação:** sem o seam, o novo teste falha.
+- **A primeira correção de `SnapshotClaims` ainda misturava a proveniência dos tokens.** O refresh guardava só
+  as claims do access token e o handler tentava derivar dali o identity token por exclusão. Isso deixava
+  `client_id` e claims arbitrárias do client entrarem no `id_token`. `RefreshToken` agora mantém coleções
+  distintas, a emissão inicial cria o identity token antes de persistir o refresh e a rotação captura novamente
+  os dois conjuntos. O aceite prova simultaneamente que uma claim de perfil removida depois do grant permanece
+  nos dois tokens e que `client_id`/claim exclusiva do access token não entram no identity token.
 - **A tolerância rodava duas vezes.** `LoadRefreshToken` ainda a avaliava sobre o estado pré-transição — o que
   também contradizia o texto deste relatório. A validação antecipada saiu do decorator, que agora cobre lookup,
   expiração, client e offline access; consumo e tolerância ficam juntos no handler, sobre o estado
@@ -1578,13 +1587,13 @@ erros.
   conflito reintroduziria pela API legada exatamente o lost update que MP-3 existe para impedir.
 - **Testes que prometiam mais do que cobriam.** `CurrentMode_ReflectsClaimsAddedAfterTheGrant` não alterava
   claim alguma. Foi reescrito para de fato adicionar uma claim entre o grant e a renovação, e ganhou par:
-  `Snapshot` ignora a claim nova **em ambos os tokens**, e um terceiro teste prova que os dois modos divergem no
-  mesmo cenário. Somaram-se ainda `TryUpdate` que comprova persistência efetiva e `UpdateAsync` que comprova o
-  lançamento em conflito.
-- **Lacunas de cobertura ainda abertas**, registradas honestamente em vez de marcadas como feitas: tolerâncias
-  zero/finita/infinita ponta a ponta, active-user/session nos dois modos, dois realms simultâneos com modos
-  diferentes, e falha posterior ao CAS (`invalid_target`) mantendo o refresh consumido. O comando focado de
-  `Tests.Identity` previsto na fase também não encontra testes — a cobertura equivalente vive em
+  `Snapshot` ignora a claim nova **em ambos os tokens**. `Current` também cobre remoção de claim em ambos, e
+  `Snapshot` cobre preservação da claim original depois de sua remoção no UserAccounts. Somaram-se ainda
+  `TryUpdate` que comprova persistência efetiva e `UpdateAsync` que comprova o lançamento em conflito.
+- **As lacunas de cobertura foram fechadas:** há aceites ponta a ponta para tolerância zero, finita dentro e fora
+  da janela (usando o timestamp persistido) e infinita; active-user e sessão encerrada nos dois modes; dois realms
+  simultâneos com policies diferentes; e `invalid_target` posterior ao CAS mantendo o refresh consumido. O
+  comando focado de `Tests.Identity` previsto na fase continua sem casos porque essa cobertura de fluxo vive em
   `Tests.Integration`.
 
 ---

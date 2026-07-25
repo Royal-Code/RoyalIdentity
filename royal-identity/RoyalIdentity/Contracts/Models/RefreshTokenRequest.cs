@@ -18,4 +18,11 @@ public class RefreshTokenRequest
     public required Client Client { get; init; }
 
     public required AccessToken AccessToken { get; init; }
+
+    /// <summary>
+    /// Claims of the identity token emitted alongside the access token. They are used only when the realm
+    /// captures a snapshot and remain separate from <see cref="AccessToken"/> claims so access-only client
+    /// claims can never be copied into a renewed identity token.
+    /// </summary>
+    public IReadOnlyCollection<Claim>? IdentityTokenClaims { get; init; }
 }

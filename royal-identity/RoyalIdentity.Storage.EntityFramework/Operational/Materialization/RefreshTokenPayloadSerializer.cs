@@ -13,7 +13,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 public sealed class RefreshTokenPayloadSerializer
 {
     /// <summary>Current payload schema version.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     private readonly OperationalPayloadCodec<RefreshTokenPayload> codec =
         new(nameof(RefreshToken), CurrentVersion);
@@ -31,6 +31,7 @@ public sealed class RefreshTokenPayloadSerializer
             Audiences = [.. token.Audiences],
             AllowedSigningAlgorithms = [.. token.AllowedSigningAlgorithms],
             Claims = [.. token.Claims.Select(ClaimPayload.From)],
+            IdentityTokenClaims = [.. token.IdentityTokenClaims.Select(ClaimPayload.From)],
         };
 
         return (CurrentVersion, codec.Serialize(payload));
@@ -66,6 +67,9 @@ public sealed class RefreshTokenPayloadSerializer
         token.Claims.Clear();
         foreach (var claim in payload.Claims)
             token.Claims.Add(claim.ToClaim());
+
+        foreach (var claim in payload.IdentityTokenClaims)
+            token.IdentityTokenClaims.Add(claim.ToClaim());
 
         foreach (var uri in payload.ResourceUris)
             token.ResourceUris.Add(uri);

@@ -105,12 +105,6 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         var subject = newAccessToken.CreatePrincipal();
 
         /////////////////////////////////////
-        // Refresh Token
-        /////////////////////////////////////
-
-        var newRefreshToken = await IssueRefreshTokenAsync(context, client, refreshToken, newAccessToken, subject, ct);
-
-        /////////////////////////////////////
         // Identity Token
         /////////////////////////////////////
 
@@ -132,12 +126,19 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
                 // DF32: in Snapshot the whole response reproduces the grant. Letting the identity token consult
                 // the provider would return current claims beside an access token built from the snapshot.
                 SnapshotClaims = refreshToken.ClaimsMode is RefreshTokenClaimsMode.Snapshot
-                    ? [.. refreshToken.Claims.Where(claim => !IsProtocolClaim(claim.Type))]
+                    ? [.. refreshToken.IdentityTokenClaims]
                     : null,
             };
 
             newIdentityToken = await tokenFactory.CreateIdentityTokenAsync(idTokenRequest, ct);
         }
+
+        /////////////////////////////////////
+        // Refresh Token
+        /////////////////////////////////////
+
+        var newRefreshToken = await IssueRefreshTokenAsync(
+            context, client, refreshToken, newAccessToken, newIdentityToken, subject, ct);
 
         context.Response = new Responses.TokenResponse(
             newAccessToken,
@@ -180,21 +181,6 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         context.InvalidGrant("Refresh token has been consumed already.");
         return null;
     }
-
-    /// <summary>
-    /// Claims the identity token mints for itself. Feeding them from a snapshot would replay a stale value into
-    /// a fresh token instead of describing the subject.
-    /// </summary>
-    private static bool IsProtocolClaim(string claimType)
-        => claimType is JwtRegisteredClaimNames.Sid
-            or JwtRegisteredClaimNames.Jti
-            or JwtRegisteredClaimNames.Iat
-            or JwtRegisteredClaimNames.Exp
-            or JwtRegisteredClaimNames.Nbf
-            or JwtRegisteredClaimNames.Aud
-            or JwtRegisteredClaimNames.Iss
-            or JwtRegisteredClaimNames.AtHash
-            or Jwt.ClaimTypes.Scope;
 
     private static bool IsWithinTolerance(Models.Client client, DateTime? consumedTime, DateTime now)
     {
@@ -266,6 +252,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         Models.Client client,
         RefreshToken refreshToken,
         AccessToken newAccessToken,
+        IdentityToken? newIdentityToken,
         ClaimsPrincipal subject,
         CancellationToken ct)
     {
@@ -290,6 +277,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             Subject = subject,
             Client = client,
             AccessToken = newAccessToken,
+            IdentityTokenClaims = newIdentityToken?.Claims,
         };
 
         return await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);

@@ -66,22 +66,6 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
 
         logger.LogDebug("Access token issued");
 
-        if (resources.OfflineAccess)
-        {
-            var refreshTokenRequest = new RefreshTokenRequest()
-            {
-                HttpContext = context.HttpContext,
-                Subject = code.Subject,
-                Client = client,
-                AccessToken = accessToken
-            };
-
-            refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);
-            rtEvent = new RefreshTokenIssuedEvent(context, new Token(Oidc.Token.Types.RefreshToken, refreshToken.Token));
-
-            logger.LogDebug("Refresh token issued");
-        }
-
         if (resources.IsOpenId)
         {
             var idTokenRequest = new IdentityTokenRequest()
@@ -98,6 +82,23 @@ public class AuthorizationCodeHandler : IHandler<AuthorizationCodeContext>
             idEvent = new IdentityTokenIssuedEvent(context, new Token(Oidc.Token.Types.IdentityToken, identityToken.Token));
 
             logger.LogDebug("Identity token issued");
+        }
+
+        if (resources.OfflineAccess)
+        {
+            var refreshTokenRequest = new RefreshTokenRequest()
+            {
+                HttpContext = context.HttpContext,
+                Subject = code.Subject,
+                Client = client,
+                AccessToken = accessToken,
+                IdentityTokenClaims = identityToken?.Claims,
+            };
+
+            refreshToken = await tokenFactory.CreateRefreshTokenAsync(refreshTokenRequest, ct);
+            rtEvent = new RefreshTokenIssuedEvent(context, new Token(Oidc.Token.Types.RefreshToken, refreshToken.Token));
+
+            logger.LogDebug("Refresh token issued");
         }
 
         context.Response = new TokenResponse(

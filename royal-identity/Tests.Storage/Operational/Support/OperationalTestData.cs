@@ -149,6 +149,7 @@ internal static class OperationalTestData
 
         token.ResourceUris.Add("https://api.example/orders");
         token.Claims.Add(new Claim("amr", "pwd"));
+        token.IdentityTokenClaims.Add(new Claim("website", "https://subject.example"));
 
         return token;
     }

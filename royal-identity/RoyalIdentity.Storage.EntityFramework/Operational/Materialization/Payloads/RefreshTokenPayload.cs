@@ -24,4 +24,6 @@ public sealed class RefreshTokenPayload
     public required List<string> AllowedSigningAlgorithms { get; set; }
 
     public required List<ClaimPayload> Claims { get; set; }
+
+    public required List<ClaimPayload> IdentityTokenClaims { get; set; }
 }
