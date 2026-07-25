@@ -208,6 +208,48 @@ public class SqliteOperationalUserSessionTests
         Assert.Equal(lastSeen, row.LastSeenAtUtc);
     }
 
+    // The last sighting never moves backwards. A writer that captured an earlier instant but reached the
+    // database later must not overwrite a newer sighting — here the clock is rewound to stage exactly that,
+    // deterministically, without depending on a race to produce the inversion.
+    [Fact]
+    public async Task RecordClient_WithAnEarlierTimestampArrivingLater_DoesNotMoveLastSeenAtBackwards()
+    {
+        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        var store = harness.Storage.GetUserSessionStore(harness.RealmA);
+        await store.CreateAsync(NewSession("no-regress-sid"));
+
+        harness.Clock.Advance(TimeSpan.FromMinutes(10));
+        var later = harness.Clock.GetUtcNow().UtcDateTime;
+        await store.RecordClientAsync("no-regress-sid", "client-a");
+
+        // The delayed writer: its instant is older than what is already stored.
+        harness.Clock.Now = later.AddMinutes(-5);
+        await store.RecordClientAsync("no-regress-sid", "client-a");
+
+        var row = Assert.Single(await ClientRowsAsync(harness));
+        Assert.Equal(later, row.LastSeenAtUtc);
+    }
+
+    // The same rule on the very first refresh after the insert.
+    [Fact]
+    public async Task RecordClient_WithAnEarlierTimestampThanTheFirstSighting_KeepsTheGreaterLastSeenAt()
+    {
+        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        var store = harness.Storage.GetUserSessionStore(harness.RealmA);
+        await store.CreateAsync(NewSession("no-regress-first-sid"));
+
+        harness.Clock.Advance(TimeSpan.FromHours(1));
+        var firstSeen = harness.Clock.GetUtcNow().UtcDateTime;
+        await store.RecordClientAsync("no-regress-first-sid", "client-a");
+
+        harness.Clock.Now = firstSeen.AddMinutes(-30);
+        await store.RecordClientAsync("no-regress-first-sid", "client-a");
+
+        var row = Assert.Single(await ClientRowsAsync(harness));
+        Assert.Equal(firstSeen, row.FirstSeenAtUtc);
+        Assert.Equal(firstSeen, row.LastSeenAtUtc);
+    }
+
     // DF35: the session's clients are owned by it, so purging the session takes them with it.
     [Fact]
     public async Task DeletingASession_CascadesToItsClients()

@@ -34,13 +34,21 @@ internal sealed class SqliteOperationalFileDatabase : IAsyncDisposable
 
     public string ConnectionString => $"Data Source={path};Pooling=False;Default Timeout=30";
 
-    public static async Task<SqliteOperationalFileDatabase> CreateMigratedAsync()
+    /// <param name="clock">
+    /// A controllable clock for scenarios that need to act at a precise point inside a store operation.
+    /// Registered before the storage extension, whose <c>TryAdd</c> then leaves it in place.
+    /// </param>
+    public static async Task<SqliteOperationalFileDatabase> CreateMigratedAsync(TimeProvider? clock = null)
     {
         var path = Path.Combine(Path.GetTempPath(), $"royalidentity-operational-{Guid.NewGuid():N}.db");
         var connectionString = $"Data Source={path};Pooling=False;Default Timeout=30";
 
         var collection = new ServiceCollection();
         collection.AddLogging();
+
+        if (clock is not null)
+            collection.AddSingleton(clock);
+
         collection.AddDbContext<OperationalSqliteDbContext>(
             options => options.UseSqlite(connectionString, sqlite => sqlite.UseOperationalMigrationsHistory()),
             ServiceLifetime.Scoped);
@@ -102,6 +110,17 @@ internal sealed class SqliteOperationalFileDatabase : IAsyncDisposable
 
     public IOperationalStoreFactory StoresOf(AsyncServiceScope scope)
         => scope.ServiceProvider.GetRequiredService<IOperationalStoreFactory>();
+
+    /// <summary>Removes a session out-of-band, standing in for cleanup or a realm purge.</summary>
+    public async Task DeleteSessionAsync(string sessionId)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM user_sessions WHERE session_id = $id;";
+        command.Parameters.AddWithValue("$id", sessionId);
+        await command.ExecuteNonQueryAsync();
+    }
 
     public Task<int> CountConsentsAsync() => CountAsync("consents");
 

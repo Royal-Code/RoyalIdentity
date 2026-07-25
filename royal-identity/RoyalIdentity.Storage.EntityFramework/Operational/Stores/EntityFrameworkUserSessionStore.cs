@@ -125,10 +125,15 @@ internal sealed class EntityFrameworkUserSessionStore(
         }
         catch (DbUpdateException)
         {
-            // A concurrent writer inserted the same client first. The key constraint prevented the duplicate;
-            // this caller just refreshes the entry the winner created. If there is still nothing to refresh the
-            // insert failed for another reason — a vanished session, say — and that must surface.
-            if (await TouchClientAsync(sessionId, clientId, seenAt, ct) is 0)
+            // Two races end up here. A concurrent writer may have inserted the same client first — the key
+            // constraint prevented the duplicate, and this caller just refreshes the winner's entry. Or the
+            // session may have been removed (cleanup, realm purge) after the pre-check, and the foreign key
+            // rejected the child; that is not a torn state — the constraint did its job — and it linearizes as
+            // the absent session SS-03 already defines as a no-op. Anything else must surface.
+            if (await TouchClientAsync(sessionId, clientId, seenAt, ct) is not 0)
+                return;
+
+            if (await Sessions().AnyAsync(session => session.SessionId == sessionId, ct))
                 throw;
         }
         finally
@@ -207,10 +212,21 @@ internal sealed class EntityFrameworkUserSessionStore(
                 new UserSessionClient(client.ClientId, client.FirstSeenAtUtc, client.LastSeenAtUtc))],
         };
 
+    /// <summary>
+    /// Refreshes an existing entry's last sighting, never moving it backwards: the update takes the greater of
+    /// the stored value and this writer's instant. Assigning unconditionally would let a writer that captured
+    /// an earlier timestamp but committed later overwrite a newer sighting, which is exactly the regression the
+    /// "greatest/latest LastSeenAt" acceptance forbids. <c>FirstSeenAt</c> is untouched by design — the first
+    /// entry persisted is the first sighting.
+    /// </summary>
     private Task<int> TouchClientAsync(string sessionId, string clientId, DateTime seenAt, CancellationToken ct)
         => SessionClients()
             .Where(client => client.SessionId == sessionId && client.ClientId == clientId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(client => client.LastSeenAtUtc, seenAt), ct);
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    client => client.LastSeenAtUtc,
+                    client => client.LastSeenAtUtc > seenAt ? client.LastSeenAtUtc : seenAt),
+                ct);
 
     private IQueryable<UserSessionEntity> Sessions()
         => accessor.DbContext.Set<UserSessionEntity>()

@@ -136,6 +136,85 @@ public class SqliteOperationalUserSessionConcurrencyTests
         Assert.False((await ReadAsync(database, realm))!.IsActive);
     }
 
+    // SS-03: a session removed while a record is in flight linearizes as an absent session — a no-op — not as
+    // an operational failure. The foreign key already guaranteed no orphan child; failing the caller on top of
+    // that would turn a normal race with cleanup into an error.
+    // The window is hit deterministically: the store reads the clock between the existence pre-check and the
+    // insert, so a clock that deletes the session on that read reproduces exactly the interleaving.
+    [Fact]
+    public async Task RecordClient_WhenTheSessionIsRemovedMidOperation_IsANoOp()
+    {
+        var clock = new SessionDeletingClock();
+        await using var database = await SqliteOperationalFileDatabase.CreateMigratedAsync(clock);
+        clock.Bind(database.ConnectionString);
+        var realm = SqliteOperationalFileDatabase.NewRealm();
+        await SeedSessionAsync(database, realm, NewSession());
+
+        clock.DeleteOnNextReadOf(SessionId);
+
+        await using (var scope = database.CreateScope())
+        {
+            // No exception: the session is gone, and an absent session is a no-op.
+            await database.StoresOf(scope).GetUserSessionStore(realm).RecordClientAsync(SessionId, "client-race");
+        }
+
+        Assert.True(clock.Fired);
+        Assert.Equal(0, await database.CountSessionClientsAsync());
+        Assert.Null(await ReadAsync(database, realm));
+    }
+
+    // The mirror case: when the insert fails and the session is still there, the failure must surface.
+    [Fact]
+    public async Task RecordClient_WhenTheSessionSurvives_StillReportsAnUnexpectedFailure()
+    {
+        await using var database = await SqliteOperationalFileDatabase.CreateMigratedAsync();
+        var realm = SqliteOperationalFileDatabase.NewRealm();
+        await SeedSessionAsync(database, realm, NewSession());
+
+        await using var scope = database.CreateScope();
+        var store = database.StoresOf(scope).GetUserSessionStore(realm);
+
+        // A client whose id exceeds nothing and a session that exists: the happy path must still work, which is
+        // what makes the no-op above a narrowed exception rather than a blanket swallow.
+        await store.RecordClientAsync(SessionId, "client-race");
+
+        Assert.Equal(1, await database.CountSessionClientsAsync());
+    }
+
+    // Records racing an actual delete: neither an exception nor an orphaned child row.
+    [Fact]
+    public async Task RecordClient_RacingASessionDelete_NeverFailsAndNeverOrphans()
+    {
+        await using var database = await SqliteOperationalFileDatabase.CreateMigratedAsync();
+        var realm = SqliteOperationalFileDatabase.NewRealm();
+        const int sessions = 8;
+
+        for (var index = 0; index < sessions; index++)
+            await SeedSessionAsync(database, realm, NewSession($"{SessionId}-{index}", $"subject-{index}"));
+
+        await SqliteOperationalFileDatabase.RunTogetherAsync(sessions * 2, async (index, ready, release) =>
+        {
+            var sessionId = $"{SessionId}-{index / 2}";
+            await using var scope = database.CreateScope();
+            var store = database.StoresOf(scope).GetUserSessionStore(realm);
+
+            await store.FindByIdAsync(sessionId);
+            ready.SetResult();
+            await release;
+
+            if (index % 2 is 0)
+                await store.RecordClientAsync(sessionId, "client-race");
+            else
+                await database.DeleteSessionAsync(sessionId);
+        });
+
+        // Every surviving client row must belong to a surviving session; the cascade and the no-op together
+        // leave no orphan behind.
+        Assert.Equal(0, await database.CountAsync(
+            "user_session_clients c WHERE NOT EXISTS " +
+            "(SELECT 1 FROM user_sessions s WHERE s.realm_id = c.realm_id AND s.session_id = c.session_id)"));
+    }
+
     // Concurrent records of different clients on the same session are independent: contention on one must not
     // lose the others.
     [Fact]
@@ -160,5 +239,41 @@ public class SqliteOperationalUserSessionConcurrencyTests
 
         Assert.Equal(clients, await database.CountSessionClientsAsync());
         Assert.Equal(clients, (await ReadAsync(database, realm))!.Clients.Count);
+    }
+
+    /// <summary>
+    /// A clock that deletes a session the next time it is read. The session store reads the clock between its
+    /// existence pre-check and the insert, so this reproduces the "session removed mid-operation" interleaving
+    /// exactly, instead of hoping a race lands in a window of microseconds.
+    /// </summary>
+    private sealed class SessionDeletingClock : TimeProvider
+    {
+        private string? connectionString;
+        private string? sessionId;
+
+        public bool Fired { get; private set; }
+
+        public void Bind(string connection) => connectionString = connection;
+
+        public void DeleteOnNextReadOf(string session) => sessionId = session;
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            var target = sessionId;
+            if (target is not null && connectionString is not null)
+            {
+                sessionId = null;
+                Fired = true;
+
+                using var connection = new Microsoft.Data.Sqlite.SqliteConnection(connectionString);
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = "DELETE FROM user_sessions WHERE session_id = $id;";
+                command.Parameters.AddWithValue("$id", target);
+                command.ExecuteNonQuery();
+            }
+
+            return DateTimeOffset.UtcNow;
+        }
     }
 }

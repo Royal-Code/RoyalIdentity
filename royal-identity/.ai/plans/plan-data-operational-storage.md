@@ -1222,13 +1222,14 @@ git diff --check
 
 ```powershell
 dotnet test Tests.Storage --filter "FullyQualifiedName~UserSession|FullyQualifiedName~SqliteOperational"
-dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionService"
+dotnet test Tests.Integration --filter "FullyQualifiedName~DefaultUserSessionService"
 ```
 
 ### Resultado da Fase 3
 
-**Concluída em 2026-07-25.** `dotnet test RoyalIdentity.sln` verde: 1017 aprovados, 9 ignorados (PostgreSQL
-opt-in), 0 falhas. `git diff --check` sem erros.
+**Concluída em 2026-07-25**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
+RoyalIdentity.sln` verde: 1022 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas. `git diff --check` sem
+erros.
 
 **Arquivos criados**
 
@@ -1263,11 +1264,31 @@ opt-in), 0 falhas. `git diff --check` sem erros.
   de clients distintos não se perdem. **Verificado por mutação:** removendo a recuperação do upsert, 2 dos 4
   testes falham.
 
+**Ajustes aplicados após revisão externa (2026-07-25)**
+
+- **`LastSeenAt` não regride mais.** `TouchClientAsync` atribuía o instante do writer incondicionalmente, então
+  um writer que capturou `10:01` e commitou depois de outro que gravou `10:02` reescrevia para trás — violando o
+  aceite "publica o maior/último `LastSeenAt`". A atualização passou a tomar o maior entre o valor armazenado e o
+  do writer. `FirstSeenAt` permanece intocado por decisão: o aceite pede que a primeira entrada persistida seja
+  preservada, e é isso que a operação garante. **Testes determinísticos** com o relógio rebobinado provam a
+  não-regressão sem depender de uma corrida produzir a inversão.
+- **Remoção concorrente da sessão virou no-op.** O achado está certo: a FK já garantiu que não há órfão, então a
+  remoção física durante o `RecordClientAsync` lineariza como sessão ausente — exatamente o no-op de SS-03 — e não
+  como falha operacional. Depois do refresh retornar zero, o store reconfere a sessão: ausente conclui em no-op,
+  presente relança. **Teste determinístico:** o store lê o relógio entre o pre-check e o insert, então um
+  `TimeProvider` que apaga a sessão nessa leitura reproduz a janela exata, sem depender de sorte; há ainda um
+  teste de corrida real `record × delete` provando ausência de exceção e de linha órfã.
+- **Comando focado corrigido no plano:** `DefaultUserSessionServiceTests` vive em `Tests.Integration`, não em
+  `Tests.Identity` — o comando anterior encontrava zero testes (sem lacuna funcional, a suíte completa os cobria).
+- **Pontos do relatório mantidos:** sessão sem payload protegido e `ended_at_utc` na criação de sessão inativa,
+  ambos aprovados na revisão.
+- **Verificado por mutação:** revertendo as duas correções, os 4 testes novos falham.
+
 **Comandos executados**
 
 ```powershell
 dotnet test Tests.Storage --filter "FullyQualifiedName~UserSession|FullyQualifiedName~SqliteOperational"
-dotnet test Tests.Identity
+dotnet test Tests.Integration --filter "FullyQualifiedName~DefaultUserSessionService"
 dotnet test RoyalIdentity.sln
 git diff --check
 ```
