@@ -9,5 +9,5 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration;
 /// </summary>
 public interface IConfigurationDbContextAccessor
 {
-	DbContext DbContext { get; }
+    DbContext DbContext { get; }
 }

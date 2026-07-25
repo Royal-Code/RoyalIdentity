@@ -11,5 +11,5 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational;
 /// </summary>
 public interface IOperationalDbContextAccessor
 {
-	DbContext DbContext { get; }
+    DbContext DbContext { get; }
 }

@@ -12,39 +12,39 @@ namespace RoyalIdentity.Data.Configuration;
 /// </summary>
 public class ConfigurationDbContext : DbContext
 {
-	public ConfigurationDbContext(DbContextOptions<ConfigurationDbContext> options) : base(options)
-	{
-	}
+    public ConfigurationDbContext(DbContextOptions<ConfigurationDbContext> options) : base(options)
+    {
+    }
 
-	/// <summary>Constructor for derived provider contexts carrying their own options type.</summary>
-	protected ConfigurationDbContext(DbContextOptions options) : base(options)
-	{
-	}
+    /// <summary>Constructor for derived provider contexts carrying their own options type.</summary>
+    protected ConfigurationDbContext(DbContextOptions options) : base(options)
+    {
+    }
 
-	public DbSet<ServerOptionsEntity> ServerOptions => Set<ServerOptionsEntity>();
+    public DbSet<ServerOptionsEntity> ServerOptions => Set<ServerOptionsEntity>();
 
-	public DbSet<RealmEntity> Realms => Set<RealmEntity>();
+    public DbSet<RealmEntity> Realms => Set<RealmEntity>();
 
-	public DbSet<ClientEntity> Clients => Set<ClientEntity>();
+    public DbSet<ClientEntity> Clients => Set<ClientEntity>();
 
-	public DbSet<ClientStringValueEntity> ClientStringValues => Set<ClientStringValueEntity>();
+    public DbSet<ClientStringValueEntity> ClientStringValues => Set<ClientStringValueEntity>();
 
-	public DbSet<ClientClaimEntity> ClientClaims => Set<ClientClaimEntity>();
+    public DbSet<ClientClaimEntity> ClientClaims => Set<ClientClaimEntity>();
 
-	public DbSet<ClientSecretEntity> ClientSecrets => Set<ClientSecretEntity>();
+    public DbSet<ClientSecretEntity> ClientSecrets => Set<ClientSecretEntity>();
 
-	public DbSet<SigningKeyEntity> SigningKeys => Set<SigningKeyEntity>();
+    public DbSet<SigningKeyEntity> SigningKeys => Set<SigningKeyEntity>();
 
-	protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
-	{
-		base.OnModelCreating(modelBuilder);
-		ApplyConfigurationModel(modelBuilder);
-	}
+    protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        ApplyConfigurationModel(modelBuilder);
+    }
 
-	/// <summary>
-	/// Model hook (plan DF3): the default applies only the neutral mappings; provider contexts override it
-	/// to apply the full public mapping extension of exactly one provider.
-	/// </summary>
-	protected virtual void ApplyConfigurationModel(ModelBuilder modelBuilder)
-		=> modelBuilder.ApplyRoyalIdentityConfigurationMappings(new ConfigurationModelOptions());
+    /// <summary>
+    /// Model hook (plan DF3): the default applies only the neutral mappings; provider contexts override it
+    /// to apply the full public mapping extension of exactly one provider.
+    /// </summary>
+    protected virtual void ApplyConfigurationModel(ModelBuilder modelBuilder)
+        => modelBuilder.ApplyRoyalIdentityConfigurationMappings(new ConfigurationModelOptions());
 }

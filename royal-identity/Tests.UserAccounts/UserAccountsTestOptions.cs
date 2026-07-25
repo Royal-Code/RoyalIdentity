@@ -9,25 +9,25 @@ namespace Tests.UserAccounts;
 /// </summary>
 internal static class UserAccountsTestOptions
 {
-	/// <summary>
-	/// Builds realm options with the password complexity rules relaxed for tests.
-	/// </summary>
-	/// <param name="minimumLength">The minimum password length to enforce.</param>
-	/// <param name="allowProvidedSubjectId">Whether callers may provide a deterministic subject id.</param>
-	/// <returns>The relaxed realm options.</returns>
-	public static UserAccountsRealmOptions Relaxed(int minimumLength = 4, bool allowProvidedSubjectId = false)
-	{
-		var options = new UserAccountsRealmOptions
-		{
-			AllowProvidedSubjectId = allowProvidedSubjectId
-		};
-		options.PasswordOptions.MinimumLength = minimumLength;
-		options.PasswordOptions.RequireSpecialCharacters = false;
-		options.PasswordOptions.RequireDigit = false;
-		options.PasswordOptions.RequireUppercase = false;
-		options.PasswordOptions.RequireLowercase = false;
-		options.PasswordOptions.MinimumUniqueCharacters = 0;
-		options.PasswordOptions.DisallowUsernameInPassword = false;
-		return options;
-	}
+    /// <summary>
+    /// Builds realm options with the password complexity rules relaxed for tests.
+    /// </summary>
+    /// <param name="minimumLength">The minimum password length to enforce.</param>
+    /// <param name="allowProvidedSubjectId">Whether callers may provide a deterministic subject id.</param>
+    /// <returns>The relaxed realm options.</returns>
+    public static UserAccountsRealmOptions Relaxed(int minimumLength = 4, bool allowProvidedSubjectId = false)
+    {
+        var options = new UserAccountsRealmOptions
+        {
+            AllowProvidedSubjectId = allowProvidedSubjectId
+        };
+        options.PasswordOptions.MinimumLength = minimumLength;
+        options.PasswordOptions.RequireSpecialCharacters = false;
+        options.PasswordOptions.RequireDigit = false;
+        options.PasswordOptions.RequireUppercase = false;
+        options.PasswordOptions.RequireLowercase = false;
+        options.PasswordOptions.MinimumUniqueCharacters = 0;
+        options.PasswordOptions.DisallowUsernameInPassword = false;
+        return options;
+    }
 }

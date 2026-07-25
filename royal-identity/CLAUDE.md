@@ -98,7 +98,7 @@ See [.ai/references/external-libraries/instructions.md](.ai/references/external-
 
 ## Code Style
 
-- Tabs, width 4 (`indent_size = 4` in `.editorconfig`)
+- 4 spaces for C# indentation (`indent_size = 4` in `.editorconfig`)
 - `Nullable enable`, `ImplicitUsings enable`, `LangVersion latest` — applied globally via `Directory.Build.props`
 - File-scoped namespaces preferred (`csharp_style_namespace_declarations = block_scoped:silent`)
 - Primary constructors preferred for simple cases (`csharp_style_prefer_primary_constructors = true:suggestion`)

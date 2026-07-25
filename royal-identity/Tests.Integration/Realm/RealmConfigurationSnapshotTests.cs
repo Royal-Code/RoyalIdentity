@@ -12,49 +12,49 @@ namespace Tests.Integration.Realm;
 /// </summary>
 public class RealmConfigurationSnapshotTests : IClassFixture<AppFactory>
 {
-	private readonly AppFactory factory;
+    private readonly AppFactory factory;
 
-	public RealmConfigurationSnapshotTests(AppFactory factory)
-	{
-		this.factory = factory;
-		// Force the host (and its hosted services) to start.
-		factory.CreateClient();
-	}
+    public RealmConfigurationSnapshotTests(AppFactory factory)
+    {
+        this.factory = factory;
+        // Force the host (and its hosted services) to start.
+        factory.CreateClient();
+    }
 
-	[Fact]
-	public void Snapshot_IsLoadedAtStartup_WithSeedRealms()
-	{
-		var snapshot = factory.Services.GetRequiredService<IConfigurationSnapshot>();
+    [Fact]
+    public void Snapshot_IsLoadedAtStartup_WithSeedRealms()
+    {
+        var snapshot = factory.Services.GetRequiredService<IConfigurationSnapshot>();
 
-		Assert.True(snapshot.IsLoaded);
-		Assert.NotNull(snapshot.ServerOptions);
-		Assert.NotNull(snapshot.FindRealmByPath("server"));
-	}
+        Assert.True(snapshot.IsLoaded);
+        Assert.NotNull(snapshot.ServerOptions);
+        Assert.NotNull(snapshot.FindRealmByPath("server"));
+    }
 
-	[Fact]
-	public async Task RealmCreatedAtRuntime_IsVisibleInSnapshot()
-	{
-		var suffix = Guid.NewGuid().ToString("N")[..8];
-		var path = $"snap-{suffix}";
+    [Fact]
+    public async Task RealmCreatedAtRuntime_IsVisibleInSnapshot()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var path = $"snap-{suffix}";
 
-		using (var scope = factory.Services.CreateScope())
-		{
-			var manager = scope.ServiceProvider.GetRequiredService<IRealmManager>();
-			await manager.CreateAsync(path, $"{path}.test", $"Snapshot Realm {suffix}");
-		}
+        using (var scope = factory.Services.CreateScope())
+        {
+            var manager = scope.ServiceProvider.GetRequiredService<IRealmManager>();
+            await manager.CreateAsync(path, $"{path}.test", $"Snapshot Realm {suffix}");
+        }
 
-		var snapshot = factory.Services.GetRequiredService<IConfigurationSnapshot>();
-		Assert.NotNull(snapshot.FindRealmByPath(path));
-	}
+        var snapshot = factory.Services.GetRequiredService<IConfigurationSnapshot>();
+        Assert.NotNull(snapshot.FindRealmByPath(path));
+    }
 
-	[Fact]
-	public void ServerOptions_FromSnapshot_IsADefensiveCopy()
-	{
-		var snapshot = factory.Services.GetRequiredService<IConfigurationSnapshot>();
+    [Fact]
+    public void ServerOptions_FromSnapshot_IsADefensiveCopy()
+    {
+        var snapshot = factory.Services.GetRequiredService<IConfigurationSnapshot>();
 
-		var first = snapshot.ServerOptions;
-		first.IssuerUri = "https://mutated-by-caller.test";
+        var first = snapshot.ServerOptions;
+        first.IssuerUri = "https://mutated-by-caller.test";
 
-		Assert.NotEqual("https://mutated-by-caller.test", snapshot.ServerOptions.IssuerUri);
-	}
+        Assert.NotEqual("https://mutated-by-caller.test", snapshot.ServerOptions.IssuerUri);
+    }
 }

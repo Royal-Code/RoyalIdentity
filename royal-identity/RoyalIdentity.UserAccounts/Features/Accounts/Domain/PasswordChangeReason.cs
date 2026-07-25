@@ -5,18 +5,18 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 /// </summary>
 public enum PasswordChangeReason
 {
-	/// <summary>The initial password set when the account was created.</summary>
-	Create,
+    /// <summary>The initial password set when the account was created.</summary>
+    Create,
 
-	/// <summary>A user-initiated password change.</summary>
-	Change,
+    /// <summary>A user-initiated password change.</summary>
+    Change,
 
-	/// <summary>A password reset performed via a recovery token.</summary>
-	Reset,
+    /// <summary>A password reset performed via a recovery token.</summary>
+    Reset,
 
-	/// <summary>An administrative password set or reset.</summary>
-	AdminSet,
+    /// <summary>An administrative password set or reset.</summary>
+    AdminSet,
 
-	/// <summary>A password imported or migrated from another system.</summary>
-	Import
+    /// <summary>A password imported or migrated from another system.</summary>
+    Import
 }

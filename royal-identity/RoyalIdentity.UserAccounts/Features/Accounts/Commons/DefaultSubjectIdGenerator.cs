@@ -7,9 +7,9 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 /// </summary>
 public sealed class DefaultSubjectIdGenerator : ISubjectIdGenerator
 {
-	private const int ByteLength = 32;
+    private const int ByteLength = 32;
 
-	/// <inheritdoc />
-	public string NewSubjectId()
-		=> CryptoRandom.CreateUniqueId(ByteLength, OutputFormat.Base64Url);
+    /// <inheritdoc />
+    public string NewSubjectId()
+        => CryptoRandom.CreateUniqueId(ByteLength, OutputFormat.Base64Url);
 }

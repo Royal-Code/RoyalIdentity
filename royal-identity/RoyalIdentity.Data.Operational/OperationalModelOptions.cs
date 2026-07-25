@@ -6,9 +6,9 @@ namespace RoyalIdentity.Data.Operational;
 /// </summary>
 public sealed class OperationalModelOptions
 {
-	/// <summary>
-	/// Relational schema for the Operational tables. <c>null</c> means no schema (SQLite); the PostgreSQL
-	/// mapping extension defaults it to <c>operation</c> (plan DF4).
-	/// </summary>
-	public string? Schema { get; set; }
+    /// <summary>
+    /// Relational schema for the Operational tables. <c>null</c> means no schema (SQLite); the PostgreSQL
+    /// mapping extension defaults it to <c>operation</c> (plan DF4).
+    /// </summary>
+    public string? Schema { get; set; }
 }

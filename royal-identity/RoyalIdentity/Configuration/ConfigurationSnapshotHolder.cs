@@ -12,53 +12,53 @@ namespace RoyalIdentity.Configuration;
 /// </summary>
 internal sealed class ConfigurationSnapshotHolder(TimeProvider clock) : IConfigurationSnapshot
 {
-	private volatile PublishedConfigurationSnapshot? current;
-	private long lastRefreshFailureTicks;
+    private volatile PublishedConfigurationSnapshot? current;
+    private long lastRefreshFailureTicks;
 
-	public bool IsLoaded => current is not null;
+    public bool IsLoaded => current is not null;
 
-	public ServerOptions ServerOptions => Require().CopyServerOptions();
+    public ServerOptions ServerOptions => Require().CopyServerOptions();
 
-	public Realm? FindRealmByPath(string path)
-	{
-		ArgumentNullException.ThrowIfNull(path);
-		return Require().FindRealmByPath(path);
-	}
+    public Realm? FindRealmByPath(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return Require().FindRealmByPath(path);
+    }
 
-	public IReadOnlyCollection<string> RealmPaths => current?.RealmPaths ?? [];
+    public IReadOnlyCollection<string> RealmPaths => current?.RealmPaths ?? [];
 
-	public DateTimeOffset LoadedAtUtc => Require().LoadedAtUtc;
+    public DateTimeOffset LoadedAtUtc => Require().LoadedAtUtc;
 
-	public DateTimeOffset? LastRefreshFailureUtc
-	{
-		get
-		{
-			var ticks = Interlocked.Read(ref lastRefreshFailureTicks);
-			return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
-		}
-	}
+    public DateTimeOffset? LastRefreshFailureUtc
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref lastRefreshFailureTicks);
+            return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+    }
 
-	/// <summary>
-	/// Publishes a new snapshot atomically and returns the realm paths of the previous snapshot, so the caller
-	/// can invalidate exactly the named options that were affected (previous ∪ new). A successful publish clears
-	/// the last-recorded failure.
-	/// </summary>
-	public IReadOnlyCollection<string> Publish(ConfigurationSnapshotData data)
-	{
-		ArgumentNullException.ThrowIfNull(data);
+    /// <summary>
+    /// Publishes a new snapshot atomically and returns the realm paths of the previous snapshot, so the caller
+    /// can invalidate exactly the named options that were affected (previous ∪ new). A successful publish clears
+    /// the last-recorded failure.
+    /// </summary>
+    public IReadOnlyCollection<string> Publish(ConfigurationSnapshotData data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
 
-		var previousPaths = current?.RealmPaths.ToArray() ?? [];
-		current = new PublishedConfigurationSnapshot(data, clock.GetUtcNow());
-		Interlocked.Exchange(ref lastRefreshFailureTicks, 0);
+        var previousPaths = current?.RealmPaths.ToArray() ?? [];
+        current = new PublishedConfigurationSnapshot(data, clock.GetUtcNow());
+        Interlocked.Exchange(ref lastRefreshFailureTicks, 0);
 
-		return previousPaths;
-	}
+        return previousPaths;
+    }
 
-	/// <summary>Records that a periodic refresh failed; the last-known-good snapshot is preserved (plan DF26).</summary>
-	public void MarkRefreshFailure()
-		=> Interlocked.Exchange(ref lastRefreshFailureTicks, clock.GetUtcNow().UtcTicks);
+    /// <summary>Records that a periodic refresh failed; the last-known-good snapshot is preserved (plan DF26).</summary>
+    public void MarkRefreshFailure()
+        => Interlocked.Exchange(ref lastRefreshFailureTicks, clock.GetUtcNow().UtcTicks);
 
-	private PublishedConfigurationSnapshot Require()
-		=> current ?? throw new InvalidOperationException(
-			"The configuration snapshot has not been loaded yet. It is published by the hosted refresher before the server accepts traffic.");
+    private PublishedConfigurationSnapshot Require()
+        => current ?? throw new InvalidOperationException(
+            "The configuration snapshot has not been loaded yet. It is published by the hosted refresher before the server accepts traffic.");
 }

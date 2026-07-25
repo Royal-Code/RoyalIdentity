@@ -6,6 +6,6 @@ namespace RoyalIdentity.UserAccounts.PostgreSql;
 /// </summary>
 public sealed class PostgreSqlProviderMarker
 {
-	/// <summary>Anchor to the pure module assembly, enforced by architecture tests.</summary>
-	public static readonly System.Type ModuleAnchor = typeof(RoyalIdentity.UserAccounts.UserAccountsAssemblyMarker);
+    /// <summary>Anchor to the pure module assembly, enforced by architecture tests.</summary>
+    public static readonly System.Type ModuleAnchor = typeof(RoyalIdentity.UserAccounts.UserAccountsAssemblyMarker);
 }

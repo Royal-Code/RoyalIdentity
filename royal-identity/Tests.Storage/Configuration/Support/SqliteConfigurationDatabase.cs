@@ -14,40 +14,40 @@ namespace Tests.Storage.Configuration.Support;
 /// </summary>
 internal sealed class SqliteConfigurationDatabase : IConfigurationTestDatabase<ConfigurationSqliteDbContext>
 {
-	private readonly SqliteConnection connection;
+    private readonly SqliteConnection connection;
 
-	private SqliteConfigurationDatabase(SqliteConnection connection) => this.connection = connection;
+    private SqliteConfigurationDatabase(SqliteConnection connection) => this.connection = connection;
 
-	public SqliteConnection Connection => connection;
+    public SqliteConnection Connection => connection;
 
-	/// <summary>Opens the shared connection and applies the real migration (EnsureDeleted first, then MigrateAsync).</summary>
-	public static async Task<SqliteConfigurationDatabase> CreateMigratedAsync()
-	{
-		var connection = new SqliteConnection("DataSource=:memory:");
-		await connection.OpenAsync();
+    /// <summary>Opens the shared connection and applies the real migration (EnsureDeleted first, then MigrateAsync).</summary>
+    public static async Task<SqliteConfigurationDatabase> CreateMigratedAsync()
+    {
+        var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
 
-		var database = new SqliteConfigurationDatabase(connection);
-		await using var context = database.NewContext();
-		await context.Database.EnsureDeletedAsync();
-		await context.Database.MigrateAsync();
+        var database = new SqliteConfigurationDatabase(connection);
+        await using var context = database.NewContext();
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
 
-		return database;
-	}
+        return database;
+    }
 
-	public ConfigurationSqliteDbContext NewContext()
-	{
-		var options = new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
-			.UseSqlite(connection)
-			.Options;
+    public ConfigurationSqliteDbContext NewContext()
+    {
+        var options = new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
+            .UseSqlite(connection)
+            .Options;
 
-		return new ConfigurationSqliteDbContext(options);
-	}
+        return new ConfigurationSqliteDbContext(options);
+    }
 
-	public void AddStorage(ServiceCollection services)
-	{
-		services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(connection));
-		services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
-	}
+    public void AddStorage(ServiceCollection services)
+    {
+        services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(connection));
+        services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
+    }
 
-	public async ValueTask DisposeAsync() => await connection.DisposeAsync();
+    public async ValueTask DisposeAsync() => await connection.DisposeAsync();
 }

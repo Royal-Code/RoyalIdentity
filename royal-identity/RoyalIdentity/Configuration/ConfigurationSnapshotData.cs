@@ -10,7 +10,7 @@ namespace RoyalIdentity.Configuration;
 /// </summary>
 public sealed class ConfigurationSnapshotData
 {
-	public required ServerOptions ServerOptions { get; init; }
+    public required ServerOptions ServerOptions { get; init; }
 
-	public required IReadOnlyList<Realm> Realms { get; init; }
+    public required IReadOnlyList<Realm> Realms { get; init; }
 }

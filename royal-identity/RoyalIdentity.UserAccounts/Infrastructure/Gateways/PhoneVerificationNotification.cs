@@ -12,9 +12,9 @@ namespace RoyalIdentity.UserAccounts.Infrastructure.Gateways;
 /// <param name="Token">The raw verification token/code (single-use, transported once).</param>
 /// <param name="ExpiresAt">When the token expires.</param>
 public sealed record PhoneVerificationNotification(
-	string RealmId,
-	string SubjectId,
-	string DisplayName,
-	string Number,
-	string Token,
-	DateTimeOffset ExpiresAt);
+    string RealmId,
+    string SubjectId,
+    string DisplayName,
+    string Number,
+    string Token,
+    DateTimeOffset ExpiresAt);

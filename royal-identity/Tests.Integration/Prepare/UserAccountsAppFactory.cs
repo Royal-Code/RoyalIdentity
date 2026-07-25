@@ -17,55 +17,55 @@ namespace Tests.Integration.Prepare;
 /// </summary>
 public sealed class UserAccountsAppFactory : AppFactory
 {
-	protected override void ConfigureWebHost(IWebHostBuilder builder)
-	{
-		base.ConfigureWebHost(builder);
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
 
-		builder.ConfigureServices(services =>
-		{
-			var options = CreateOptions();
+        builder.ConfigureServices(services =>
+        {
+            var options = CreateOptions();
 
-			services.TryAddSingleton(TimeProvider.System);
-			services.AddSingleton<IUserAccountsRealmOptionsResolver>(
-				new DefaultUserAccountsRealmOptionsResolver(options));
-			services.AddUserAccountsSqliteInMemory();
-			services.AddUserAccountsForRoyalIdentity();
-			services.AddHostedService<UserAccountsSeedHostedService>();
-		});
-	}
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddSingleton<IUserAccountsRealmOptionsResolver>(
+                new DefaultUserAccountsRealmOptionsResolver(options));
+            services.AddUserAccountsSqliteInMemory();
+            services.AddUserAccountsForRoyalIdentity();
+            services.AddHostedService<UserAccountsSeedHostedService>();
+        });
+    }
 
-	private static UserAccountsRealmOptions CreateOptions()
-	{
-		var options = new UserAccountsRealmOptions
-		{
-			AllowProvidedSubjectId = true
-		};
-		options.PasswordOptions.MinimumLength = 1;
-		options.PasswordOptions.RequireSpecialCharacters = false;
-		options.PasswordOptions.RequireDigit = false;
-		options.PasswordOptions.RequireUppercase = false;
-		options.PasswordOptions.RequireLowercase = false;
-		options.PasswordOptions.MinimumUniqueCharacters = 0;
-		options.PasswordOptions.DisallowUsernameInPassword = false;
-		return options;
-	}
+    private static UserAccountsRealmOptions CreateOptions()
+    {
+        var options = new UserAccountsRealmOptions
+        {
+            AllowProvidedSubjectId = true
+        };
+        options.PasswordOptions.MinimumLength = 1;
+        options.PasswordOptions.RequireSpecialCharacters = false;
+        options.PasswordOptions.RequireDigit = false;
+        options.PasswordOptions.RequireUppercase = false;
+        options.PasswordOptions.RequireLowercase = false;
+        options.PasswordOptions.MinimumUniqueCharacters = 0;
+        options.PasswordOptions.DisallowUsernameInPassword = false;
+        return options;
+    }
 
-	private sealed class UserAccountsSeedHostedService(
-		IServiceScopeFactory scopeFactory,
-		IUserAccountsRealmOptionsResolver optionsResolver) : IHostedService
-	{
-		public async Task StartAsync(CancellationToken cancellationToken)
-		{
-			using var scope = scopeFactory.CreateScope();
-			var db = scope.ServiceProvider.GetRequiredService<UserAccountsDbContext>();
-			var realmId = MemoryStorage.DemoRealm.Id;
-			var now = DateTimeOffset.UtcNow;
+    private sealed class UserAccountsSeedHostedService(
+        IServiceScopeFactory scopeFactory,
+        IUserAccountsRealmOptionsResolver optionsResolver) : IHostedService
+    {
+        public async Task StartAsync(CancellationToken cancellationToken)
+        {
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<UserAccountsDbContext>();
+            var realmId = MemoryStorage.DemoRealm.Id;
+            var now = DateTimeOffset.UtcNow;
 
-			await UserAccountsModuleSeed.SeedDefaultScopesAsync(db, realmId, now, cancellationToken);
-			await UserAccountsModuleSeed.SeedDefaultAccountsAsync(
-				scope.ServiceProvider, realmId, optionsResolver.Resolve(realmId), now, cancellationToken);
-		}
+            await UserAccountsModuleSeed.SeedDefaultScopesAsync(db, realmId, now, cancellationToken);
+            await UserAccountsModuleSeed.SeedDefaultAccountsAsync(
+                scope.ServiceProvider, realmId, optionsResolver.Resolve(realmId), now, cancellationToken);
+        }
 
-		public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-	}
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
 }

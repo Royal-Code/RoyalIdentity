@@ -11,93 +11,93 @@ namespace RoyalIdentity.Storage.EntityFramework.Security.Cryptography;
 /// </summary>
 public sealed class AesGcmCipher : IDisposable
 {
-	private const int NonceSize = 12;
-	private const int TagSize = 16;
+    private const int NonceSize = 12;
+    private const int TagSize = 16;
 
-	private readonly byte[] key;
+    private readonly byte[] key;
 
-	/// <summary>Creates a cipher over a copy of a 16, 24 or 32 byte key.</summary>
-	public AesGcmCipher(ReadOnlySpan<byte> key)
-	{
-		if (key.Length is not (16 or 24 or 32))
-			throw new ArgumentException("AES-GCM requires a 16, 24 or 32 byte key.", nameof(key));
+    /// <summary>Creates a cipher over a copy of a 16, 24 or 32 byte key.</summary>
+    public AesGcmCipher(ReadOnlySpan<byte> key)
+    {
+        if (key.Length is not (16 or 24 or 32))
+            throw new ArgumentException("AES-GCM requires a 16, 24 or 32 byte key.", nameof(key));
 
-		this.key = key.ToArray();
-	}
+        this.key = key.ToArray();
+    }
 
-	/// <summary>
-	/// Encrypts <paramref name="plaintext"/> and returns <c>base64(nonce | tag | ciphertext)</c>.
-	/// <paramref name="associatedData"/> is authenticated but not encrypted, so decryption fails when the
-	/// context it came from differs.
-	/// </summary>
-	public string Encrypt(string plaintext, ReadOnlySpan<byte> associatedData)
-	{
-		ArgumentNullException.ThrowIfNull(plaintext);
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> and returns <c>base64(nonce | tag | ciphertext)</c>.
+    /// <paramref name="associatedData"/> is authenticated but not encrypted, so decryption fails when the
+    /// context it came from differs.
+    /// </summary>
+    public string Encrypt(string plaintext, ReadOnlySpan<byte> associatedData)
+    {
+        ArgumentNullException.ThrowIfNull(plaintext);
 
-		var plainBytes = Encoding.UTF8.GetBytes(plaintext);
-		var nonce = RandomNumberGenerator.GetBytes(NonceSize);
-		var ciphertext = new byte[plainBytes.Length];
-		var tag = new byte[TagSize];
+        var plainBytes = Encoding.UTF8.GetBytes(plaintext);
+        var nonce = RandomNumberGenerator.GetBytes(NonceSize);
+        var ciphertext = new byte[plainBytes.Length];
+        var tag = new byte[TagSize];
 
-		try
-		{
-			using var aes = new AesGcm(key, TagSize);
-			aes.Encrypt(nonce, plainBytes, ciphertext, tag, associatedData);
+        try
+        {
+            using var aes = new AesGcm(key, TagSize);
+            aes.Encrypt(nonce, plainBytes, ciphertext, tag, associatedData);
 
-			var payload = new byte[NonceSize + TagSize + ciphertext.Length];
-			nonce.CopyTo(payload, 0);
-			tag.CopyTo(payload, NonceSize);
-			ciphertext.CopyTo(payload, NonceSize + TagSize);
+            var payload = new byte[NonceSize + TagSize + ciphertext.Length];
+            nonce.CopyTo(payload, 0);
+            tag.CopyTo(payload, NonceSize);
+            ciphertext.CopyTo(payload, NonceSize + TagSize);
 
-			return Convert.ToBase64String(payload);
-		}
-		finally
-		{
-			CryptographicOperations.ZeroMemory(plainBytes);
-			CryptographicOperations.ZeroMemory(ciphertext);
-		}
-	}
+            return Convert.ToBase64String(payload);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainBytes);
+            CryptographicOperations.ZeroMemory(ciphertext);
+        }
+    }
 
-	/// <summary>
-	/// Decrypts a value produced by <see cref="Encrypt"/>. Throws <see cref="CryptographicException"/> when the
-	/// payload is malformed, tampered with, or was produced under different associated data.
-	/// </summary>
-	public string Decrypt(string protectedPayload, ReadOnlySpan<byte> associatedData)
-	{
-		ArgumentException.ThrowIfNullOrEmpty(protectedPayload);
+    /// <summary>
+    /// Decrypts a value produced by <see cref="Encrypt"/>. Throws <see cref="CryptographicException"/> when the
+    /// payload is malformed, tampered with, or was produced under different associated data.
+    /// </summary>
+    public string Decrypt(string protectedPayload, ReadOnlySpan<byte> associatedData)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(protectedPayload);
 
-		byte[] payload;
-		try
-		{
-			payload = Convert.FromBase64String(protectedPayload);
-		}
-		catch (FormatException exception)
-		{
-			throw new CryptographicException("The AES-GCM payload is invalid.", exception);
-		}
+        byte[] payload;
+        try
+        {
+            payload = Convert.FromBase64String(protectedPayload);
+        }
+        catch (FormatException exception)
+        {
+            throw new CryptographicException("The AES-GCM payload is invalid.", exception);
+        }
 
-		if (payload.Length <= NonceSize + TagSize)
-			throw new CryptographicException("The AES-GCM payload is invalid.");
+        if (payload.Length <= NonceSize + TagSize)
+            throw new CryptographicException("The AES-GCM payload is invalid.");
 
-		var plainBytes = new byte[payload.Length - NonceSize - TagSize];
-		try
-		{
-			using var aes = new AesGcm(key, TagSize);
-			aes.Decrypt(
-				payload.AsSpan(0, NonceSize),
-				payload.AsSpan(NonceSize + TagSize),
-				payload.AsSpan(NonceSize, TagSize),
-				plainBytes,
-				associatedData);
+        var plainBytes = new byte[payload.Length - NonceSize - TagSize];
+        try
+        {
+            using var aes = new AesGcm(key, TagSize);
+            aes.Decrypt(
+                payload.AsSpan(0, NonceSize),
+                payload.AsSpan(NonceSize + TagSize),
+                payload.AsSpan(NonceSize, TagSize),
+                plainBytes,
+                associatedData);
 
-			return Encoding.UTF8.GetString(plainBytes);
-		}
-		finally
-		{
-			CryptographicOperations.ZeroMemory(plainBytes);
-			CryptographicOperations.ZeroMemory(payload);
-		}
-	}
+            return Encoding.UTF8.GetString(plainBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainBytes);
+            CryptographicOperations.ZeroMemory(payload);
+        }
+    }
 
-	public void Dispose() => CryptographicOperations.ZeroMemory(key);
+    public void Dispose() => CryptographicOperations.ZeroMemory(key);
 }

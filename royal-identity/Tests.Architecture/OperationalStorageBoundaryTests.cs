@@ -13,38 +13,38 @@ namespace Tests.Architecture;
 /// </summary>
 public class OperationalStorageBoundaryTests
 {
-	private static readonly Assembly DataOperational = typeof(OperationalDataAssemblyMarker).Assembly;
+    private static readonly Assembly DataOperational = typeof(OperationalDataAssemblyMarker).Assembly;
 
-	private const string CoreName = "RoyalIdentity";
-	private const string ConfigurationDataName = "RoyalIdentity.Data.Configuration";
-	private const string AdapterName = "RoyalIdentity.Storage.EntityFramework";
+    private const string CoreName = "RoyalIdentity";
+    private const string ConfigurationDataName = "RoyalIdentity.Data.Configuration";
+    private const string AdapterName = "RoyalIdentity.Storage.EntityFramework";
 
-	[Fact]
-	public void DataOperational_DoesNotReference_Core_Configuration_Adapter_Or_AspNetCore()
-	{
-		var refs = DataOperational.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+    [Fact]
+    public void DataOperational_DoesNotReference_Core_Configuration_Adapter_Or_AspNetCore()
+    {
+        var refs = DataOperational.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
 
-		Assert.DoesNotContain(refs, n => n == CoreName);
-		Assert.DoesNotContain(refs, n => n == ConfigurationDataName);
-		Assert.DoesNotContain(refs, n => n.StartsWith(AdapterName, StringComparison.Ordinal));
-		Assert.DoesNotContain(refs, n => n.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
-	}
+        Assert.DoesNotContain(refs, n => n == CoreName);
+        Assert.DoesNotContain(refs, n => n == ConfigurationDataName);
+        Assert.DoesNotContain(refs, n => n.StartsWith(AdapterName, StringComparison.Ordinal));
+        Assert.DoesNotContain(refs, n => n.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
+    }
 
-	[Fact]
-	public void DataOperational_DependsOn_EntityFrameworkCore_Only_AsDataStack()
-	{
-		var refs = DataOperational.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+    [Fact]
+    public void DataOperational_DependsOn_EntityFrameworkCore_Only_AsDataStack()
+    {
+        var refs = DataOperational.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
 
-		Assert.Contains(refs, n => n.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
-		Assert.DoesNotContain(refs, n => n.StartsWith("RoyalIdentity", StringComparison.Ordinal));
-	}
+        Assert.Contains(refs, n => n.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
+        Assert.DoesNotContain(refs, n => n.StartsWith("RoyalIdentity", StringComparison.Ordinal));
+    }
 
-	[Fact]
-	public void DataOperational_Project_HasNoProjectReferences()
-	{
-		var projectReferences = ProjectReferenceReader.ReadProjectReferences(
-			"RoyalIdentity.Data.Operational/RoyalIdentity.Data.Operational.csproj");
+    [Fact]
+    public void DataOperational_Project_HasNoProjectReferences()
+    {
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences(
+            "RoyalIdentity.Data.Operational/RoyalIdentity.Data.Operational.csproj");
 
-		Assert.Empty(projectReferences);
-	}
+        Assert.Empty(projectReferences);
+    }
 }

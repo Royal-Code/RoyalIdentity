@@ -996,10 +996,13 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
   devolvido, então o fallback da DF39 é inalcançável a partir do adapter.
 - **DF44 — exclusão de `ResourceServer.Secrets` formalizada.** Deixou de ser desvio e virou decisão fechada, com
   DF9 emendada, invariante e teste dedicado.
-- **Indentação:** a revisão apontou os 11 arquivos novos do core como fora do padrão por usarem 4 espaços. O
-  achado é incorreto: o `.editorconfig` define apenas `indent_size = 4`, sem `indent_style`, e todo o projeto
-  `RoyalIdentity` usa espaços. Os arquivos foram mantidos como estavam. A linha "Use tabs with width 4" do
-  `AGENTS.md` contradiz o código e merece correção em separado.
+- **Indentação:** a revisão apontou os 11 arquivos novos do core como fora do padrão por usarem 4 espaços — o
+  achado estava invertido. A regra do repositório é **4 espaços**, e o texto contraditório do `AGENTS.md` era o
+  erro. Resolução: `AGENTS.md` passou a delegar o estilo a `.ai/rules/code-style.rules.md` ("Use 4 spaces for C#
+  indentation"), `CLAUDE.md` foi corrigido, `.editorconfig` ganhou `indent_style = space` para a regra deixar de
+  depender do default do editor, e os 287 arquivos `.cs` que ainda usavam tab de indentação — em todos os
+  projetos, não só nos desta fase — foram convertidos. Nenhum `.cs` do repositório (fora de `old-is4/`) começa
+  linha com tab.
 
 **Comandos executados**
 

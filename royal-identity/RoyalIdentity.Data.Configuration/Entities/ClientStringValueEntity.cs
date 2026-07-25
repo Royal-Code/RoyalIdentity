@@ -8,13 +8,13 @@ namespace RoyalIdentity.Data.Configuration.Entities;
 /// </summary>
 public class ClientStringValueEntity
 {
-	public required string RealmId { get; set; }
+    public required string RealmId { get; set; }
 
-	public required string ClientId { get; set; }
+    public required string ClientId { get; set; }
 
-	public required string Kind { get; set; }
+    public required string Kind { get; set; }
 
-	public required string Value { get; set; }
+    public required string Value { get; set; }
 
-	public required string ComparisonKey { get; set; }
+    public required string ComparisonKey { get; set; }
 }

@@ -6,22 +6,22 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 /// </summary>
 public sealed class ConfigurationMaterializationException : Exception
 {
-	private ConfigurationMaterializationException(string message) : base(message)
-	{
-	}
+    private ConfigurationMaterializationException(string message) : base(message)
+    {
+    }
 
-	internal static ConfigurationMaterializationException RealmMismatch()
-		=> new("The persisted client root does not belong to the requested realm.");
+    internal static ConfigurationMaterializationException RealmMismatch()
+        => new("The persisted client root does not belong to the requested realm.");
 
-	internal static ConfigurationMaterializationException SatelliteMismatch(string satellite)
-		=> new($"The persisted client {satellite} rows do not belong to the client root.");
+    internal static ConfigurationMaterializationException SatelliteMismatch(string satellite)
+        => new($"The persisted client {satellite} rows do not belong to the client root.");
 
-	internal static ConfigurationMaterializationException UnknownStringValueKind()
-		=> new("The persisted client contains an unsupported string-value kind.");
+    internal static ConfigurationMaterializationException UnknownStringValueKind()
+        => new("The persisted client contains an unsupported string-value kind.");
 
-	internal static ConfigurationMaterializationException InvalidEnum(string property)
-		=> new($"The persisted client contains an invalid {property} value.");
+    internal static ConfigurationMaterializationException InvalidEnum(string property)
+        => new($"The persisted client contains an invalid {property} value.");
 
-	internal static ConfigurationMaterializationException InvalidSigningKeyEnum(string property)
-		=> new($"The persisted signing key contains an invalid {property} value.");
+    internal static ConfigurationMaterializationException InvalidSigningKeyEnum(string property)
+        => new($"The persisted signing key contains an invalid {property} value.");
 }

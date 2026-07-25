@@ -14,24 +14,24 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payl
 /// </summary>
 public sealed class AuthorizationCodePayload
 {
-	public required string SessionState { get; set; }
+    public required string SessionState { get; set; }
 
-	public string? Nonce { get; set; }
+    public string? Nonce { get; set; }
 
-	public string? StateHash { get; set; }
+    public string? StateHash { get; set; }
 
-	public string? CodeChallenge { get; set; }
+    public string? CodeChallenge { get; set; }
 
-	public string? CodeChallengeMethod { get; set; }
+    public string? CodeChallengeMethod { get; set; }
 
-	/// <summary>
-	/// The code's own properties. Unlike the deliberately dropped claim metadata of
-	/// <see cref="ClaimPayload"/>, these are part of the operational contract and survive the round-trip.
-	/// <c>null</c> is distinct from an empty dictionary, so the round-trip reproduces the model exactly.
-	/// </summary>
-	public Dictionary<string, string>? Properties { get; set; }
+    /// <summary>
+    /// The code's own properties. Unlike the deliberately dropped claim metadata of
+    /// <see cref="ClaimPayload"/>, these are part of the operational contract and survive the round-trip.
+    /// <c>null</c> is distinct from an empty dictionary, so the round-trip reproduces the model exactly.
+    /// </summary>
+    public Dictionary<string, string>? Properties { get; set; }
 
-	public required ClaimsPrincipalPayload Subject { get; set; }
+    public required ClaimsPrincipalPayload Subject { get; set; }
 
-	public required RequestedResourcesPayload Scopes { get; set; }
+    public required RequestedResourcesPayload Scopes { get; set; }
 }

@@ -7,15 +7,15 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 /// </summary>
 public enum ActionTokenPurpose
 {
-	/// <summary>A password recovery token consumed by the reset flow.</summary>
-	PasswordRecovery,
+    /// <summary>A password recovery token consumed by the reset flow.</summary>
+    PasswordRecovery,
 
-	/// <summary>An email verification token bound to the target email value.</summary>
-	EmailVerification,
+    /// <summary>An email verification token bound to the target email value.</summary>
+    EmailVerification,
 
-	/// <summary>A phone verification token bound to the target phone value.</summary>
-	PhoneVerification,
+    /// <summary>A phone verification token bound to the target phone value.</summary>
+    PhoneVerification,
 
-	/// <summary>A transitional token that authorizes changing an expired/forced password before re-login.</summary>
-	ChangeExpiredPassword
+    /// <summary>A transitional token that authorizes changing an expired/forced password before re-login.</summary>
+    ChangeExpiredPassword
 }

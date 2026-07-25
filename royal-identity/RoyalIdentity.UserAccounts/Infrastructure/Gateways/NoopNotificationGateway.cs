@@ -7,15 +7,15 @@ namespace RoyalIdentity.UserAccounts.Infrastructure.Gateways;
 /// </summary>
 public sealed class NoopNotificationGateway : INotificationGateway
 {
-	/// <inheritdoc />
-	public Task SendPasswordRecoveryAsync(PasswordRecoveryNotification notification, CancellationToken ct = default)
-		=> Task.CompletedTask;
+    /// <inheritdoc />
+    public Task SendPasswordRecoveryAsync(PasswordRecoveryNotification notification, CancellationToken ct = default)
+        => Task.CompletedTask;
 
-	/// <inheritdoc />
-	public Task SendEmailVerificationAsync(EmailVerificationNotification notification, CancellationToken ct = default)
-		=> Task.CompletedTask;
+    /// <inheritdoc />
+    public Task SendEmailVerificationAsync(EmailVerificationNotification notification, CancellationToken ct = default)
+        => Task.CompletedTask;
 
-	/// <inheritdoc />
-	public Task SendPhoneVerificationAsync(PhoneVerificationNotification notification, CancellationToken ct = default)
-		=> Task.CompletedTask;
+    /// <inheritdoc />
+    public Task SendPhoneVerificationAsync(PhoneVerificationNotification notification, CancellationToken ct = default)
+        => Task.CompletedTask;
 }

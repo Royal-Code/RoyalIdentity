@@ -12,40 +12,40 @@ namespace RoyalIdentity.Contracts.Defaults;
 /// </summary>
 public sealed class SigningKeyStartupValidator(IServiceProvider applicationServices) : IHostedService
 {
-	public async Task StartAsync(CancellationToken cancellationToken)
-	{
-		await using var scope = applicationServices.CreateAsyncScope();
-		var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
-		var keyManager = scope.ServiceProvider.GetRequiredService<IKeyManager>();
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = applicationServices.CreateAsyncScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
+        var keyManager = scope.ServiceProvider.GetRequiredService<IKeyManager>();
 
-		await foreach (var realm in storage.Realms.GetAllAsync(cancellationToken))
-		{
-			if (!realm.Enabled)
-				continue;
+        await foreach (var realm in storage.Realms.GetAllAsync(cancellationToken))
+        {
+            if (!realm.Enabled)
+                continue;
 
-			SigningCredentials? credentials;
-			try
-			{
-				credentials = await keyManager.GetSigningCredentialsAsync(realm, cancellationToken);
-			}
-			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-			{
-				throw;
-			}
-			catch (Exception exception)
-			{
-				throw UnusableKey(realm.Id, exception);
-			}
+            SigningCredentials? credentials;
+            try
+            {
+                credentials = await keyManager.GetSigningCredentialsAsync(realm, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw UnusableKey(realm.Id, exception);
+            }
 
-			if (credentials is null)
-				throw UnusableKey(realm.Id);
-		}
-	}
+            if (credentials is null)
+                throw UnusableKey(realm.Id);
+        }
+    }
 
-	public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-	private static InvalidOperationException UnusableKey(string realmId, Exception? inner = null)
-		=> new(
-			$"Enabled realm '{realmId}' has no usable current signing key for its configured main algorithm.",
-			inner);
+    private static InvalidOperationException UnusableKey(string realmId, Exception? inner = null)
+        => new(
+            $"Enabled realm '{realmId}' has no usable current signing key for its configured main algorithm.",
+            inner);
 }

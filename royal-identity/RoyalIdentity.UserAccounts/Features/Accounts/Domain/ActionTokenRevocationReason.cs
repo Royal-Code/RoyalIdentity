@@ -6,6 +6,6 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 /// </summary>
 public enum ActionTokenRevocationReason
 {
-	/// <summary>Revoked because a newer token of the same purpose was issued for the account.</summary>
-	Superseded
+    /// <summary>Revoked because a newer token of the same purpose was issued for the account.</summary>
+    Superseded
 }

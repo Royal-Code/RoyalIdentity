@@ -5,9 +5,9 @@ using RoyalIdentity.Data.Configuration;
 namespace Tests.Storage.Configuration.Support;
 
 internal interface IConfigurationTestDatabase<out TContext> : IAsyncDisposable
-	where TContext : ConfigurationDbContext
+    where TContext : ConfigurationDbContext
 {
-	TContext NewContext();
+    TContext NewContext();
 
-	void AddStorage(ServiceCollection services);
+    void AddStorage(ServiceCollection services);
 }

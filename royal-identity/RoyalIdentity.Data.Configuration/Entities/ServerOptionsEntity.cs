@@ -7,14 +7,14 @@ namespace RoyalIdentity.Data.Configuration.Entities;
 /// </summary>
 public class ServerOptionsEntity
 {
-	/// <summary>The only valid value of <see cref="Id"/>.</summary>
-	public const short SingletonId = 1;
+    /// <summary>The only valid value of <see cref="Id"/>.</summary>
+    public const short SingletonId = 1;
 
-	public short Id { get; set; } = SingletonId;
+    public short Id { get; set; } = SingletonId;
 
-	public int PayloadVersion { get; set; }
+    public int PayloadVersion { get; set; }
 
-	public required string PayloadJson { get; set; }
+    public required string PayloadJson { get; set; }
 
-	public DateTime UpdatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
 }

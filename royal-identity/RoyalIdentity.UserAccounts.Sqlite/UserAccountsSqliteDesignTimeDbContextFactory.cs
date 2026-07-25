@@ -13,21 +13,21 @@ namespace RoyalIdentity.UserAccounts.Sqlite;
 /// </summary>
 public sealed class UserAccountsSqliteDesignTimeDbContextFactory : IDesignTimeDbContextFactory<UserAccountsSqliteDbContext>
 {
-	/// <inheritdoc />
-	public UserAccountsSqliteDbContext CreateDbContext(string[] args)
-	{
-		var options = new DbContextOptionsBuilder<UserAccountsSqliteDbContext>()
-			.UseSqlite("DataSource=design-time.db")
-			.Options;
+    /// <inheritdoc />
+    public UserAccountsSqliteDbContext CreateDbContext(string[] args)
+    {
+        var options = new DbContextOptionsBuilder<UserAccountsSqliteDbContext>()
+            .UseSqlite("DataSource=design-time.db")
+            .Options;
 
-		return new UserAccountsSqliteDbContext(options, NoopDomainEventDispatcher.Instance);
-	}
+        return new UserAccountsSqliteDbContext(options, NoopDomainEventDispatcher.Instance);
+    }
 
-	private sealed class NoopDomainEventDispatcher : IDomainEventDispatcher
-	{
-		public static readonly NoopDomainEventDispatcher Instance = new();
+    private sealed class NoopDomainEventDispatcher : IDomainEventDispatcher
+    {
+        public static readonly NoopDomainEventDispatcher Instance = new();
 
-		public Task DispatchAsync(IReadOnlyList<IDomainEvent> domainEvents, CancellationToken ct = default)
-			=> Task.CompletedTask;
-	}
+        public Task DispatchAsync(IReadOnlyList<IDomainEvent> domainEvents, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
 }

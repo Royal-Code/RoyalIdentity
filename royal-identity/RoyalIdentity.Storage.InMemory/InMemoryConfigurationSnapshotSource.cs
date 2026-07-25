@@ -12,25 +12,25 @@ namespace RoyalIdentity.Storage.InMemory;
 /// </summary>
 internal sealed class InMemoryConfigurationSnapshotSource(MemoryStorage storage) : IConfigurationSnapshotSource
 {
-	public Task<ConfigurationSnapshotData> LoadAsync(CancellationToken ct)
-	{
-		var serverOptions = new ServerOptions(storage.ServerOptions);
+    public Task<ConfigurationSnapshotData> LoadAsync(CancellationToken ct)
+    {
+        var serverOptions = new ServerOptions(storage.ServerOptions);
 
-		var realms = storage.Realms.Values
-			.Select(realm => Clone(realm, serverOptions))
-			.ToList();
+        var realms = storage.Realms.Values
+            .Select(realm => Clone(realm, serverOptions))
+            .ToList();
 
-		return Task.FromResult(new ConfigurationSnapshotData
-		{
-			ServerOptions = serverOptions,
-			Realms = realms,
-		});
-	}
+        return Task.FromResult(new ConfigurationSnapshotData
+        {
+            ServerOptions = serverOptions,
+            Realms = realms,
+        });
+    }
 
-	private static Realm Clone(Realm realm, ServerOptions authoritativeServerOptions)
-		=> new(realm.Id, realm.Domain, realm.Path, realm.DisplayName, realm.Internal,
-			new RealmOptions(realm.Options, authoritativeServerOptions))
-		{
-			Enabled = realm.Enabled,
-		};
+    private static Realm Clone(Realm realm, ServerOptions authoritativeServerOptions)
+        => new(realm.Id, realm.Domain, realm.Path, realm.DisplayName, realm.Internal,
+            new RealmOptions(realm.Options, authoritativeServerOptions))
+        {
+            Enabled = realm.Enabled,
+        };
 }

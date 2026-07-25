@@ -14,234 +14,234 @@ namespace Tests.Storage.Operational.Support;
 /// </summary>
 internal static class OperationalTestData
 {
-	public static readonly DateTime CreationTime = new(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+    public static readonly DateTime CreationTime = new(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
 
-	/// <summary>
-	/// The relational identity a store would read back for <see cref="NewReferenceAccessToken"/>. Building it
-	/// from the model's own values is what keeps the scenarios honest: the columns are the authoritative
-	/// source, so a round-trip must reproduce them without the payload carrying a second copy.
-	/// </summary>
-	public static AccessTokenIdentity IdentityOf(AccessToken token) => new(
-		token.Id,
-		token.RealmId!,
-		token.ClientId,
-		token.AccessTokenType,
-		token.CreationTime,
-		token.CreationTime.AddSeconds(token.Lifetime));
+    /// <summary>
+    /// The relational identity a store would read back for <see cref="NewReferenceAccessToken"/>. Building it
+    /// from the model's own values is what keeps the scenarios honest: the columns are the authoritative
+    /// source, so a round-trip must reproduce them without the payload carrying a second copy.
+    /// </summary>
+    public static AccessTokenIdentity IdentityOf(AccessToken token) => new(
+        token.Id,
+        token.RealmId!,
+        token.ClientId,
+        token.AccessTokenType,
+        token.CreationTime,
+        token.CreationTime.AddSeconds(token.Lifetime));
 
-	/// <inheritdoc cref="IdentityOf(AccessToken)"/>
-	public static RefreshTokenIdentity IdentityOf(RefreshToken token) => new(
-		token.Token,
-		token.RealmId!,
-		token.ClientId,
-		token.CreationTime,
-		token.CreationTime.AddSeconds(token.Lifetime));
+    /// <inheritdoc cref="IdentityOf(AccessToken)"/>
+    public static RefreshTokenIdentity IdentityOf(RefreshToken token) => new(
+        token.Token,
+        token.RealmId!,
+        token.ClientId,
+        token.CreationTime,
+        token.CreationTime.AddSeconds(token.Lifetime));
 
-	/// <inheritdoc cref="IdentityOf(AccessToken)"/>
-	public static AuthorizationCodeIdentity IdentityOf(AuthorizationCode code) => new(
-		code.Code,
-		code.RealmId!,
-		code.ClientId,
-		code.RedirectUri,
-		code.SessionId,
-		code.CreationTime,
-		code.CreationTime.AddSeconds(code.Lifetime));
+    /// <inheritdoc cref="IdentityOf(AccessToken)"/>
+    public static AuthorizationCodeIdentity IdentityOf(AuthorizationCode code) => new(
+        code.Code,
+        code.RealmId!,
+        code.ClientId,
+        code.RedirectUri,
+        code.SessionId,
+        code.CreationTime,
+        code.CreationTime.AddSeconds(code.Lifetime));
 
-	public static RequestedResources NewRequestedResources()
-	{
-		var identityScope = new IdentityScope(
-			ScopeVisibility.Public, "profile", "Profile", "Profile", ["name", "family_name"])
-		{
-			// The constructor derives Description from DisplayName; setting it apart proves the round-trip
-			// reproduces what was persisted instead of re-deriving it.
-			Description = "Profile description",
-			Required = true,
-			Emphasize = true,
-			Enabled = true,
-			ShowInDiscoveryDocument = false,
-		};
+    public static RequestedResources NewRequestedResources()
+    {
+        var identityScope = new IdentityScope(
+            ScopeVisibility.Public, "profile", "Profile", "Profile", ["name", "family_name"])
+        {
+            // The constructor derives Description from DisplayName; setting it apart proves the round-trip
+            // reproduces what was persisted instead of re-deriving it.
+            Description = "Profile description",
+            Required = true,
+            Emphasize = true,
+            Enabled = true,
+            ShowInDiscoveryDocument = false,
+        };
 
-		var scope = new Scope(ScopeVisibility.Internal, "api.read", "Read", "Read description")
-		{
-			Required = true,
-			Emphasize = true,
-			Enabled = false,
-			ShowInDiscoveryDocument = true,
-		};
+        var scope = new Scope(ScopeVisibility.Internal, "api.read", "Read", "Read description")
+        {
+            Required = true,
+            Emphasize = true,
+            Enabled = false,
+            ShowInDiscoveryDocument = true,
+        };
 
-		var protectedResource = new ProtectedResource("https://api.example/orders")
-		{
-			ShowInDiscoveryDocument = false,
-			DisplayName = "Orders",
-			DocumentationUri = "https://docs.example",
-			PolicyUri = "https://policy.example",
-			TosUri = "https://tos.example",
-		};
+        var protectedResource = new ProtectedResource("https://api.example/orders")
+        {
+            ShowInDiscoveryDocument = false,
+            DisplayName = "Orders",
+            DocumentationUri = "https://docs.example",
+            PolicyUri = "https://policy.example",
+            TosUri = "https://tos.example",
+        };
 
-		var resourceServer = new ResourceServer(ScopeVisibility.Public, "api", "API", "API description")
-		{
-			Audience = "https://api.example",
-			AllowScopeRequests = false,
-			Enabled = true,
-			ShowInDiscoveryDocument = true,
-			Scopes = [scope],
-			ProtectedResources = [protectedResource],
-			AllowedAccessTokenSigningAlgorithms = ["RS256", "ES256"],
-		};
+        var resourceServer = new ResourceServer(ScopeVisibility.Public, "api", "API", "API description")
+        {
+            Audience = "https://api.example",
+            AllowScopeRequests = false,
+            Enabled = true,
+            ShowInDiscoveryDocument = true,
+            Scopes = [scope],
+            ProtectedResources = [protectedResource],
+            AllowedAccessTokenSigningAlgorithms = ["RS256", "ES256"],
+        };
 
-		var resources = new RequestedResources([identityScope], [resourceServer], [scope])
-		{
-			OfflineAccess = true,
-		};
+        var resources = new RequestedResources([identityScope], [resourceServer], [scope])
+        {
+            OfflineAccess = true,
+        };
 
-		resources.RequestedScopeNames.Add("openid");
-		resources.RequestedScopeNames.Add("api.read");
-		resources.MissingScopes.Add("api.write");
-		resources.RequestedResourceUris.Add("https://api.example/orders");
-		resources.InvalidTargets.Add("https://unknown.example");
-		resources.ProtectedResources.Add(protectedResource);
+        resources.RequestedScopeNames.Add("openid");
+        resources.RequestedScopeNames.Add("api.read");
+        resources.MissingScopes.Add("api.write");
+        resources.RequestedResourceUris.Add("https://api.example/orders");
+        resources.InvalidTargets.Add("https://unknown.example");
+        resources.ProtectedResources.Add(protectedResource);
 
-		return resources;
-	}
+        return resources;
+    }
 
-	public static AccessToken NewReferenceAccessToken(string jti = "at-jti-1")
-	{
-		var token = new AccessToken(
-			"client-one",
-			"https://issuer.example",
-			AccessTokenType.Reference,
-			CreationTime,
-			3600,
-			jti,
-			"Bearer")
-		{
-			RealmId = "realm-a",
-			Confirmation = "cnf-value",
-			Audiences = ["https://api.example", "https://other.example"],
-			AllowedSigningAlgorithms = ["RS256"],
-		};
+    public static AccessToken NewReferenceAccessToken(string jti = "at-jti-1")
+    {
+        var token = new AccessToken(
+            "client-one",
+            "https://issuer.example",
+            AccessTokenType.Reference,
+            CreationTime,
+            3600,
+            jti,
+            "Bearer")
+        {
+            RealmId = "realm-a",
+            Confirmation = "cnf-value",
+            Audiences = ["https://api.example", "https://other.example"],
+            AllowedSigningAlgorithms = ["RS256"],
+        };
 
-		token.ResourceUris.Add("https://api.example/orders");
-		token.Claims.Add(new Claim("sub", "subject-one"));
-		token.Claims.Add(new Claim("sid", "session-one"));
-		token.Claims.Add(new Claim("auth_time", "1780000000", ClaimValueTypes.Integer64));
+        token.ResourceUris.Add("https://api.example/orders");
+        token.Claims.Add(new Claim("sub", "subject-one"));
+        token.Claims.Add(new Claim("sid", "session-one"));
+        token.Claims.Add(new Claim("auth_time", "1780000000", ClaimValueTypes.Integer64));
 
-		return token;
-	}
+        return token;
+    }
 
-	public static RefreshToken NewRefreshToken(string handle = "rt-handle-1")
-	{
-		var token = new RefreshToken(
-			"subject-one",
-			"session-one",
-			"at-jti-1",
-			["openid", "api.read"],
-			"client-one",
-			"https://issuer.example",
-			CreationTime,
-			86400,
-			handle)
-		{
-			RealmId = "realm-a",
-			Confirmation = "cnf-value",
-			Audiences = ["https://api.example"],
-			AllowedSigningAlgorithms = ["RS256"],
-		};
+    public static RefreshToken NewRefreshToken(string handle = "rt-handle-1")
+    {
+        var token = new RefreshToken(
+            "subject-one",
+            "session-one",
+            "at-jti-1",
+            ["openid", "api.read"],
+            "client-one",
+            "https://issuer.example",
+            CreationTime,
+            86400,
+            handle)
+        {
+            RealmId = "realm-a",
+            Confirmation = "cnf-value",
+            Audiences = ["https://api.example"],
+            AllowedSigningAlgorithms = ["RS256"],
+        };
 
-		token.ResourceUris.Add("https://api.example/orders");
-		token.Claims.Add(new Claim("amr", "pwd"));
+        token.ResourceUris.Add("https://api.example/orders");
+        token.Claims.Add(new Claim("amr", "pwd"));
 
-		return token;
-	}
+        return token;
+    }
 
-	public static AuthorizationCode NewAuthorizationCode()
-	{
-		var identity = new ClaimsIdentity(
-			[
-				new Claim("sub", "subject-one"),
-				new Claim("sid", "session-one"),
-				new Claim("auth_time", "1780000000", ClaimValueTypes.Integer64),
-			],
-			"RoyalIdentity",
-			"sub",
-			"role");
+    public static AuthorizationCode NewAuthorizationCode()
+    {
+        var identity = new ClaimsIdentity(
+            [
+                new Claim("sub", "subject-one"),
+                new Claim("sid", "session-one"),
+                new Claim("auth_time", "1780000000", ClaimValueTypes.Integer64),
+            ],
+            "RoyalIdentity",
+            "sub",
+            "role");
 
-		return new AuthorizationCode(
-			"client-one",
-			new ClaimsPrincipal(identity),
-			"session-state",
-			CreationTime,
-			300,
-			NewRequestedResources(),
-			"https://client.example/callback")
-		{
-			RealmId = "realm-a",
-			Nonce = "nonce-value",
-			StateHash = "state-hash",
-			SessionId = "session-one",
-			CodeChallenge = "challenge",
-			CodeChallengeMethod = "S256",
-			Properties = new Dictionary<string, string> { ["custom"] = "value" },
-		};
-	}
+        return new AuthorizationCode(
+            "client-one",
+            new ClaimsPrincipal(identity),
+            "session-state",
+            CreationTime,
+            300,
+            NewRequestedResources(),
+            "https://client.example/callback")
+        {
+            RealmId = "realm-a",
+            Nonce = "nonce-value",
+            StateHash = "state-hash",
+            SessionId = "session-one",
+            CodeChallenge = "challenge",
+            CodeChallengeMethod = "S256",
+            Properties = new Dictionary<string, string> { ["custom"] = "value" },
+        };
+    }
 
-	/// <summary>
-	/// A code whose resolved resource server carries a secret, so a scenario can prove the secret never
-	/// reaches the persisted payload (plan DF44).
-	/// </summary>
-	public static AuthorizationCode NewAuthorizationCodeWithResourceServerSecret(string secret)
-	{
-		var code = NewAuthorizationCode();
-		code.Scopes.ResourceServers.Single().Secrets.Add(new ClientSecret(secret, "resource server secret"));
+    /// <summary>
+    /// A code whose resolved resource server carries a secret, so a scenario can prove the secret never
+    /// reaches the persisted payload (plan DF44).
+    /// </summary>
+    public static AuthorizationCode NewAuthorizationCodeWithResourceServerSecret(string secret)
+    {
+        var code = NewAuthorizationCode();
+        code.Scopes.ResourceServers.Single().Secrets.Add(new ClientSecret(secret, "resource server secret"));
 
-		return code;
-	}
+        return code;
+    }
 
-	public static Consent NewConsent()
-	{
-		var consent = new Consent
-		{
-			RealmId = "realm-a",
-			SubjectId = "subject-one",
-			ClientId = "client-one",
-			CreationTime = CreationTime,
-			Expiration = CreationTime.AddDays(30),
-		};
+    public static Consent NewConsent()
+    {
+        var consent = new Consent
+        {
+            RealmId = "realm-a",
+            SubjectId = "subject-one",
+            ClientId = "client-one",
+            CreationTime = CreationTime,
+            Expiration = CreationTime.AddDays(30),
+        };
 
-		consent.AddScopes(
-		[
-			new ConsentedScope
-			{
-				Scope = "Api.Read",
-				Description = "Read",
-				CreationTime = CreationTime,
-				JustOnce = false,
-			},
-			new ConsentedScope
-			{
-				Scope = "api.read",
-				Description = "read",
-				CreationTime = CreationTime,
-				JustOnce = true,
-			},
-		]);
+        consent.AddScopes(
+        [
+            new ConsentedScope
+            {
+                Scope = "Api.Read",
+                Description = "Read",
+                CreationTime = CreationTime,
+                JustOnce = false,
+            },
+            new ConsentedScope
+            {
+                Scope = "api.read",
+                Description = "read",
+                CreationTime = CreationTime,
+                JustOnce = true,
+            },
+        ]);
 
-		return consent;
-	}
+        return consent;
+    }
 
-	public static NameValueCollection NewAuthorizeParameters()
-	{
-		var parameters = new NameValueCollection
-		{
-			{ "client_id", "client-one" },
-			{ "response_type", "code" },
-			{ "scope", "openid profile" },
-		};
+    public static NameValueCollection NewAuthorizeParameters()
+    {
+        var parameters = new NameValueCollection
+        {
+            { "client_id", "client-one" },
+            { "response_type", "code" },
+            { "scope", "openid profile" },
+        };
 
-		// Repeated key: the authorize endpoint accepts more than one `resource` (RFC 8707).
-		parameters.Add("resource", "https://api.example/orders");
-		parameters.Add("resource", "https://api.example/invoices");
+        // Repeated key: the authorize endpoint accepts more than one `resource` (RFC 8707).
+        parameters.Add("resource", "https://api.example/orders");
+        parameters.Add("resource", "https://api.example/invoices");
 
-		return parameters;
-	}
+        return parameters;
+    }
 }

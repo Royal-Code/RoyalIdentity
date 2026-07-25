@@ -9,14 +9,14 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payl
 /// </summary>
 public sealed class AuthorizeParametersPayload
 {
-	public required List<AuthorizeParameterPayload> Parameters { get; set; }
+    public required List<AuthorizeParameterPayload> Parameters { get; set; }
 }
 
 /// <summary>One key of the authorize parameters, with every value it holds — including a null value.</summary>
 public sealed class AuthorizeParameterPayload
 {
-	/// <summary>The key. A <see cref="NameValueCollection"/> allows a null key, so it is nullable here too.</summary>
-	public string? Name { get; set; }
+    /// <summary>The key. A <see cref="NameValueCollection"/> allows a null key, so it is nullable here too.</summary>
+    public string? Name { get; set; }
 
-	public required List<string?> Values { get; set; }
+    public required List<string?> Values { get; set; }
 }

@@ -6,31 +6,31 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 /// </summary>
 public interface IUserAccountNormalizer
 {
-	/// <summary>
-	/// Normalizes a username for case-insensitive lookup and uniqueness.
-	/// </summary>
-	/// <param name="username">The raw username.</param>
-	/// <returns>The normalized username.</returns>
-	string NormalizeUsername(string username);
+    /// <summary>
+    /// Normalizes a username for case-insensitive lookup and uniqueness.
+    /// </summary>
+    /// <param name="username">The raw username.</param>
+    /// <returns>The normalized username.</returns>
+    string NormalizeUsername(string username);
 
-	/// <summary>
-	/// Normalizes an email address for case-insensitive lookup and uniqueness.
-	/// </summary>
-	/// <param name="email">The raw email address.</param>
-	/// <returns>The normalized email address.</returns>
-	string NormalizeEmail(string email);
+    /// <summary>
+    /// Normalizes an email address for case-insensitive lookup and uniqueness.
+    /// </summary>
+    /// <param name="email">The raw email address.</param>
+    /// <returns>The normalized email address.</returns>
+    string NormalizeEmail(string email);
 
-	/// <summary>
-	/// Normalizes a role name for case-insensitive lookup and uniqueness.
-	/// </summary>
-	/// <param name="roleName">The raw role name.</param>
-	/// <returns>The normalized role name.</returns>
-	string NormalizeRoleName(string roleName);
+    /// <summary>
+    /// Normalizes a role name for case-insensitive lookup and uniqueness.
+    /// </summary>
+    /// <param name="roleName">The raw role name.</param>
+    /// <returns>The normalized role name.</returns>
+    string NormalizeRoleName(string roleName);
 
-	/// <summary>
-	/// Normalizes a phone number for comparison and uniqueness (formatting stripped to digits and a leading plus).
-	/// </summary>
-	/// <param name="phoneNumber">The raw phone number.</param>
-	/// <returns>The normalized phone number.</returns>
-	string NormalizePhoneNumber(string phoneNumber);
+    /// <summary>
+    /// Normalizes a phone number for comparison and uniqueness (formatting stripped to digits and a leading plus).
+    /// </summary>
+    /// <param name="phoneNumber">The raw phone number.</param>
+    /// <returns>The normalized phone number.</returns>
+    string NormalizePhoneNumber(string phoneNumber);
 }

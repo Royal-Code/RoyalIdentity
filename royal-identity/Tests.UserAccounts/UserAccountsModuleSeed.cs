@@ -24,121 +24,121 @@ namespace Tests.UserAccounts;
 /// </summary>
 public static class UserAccountsModuleSeed
 {
-	/// <summary>Alice's username, matching the in-memory fake's seeded account.</summary>
-	public const string AliceUsername = "alice";
+    /// <summary>Alice's username, matching the in-memory fake's seeded account.</summary>
+    public const string AliceUsername = "alice";
 
-	/// <summary>Alice's password, matching the in-memory fake's seeded account.</summary>
-	public const string AlicePassword = "alice";
+    /// <summary>Alice's password, matching the in-memory fake's seeded account.</summary>
+    public const string AlicePassword = "alice";
 
-	/// <summary>Bob's username, matching the in-memory fake's seeded account.</summary>
-	public const string BobUsername = "bob";
+    /// <summary>Bob's username, matching the in-memory fake's seeded account.</summary>
+    public const string BobUsername = "bob";
 
-	/// <summary>Bob's password, matching the in-memory fake's seeded account.</summary>
-	public const string BobPassword = "bob";
+    /// <summary>Bob's password, matching the in-memory fake's seeded account.</summary>
+    public const string BobPassword = "bob";
 
-	/// <summary>
-	/// Seeds the "profile" and "email" property scopes used by the default claims projection, idempotently.
-	/// </summary>
-	public static async Task SeedDefaultScopesAsync(
-		UserAccountsDbContext db, string realmId, DateTimeOffset now, CancellationToken ct = default)
-	{
-		await SeedScopeAsync(db, realmId, "profile", now, ct);
-		await SeedScopeAsync(db, realmId, "email", now, ct);
-	}
+    /// <summary>
+    /// Seeds the "profile" and "email" property scopes used by the default claims projection, idempotently.
+    /// </summary>
+    public static async Task SeedDefaultScopesAsync(
+        UserAccountsDbContext db, string realmId, DateTimeOffset now, CancellationToken ct = default)
+    {
+        await SeedScopeAsync(db, realmId, "profile", now, ct);
+        await SeedScopeAsync(db, realmId, "email", now, ct);
+    }
 
-	/// <summary>Seeds a single active property scope by name, idempotently (no-op if it already exists).</summary>
-	public static async Task SeedScopeAsync(
-		UserAccountsDbContext db, string realmId, string scopeName, DateTimeOffset now, CancellationToken ct = default)
-	{
-		if (await db.PropertyScopes.AnyAsync(s => s.RealmId == realmId && s.Name == scopeName, ct))
-		{
-			return;
-		}
+    /// <summary>Seeds a single active property scope by name, idempotently (no-op if it already exists).</summary>
+    public static async Task SeedScopeAsync(
+        UserAccountsDbContext db, string realmId, string scopeName, DateTimeOffset now, CancellationToken ct = default)
+    {
+        if (await db.PropertyScopes.AnyAsync(s => s.RealmId == realmId && s.Name == scopeName, ct))
+        {
+            return;
+        }
 
-		var propertyScope = new PropertyScope(realmId, scopeName, scopeName, now);
-		var version = propertyScope.Versions.Single();
-		var approveResult = propertyScope.ApproveVersion(version, now);
-		if (approveResult.HasProblems(out var approveProblems))
-		{
-			throw new InvalidOperationException($"Could not seed UserAccounts property scope '{scopeName}': {approveProblems}");
-		}
+        var propertyScope = new PropertyScope(realmId, scopeName, scopeName, now);
+        var version = propertyScope.Versions.Single();
+        var approveResult = propertyScope.ApproveVersion(version, now);
+        if (approveResult.HasProblems(out var approveProblems))
+        {
+            throw new InvalidOperationException($"Could not seed UserAccounts property scope '{scopeName}': {approveProblems}");
+        }
 
-		db.PropertyScopes.Add(propertyScope);
-		await db.SaveChangesAsync(ct);
-	}
+        db.PropertyScopes.Add(propertyScope);
+        await db.SaveChangesAsync(ct);
+    }
 
-	/// <summary>
-	/// Seeds the default Alice + Bob accounts (both admins, both active, both with the "profile"/"email" scopes
-	/// already seeded) into the given realm, idempotently.
-	/// </summary>
-	public static async Task SeedDefaultAccountsAsync(
-		IServiceProvider services,
-		string realmId,
-		UserAccountsRealmOptions options,
-		DateTimeOffset now,
-		CancellationToken ct = default)
-	{
-		await SeedAccountAsync(
-			services, realmId, options,
-			MemoryStorage.AliceSubjectId, AliceUsername, "Alice", "Alice@example.com", AlicePassword,
-			isActive: true, roles: ["admin"], now, ct);
-		await SeedAccountAsync(
-			services, realmId, options,
-			MemoryStorage.BobSubjectId, BobUsername, "Bob", "bob@example.com", BobPassword,
-			isActive: true, roles: ["admin"], now, ct);
-	}
+    /// <summary>
+    /// Seeds the default Alice + Bob accounts (both admins, both active, both with the "profile"/"email" scopes
+    /// already seeded) into the given realm, idempotently.
+    /// </summary>
+    public static async Task SeedDefaultAccountsAsync(
+        IServiceProvider services,
+        string realmId,
+        UserAccountsRealmOptions options,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        await SeedAccountAsync(
+            services, realmId, options,
+            MemoryStorage.AliceSubjectId, AliceUsername, "Alice", "Alice@example.com", AlicePassword,
+            isActive: true, roles: ["admin"], now, ct);
+        await SeedAccountAsync(
+            services, realmId, options,
+            MemoryStorage.BobSubjectId, BobUsername, "Bob", "bob@example.com", BobPassword,
+            isActive: true, roles: ["admin"], now, ct);
+    }
 
-	/// <summary>
-	/// Seeds a single account via <see cref="ICreateUserAccountHandler"/>, idempotently (returns the existing
-	/// account, unmodified, if one with the same realm/subject already exists).
-	/// </summary>
-	public static async Task<UserAccount> SeedAccountAsync(
-		IServiceProvider services,
-		string realmId,
-		UserAccountsRealmOptions options,
-		string subjectId,
-		string username,
-		string displayName,
-		string email,
-		string? password,
-		bool isActive,
-		IReadOnlyList<string> roles,
-		DateTimeOffset now,
-		CancellationToken ct = default)
-	{
-		var db = services.GetRequiredService<UserAccountsDbContext>();
-		var existing = await db.UserAccounts
-			.SingleOrDefaultAsync(a => a.RealmId == realmId && a.SubjectId == subjectId, ct);
-		if (existing is not null)
-		{
-			return existing;
-		}
+    /// <summary>
+    /// Seeds a single account via <see cref="ICreateUserAccountHandler"/>, idempotently (returns the existing
+    /// account, unmodified, if one with the same realm/subject already exists).
+    /// </summary>
+    public static async Task<UserAccount> SeedAccountAsync(
+        IServiceProvider services,
+        string realmId,
+        UserAccountsRealmOptions options,
+        string subjectId,
+        string username,
+        string displayName,
+        string email,
+        string? password,
+        bool isActive,
+        IReadOnlyList<string> roles,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        var db = services.GetRequiredService<UserAccountsDbContext>();
+        var existing = await db.UserAccounts
+            .SingleOrDefaultAsync(a => a.RealmId == realmId && a.SubjectId == subjectId, ct);
+        if (existing is not null)
+        {
+            return existing;
+        }
 
-		var handler = services.GetRequiredService<ICreateUserAccountHandler>();
-		var result = await handler.HandleAsync(new CreateUserAccount
-		{
-			RealmId = realmId,
-			Options = options,
-			Username = username,
-			DisplayName = displayName,
-			Email = email,
-			EmailVerified = true,
-			Password = password,
-			SubjectId = subjectId,
-			Roles = roles
-		}, ct);
+        var handler = services.GetRequiredService<ICreateUserAccountHandler>();
+        var result = await handler.HandleAsync(new CreateUserAccount
+        {
+            RealmId = realmId,
+            Options = options,
+            Username = username,
+            DisplayName = displayName,
+            Email = email,
+            EmailVerified = true,
+            Password = password,
+            SubjectId = subjectId,
+            Roles = roles
+        }, ct);
 
-		if (!result.HasValue(out var account))
-		{
-			throw new InvalidOperationException($"Could not seed UserAccounts user '{username}'.");
-		}
+        if (!result.HasValue(out var account))
+        {
+            throw new InvalidOperationException($"Could not seed UserAccounts user '{username}'.");
+        }
 
-		if (!isActive)
-		{
-			account.Deactivate(now);
-			await db.SaveChangesAsync(ct);
-		}
+        if (!isActive)
+        {
+            account.Deactivate(now);
+            await db.SaveChangesAsync(ct);
+        }
 
-		return account;
-	}
+        return account;
+    }
 }

@@ -11,10 +11,10 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite;
 /// </summary>
 public class ConfigurationSqliteDbContext : ConfigurationDbContext
 {
-	public ConfigurationSqliteDbContext(DbContextOptions<ConfigurationSqliteDbContext> options) : base(options)
-	{
-	}
+    public ConfigurationSqliteDbContext(DbContextOptions<ConfigurationSqliteDbContext> options) : base(options)
+    {
+    }
 
-	protected override void ApplyConfigurationModel(ModelBuilder modelBuilder)
-		=> modelBuilder.ApplyRoyalIdentityConfigurationSqliteMappings();
+    protected override void ApplyConfigurationModel(ModelBuilder modelBuilder)
+        => modelBuilder.ApplyRoyalIdentityConfigurationSqliteMappings();
 }

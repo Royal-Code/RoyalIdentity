@@ -11,44 +11,44 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Protection;
 /// </summary>
 public sealed class AesGcmOperationalPayloadProtector : IOperationalPayloadProtector, IDisposable
 {
-	private readonly AesGcmCipher cipher;
+    private readonly AesGcmCipher cipher;
 
-	public AesGcmOperationalPayloadProtector(string profileId, ReadOnlySpan<byte> key)
-	{
-		ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+    public AesGcmOperationalPayloadProtector(string profileId, ReadOnlySpan<byte> key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
 
-		ProfileId = profileId;
-		cipher = new AesGcmCipher(key);
-	}
+        ProfileId = profileId;
+        cipher = new AesGcmCipher(key);
+    }
 
-	public string ProfileId { get; }
+    public string ProfileId { get; }
 
-	public ValueTask<string> ProtectAsync(
-		string payload, OperationalProtectionContext context, CancellationToken ct = default)
-	{
-		ArgumentException.ThrowIfNullOrEmpty(payload);
-		ArgumentNullException.ThrowIfNull(context);
-		ct.ThrowIfCancellationRequested();
+    public ValueTask<string> ProtectAsync(
+        string payload, OperationalProtectionContext context, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(payload);
+        ArgumentNullException.ThrowIfNull(context);
+        ct.ThrowIfCancellationRequested();
 
-		return ValueTask.FromResult(cipher.Encrypt(payload, context.ToAssociatedData()));
-	}
+        return ValueTask.FromResult(cipher.Encrypt(payload, context.ToAssociatedData()));
+    }
 
-	public ValueTask<string> UnprotectAsync(
-		string protectedPayload, OperationalProtectionContext context, CancellationToken ct = default)
-	{
-		ArgumentException.ThrowIfNullOrEmpty(protectedPayload);
-		ArgumentNullException.ThrowIfNull(context);
-		ct.ThrowIfCancellationRequested();
+    public ValueTask<string> UnprotectAsync(
+        string protectedPayload, OperationalProtectionContext context, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(protectedPayload);
+        ArgumentNullException.ThrowIfNull(context);
+        ct.ThrowIfCancellationRequested();
 
-		try
-		{
-			return ValueTask.FromResult(cipher.Decrypt(protectedPayload, context.ToAssociatedData()));
-		}
-		catch (CryptographicException exception)
-		{
-			throw OperationalPayloadProtectionException.Unreadable(ProfileId, exception);
-		}
-	}
+        try
+        {
+            return ValueTask.FromResult(cipher.Decrypt(protectedPayload, context.ToAssociatedData()));
+        }
+        catch (CryptographicException exception)
+        {
+            throw OperationalPayloadProtectionException.Unreadable(ProfileId, exception);
+        }
+    }
 
-	public void Dispose() => cipher.Dispose();
+    public void Dispose() => cipher.Dispose();
 }

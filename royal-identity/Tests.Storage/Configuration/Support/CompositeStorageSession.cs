@@ -7,13 +7,13 @@ namespace Tests.Storage.Configuration.Support;
 /// <summary>Shared counter so a test can assert a scoped dependency was released exactly once per session.</summary>
 internal sealed class ScopedDisposalTracker
 {
-	public int DisposedCount;
+    public int DisposedCount;
 }
 
 /// <summary>A scoped, disposable dependency that reports its disposal to the shared tracker.</summary>
 internal sealed class ScopedProbe(ScopedDisposalTracker tracker) : IDisposable
 {
-	public void Dispose() => Interlocked.Increment(ref tracker.DisposedCount);
+    public void Dispose() => Interlocked.Increment(ref tracker.DisposedCount);
 }
 
 /// <summary>
@@ -24,26 +24,26 @@ internal sealed class ScopedProbe(ScopedDisposalTracker tracker) : IDisposable
 /// </summary>
 internal sealed class CompositeStorageProvider(IServiceScopeFactory scopeFactory) : IStorageProvider
 {
-	public IStorageSession CreateSession() => new CompositeStorageSession(scopeFactory.CreateScope());
+    public IStorageSession CreateSession() => new CompositeStorageSession(scopeFactory.CreateScope());
 }
 
 internal sealed class CompositeStorageSession : IStorageSession
 {
-	private readonly IServiceScope scope;
+    private readonly IServiceScope scope;
 
-	public CompositeStorageSession(IServiceScope scope)
-	{
-		this.scope = scope;
-		// Configuration (EF) is a scoped dependency owned by this session; the scoped probe stands in for any
-		// other scoped resource whose release proves the scope was disposed.
-		ConfigurationDbContext = scope.ServiceProvider.GetRequiredService<ConfigurationSqliteDbContext>();
-		_ = scope.ServiceProvider.GetRequiredService<ScopedProbe>();
-	}
+    public CompositeStorageSession(IServiceScope scope)
+    {
+        this.scope = scope;
+        // Configuration (EF) is a scoped dependency owned by this session; the scoped probe stands in for any
+        // other scoped resource whose release proves the scope was disposed.
+        ConfigurationDbContext = scope.ServiceProvider.GetRequiredService<ConfigurationSqliteDbContext>();
+        _ = scope.ServiceProvider.GetRequiredService<ScopedProbe>();
+    }
 
-	public ConfigurationSqliteDbContext ConfigurationDbContext { get; }
+    public ConfigurationSqliteDbContext ConfigurationDbContext { get; }
 
-	/// <summary>The Operational storage (in-memory in this composite) resolved within the session scope.</summary>
-	public IStorage GetStorage() => scope.ServiceProvider.GetRequiredService<IStorage>();
+    /// <summary>The Operational storage (in-memory in this composite) resolved within the session scope.</summary>
+    public IStorage GetStorage() => scope.ServiceProvider.GetRequiredService<IStorage>();
 
-	public void Dispose() => scope.Dispose();
+    public void Dispose() => scope.Dispose();
 }

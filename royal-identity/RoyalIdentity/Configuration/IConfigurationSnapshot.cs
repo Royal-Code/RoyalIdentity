@@ -19,21 +19,21 @@ namespace RoyalIdentity.Configuration;
 /// </summary>
 public interface IConfigurationSnapshot
 {
-	/// <summary>Whether an initial snapshot has been published. Reads throw until it is.</summary>
-	bool IsLoaded { get; }
+    /// <summary>Whether an initial snapshot has been published. Reads throw until it is.</summary>
+    bool IsLoaded { get; }
 
-	/// <summary>A defensive copy of the authoritative server options.</summary>
-	ServerOptions ServerOptions { get; }
+    /// <summary>A defensive copy of the authoritative server options.</summary>
+    ServerOptions ServerOptions { get; }
 
-	/// <summary>A defensive copy of the realm with the given path, or <c>null</c> when unknown/tombstoned.</summary>
-	Realm? FindRealmByPath(string path);
+    /// <summary>A defensive copy of the realm with the given path, or <c>null</c> when unknown/tombstoned.</summary>
+    Realm? FindRealmByPath(string path);
 
-	/// <summary>The paths of the realms in the current snapshot (used to scope named-options invalidation).</summary>
-	IReadOnlyCollection<string> RealmPaths { get; }
+    /// <summary>The paths of the realms in the current snapshot (used to scope named-options invalidation).</summary>
+    IReadOnlyCollection<string> RealmPaths { get; }
 
-	/// <summary>When the current snapshot was published (for observable staleness — plan DF26).</summary>
-	DateTimeOffset LoadedAtUtc { get; }
+    /// <summary>When the current snapshot was published (for observable staleness — plan DF26).</summary>
+    DateTimeOffset LoadedAtUtc { get; }
 
-	/// <summary>When the last periodic refresh failed, if any; a successful publish clears it (plan DF26).</summary>
-	DateTimeOffset? LastRefreshFailureUtc { get; }
+    /// <summary>When the last periodic refresh failed, if any; a successful publish clears it (plan DF26).</summary>
+    DateTimeOffset? LastRefreshFailureUtc { get; }
 }

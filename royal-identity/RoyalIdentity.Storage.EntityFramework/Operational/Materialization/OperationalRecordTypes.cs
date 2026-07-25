@@ -11,18 +11,18 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 /// </summary>
 public static class OperationalRecordTypes
 {
-	/// <inheritdoc cref="ProtocolArtifactTypes.AccessToken"/>
-	public const string AccessToken = ProtocolArtifactTypes.AccessToken;
+    /// <inheritdoc cref="ProtocolArtifactTypes.AccessToken"/>
+    public const string AccessToken = ProtocolArtifactTypes.AccessToken;
 
-	/// <inheritdoc cref="ProtocolArtifactTypes.RefreshToken"/>
-	public const string RefreshToken = ProtocolArtifactTypes.RefreshToken;
+    /// <inheritdoc cref="ProtocolArtifactTypes.RefreshToken"/>
+    public const string RefreshToken = ProtocolArtifactTypes.RefreshToken;
 
-	/// <inheritdoc cref="ProtocolArtifactTypes.AuthorizationCode"/>
-	public const string AuthorizationCode = ProtocolArtifactTypes.AuthorizationCode;
+    /// <inheritdoc cref="ProtocolArtifactTypes.AuthorizationCode"/>
+    public const string AuthorizationCode = ProtocolArtifactTypes.AuthorizationCode;
 
-	/// <summary>Consents (table <c>consents</c>).</summary>
-	public const string Consent = "consent";
+    /// <summary>Consents (table <c>consents</c>).</summary>
+    public const string Consent = "consent";
 
-	/// <summary>Authorize-parameters continuations (table <c>authorize_parameters</c>).</summary>
-	public const string AuthorizeParameters = "authorize_parameters";
+    /// <summary>Authorize-parameters continuations (table <c>authorize_parameters</c>).</summary>
+    public const string AuthorizeParameters = "authorize_parameters";
 }

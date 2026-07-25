@@ -8,31 +8,31 @@ namespace Tests.Architecture;
 /// </summary>
 internal static class ProjectReferenceReader
 {
-	public static IReadOnlyList<string> ReadProjectReferences(string relativeProjectPath)
-	{
-		var projectPath = Path.Combine(FindRepositoryRoot(), relativeProjectPath);
-		var document = XDocument.Load(projectPath);
+    public static IReadOnlyList<string> ReadProjectReferences(string relativeProjectPath)
+    {
+        var projectPath = Path.Combine(FindRepositoryRoot(), relativeProjectPath);
+        var document = XDocument.Load(projectPath);
 
-		return document
-			.Descendants("ProjectReference")
-			.Select(e => e.Attribute("Include")?.Value)
-			.Where(v => !string.IsNullOrWhiteSpace(v))
-			.Select(v => v!.Replace('\\', '/'))
-			.ToArray();
-	}
+        return document
+            .Descendants("ProjectReference")
+            .Select(e => e.Attribute("Include")?.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!.Replace('\\', '/'))
+            .ToArray();
+    }
 
-	public static string FindRepositoryRoot()
-	{
-		var directory = new DirectoryInfo(AppContext.BaseDirectory);
+    public static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
 
-		while (directory is not null)
-		{
-			if (File.Exists(Path.Combine(directory.FullName, "RoyalIdentity.sln")))
-				return directory.FullName;
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "RoyalIdentity.sln")))
+                return directory.FullName;
 
-			directory = directory.Parent;
-		}
+            directory = directory.Parent;
+        }
 
-		throw new DirectoryNotFoundException("Could not locate repository root from test output directory.");
-	}
+        throw new DirectoryNotFoundException("Could not locate repository root from test output directory.");
+    }
 }

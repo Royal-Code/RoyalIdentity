@@ -23,116 +23,116 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 /// </summary>
 public partial class RequestPasswordRecovery
 {
-	/// <summary>
-	/// Gets or sets the owning realm.
-	/// </summary>
-	public string RealmId { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets the owning realm.
+    /// </summary>
+    public string RealmId { get; set; } = string.Empty;
 
-	/// <summary>
-	/// Gets or sets the realm account policies (recovery toggle, token lifetime/throttle, login resolution).
-	/// </summary>
-	public UserAccountsRealmOptions Options { get; set; } = default!;
+    /// <summary>
+    /// Gets or sets the realm account policies (recovery toggle, token lifetime/throttle, login resolution).
+    /// </summary>
+    public UserAccountsRealmOptions Options { get; set; } = default!;
 
-	/// <summary>
-	/// Gets or sets the raw login (username or email) the recovery was requested for.
-	/// </summary>
-	public string Login { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets the raw login (username or email) the recovery was requested for.
+    /// </summary>
+    public string Login { get; set; } = string.Empty;
 
-	/// <summary>
-	/// Validates the recovery request input.
-	/// </summary>
-	/// <param name="problems">The collected problems, when invalid.</param>
-	/// <returns><c>true</c> when the input is invalid.</returns>
-	public bool HasProblems(out Problems? problems)
-	{
-		return Rules.Set<RequestPasswordRecovery>()
-			.NotNull(Options)
-			.NotEmpty(RealmId)
-			.NotEmpty(Login)
-			.HasProblems(out problems);
-	}
+    /// <summary>
+    /// Validates the recovery request input.
+    /// </summary>
+    /// <param name="problems">The collected problems, when invalid.</param>
+    /// <returns><c>true</c> when the input is invalid.</returns>
+    public bool HasProblems(out Problems? problems)
+    {
+        return Rules.Set<RequestPasswordRecovery>()
+            .NotNull(Options)
+            .NotEmpty(RealmId)
+            .NotEmpty(Login)
+            .HasProblems(out problems);
+    }
 
-	/// <summary>
-	/// Executes the password recovery request use case. The unit of work is committed here (not by the generated
-	/// handler) so the notification can be dispatched after the token is durably persisted.
-	/// </summary>
-	[Command, WithValidateModel]
-	public async Task<Result> Execute(
-		IWorkContext work,
-		UserAccountReader reader,
-		UserAccountActionTokenService tokens,
-		INotificationGateway notifications,
-		TimeProvider clock,
-		CancellationToken ct)
-	{
-		if (!Options.AllowForgotPassword)
-		{
-			return Problems.NotAllowed(
-				"Password recovery is not allowed for this realm.",
-				nameof(Options.AllowForgotPassword),
-				"user_account.forgot_password_not_allowed");
-		}
+    /// <summary>
+    /// Executes the password recovery request use case. The unit of work is committed here (not by the generated
+    /// handler) so the notification can be dispatched after the token is durably persisted.
+    /// </summary>
+    [Command, WithValidateModel]
+    public async Task<Result> Execute(
+        IWorkContext work,
+        UserAccountReader reader,
+        UserAccountActionTokenService tokens,
+        INotificationGateway notifications,
+        TimeProvider clock,
+        CancellationToken ct)
+    {
+        if (!Options.AllowForgotPassword)
+        {
+            return Problems.NotAllowed(
+                "Password recovery is not allowed for this realm.",
+                nameof(Options.AllowForgotPassword),
+                "user_account.forgot_password_not_allowed");
+        }
 
-		var account = await reader.FindByLoginAsync(RealmId, Login, Options, ct);
-		var now = clock.GetUtcNow();
+        var account = await reader.FindByLoginAsync(RealmId, Login, Options, ct);
+        var now = clock.GetUtcNow();
 
-		// Anti-enumeration: an ineligible request returns the same generic success without issuing a token. Only an
-		// active account that holds a password and has somewhere to deliver the token proceeds. The administrative
-		// block is evaluated against its window (a scheduled/expired block is not in effect).
-		if (account is null || !account.IsActive || account.IsBlockedAt(now) || !account.LocalCredential.HasPassword)
-		{
-			return Result.Ok();
-		}
+        // Anti-enumeration: an ineligible request returns the same generic success without issuing a token. Only an
+        // active account that holds a password and has somewhere to deliver the token proceeds. The administrative
+        // block is evaluated against its window (a scheduled/expired block is not in effect).
+        if (account is null || !account.IsActive || account.IsBlockedAt(now) || !account.LocalCredential.HasPassword)
+        {
+            return Result.Ok();
+        }
 
-		var destination = account.PrimaryEmail;
-		if (destination is null)
-		{
-			return Result.Ok();
-		}
+        var destination = account.PrimaryEmail;
+        if (destination is null)
+        {
+            return Result.Ok();
+        }
 
-		var cooldown = Options.SecurityLifecycle.PasswordRecoveryResendCooldownSeconds;
-		if (cooldown > 0)
-		{
-			var threshold = now - TimeSpan.FromSeconds(cooldown);
-			if (await tokens.HasActiveTokenSinceAsync(
-				RealmId, account.Id, ActionTokenPurpose.PasswordRecovery, threshold, now, ct))
-			{
-				// A recent token is still valid; do not flood the user. The response is identical to a fresh issuance.
-				return Result.Ok();
-			}
-		}
+        var cooldown = Options.SecurityLifecycle.PasswordRecoveryResendCooldownSeconds;
+        if (cooldown > 0)
+        {
+            var threshold = now - TimeSpan.FromSeconds(cooldown);
+            if (await tokens.HasActiveTokenSinceAsync(
+                RealmId, account.Id, ActionTokenPurpose.PasswordRecovery, threshold, now, ct))
+            {
+                // A recent token is still valid; do not flood the user. The response is identical to a fresh issuance.
+                return Result.Ok();
+            }
+        }
 
-		var expiresAt = now.AddMinutes(Options.SecurityLifecycle.PasswordRecoveryTokenLifetimeMinutes);
-		var rawToken = await tokens.IssueAsync(
-			account,
-			ActionTokenPurpose.PasswordRecovery,
-			destination.NormalizedAddress,
-			now,
-			expiresAt,
-			ct);
+        var expiresAt = now.AddMinutes(Options.SecurityLifecycle.PasswordRecoveryTokenLifetimeMinutes);
+        var rawToken = await tokens.IssueAsync(
+            account,
+            ActionTokenPurpose.PasswordRecovery,
+            destination.NormalizedAddress,
+            now,
+            expiresAt,
+            ct);
 
-		// Persist the token (and the revocation of any previous one) before delivering, so the link is always backed
-		// by a stored hash.
-		await work.SaveAsync(ct);
+        // Persist the token (and the revocation of any previous one) before delivering, so the link is always backed
+        // by a stored hash.
+        await work.SaveAsync(ct);
 
-		var notification = new PasswordRecoveryNotification(
-			RealmId,
-			account.SubjectId,
-			account.DisplayName,
-			destination.Address,
-			rawToken,
-			expiresAt);
+        var notification = new PasswordRecoveryNotification(
+            RealmId,
+            account.SubjectId,
+            account.DisplayName,
+            destination.Address,
+            rawToken,
+            expiresAt);
 
-		try
-		{
-			await notifications.SendPasswordRecoveryAsync(notification, ct);
-		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
-		{
-			// Best-effort delivery: the token is already persisted, so a transport failure can be retried by the
-			// user. Surfacing it as a request error would be misleading (the recovery was registered).
-		}
+        try
+        {
+            await notifications.SendPasswordRecoveryAsync(notification, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Best-effort delivery: the token is already persisted, so a transport failure can be retried by the
+            // user. Surfacing it as a request error would be misleading (the recovery was registered).
+        }
 
-		return Result.Ok();
-	}
+        return Result.Ok();
+    }
 }

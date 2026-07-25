@@ -8,16 +8,16 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 /// </summary>
 public sealed class ConfigurationPayloadException : Exception
 {
-	private ConfigurationPayloadException(string message, Exception? inner = null) : base(message, inner)
-	{
-	}
+    private ConfigurationPayloadException(string message, Exception? inner = null) : base(message, inner)
+    {
+    }
 
-	public static ConfigurationPayloadException UnsupportedVersion(string payloadName, int found, int expected)
-		=> new($"The persisted {payloadName} payload has version {found}, but only version {expected} is supported.");
+    public static ConfigurationPayloadException UnsupportedVersion(string payloadName, int found, int expected)
+        => new($"The persisted {payloadName} payload has version {found}, but only version {expected} is supported.");
 
-	public static ConfigurationPayloadException InvalidJson(string payloadName, Exception inner)
-		=> new($"The persisted {payloadName} payload is not valid JSON.", inner);
+    public static ConfigurationPayloadException InvalidJson(string payloadName, Exception inner)
+        => new($"The persisted {payloadName} payload is not valid JSON.", inner);
 
-	public static ConfigurationPayloadException EmptyPayload(string payloadName)
-		=> new($"The persisted {payloadName} payload deserialized to null.");
+    public static ConfigurationPayloadException EmptyPayload(string payloadName)
+        => new($"The persisted {payloadName} payload deserialized to null.");
 }

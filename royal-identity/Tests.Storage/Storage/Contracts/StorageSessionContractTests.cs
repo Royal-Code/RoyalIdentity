@@ -10,38 +10,38 @@ namespace Tests.Storage.Contracts;
 /// </summary>
 public abstract class StorageSessionContractTests : StorageContractTests
 {
-	// SP-01/SP-02 `preservar` (DF21): within its lifetime, the session provides storage access able to
-	// read configuration (the key cache depends on this exact usage).
-	[Fact]
-	public async Task CreateSession_ProvidesUsableStorage_WithinItsLifetime()
-	{
-		await using var harness = await CreateHarnessAsync();
+    // SP-01/SP-02 `preservar` (DF21): within its lifetime, the session provides storage access able to
+    // read configuration (the key cache depends on this exact usage).
+    [Fact]
+    public async Task CreateSession_ProvidesUsableStorage_WithinItsLifetime()
+    {
+        await using var harness = await CreateHarnessAsync();
 
-		using var session = harness.Provider.CreateSession();
-		var storage = session.GetStorage();
-		var realm = await storage.Realms.GetByIdAsync(harness.RealmA.Id, default);
+        using var session = harness.Provider.CreateSession();
+        var storage = session.GetStorage();
+        var realm = await storage.Realms.GetByIdAsync(harness.RealmA.Id, default);
 
-		Assert.NotNull(realm);
-		Assert.Equal(harness.RealmA.Id, realm.Id);
-	}
+        Assert.NotNull(realm);
+        Assert.Equal(harness.RealmA.Id, realm.Id);
+    }
 
-	// SP-03 `preservar` (DF21): disposal completes without error; sessions are independently creatable.
-	[Fact]
-	public async Task Sessions_AreIndependentlyCreatableAndDisposable()
-	{
-		await using var harness = await CreateHarnessAsync();
+    // SP-03 `preservar` (DF21): disposal completes without error; sessions are independently creatable.
+    [Fact]
+    public async Task Sessions_AreIndependentlyCreatableAndDisposable()
+    {
+        await using var harness = await CreateHarnessAsync();
 
-		var first = harness.Provider.CreateSession();
-		first.Dispose();
+        var first = harness.Provider.CreateSession();
+        first.Dispose();
 
-		using var second = harness.Provider.CreateSession();
-		var realm = await second.GetStorage().Realms.GetByIdAsync(harness.RealmB.Id, default);
+        using var second = harness.Provider.CreateSession();
+        var realm = await second.GetStorage().Realms.GetByIdAsync(harness.RealmB.Id, default);
 
-		Assert.NotNull(realm);
-	}
+        Assert.NotNull(realm);
+    }
 
-	public sealed class InMemory : StorageSessionContractTests
-	{
-		protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-	}
+    public sealed class InMemory : StorageSessionContractTests
+    {
+        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
+    }
 }

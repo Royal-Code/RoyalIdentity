@@ -9,23 +9,23 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payl
 /// </summary>
 public sealed class ClaimsPrincipalPayload
 {
-	public required List<ClaimsIdentityPayload> Identities { get; set; }
+    public required List<ClaimsIdentityPayload> Identities { get; set; }
 
-	public static ClaimsPrincipalPayload From(ClaimsPrincipal principal)
-	{
-		ArgumentNullException.ThrowIfNull(principal);
+    public static ClaimsPrincipalPayload From(ClaimsPrincipal principal)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
 
-		return new ClaimsPrincipalPayload
-		{
-			Identities = [.. principal.Identities.Select(ClaimsIdentityPayload.From)],
-		};
-	}
+        return new ClaimsPrincipalPayload
+        {
+            Identities = [.. principal.Identities.Select(ClaimsIdentityPayload.From)],
+        };
+    }
 
-	public ClaimsPrincipal ToClaimsPrincipal(string payloadName)
-	{
-		if (Identities.Count is 0)
-			throw OperationalPayloadException.IncompletePayload(payloadName, "the subject has no identity");
+    public ClaimsPrincipal ToClaimsPrincipal(string payloadName)
+    {
+        if (Identities.Count is 0)
+            throw OperationalPayloadException.IncompletePayload(payloadName, "the subject has no identity");
 
-		return new ClaimsPrincipal(Identities.Select(identity => identity.ToClaimsIdentity()));
-	}
+        return new ClaimsPrincipal(Identities.Select(identity => identity.ToClaimsIdentity()));
+    }
 }

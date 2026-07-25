@@ -6,17 +6,17 @@ namespace RoyalIdentity.Data.Configuration.Entities;
 /// </summary>
 public class ClientSecretEntity
 {
-	public required string RealmId { get; set; }
+    public required string RealmId { get; set; }
 
-	public required string ClientId { get; set; }
+    public required string ClientId { get; set; }
 
-	public int Ordinal { get; set; }
+    public int Ordinal { get; set; }
 
-	public required string Type { get; set; }
+    public required string Type { get; set; }
 
-	public required string Value { get; set; }
+    public required string Value { get; set; }
 
-	public string? Description { get; set; }
+    public string? Description { get; set; }
 
-	public DateTime? ExpirationUtc { get; set; }
+    public DateTime? ExpirationUtc { get; set; }
 }

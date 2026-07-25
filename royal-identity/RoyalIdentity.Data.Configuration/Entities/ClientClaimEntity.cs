@@ -6,19 +6,19 @@ namespace RoyalIdentity.Data.Configuration.Entities;
 /// </summary>
 public class ClientClaimEntity
 {
-	public required string RealmId { get; set; }
+    public required string RealmId { get; set; }
 
-	public required string ClientId { get; set; }
+    public required string ClientId { get; set; }
 
-	public int Ordinal { get; set; }
+    public int Ordinal { get; set; }
 
-	public required string Type { get; set; }
+    public required string Type { get; set; }
 
-	public required string Value { get; set; }
+    public required string Value { get; set; }
 
-	public string? ValueType { get; set; }
+    public string? ValueType { get; set; }
 
-	public string? Issuer { get; set; }
+    public string? Issuer { get; set; }
 
-	public string? OriginalIssuer { get; set; }
+    public string? OriginalIssuer { get; set; }
 }

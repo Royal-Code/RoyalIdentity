@@ -8,7 +8,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
 /// </summary>
 public interface IConfigurationResourceSource
 {
-	IEnumerable<IdentityScope> GetIdentityScopes(string realmId);
+    IEnumerable<IdentityScope> GetIdentityScopes(string realmId);
 
-	IEnumerable<ResourceServer> GetResourceServers(string realmId);
+    IEnumerable<ResourceServer> GetResourceServers(string realmId);
 }

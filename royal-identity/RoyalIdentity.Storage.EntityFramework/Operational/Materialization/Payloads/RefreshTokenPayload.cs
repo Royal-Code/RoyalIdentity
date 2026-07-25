@@ -11,17 +11,17 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payl
 /// </summary>
 public sealed class RefreshTokenPayload
 {
-	public required string Issuer { get; set; }
+    public required string Issuer { get; set; }
 
-	public string? Confirmation { get; set; }
+    public string? Confirmation { get; set; }
 
-	public required List<string> RequestedScopes { get; set; }
+    public required List<string> RequestedScopes { get; set; }
 
-	public required List<string> ResourceUris { get; set; }
+    public required List<string> ResourceUris { get; set; }
 
-	public required List<string> Audiences { get; set; }
+    public required List<string> Audiences { get; set; }
 
-	public required List<string> AllowedSigningAlgorithms { get; set; }
+    public required List<string> AllowedSigningAlgorithms { get; set; }
 
-	public required List<ClaimPayload> Claims { get; set; }
+    public required List<ClaimPayload> Claims { get; set; }
 }

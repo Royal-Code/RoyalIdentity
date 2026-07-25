@@ -13,21 +13,21 @@ namespace RoyalIdentity.UserAccounts.PostgreSql;
 /// </summary>
 public sealed class UserAccountsPostgreSqlDesignTimeDbContextFactory : IDesignTimeDbContextFactory<UserAccountsPostgreSqlDbContext>
 {
-	/// <inheritdoc />
-	public UserAccountsPostgreSqlDbContext CreateDbContext(string[] args)
-	{
-		var options = new DbContextOptionsBuilder<UserAccountsPostgreSqlDbContext>()
-			.UseNpgsql("Host=design-time;Database=design-time;Username=design-time;Password=design-time")
-			.Options;
+    /// <inheritdoc />
+    public UserAccountsPostgreSqlDbContext CreateDbContext(string[] args)
+    {
+        var options = new DbContextOptionsBuilder<UserAccountsPostgreSqlDbContext>()
+            .UseNpgsql("Host=design-time;Database=design-time;Username=design-time;Password=design-time")
+            .Options;
 
-		return new UserAccountsPostgreSqlDbContext(options, NoopDomainEventDispatcher.Instance);
-	}
+        return new UserAccountsPostgreSqlDbContext(options, NoopDomainEventDispatcher.Instance);
+    }
 
-	private sealed class NoopDomainEventDispatcher : IDomainEventDispatcher
-	{
-		public static readonly NoopDomainEventDispatcher Instance = new();
+    private sealed class NoopDomainEventDispatcher : IDomainEventDispatcher
+    {
+        public static readonly NoopDomainEventDispatcher Instance = new();
 
-		public Task DispatchAsync(IReadOnlyList<IDomainEvent> domainEvents, CancellationToken ct = default)
-			=> Task.CompletedTask;
-	}
+        public Task DispatchAsync(IReadOnlyList<IDomainEvent> domainEvents, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
 }

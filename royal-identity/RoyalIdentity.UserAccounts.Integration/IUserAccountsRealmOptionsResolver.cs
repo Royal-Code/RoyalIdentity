@@ -7,8 +7,8 @@ namespace RoyalIdentity.UserAccounts.Integration;
 /// </summary>
 public interface IUserAccountsRealmOptionsResolver
 {
-	/// <summary>
-	/// Resolves an independent options instance for the realm.
-	/// </summary>
-	UserAccountsRealmOptions Resolve(string realmId);
+    /// <summary>
+    /// Resolves an independent options instance for the realm.
+    /// </summary>
+    UserAccountsRealmOptions Resolve(string realmId);
 }

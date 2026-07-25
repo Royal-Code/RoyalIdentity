@@ -14,18 +14,18 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Protection;
 /// </summary>
 public interface IOperationalPayloadProtector
 {
-	/// <summary>
-	/// Stable identifier persisted in the envelope of everything this profile writes, so a later rotation only
-	/// needs the previous profile to stay registered as a reader.
-	/// </summary>
-	string ProfileId { get; }
+    /// <summary>
+    /// Stable identifier persisted in the envelope of everything this profile writes, so a later rotation only
+    /// needs the previous profile to stay registered as a reader.
+    /// </summary>
+    string ProfileId { get; }
 
-	/// <summary>Protects a payload, binding it to <paramref name="context"/>.</summary>
-	ValueTask<string> ProtectAsync(string payload, OperationalProtectionContext context, CancellationToken ct = default);
+    /// <summary>Protects a payload, binding it to <paramref name="context"/>.</summary>
+    ValueTask<string> ProtectAsync(string payload, OperationalProtectionContext context, CancellationToken ct = default);
 
-	/// <summary>
-	/// Restores a payload this profile produced. Fails when the value is malformed, tampered with, or was
-	/// produced under a different context.
-	/// </summary>
-	ValueTask<string> UnprotectAsync(string protectedPayload, OperationalProtectionContext context, CancellationToken ct = default);
+    /// <summary>
+    /// Restores a payload this profile produced. Fails when the value is malformed, tampered with, or was
+    /// produced under a different context.
+    /// </summary>
+    ValueTask<string> UnprotectAsync(string protectedPayload, OperationalProtectionContext context, CancellationToken ct = default);
 }

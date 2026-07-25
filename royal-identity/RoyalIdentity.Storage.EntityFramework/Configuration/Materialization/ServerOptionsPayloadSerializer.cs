@@ -12,34 +12,34 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 /// </summary>
 public sealed class ServerOptionsPayloadSerializer
 {
-	/// <summary>Current payload schema version written by <see cref="Serialize"/>.</summary>
-	public const int CurrentVersion = 1;
+    /// <summary>Current payload schema version written by <see cref="Serialize"/>.</summary>
+    public const int CurrentVersion = 1;
 
-	private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.General)
-	{
-		TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { GetOnlyCollectionModifier.Apply } },
-		Converters = { new ConfigurationObjectJsonConverter() },
-	};
+    private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.General)
+    {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { GetOnlyCollectionModifier.Apply } },
+        Converters = { new ConfigurationObjectJsonConverter() },
+    };
 
-	public (int Version, string Json) Serialize(ServerOptions serverOptions)
-	{
-		ArgumentNullException.ThrowIfNull(serverOptions);
-		return (CurrentVersion, JsonSerializer.Serialize(serverOptions, options));
-	}
+    public (int Version, string Json) Serialize(ServerOptions serverOptions)
+    {
+        ArgumentNullException.ThrowIfNull(serverOptions);
+        return (CurrentVersion, JsonSerializer.Serialize(serverOptions, options));
+    }
 
-	public ServerOptions Deserialize(int version, string json)
-	{
-		if (version != CurrentVersion)
-			throw ConfigurationPayloadException.UnsupportedVersion(nameof(ServerOptions), version, CurrentVersion);
+    public ServerOptions Deserialize(int version, string json)
+    {
+        if (version != CurrentVersion)
+            throw ConfigurationPayloadException.UnsupportedVersion(nameof(ServerOptions), version, CurrentVersion);
 
-		try
-		{
-			return JsonSerializer.Deserialize<ServerOptions>(json, options)
-				?? throw ConfigurationPayloadException.EmptyPayload(nameof(ServerOptions));
-		}
-		catch (JsonException ex)
-		{
-			throw ConfigurationPayloadException.InvalidJson(nameof(ServerOptions), ex);
-		}
-	}
+        try
+        {
+            return JsonSerializer.Deserialize<ServerOptions>(json, options)
+                ?? throw ConfigurationPayloadException.EmptyPayload(nameof(ServerOptions));
+        }
+        catch (JsonException ex)
+        {
+            throw ConfigurationPayloadException.InvalidJson(nameof(ServerOptions), ex);
+        }
+    }
 }

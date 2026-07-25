@@ -6,14 +6,14 @@ namespace RoyalIdentity.Configuration;
 /// </summary>
 public sealed class ConfigurationSnapshotRefreshOptions
 {
-	/// <summary>How often the snapshot is reloaded from its source after the initial bootstrap.</summary>
-	public TimeSpan RefreshInterval { get; set; }
+    /// <summary>How often the snapshot is reloaded from its source after the initial bootstrap.</summary>
+    public TimeSpan RefreshInterval { get; set; }
 
-	/// <summary>Throws when the interval is not a positive duration (validated at host start).</summary>
-	public void Validate()
-	{
-		if (RefreshInterval <= TimeSpan.Zero)
-			throw new InvalidOperationException(
-				$"{nameof(ConfigurationSnapshotRefreshOptions)}.{nameof(RefreshInterval)} must be a positive duration.");
-	}
+    /// <summary>Throws when the interval is not a positive duration (validated at host start).</summary>
+    public void Validate()
+    {
+        if (RefreshInterval <= TimeSpan.Zero)
+            throw new InvalidOperationException(
+                $"{nameof(ConfigurationSnapshotRefreshOptions)}.{nameof(RefreshInterval)} must be a positive duration.");
+    }
 }

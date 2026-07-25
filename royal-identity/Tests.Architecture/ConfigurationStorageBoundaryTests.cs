@@ -16,121 +16,121 @@ namespace Tests.Architecture;
 /// </summary>
 public class ConfigurationStorageBoundaryTests
 {
-	private static readonly Assembly DataConfiguration = typeof(ConfigurationDataAssemblyMarker).Assembly;
-	private static readonly Assembly Adapter = typeof(EntityFrameworkStorageAssemblyMarker).Assembly;
-	private static readonly Assembly SqliteProvider = typeof(EntityFrameworkSqliteAssemblyMarker).Assembly;
-	private static readonly Assembly PostgreSqlProvider = typeof(EntityFrameworkPostgreSqlAssemblyMarker).Assembly;
+    private static readonly Assembly DataConfiguration = typeof(ConfigurationDataAssemblyMarker).Assembly;
+    private static readonly Assembly Adapter = typeof(EntityFrameworkStorageAssemblyMarker).Assembly;
+    private static readonly Assembly SqliteProvider = typeof(EntityFrameworkSqliteAssemblyMarker).Assembly;
+    private static readonly Assembly PostgreSqlProvider = typeof(EntityFrameworkPostgreSqlAssemblyMarker).Assembly;
 
-	private const string CoreName = "RoyalIdentity";
-	private const string DataName = "RoyalIdentity.Data.Configuration";
-	private const string AdapterName = "RoyalIdentity.Storage.EntityFramework";
+    private const string CoreName = "RoyalIdentity";
+    private const string DataName = "RoyalIdentity.Data.Configuration";
+    private const string AdapterName = "RoyalIdentity.Storage.EntityFramework";
 
-	public static TheoryData<string, Assembly> ProviderAssemblies => new()
-	{
-		{ "Sqlite", SqliteProvider },
-		{ "PostgreSql", PostgreSqlProvider }
-	};
+    public static TheoryData<string, Assembly> ProviderAssemblies => new()
+    {
+        { "Sqlite", SqliteProvider },
+        { "PostgreSql", PostgreSqlProvider }
+    };
 
-	[Fact]
-	public void DataConfiguration_DoesNotReference_Core_Adapter_Or_AspNetCore()
-	{
-		var refs = DataConfiguration.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+    [Fact]
+    public void DataConfiguration_DoesNotReference_Core_Adapter_Or_AspNetCore()
+    {
+        var refs = DataConfiguration.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
 
-		Assert.DoesNotContain(refs, n => n == CoreName);
-		Assert.DoesNotContain(refs, n => n.StartsWith(AdapterName, StringComparison.Ordinal));
-		Assert.DoesNotContain(refs, n => n.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
-	}
+        Assert.DoesNotContain(refs, n => n == CoreName);
+        Assert.DoesNotContain(refs, n => n.StartsWith(AdapterName, StringComparison.Ordinal));
+        Assert.DoesNotContain(refs, n => n.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
+    }
 
-	[Fact]
-	public void DataConfiguration_DependsOn_EntityFrameworkCore_Only_AsDataStack()
-	{
-		var refs = DataConfiguration.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+    [Fact]
+    public void DataConfiguration_DependsOn_EntityFrameworkCore_Only_AsDataStack()
+    {
+        var refs = DataConfiguration.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
 
-		Assert.Contains(refs, n => n.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
-		Assert.DoesNotContain(refs, n => n.StartsWith("RoyalIdentity", StringComparison.Ordinal));
-	}
+        Assert.Contains(refs, n => n.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
+        Assert.DoesNotContain(refs, n => n.StartsWith("RoyalIdentity", StringComparison.Ordinal));
+    }
 
-	[Fact]
-	public void DataConfiguration_Project_HasNoProjectReferences()
-	{
-		var projectReferences = ProjectReferenceReader.ReadProjectReferences(
-			"RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj");
+    [Fact]
+    public void DataConfiguration_Project_HasNoProjectReferences()
+    {
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences(
+            "RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj");
 
-		Assert.Empty(projectReferences);
-	}
+        Assert.Empty(projectReferences);
+    }
 
-	[Fact]
-	public void Adapter_ProjectGraph_References_Core_And_Data_Only()
-	{
-		var projectReferences = ProjectReferenceReader.ReadProjectReferences(
-			"RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj");
+    [Fact]
+    public void Adapter_ProjectGraph_References_Core_And_Data_Only()
+    {
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences(
+            "RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj");
 
-		// The adapter is the only project that knows the core and both pure Data families.
-		Assert.Equal(3, projectReferences.Count);
-		Assert.Contains(projectReferences, r => r.EndsWith("RoyalIdentity/RoyalIdentity.csproj", StringComparison.Ordinal));
-		Assert.Contains(projectReferences, r => r.EndsWith(
-			"RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj", StringComparison.Ordinal));
-		Assert.Contains(projectReferences, r => r.EndsWith(
-			"RoyalIdentity.Data.Operational/RoyalIdentity.Data.Operational.csproj", StringComparison.Ordinal));
-	}
+        // The adapter is the only project that knows the core and both pure Data families.
+        Assert.Equal(3, projectReferences.Count);
+        Assert.Contains(projectReferences, r => r.EndsWith("RoyalIdentity/RoyalIdentity.csproj", StringComparison.Ordinal));
+        Assert.Contains(projectReferences, r => r.EndsWith(
+            "RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj", StringComparison.Ordinal));
+        Assert.Contains(projectReferences, r => r.EndsWith(
+            "RoyalIdentity.Data.Operational/RoyalIdentity.Data.Operational.csproj", StringComparison.Ordinal));
+    }
 
-	[Theory]
-	[MemberData(nameof(ProviderAssemblies))]
-	public void Providers_DoNotBind_Core_Directly(string _, Assembly provider)
-	{
-		var refs = provider.GetReferencedAssemblies().Select(a => a.Name!);
+    [Theory]
+    [MemberData(nameof(ProviderAssemblies))]
+    public void Providers_DoNotBind_Core_Directly(string _, Assembly provider)
+    {
+        var refs = provider.GetReferencedAssemblies().Select(a => a.Name!);
 
-		Assert.DoesNotContain(refs, n => n == CoreName);
-	}
+        Assert.DoesNotContain(refs, n => n == CoreName);
+    }
 
-	[Theory]
-	[InlineData("RoyalIdentity.Storage.EntityFramework.Sqlite/RoyalIdentity.Storage.EntityFramework.Sqlite.csproj")]
-	[InlineData("RoyalIdentity.Storage.EntityFramework.PostgreSql/RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj")]
-	public void Providers_ProjectGraph_References_Adapter_And_Data_Only(string providerProject)
-	{
-		var projectReferences = ProjectReferenceReader.ReadProjectReferences(providerProject);
+    [Theory]
+    [InlineData("RoyalIdentity.Storage.EntityFramework.Sqlite/RoyalIdentity.Storage.EntityFramework.Sqlite.csproj")]
+    [InlineData("RoyalIdentity.Storage.EntityFramework.PostgreSql/RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj")]
+    public void Providers_ProjectGraph_References_Adapter_And_Data_Only(string providerProject)
+    {
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences(providerProject);
 
-		Assert.Equal(2, projectReferences.Count);
-		Assert.Contains(projectReferences, r => r.EndsWith(
-			"RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj", StringComparison.Ordinal));
-		Assert.Contains(projectReferences, r => r.EndsWith(
-			"RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj", StringComparison.Ordinal));
-	}
+        Assert.Equal(2, projectReferences.Count);
+        Assert.Contains(projectReferences, r => r.EndsWith(
+            "RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj", StringComparison.Ordinal));
+        Assert.Contains(projectReferences, r => r.EndsWith(
+            "RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj", StringComparison.Ordinal));
+    }
 
-	[Fact]
-	public void MigrationsRunner_ProjectGraph_References_Providers_Only()
-	{
-		var projectReferences = ProjectReferenceReader.ReadProjectReferences(
-			"RoyalIdentity.Migrations/RoyalIdentity.Migrations.csproj");
+    [Fact]
+    public void MigrationsRunner_ProjectGraph_References_Providers_Only()
+    {
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences(
+            "RoyalIdentity.Migrations/RoyalIdentity.Migrations.csproj");
 
-		Assert.Equal(2, projectReferences.Count);
-		Assert.All(projectReferences, r => Assert.Contains("RoyalIdentity.Storage.EntityFramework.", r));
-	}
+        Assert.Equal(2, projectReferences.Count);
+        Assert.All(projectReferences, r => Assert.Contains("RoyalIdentity.Storage.EntityFramework.", r));
+    }
 
-	[Fact]
-	public void Host_DoesNotReference_TheEntityFrameworkFamily()
-	{
-		// DF11/DF20: no database, runner or EF storage becomes a prerequisite of the default host.
-		var projectReferences = ProjectReferenceReader.ReadProjectReferences(
-			"RoyalIdentity.Server/RoyalIdentity.Server.csproj");
+    [Fact]
+    public void Host_DoesNotReference_TheEntityFrameworkFamily()
+    {
+        // DF11/DF20: no database, runner or EF storage becomes a prerequisite of the default host.
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences(
+            "RoyalIdentity.Server/RoyalIdentity.Server.csproj");
 
-		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Storage.EntityFramework", StringComparison.Ordinal));
-		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Configuration", StringComparison.Ordinal));
-		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Operational", StringComparison.Ordinal));
-		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Migrations", StringComparison.Ordinal));
-	}
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Storage.EntityFramework", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Configuration", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Operational", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Migrations", StringComparison.Ordinal));
+    }
 
-	[Fact]
-	public void Core_DoesNotReference_DataOrAdapter()
-	{
-		var projectReferences = ProjectReferenceReader.ReadProjectReferences("RoyalIdentity/RoyalIdentity.csproj");
+    [Fact]
+    public void Core_DoesNotReference_DataOrAdapter()
+    {
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences("RoyalIdentity/RoyalIdentity.csproj");
 
-		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Configuration", StringComparison.Ordinal));
-		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Operational", StringComparison.Ordinal));
-		Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Storage.EntityFramework", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Configuration", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Operational", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Storage.EntityFramework", StringComparison.Ordinal));
 
-		var refs = typeof(RoyalIdentity.Contracts.Storage.IStorage).Assembly
-			.GetReferencedAssemblies().Select(a => a.Name!);
-		Assert.DoesNotContain(refs, n => n == DataName || n.StartsWith(AdapterName, StringComparison.Ordinal));
-	}
+        var refs = typeof(RoyalIdentity.Contracts.Storage.IStorage).Assembly
+            .GetReferencedAssemblies().Select(a => a.Name!);
+        Assert.DoesNotContain(refs, n => n == DataName || n.StartsWith(AdapterName, StringComparison.Ordinal));
+    }
 }

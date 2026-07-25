@@ -7,26 +7,26 @@ namespace RoyalIdentity.Data.Configuration.Entities;
 /// </summary>
 public class SigningKeyEntity
 {
-	public required string RealmId { get; set; }
+    public required string RealmId { get; set; }
 
-	public required string KeyId { get; set; }
+    public required string KeyId { get; set; }
 
-	public required string Name { get; set; }
+    public required string Name { get; set; }
 
-	public required string SecurityAlgorithm { get; set; }
+    public required string SecurityAlgorithm { get; set; }
 
-	public int SerializationFormat { get; set; }
+    public int SerializationFormat { get; set; }
 
-	public int Encoding { get; set; }
+    public int Encoding { get; set; }
 
-	public DateTime CreatedUtc { get; set; }
+    public DateTime CreatedUtc { get; set; }
 
-	public DateTime? NotBeforeUtc { get; set; }
+    public DateTime? NotBeforeUtc { get; set; }
 
-	public DateTime? ExpiresUtc { get; set; }
+    public DateTime? ExpiresUtc { get; set; }
 
-	/// <summary>Identifier of the protector that produced <see cref="ProtectedMaterial"/> (plan DF8).</summary>
-	public required string ProtectorId { get; set; }
+    /// <summary>Identifier of the protector that produced <see cref="ProtectedMaterial"/> (plan DF8).</summary>
+    public required string ProtectorId { get; set; }
 
-	public required string ProtectedMaterial { get; set; }
+    public required string ProtectedMaterial { get; set; }
 }

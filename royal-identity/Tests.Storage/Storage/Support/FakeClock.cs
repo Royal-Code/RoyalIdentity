@@ -7,9 +7,9 @@ namespace Tests.Storage.Support;
 /// </summary>
 public sealed class FakeClock(DateTimeOffset start) : TimeProvider
 {
-	public DateTimeOffset Now { get; set; } = start;
+    public DateTimeOffset Now { get; set; } = start;
 
-	public override DateTimeOffset GetUtcNow() => Now;
+    public override DateTimeOffset GetUtcNow() => Now;
 
-	public void Advance(TimeSpan delta) => Now = Now.Add(delta);
+    public void Advance(TimeSpan delta) => Now = Now.Add(delta);
 }

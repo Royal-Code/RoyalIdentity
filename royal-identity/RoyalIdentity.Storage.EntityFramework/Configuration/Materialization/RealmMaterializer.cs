@@ -12,16 +12,16 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 /// </summary>
 public sealed class RealmMaterializer(RealmOptionsPayloadSerializer realmOptionsSerializer)
 {
-	public Realm ToRealm(RealmEntity entity, ServerOptions serverOptions)
-	{
-		ArgumentNullException.ThrowIfNull(entity);
-		ArgumentNullException.ThrowIfNull(serverOptions);
+    public Realm ToRealm(RealmEntity entity, ServerOptions serverOptions)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(serverOptions);
 
-		var options = realmOptionsSerializer.Deserialize(entity.OptionsVersion, entity.OptionsJson, serverOptions);
+        var options = realmOptionsSerializer.Deserialize(entity.OptionsVersion, entity.OptionsJson, serverOptions);
 
-		return new Realm(entity.Id, entity.Domain, entity.Path, entity.DisplayName, entity.Internal, options)
-		{
-			Enabled = entity.Enabled,
-		};
-	}
+        return new Realm(entity.Id, entity.Domain, entity.Path, entity.DisplayName, entity.Internal, options)
+        {
+            Enabled = entity.Enabled,
+        };
+    }
 }

@@ -8,5 +8,5 @@ namespace RoyalIdentity.Configuration;
 /// </summary>
 public interface IConfigurationSnapshotSource
 {
-	Task<ConfigurationSnapshotData> LoadAsync(CancellationToken ct);
+    Task<ConfigurationSnapshotData> LoadAsync(CancellationToken ct);
 }

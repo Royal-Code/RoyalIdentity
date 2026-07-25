@@ -9,21 +9,21 @@ namespace RoyalIdentity.UserAccounts.Sqlite;
 /// </summary>
 public class UserAccountsSqliteDbContext : UserAccountsDbContext
 {
-	/// <summary>
-	/// Creates the context.
-	/// </summary>
-	/// <param name="options">The context options.</param>
-	/// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
-	public UserAccountsSqliteDbContext(
-		DbContextOptions<UserAccountsSqliteDbContext> options, IDomainEventDispatcher dispatcher)
-		: base(options, dispatcher)
-	{
-	}
+    /// <summary>
+    /// Creates the context.
+    /// </summary>
+    /// <param name="options">The context options.</param>
+    /// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
+    public UserAccountsSqliteDbContext(
+        DbContextOptions<UserAccountsSqliteDbContext> options, IDomainEventDispatcher dispatcher)
+        : base(options, dispatcher)
+    {
+    }
 
-	/// <inheritdoc />
-	protected override void OnModelCreating(ModelBuilder modelBuilder)
-	{
-		base.OnModelCreating(modelBuilder);
-		modelBuilder.ApplyUserAccountsSqliteMappings();
-	}
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyUserAccountsSqliteMappings();
+    }
 }

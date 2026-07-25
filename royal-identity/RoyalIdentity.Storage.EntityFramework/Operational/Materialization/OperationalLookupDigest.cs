@@ -23,21 +23,21 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 /// </summary>
 public sealed class OperationalLookupDigest
 {
-	/// <summary>
-	/// The digest of <paramref name="value"/> within <paramref name="recordType"/>, as lowercase hex.
-	/// </summary>
-	/// <param name="recordType">The record type; see <see cref="OperationalRecordTypes"/>.</param>
-	/// <param name="value">
-	/// The raw handle. For an access token this is always the <c>jti</c> (plan DF13): the reference bearer
-	/// coincides with it today, and a compact JWT is never a lookup key.
-	/// </param>
-	public string Compute(string recordType, string value)
-	{
-		ArgumentException.ThrowIfNullOrWhiteSpace(recordType);
-		ArgumentException.ThrowIfNullOrEmpty(value);
+    /// <summary>
+    /// The digest of <paramref name="value"/> within <paramref name="recordType"/>, as lowercase hex.
+    /// </summary>
+    /// <param name="recordType">The record type; see <see cref="OperationalRecordTypes"/>.</param>
+    /// <param name="value">
+    /// The raw handle. For an access token this is always the <c>jti</c> (plan DF13): the reference bearer
+    /// coincides with it today, and a compact JWT is never a lookup key.
+    /// </param>
+    public string Compute(string recordType, string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recordType);
+        ArgumentException.ThrowIfNullOrEmpty(value);
 
-		var bytes = Encoding.UTF8.GetBytes($"{recordType}|{value}");
+        var bytes = Encoding.UTF8.GetBytes($"{recordType}|{value}");
 
-		return Convert.ToHexStringLower(SHA256.HashData(bytes));
-	}
+        return Convert.ToHexStringLower(SHA256.HashData(bytes));
+    }
 }

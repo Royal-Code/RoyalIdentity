@@ -9,21 +9,21 @@ namespace RoyalIdentity.UserAccounts.Infrastructure.Data.Mappings;
 /// </summary>
 public sealed class PasswordHistoryEntryMap : IEntityTypeConfiguration<PasswordHistoryEntry>
 {
-	/// <inheritdoc />
-	public void Configure(EntityTypeBuilder<PasswordHistoryEntry> builder)
-	{
-		builder.ToTable("UserAccountPasswordHistory");
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<PasswordHistoryEntry> builder)
+    {
+        builder.ToTable("UserAccountPasswordHistory");
 
-		builder.HasKey(h => h.Id);
-		builder.Property(h => h.Id).ValueGeneratedOnAdd();
+        builder.HasKey(h => h.Id);
+        builder.Property(h => h.Id).ValueGeneratedOnAdd();
 
-		builder.Property(h => h.RealmId).IsRequired();
-		builder.Property(h => h.UserAccountId).IsRequired();
-		builder.Property(h => h.PasswordHash).IsRequired();
-		builder.Property(h => h.CreatedAt).IsRequired();
-		builder.Property(h => h.Reason).HasConversion<string>().IsRequired();
-		builder.Property(h => h.CreatedBySubjectId);
+        builder.Property(h => h.RealmId).IsRequired();
+        builder.Property(h => h.UserAccountId).IsRequired();
+        builder.Property(h => h.PasswordHash).IsRequired();
+        builder.Property(h => h.CreatedAt).IsRequired();
+        builder.Property(h => h.Reason).HasConversion<string>().IsRequired();
+        builder.Property(h => h.CreatedBySubjectId);
 
-		builder.HasIndex(h => new { h.RealmId, h.UserAccountId, h.CreatedAt });
-	}
+        builder.HasIndex(h => new { h.RealmId, h.UserAccountId, h.CreatedAt });
+    }
 }

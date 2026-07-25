@@ -7,14 +7,14 @@ namespace RoyalIdentity.UserAccounts.Integration;
 /// </summary>
 public class UserAccountsRealmBindingFactory(IUserAccountsRealmOptionsResolver optionsResolver)
 {
-	/// <summary>
-	/// Creates a binding for the supplied IdP realm.
-	/// </summary>
-	public UserAccountsRealmBinding Create(Realm realm)
-	{
-		var options = optionsResolver.Resolve(realm.Id);
-		options.EnsureValid();
+    /// <summary>
+    /// Creates a binding for the supplied IdP realm.
+    /// </summary>
+    public UserAccountsRealmBinding Create(Realm realm)
+    {
+        var options = optionsResolver.Resolve(realm.Id);
+        options.EnsureValid();
 
-		return new UserAccountsRealmBinding(realm.Id, options);
-	}
+        return new UserAccountsRealmBinding(realm.Id, options);
+    }
 }

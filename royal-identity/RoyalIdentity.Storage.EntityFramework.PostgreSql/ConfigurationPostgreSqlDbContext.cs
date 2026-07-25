@@ -9,11 +9,11 @@ namespace RoyalIdentity.Storage.EntityFramework.PostgreSql;
 /// </summary>
 public class ConfigurationPostgreSqlDbContext : ConfigurationDbContext
 {
-	public ConfigurationPostgreSqlDbContext(DbContextOptions<ConfigurationPostgreSqlDbContext> options)
-		: base(options)
-	{
-	}
+    public ConfigurationPostgreSqlDbContext(DbContextOptions<ConfigurationPostgreSqlDbContext> options)
+        : base(options)
+    {
+    }
 
-	protected override void ApplyConfigurationModel(ModelBuilder modelBuilder)
-		=> modelBuilder.ApplyRoyalIdentityConfigurationPostgreSqlMappings();
+    protected override void ApplyConfigurationModel(ModelBuilder modelBuilder)
+        => modelBuilder.ApplyRoyalIdentityConfigurationPostgreSqlMappings();
 }

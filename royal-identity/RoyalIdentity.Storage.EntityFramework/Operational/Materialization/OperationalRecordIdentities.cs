@@ -30,21 +30,21 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 /// <param name="CreatedAtUtc">Issuance instant.</param>
 /// <param name="ExpiresAtUtc">Absolute expiration; with <paramref name="CreatedAtUtc"/> it yields the lifetime.</param>
 public sealed record AccessTokenIdentity(
-	string Jti,
-	string RealmId,
-	string ClientId,
-	AccessTokenType AccessTokenType,
-	DateTime CreatedAtUtc,
-	DateTime ExpiresAtUtc)
+    string Jti,
+    string RealmId,
+    string ClientId,
+    AccessTokenType AccessTokenType,
+    DateTime CreatedAtUtc,
+    DateTime ExpiresAtUtc)
 {
-	/// <summary>
-	/// Lifetime in seconds, derived from the two authoritative timestamps rather than persisted a second time.
-	/// An expiration that precedes the creation instant is incoherent data and fails closed.
-	/// </summary>
-	public int Lifetime => ExpiresAtUtc >= CreatedAtUtc
-		? (int)(ExpiresAtUtc - CreatedAtUtc).TotalSeconds
-		: throw OperationalPayloadException.IncoherentRecord(
-			nameof(AccessToken), "the expiration precedes the creation instant");
+    /// <summary>
+    /// Lifetime in seconds, derived from the two authoritative timestamps rather than persisted a second time.
+    /// An expiration that precedes the creation instant is incoherent data and fails closed.
+    /// </summary>
+    public int Lifetime => ExpiresAtUtc >= CreatedAtUtc
+        ? (int)(ExpiresAtUtc - CreatedAtUtc).TotalSeconds
+        : throw OperationalPayloadException.IncoherentRecord(
+            nameof(AccessToken), "the expiration precedes the creation instant");
 }
 
 /// <inheritdoc cref="AccessTokenIdentity"/>
@@ -54,17 +54,17 @@ public sealed record AccessTokenIdentity(
 /// <param name="CreatedAtUtc">Issuance instant.</param>
 /// <param name="ExpiresAtUtc">Absolute expiration.</param>
 public sealed record RefreshTokenIdentity(
-	string Handle,
-	string RealmId,
-	string ClientId,
-	DateTime CreatedAtUtc,
-	DateTime ExpiresAtUtc)
+    string Handle,
+    string RealmId,
+    string ClientId,
+    DateTime CreatedAtUtc,
+    DateTime ExpiresAtUtc)
 {
-	/// <inheritdoc cref="AccessTokenIdentity.Lifetime"/>
-	public int Lifetime => ExpiresAtUtc >= CreatedAtUtc
-		? (int)(ExpiresAtUtc - CreatedAtUtc).TotalSeconds
-		: throw OperationalPayloadException.IncoherentRecord(
-			nameof(RefreshToken), "the expiration precedes the creation instant");
+    /// <inheritdoc cref="AccessTokenIdentity.Lifetime"/>
+    public int Lifetime => ExpiresAtUtc >= CreatedAtUtc
+        ? (int)(ExpiresAtUtc - CreatedAtUtc).TotalSeconds
+        : throw OperationalPayloadException.IncoherentRecord(
+            nameof(RefreshToken), "the expiration precedes the creation instant");
 }
 
 /// <inheritdoc cref="AccessTokenIdentity"/>
@@ -76,17 +76,17 @@ public sealed record RefreshTokenIdentity(
 /// <param name="CreatedAtUtc">Issuance instant.</param>
 /// <param name="ExpiresAtUtc">Absolute expiration.</param>
 public sealed record AuthorizationCodeIdentity(
-	string Code,
-	string RealmId,
-	string ClientId,
-	string RedirectUri,
-	string? SessionId,
-	DateTime CreatedAtUtc,
-	DateTime ExpiresAtUtc)
+    string Code,
+    string RealmId,
+    string ClientId,
+    string RedirectUri,
+    string? SessionId,
+    DateTime CreatedAtUtc,
+    DateTime ExpiresAtUtc)
 {
-	/// <inheritdoc cref="AccessTokenIdentity.Lifetime"/>
-	public int Lifetime => ExpiresAtUtc >= CreatedAtUtc
-		? (int)(ExpiresAtUtc - CreatedAtUtc).TotalSeconds
-		: throw OperationalPayloadException.IncoherentRecord(
-			nameof(AuthorizationCode), "the expiration precedes the creation instant");
+    /// <inheritdoc cref="AccessTokenIdentity.Lifetime"/>
+    public int Lifetime => ExpiresAtUtc >= CreatedAtUtc
+        ? (int)(ExpiresAtUtc - CreatedAtUtc).TotalSeconds
+        : throw OperationalPayloadException.IncoherentRecord(
+            nameof(AuthorizationCode), "the expiration precedes the creation instant");
 }

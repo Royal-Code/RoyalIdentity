@@ -9,15 +9,15 @@ namespace RoyalIdentity.Data.Operational.Entities;
 /// </summary>
 public static class ProtocolArtifactTypes
 {
-	/// <summary>Reference access tokens (always persisted) and JWT metadata/full when the realm enables it.</summary>
-	public const string AccessToken = "access_token";
+    /// <summary>Reference access tokens (always persisted) and JWT metadata/full when the realm enables it.</summary>
+    public const string AccessToken = "access_token";
 
-	/// <summary>Refresh tokens.</summary>
-	public const string RefreshToken = "refresh_token";
+    /// <summary>Refresh tokens.</summary>
+    public const string RefreshToken = "refresh_token";
 
-	/// <summary>Authorization codes.</summary>
-	public const string AuthorizationCode = "authorization_code";
+    /// <summary>Authorization codes.</summary>
+    public const string AuthorizationCode = "authorization_code";
 
-	/// <summary>Every discriminator known to this version of the model.</summary>
-	public static IReadOnlyList<string> All { get; } = [AccessToken, RefreshToken, AuthorizationCode];
+    /// <summary>Every discriminator known to this version of the model.</summary>
+    public static IReadOnlyList<string> All { get; } = [AccessToken, RefreshToken, AuthorizationCode];
 }

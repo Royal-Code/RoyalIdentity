@@ -6,6 +6,6 @@ namespace RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 /// </summary>
 public sealed class AesKeyMaterialProtectorOptions
 {
-	/// <summary>An AES key containing exactly 16, 24 or 32 bytes.</summary>
-	public byte[] Key { get; set; } = [];
+    /// <summary>An AES key containing exactly 16, 24 or 32 bytes.</summary>
+    public byte[] Key { get; set; } = [];
 }

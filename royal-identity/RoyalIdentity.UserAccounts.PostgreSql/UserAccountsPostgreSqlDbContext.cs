@@ -10,21 +10,21 @@ namespace RoyalIdentity.UserAccounts.PostgreSql;
 /// </summary>
 public class UserAccountsPostgreSqlDbContext : UserAccountsDbContext
 {
-	/// <summary>
-	/// Creates the context.
-	/// </summary>
-	/// <param name="options">The context options.</param>
-	/// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
-	public UserAccountsPostgreSqlDbContext(
-		DbContextOptions<UserAccountsPostgreSqlDbContext> options, IDomainEventDispatcher dispatcher)
-		: base(options, dispatcher)
-	{
-	}
+    /// <summary>
+    /// Creates the context.
+    /// </summary>
+    /// <param name="options">The context options.</param>
+    /// <param name="dispatcher">The domain event dispatcher (post-commit).</param>
+    public UserAccountsPostgreSqlDbContext(
+        DbContextOptions<UserAccountsPostgreSqlDbContext> options, IDomainEventDispatcher dispatcher)
+        : base(options, dispatcher)
+    {
+    }
 
-	/// <inheritdoc />
-	protected override void OnModelCreating(ModelBuilder modelBuilder)
-	{
-		base.OnModelCreating(modelBuilder);
-		modelBuilder.ApplyUserAccountsPostgreSqlMappings();
-	}
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyUserAccountsPostgreSqlMappings();
+    }
 }

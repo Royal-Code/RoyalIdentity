@@ -12,8 +12,8 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 /// <param name="ExpiresAt">When the token expires.</param>
 /// <param name="RequiredAction">The required action that triggered the challenge.</param>
 public sealed record ChangeExpiredPasswordToken(
-	string SubjectId,
-	string DisplayName,
-	string Token,
-	DateTimeOffset ExpiresAt,
-	LocalRequiredAction RequiredAction);
+    string SubjectId,
+    string DisplayName,
+    string Token,
+    DateTimeOffset ExpiresAt,
+    LocalRequiredAction RequiredAction);

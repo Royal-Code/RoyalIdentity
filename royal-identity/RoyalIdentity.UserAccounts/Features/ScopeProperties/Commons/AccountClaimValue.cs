@@ -5,18 +5,18 @@ namespace RoyalIdentity.UserAccounts.Features.ScopeProperties.Commons;
 /// </summary>
 public sealed class AccountClaimValue
 {
-	/// <summary>
-	/// Gets the identity scope name that enabled the value.
-	/// </summary>
-	public string ScopeName { get; init; } = string.Empty;
+    /// <summary>
+    /// Gets the identity scope name that enabled the value.
+    /// </summary>
+    public string ScopeName { get; init; } = string.Empty;
 
-	/// <summary>
-	/// Gets the claim type.
-	/// </summary>
-	public string ClaimType { get; init; } = string.Empty;
+    /// <summary>
+    /// Gets the claim type.
+    /// </summary>
+    public string ClaimType { get; init; } = string.Empty;
 
-	/// <summary>
-	/// Gets the claim value.
-	/// </summary>
-	public string Value { get; init; } = string.Empty;
+    /// <summary>
+    /// Gets the claim value.
+    /// </summary>
+    public string Value { get; init; } = string.Empty;
 }

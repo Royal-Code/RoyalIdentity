@@ -14,28 +14,28 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Snapshot;
 /// refresher on bootstrap) aborts rather than publishing an empty snapshot.
 /// </summary>
 internal sealed class EntityFrameworkConfigurationSnapshotSource(
-	IConfigurationDbContextAccessor accessor,
-	ConfigurationServerOptionsReader serverOptionsReader,
-	RealmMaterializer realmMaterializer) : IConfigurationSnapshotSource
+    IConfigurationDbContextAccessor accessor,
+    ConfigurationServerOptionsReader serverOptionsReader,
+    RealmMaterializer realmMaterializer) : IConfigurationSnapshotSource
 {
-	public async Task<ConfigurationSnapshotData> LoadAsync(CancellationToken ct)
-	{
-		var db = accessor.DbContext;
-		var serverOptions = await serverOptionsReader.ReadAsync(ct);
+    public async Task<ConfigurationSnapshotData> LoadAsync(CancellationToken ct)
+    {
+        var db = accessor.DbContext;
+        var serverOptions = await serverOptionsReader.ReadAsync(ct);
 
-		var realmRows = await db.Set<RealmEntity>()
-			.AsNoTracking()
-			.Where(r => r.DeletedAtUtc == null)
-			.ToListAsync(ct);
+        var realmRows = await db.Set<RealmEntity>()
+            .AsNoTracking()
+            .Where(r => r.DeletedAtUtc == null)
+            .ToListAsync(ct);
 
-		var realms = realmRows
-			.Select(r => realmMaterializer.ToRealm(r, serverOptions))
-			.ToList();
+        var realms = realmRows
+            .Select(r => realmMaterializer.ToRealm(r, serverOptions))
+            .ToList();
 
-		return new ConfigurationSnapshotData
-		{
-			ServerOptions = serverOptions,
-			Realms = realms,
-		};
-	}
+        return new ConfigurationSnapshotData
+        {
+            ServerOptions = serverOptions,
+            Realms = realms,
+        };
+    }
 }

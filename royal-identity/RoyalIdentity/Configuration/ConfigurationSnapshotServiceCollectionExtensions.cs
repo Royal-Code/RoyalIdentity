@@ -11,16 +11,16 @@ namespace RoyalIdentity.Configuration;
 /// </summary>
 public static class ConfigurationSnapshotServiceCollectionExtensions
 {
-	public static IServiceCollection AddConfigurationSnapshot(this IServiceCollection services)
-	{
-		ArgumentNullException.ThrowIfNull(services);
+    public static IServiceCollection AddConfigurationSnapshot(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
 
-		services.TryAddSingleton(TimeProvider.System);
-		services.AddSingleton<ConfigurationSnapshotHolder>();
-		services.TryAddSingleton<IConfigurationSnapshot>(sp => sp.GetRequiredService<ConfigurationSnapshotHolder>());
-		services.TryAddSingleton<IConfigurationSnapshotRefresher, ConfigurationSnapshotRefresher>();
-		services.AddHostedService<ConfigurationSnapshotHostedService>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<ConfigurationSnapshotHolder>();
+        services.TryAddSingleton<IConfigurationSnapshot>(sp => sp.GetRequiredService<ConfigurationSnapshotHolder>());
+        services.TryAddSingleton<IConfigurationSnapshotRefresher, ConfigurationSnapshotRefresher>();
+        services.AddHostedService<ConfigurationSnapshotHostedService>();
 
-		return services;
-	}
+        return services;
+    }
 }

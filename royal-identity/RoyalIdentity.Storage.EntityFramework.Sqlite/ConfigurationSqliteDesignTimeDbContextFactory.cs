@@ -10,14 +10,14 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite;
 /// (plan DF11).
 /// </summary>
 public sealed class ConfigurationSqliteDesignTimeDbContextFactory
-	: IDesignTimeDbContextFactory<ConfigurationSqliteDbContext>
+    : IDesignTimeDbContextFactory<ConfigurationSqliteDbContext>
 {
-	public ConfigurationSqliteDbContext CreateDbContext(string[] args)
-	{
-		var options = new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
-			.UseSqlite("DataSource=design-time.db")
-			.Options;
+    public ConfigurationSqliteDbContext CreateDbContext(string[] args)
+    {
+        var options = new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
+            .UseSqlite("DataSource=design-time.db")
+            .Options;
 
-		return new ConfigurationSqliteDbContext(options);
-	}
+        return new ConfigurationSqliteDbContext(options);
+    }
 }

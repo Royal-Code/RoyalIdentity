@@ -10,31 +10,31 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Protection;
 /// </summary>
 public sealed class OperationalPayloadProtection(OperationalPayloadProtectorResolver resolver)
 {
-	/// <summary>
-	/// Protects <paramref name="payload"/> with the profile selected by <paramref name="realm"/> and returns
-	/// the value to persist.
-	/// </summary>
-	public async ValueTask<string> ProtectAsync(
-		Realm realm, string payload, OperationalProtectionContext context, CancellationToken ct = default)
-	{
-		ArgumentNullException.ThrowIfNull(realm);
+    /// <summary>
+    /// Protects <paramref name="payload"/> with the profile selected by <paramref name="realm"/> and returns
+    /// the value to persist.
+    /// </summary>
+    public async ValueTask<string> ProtectAsync(
+        Realm realm, string payload, OperationalProtectionContext context, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(realm);
 
-		var protector = resolver.GetForWrite(realm.Options.OperationalStorage.PayloadProtectionProfile);
-		var protectedPayload = await protector.ProtectAsync(payload, context, ct);
+        var protector = resolver.GetForWrite(realm.Options.OperationalStorage.PayloadProtectionProfile);
+        var protectedPayload = await protector.ProtectAsync(payload, context, ct);
 
-		return new OperationalPayloadEnvelope(protector.ProfileId, protectedPayload).ToPersistedValue();
-	}
+        return new OperationalPayloadEnvelope(protector.ProfileId, protectedPayload).ToPersistedValue();
+    }
 
-	/// <summary>
-	/// Restores a persisted value with the profile its envelope records. An unknown envelope version, an
-	/// unregistered reader, a tampered payload or a context mismatch all fail closed.
-	/// </summary>
-	public async ValueTask<string> UnprotectAsync(
-		string persistedValue, OperationalProtectionContext context, CancellationToken ct = default)
-	{
-		var envelope = OperationalPayloadEnvelope.Parse(persistedValue);
-		var protector = resolver.GetForRead(envelope.ProtectorId);
+    /// <summary>
+    /// Restores a persisted value with the profile its envelope records. An unknown envelope version, an
+    /// unregistered reader, a tampered payload or a context mismatch all fail closed.
+    /// </summary>
+    public async ValueTask<string> UnprotectAsync(
+        string persistedValue, OperationalProtectionContext context, CancellationToken ct = default)
+    {
+        var envelope = OperationalPayloadEnvelope.Parse(persistedValue);
+        var protector = resolver.GetForRead(envelope.ProtectorId);
 
-		return await protector.UnprotectAsync(envelope.Payload, context, ct);
-	}
+        return await protector.UnprotectAsync(envelope.Payload, context, ct);
+    }
 }

@@ -16,58 +16,58 @@ namespace Tests.Storage.Configuration;
 /// </summary>
 public class CompositeStorageSessionTests
 {
-	private static ServiceProvider BuildProvider(ScopedDisposalTracker tracker)
-	{
-		var services = new ServiceCollection();
-		services.AddSingleton<TimeProvider>(new FakeClock(StorageContractHarness.Start));
-		services.AddSingleton(tracker);
-		services.AddScoped<ScopedProbe>();
+    private static ServiceProvider BuildProvider(ScopedDisposalTracker tracker)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<TimeProvider>(new FakeClock(StorageContractHarness.Start));
+        services.AddSingleton(tracker);
+        services.AddScoped<ScopedProbe>();
 
-		services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite("Data Source=:memory:"));
-		services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
-		services.AddInMemoryStorage();
+        services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite("Data Source=:memory:"));
+        services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
+        services.AddInMemoryStorage();
 
-		// Test-only composite provider replaces the in-memory provider registered above (last wins).
-		services.AddSingleton<IStorageProvider, CompositeStorageProvider>();
+        // Test-only composite provider replaces the in-memory provider registered above (last wins).
+        services.AddSingleton<IStorageProvider, CompositeStorageProvider>();
 
-		return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-	}
+        return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+    }
 
-	[Fact]
-	public void Session_CombinesConfigurationAndOperational_AndDisposalReleasesScopedDependency()
-	{
-		var tracker = new ScopedDisposalTracker();
-		using var provider = BuildProvider(tracker);
-		var storageProvider = provider.GetRequiredService<IStorageProvider>();
+    [Fact]
+    public void Session_CombinesConfigurationAndOperational_AndDisposalReleasesScopedDependency()
+    {
+        var tracker = new ScopedDisposalTracker();
+        using var provider = BuildProvider(tracker);
+        var storageProvider = provider.GetRequiredService<IStorageProvider>();
 
-		var session = (CompositeStorageSession)storageProvider.CreateSession();
+        var session = (CompositeStorageSession)storageProvider.CreateSession();
 
-		Assert.NotNull(session.GetStorage());            // Operational (in-memory) available in the scope
-		Assert.NotNull(session.ConfigurationDbContext);  // Configuration (EF) owned by the same scope
-		Assert.Equal(0, tracker.DisposedCount);
+        Assert.NotNull(session.GetStorage());            // Operational (in-memory) available in the scope
+        Assert.NotNull(session.ConfigurationDbContext);  // Configuration (EF) owned by the same scope
+        Assert.Equal(0, tracker.DisposedCount);
 
-		session.Dispose();
+        session.Dispose();
 
-		Assert.Equal(1, tracker.DisposedCount);
-		// No behavior survives after disposal: the scope is gone, so the storage can no longer be resolved.
-		Assert.Throws<ObjectDisposedException>(() => session.GetStorage());
-	}
+        Assert.Equal(1, tracker.DisposedCount);
+        // No behavior survives after disposal: the scope is gone, so the storage can no longer be resolved.
+        Assert.Throws<ObjectDisposedException>(() => session.GetStorage());
+    }
 
-	[Fact]
-	public void EachSession_OwnsAnIndependentScope()
-	{
-		var tracker = new ScopedDisposalTracker();
-		using var provider = BuildProvider(tracker);
-		var storageProvider = provider.GetRequiredService<IStorageProvider>();
+    [Fact]
+    public void EachSession_OwnsAnIndependentScope()
+    {
+        var tracker = new ScopedDisposalTracker();
+        using var provider = BuildProvider(tracker);
+        var storageProvider = provider.GetRequiredService<IStorageProvider>();
 
-		var first = (CompositeStorageSession)storageProvider.CreateSession();
-		var second = (CompositeStorageSession)storageProvider.CreateSession();
+        var first = (CompositeStorageSession)storageProvider.CreateSession();
+        var second = (CompositeStorageSession)storageProvider.CreateSession();
 
-		Assert.NotSame(first.ConfigurationDbContext, second.ConfigurationDbContext);
+        Assert.NotSame(first.ConfigurationDbContext, second.ConfigurationDbContext);
 
-		first.Dispose();
-		second.Dispose();
+        first.Dispose();
+        second.Dispose();
 
-		Assert.Equal(2, tracker.DisposedCount);
-	}
+        Assert.Equal(2, tracker.DisposedCount);
+    }
 }

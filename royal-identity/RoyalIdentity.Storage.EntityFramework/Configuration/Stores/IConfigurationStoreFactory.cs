@@ -11,18 +11,18 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 /// </summary>
 public interface IConfigurationStoreFactory
 {
-	/// <summary>Reads and materializes the single authoritative server-options row.</summary>
-	Task<ServerOptions> GetServerOptionsAsync(CancellationToken ct = default);
+    /// <summary>Reads and materializes the single authoritative server-options row.</summary>
+    Task<ServerOptions> GetServerOptionsAsync(CancellationToken ct = default);
 
-	/// <summary>Gets the global realm store.</summary>
-	IRealmStore Realms { get; }
+    /// <summary>Gets the global realm store.</summary>
+    IRealmStore Realms { get; }
 
-	/// <summary>Creates a database-backed, realm-bound client store.</summary>
-	IClientStore GetClientStore(Realm realm);
+    /// <summary>Creates a database-backed, realm-bound client store.</summary>
+    IClientStore GetClientStore(Realm realm);
 
-	/// <summary>Creates a database-backed, realm-bound signing-key store.</summary>
-	IKeyStore GetKeyStore(Realm realm);
+    /// <summary>Creates a database-backed, realm-bound signing-key store.</summary>
+    IKeyStore GetKeyStore(Realm realm);
 
-	/// <summary>Creates the transitional volatile, realm-bound resource bridge.</summary>
-	IResourceStore GetResourceStore(Realm realm);
+    /// <summary>Creates the transitional volatile, realm-bound resource bridge.</summary>
+    IResourceStore GetResourceStore(Realm realm);
 }

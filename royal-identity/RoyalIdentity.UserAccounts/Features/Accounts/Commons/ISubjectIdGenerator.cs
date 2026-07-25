@@ -6,9 +6,9 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Commons;
 /// </summary>
 public interface ISubjectIdGenerator
 {
-	/// <summary>
-	/// Creates a new unique subject identifier.
-	/// </summary>
-	/// <returns>A cryptographically random, URL-safe subject identifier.</returns>
-	string NewSubjectId();
+    /// <summary>
+    /// Creates a new unique subject identifier.
+    /// </summary>
+    /// <returns>A cryptographically random, URL-safe subject identifier.</returns>
+    string NewSubjectId();
 }

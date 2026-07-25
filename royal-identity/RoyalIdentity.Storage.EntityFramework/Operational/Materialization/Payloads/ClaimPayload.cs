@@ -21,17 +21,17 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payl
 /// <param name="ValueType">The claim value type, when it is not the default string type.</param>
 public sealed record ClaimPayload(string Type, string Value, string? ValueType)
 {
-	/// <summary>Captures a claim into the minimal contract.</summary>
-	public static ClaimPayload From(Claim claim)
-	{
-		ArgumentNullException.ThrowIfNull(claim);
+    /// <summary>Captures a claim into the minimal contract.</summary>
+    public static ClaimPayload From(Claim claim)
+    {
+        ArgumentNullException.ThrowIfNull(claim);
 
-		return new ClaimPayload(
-			claim.Type,
-			claim.Value,
-			string.Equals(claim.ValueType, ClaimValueTypes.String, StringComparison.Ordinal) ? null : claim.ValueType);
-	}
+        return new ClaimPayload(
+            claim.Type,
+            claim.Value,
+            string.Equals(claim.ValueType, ClaimValueTypes.String, StringComparison.Ordinal) ? null : claim.ValueType);
+    }
 
-	/// <summary>Recreates the claim with the canonical issuer.</summary>
-	public Claim ToClaim() => new(Type, Value, ValueType ?? ClaimValueTypes.String);
+    /// <summary>Recreates the claim with the canonical issuer.</summary>
+    public Claim ToClaim() => new(Type, Value, ValueType ?? ClaimValueTypes.String);
 }

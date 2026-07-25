@@ -13,76 +13,76 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 /// </summary>
 public partial class BlockUserAccount
 {
-	/// <summary>
-	/// Gets or sets the owning realm.
-	/// </summary>
-	public string RealmId { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets the owning realm.
+    /// </summary>
+    public string RealmId { get; set; } = string.Empty;
 
-	/// <summary>
-	/// Gets or sets the subject identifier of the account to block.
-	/// </summary>
-	public string SubjectId { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets the subject identifier of the account to block.
+    /// </summary>
+    public string SubjectId { get; set; } = string.Empty;
 
-	/// <summary>
-	/// Gets or sets the optional block reason.
-	/// </summary>
-	public string? Reason { get; set; }
+    /// <summary>
+    /// Gets or sets the optional block reason.
+    /// </summary>
+    public string? Reason { get; set; }
 
-	/// <summary>
-	/// Gets or sets when the block becomes effective. <c>null</c> means immediately.
-	/// </summary>
-	public DateTimeOffset? StartsAt { get; set; }
+    /// <summary>
+    /// Gets or sets when the block becomes effective. <c>null</c> means immediately.
+    /// </summary>
+    public DateTimeOffset? StartsAt { get; set; }
 
-	/// <summary>
-	/// Gets or sets when the block expires. <c>null</c> means indefinite.
-	/// </summary>
-	public DateTimeOffset? EndsAt { get; set; }
+    /// <summary>
+    /// Gets or sets when the block expires. <c>null</c> means indefinite.
+    /// </summary>
+    public DateTimeOffset? EndsAt { get; set; }
 
-	/// <summary>
-	/// Validates the block input.
-	/// </summary>
-	/// <param name="problems">The collected problems, when invalid.</param>
-	/// <returns><c>true</c> when the input is invalid.</returns>
-	public bool HasProblems(out Problems? problems)
-	{
-		return Rules.Set<BlockUserAccount>()
-			.NotEmpty(RealmId)
-			.NotEmpty(SubjectId)
-			.HasProblems(out problems);
-	}
+    /// <summary>
+    /// Validates the block input.
+    /// </summary>
+    /// <param name="problems">The collected problems, when invalid.</param>
+    /// <returns><c>true</c> when the input is invalid.</returns>
+    public bool HasProblems(out Problems? problems)
+    {
+        return Rules.Set<BlockUserAccount>()
+            .NotEmpty(RealmId)
+            .NotEmpty(SubjectId)
+            .HasProblems(out problems);
+    }
 
-	/// <summary>
-	/// Executes the administrative block.
-	/// </summary>
-	[Command, WithValidateModel, WithWorkContext, WithRetryOnConcurrency]
-	public async Task<Result> Execute(
-		UserAccountReader reader,
-		TimeProvider clock,
-		CancellationToken ct)
-	{
-		var now = clock.GetUtcNow();
+    /// <summary>
+    /// Executes the administrative block.
+    /// </summary>
+    [Command, WithValidateModel, WithWorkContext, WithRetryOnConcurrency]
+    public async Task<Result> Execute(
+        UserAccountReader reader,
+        TimeProvider clock,
+        CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
 
-		// A closed window must be ordered, and a block that would already be expired is meaningless. The effective
-		// start is the supplied StartsAt or now (an immediate block).
-		if (EndsAt is not null)
-		{
-			var effectiveStart = StartsAt ?? now;
-			if (EndsAt.Value <= effectiveStart || EndsAt.Value <= now)
-			{
-				return Problems.InvalidParameter(
-					"The block window end must be after its start and still be in the future.",
-					nameof(EndsAt),
-					"user_account.block_window_invalid");
-			}
-		}
+        // A closed window must be ordered, and a block that would already be expired is meaningless. The effective
+        // start is the supplied StartsAt or now (an immediate block).
+        if (EndsAt is not null)
+        {
+            var effectiveStart = StartsAt ?? now;
+            if (EndsAt.Value <= effectiveStart || EndsAt.Value <= now)
+            {
+                return Problems.InvalidParameter(
+                    "The block window end must be after its start and still be in the future.",
+                    nameof(EndsAt),
+                    "user_account.block_window_invalid");
+            }
+        }
 
-		var account = await reader.FindBySubjectIdAsync(RealmId, SubjectId, ct);
-		if (account is null)
-		{
-			return Problems.NotFound("Account was not found in the realm.", nameof(SubjectId), "user_account.not_found");
-		}
+        var account = await reader.FindBySubjectIdAsync(RealmId, SubjectId, ct);
+        if (account is null)
+        {
+            return Problems.NotFound("Account was not found in the realm.", nameof(SubjectId), "user_account.not_found");
+        }
 
-		account.Block(Reason, now, StartsAt, EndsAt);
-		return Result.Ok();
-	}
+        account.Block(Reason, now, StartsAt, EndsAt);
+        return Result.Ok();
+    }
 }

@@ -10,50 +10,50 @@ namespace RoyalIdentity.Configuration;
 /// failure (plan DF26).
 /// </summary>
 internal sealed class ConfigurationSnapshotHostedService(
-	IConfigurationSnapshotRefresher refresher,
-	ConfigurationSnapshotRefreshOptions options,
-	TimeProvider clock) : IHostedService, IDisposable
+    IConfigurationSnapshotRefresher refresher,
+    ConfigurationSnapshotRefreshOptions options,
+    TimeProvider clock) : IHostedService, IDisposable
 {
-	private CancellationTokenSource? stoppingSource;
-	private Task? periodicLoop;
+    private CancellationTokenSource? stoppingSource;
+    private Task? periodicLoop;
 
-	public async Task StartAsync(CancellationToken cancellationToken)
-	{
-		options.Validate();
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        options.Validate();
 
-		// Initial load is not guarded: a failure here fails StartAsync and the host does not serve traffic.
-		await refresher.RefreshAsync(cancellationToken);
+        // Initial load is not guarded: a failure here fails StartAsync and the host does not serve traffic.
+        await refresher.RefreshAsync(cancellationToken);
 
-		stoppingSource = new CancellationTokenSource();
-		periodicLoop = RunPeriodicAsync(stoppingSource.Token);
-	}
+        stoppingSource = new CancellationTokenSource();
+        periodicLoop = RunPeriodicAsync(stoppingSource.Token);
+    }
 
-	public async Task StopAsync(CancellationToken cancellationToken)
-	{
-		if (stoppingSource is null || periodicLoop is null)
-			return;
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        if (stoppingSource is null || periodicLoop is null)
+            return;
 
-		await stoppingSource.CancelAsync();
-		await periodicLoop.WaitAsync(cancellationToken);
-	}
+        await stoppingSource.CancelAsync();
+        await periodicLoop.WaitAsync(cancellationToken);
+    }
 
-	public void Dispose()
-	{
-		stoppingSource?.Cancel();
-		stoppingSource?.Dispose();
-	}
+    public void Dispose()
+    {
+        stoppingSource?.Cancel();
+        stoppingSource?.Dispose();
+    }
 
-	private async Task RunPeriodicAsync(CancellationToken ct)
-	{
-		using var timer = new PeriodicTimer(options.RefreshInterval, clock);
-		try
-		{
-			while (await timer.WaitForNextTickAsync(ct))
-				await refresher.TryRefreshAsync(ct);
-		}
-		catch (OperationCanceledException) when (ct.IsCancellationRequested)
-		{
-			// Normal hosted-service shutdown.
-		}
-	}
+    private async Task RunPeriodicAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(options.RefreshInterval, clock);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+                await refresher.TryRefreshAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Normal hosted-service shutdown.
+        }
+    }
 }

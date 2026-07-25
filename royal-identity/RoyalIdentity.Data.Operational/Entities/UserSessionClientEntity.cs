@@ -8,14 +8,14 @@ namespace RoyalIdentity.Data.Operational.Entities;
 /// </summary>
 public class UserSessionClientEntity
 {
-	public required string RealmId { get; set; }
+    public required string RealmId { get; set; }
 
-	public required string SessionId { get; set; }
+    public required string SessionId { get; set; }
 
-	/// <summary>The client. A logical link by value to the Configuration family (plan DF6).</summary>
-	public required string ClientId { get; set; }
+    /// <summary>The client. A logical link by value to the Configuration family (plan DF6).</summary>
+    public required string ClientId { get; set; }
 
-	public DateTime FirstSeenAtUtc { get; set; }
+    public DateTime FirstSeenAtUtc { get; set; }
 
-	public DateTime LastSeenAtUtc { get; set; }
+    public DateTime LastSeenAtUtc { get; set; }
 }

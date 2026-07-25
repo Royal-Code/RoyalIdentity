@@ -16,152 +16,152 @@ namespace Tests.Architecture;
 /// </summary>
 public class ConfigurationModelExtensibilityTests
 {
-	private static readonly Type[] ConfigurationEntityTypes =
-	[
-		typeof(ServerOptionsEntity),
-		typeof(RealmEntity),
-		typeof(ClientEntity),
-		typeof(ClientStringValueEntity),
-		typeof(ClientClaimEntity),
-		typeof(ClientSecretEntity),
-		typeof(SigningKeyEntity),
-	];
+    private static readonly Type[] ConfigurationEntityTypes =
+    [
+        typeof(ServerOptionsEntity),
+        typeof(RealmEntity),
+        typeof(ClientEntity),
+        typeof(ClientStringValueEntity),
+        typeof(ClientClaimEntity),
+        typeof(ClientSecretEntity),
+        typeof(SigningKeyEntity),
+    ];
 
-	// Combined-context stand-ins (DF3): they inherit DbContext directly — never ConfigurationDbContext —
-	// and would also apply the future Operational mappings of the same provider (Plano 3).
-	private sealed class CombinedSqliteDbContext(DbContextOptions<CombinedSqliteDbContext> options) : DbContext(options)
-	{
-		protected override void OnModelCreating(ModelBuilder modelBuilder)
-		{
-			base.OnModelCreating(modelBuilder);
-			modelBuilder.ApplyRoyalIdentityConfigurationSqliteMappings();
-		}
-	}
+    // Combined-context stand-ins (DF3): they inherit DbContext directly — never ConfigurationDbContext —
+    // and would also apply the future Operational mappings of the same provider (Plano 3).
+    private sealed class CombinedSqliteDbContext(DbContextOptions<CombinedSqliteDbContext> options) : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyRoyalIdentityConfigurationSqliteMappings();
+        }
+    }
 
-	private sealed class CombinedPostgreSqlDbContext(DbContextOptions<CombinedPostgreSqlDbContext> options)
-		: DbContext(options)
-	{
-		protected override void OnModelCreating(ModelBuilder modelBuilder)
-		{
-			base.OnModelCreating(modelBuilder);
-			modelBuilder.ApplyRoyalIdentityConfigurationPostgreSqlMappings();
-		}
-	}
+    private sealed class CombinedPostgreSqlDbContext(DbContextOptions<CombinedPostgreSqlDbContext> options)
+        : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyRoyalIdentityConfigurationPostgreSqlMappings();
+        }
+    }
 
-	private static IModel BuildCombinedSqliteModel()
-	{
-		var options = new DbContextOptionsBuilder<CombinedSqliteDbContext>()
-			.UseSqlite("Data Source=:memory:")
-			.Options;
-		using var context = new CombinedSqliteDbContext(options);
-		return context.GetService<IDesignTimeModel>().Model;
-	}
+    private static IModel BuildCombinedSqliteModel()
+    {
+        var options = new DbContextOptionsBuilder<CombinedSqliteDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+        using var context = new CombinedSqliteDbContext(options);
+        return context.GetService<IDesignTimeModel>().Model;
+    }
 
-	private static IModel BuildCombinedPostgreSqlModel()
-	{
-		var options = new DbContextOptionsBuilder<CombinedPostgreSqlDbContext>()
-			.UseNpgsql("Host=model-only;Database=model-only")
-			.Options;
-		using var context = new CombinedPostgreSqlDbContext(options);
-		return context.GetService<IDesignTimeModel>().Model;
-	}
+    private static IModel BuildCombinedPostgreSqlModel()
+    {
+        var options = new DbContextOptionsBuilder<CombinedPostgreSqlDbContext>()
+            .UseNpgsql("Host=model-only;Database=model-only")
+            .Options;
+        using var context = new CombinedPostgreSqlDbContext(options);
+        return context.GetService<IDesignTimeModel>().Model;
+    }
 
-	private static IModel BuildDefaultPostgreSqlModel()
-	{
-		var options = new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
-			.UseNpgsql("Host=model-only;Database=model-only")
-			.Options;
-		using var context = new ConfigurationPostgreSqlDbContext(options);
-		return context.GetService<IDesignTimeModel>().Model;
-	}
+    private static IModel BuildDefaultPostgreSqlModel()
+    {
+        var options = new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
+            .UseNpgsql("Host=model-only;Database=model-only")
+            .Options;
+        using var context = new ConfigurationPostgreSqlDbContext(options);
+        return context.GetService<IDesignTimeModel>().Model;
+    }
 
-	[Fact]
-	public void CustomSqliteContext_GetsNeutralModel_WithSqliteRefinements()
-	{
-		var model = BuildCombinedSqliteModel();
+    [Fact]
+    public void CustomSqliteContext_GetsNeutralModel_WithSqliteRefinements()
+    {
+        var model = BuildCombinedSqliteModel();
 
-		var mapped = model.GetEntityTypes().Select(t => t.ClrType).ToHashSet();
-		Assert.Equal(ConfigurationEntityTypes.ToHashSet(), mapped);
+        var mapped = model.GetEntityTypes().Select(t => t.ClrType).ToHashSet();
+        Assert.Equal(ConfigurationEntityTypes.ToHashSet(), mapped);
 
-		var realms = model.FindEntityType(typeof(RealmEntity))!;
-		Assert.Equal("realms", realms.GetTableName());
-		Assert.Null(realms.GetSchema());
+        var realms = model.FindEntityType(typeof(RealmEntity))!;
+        Assert.Equal("realms", realms.GetTableName());
+        Assert.Null(realms.GetSchema());
 
-		var payload = model.FindEntityType(typeof(ServerOptionsEntity))!
-			.FindProperty(nameof(ServerOptionsEntity.PayloadJson))!;
-		Assert.Equal("TEXT", payload.GetColumnType());
-		Assert.Equal("BINARY", realms.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
-	}
+        var payload = model.FindEntityType(typeof(ServerOptionsEntity))!
+            .FindProperty(nameof(ServerOptionsEntity.PayloadJson))!;
+        Assert.Equal("TEXT", payload.GetColumnType());
+        Assert.Equal("BINARY", realms.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
+    }
 
-	[Fact]
-	public void CustomPostgreSqlContext_GetsNeutralModel_WithSchemaAndJsonb()
-	{
-		var model = BuildCombinedPostgreSqlModel();
+    [Fact]
+    public void CustomPostgreSqlContext_GetsNeutralModel_WithSchemaAndJsonb()
+    {
+        var model = BuildCombinedPostgreSqlModel();
 
-		var mapped = model.GetEntityTypes().Select(t => t.ClrType).ToHashSet();
-		Assert.Equal(ConfigurationEntityTypes.ToHashSet(), mapped);
+        var mapped = model.GetEntityTypes().Select(t => t.ClrType).ToHashSet();
+        Assert.Equal(ConfigurationEntityTypes.ToHashSet(), mapped);
 
-		var realms = model.FindEntityType(typeof(RealmEntity))!;
-		Assert.Equal("realms", realms.GetTableName());
-		Assert.Equal("configuration", realms.GetSchema());
+        var realms = model.FindEntityType(typeof(RealmEntity))!;
+        Assert.Equal("realms", realms.GetTableName());
+        Assert.Equal("configuration", realms.GetSchema());
 
-		var payload = model.FindEntityType(typeof(ServerOptionsEntity))!
-			.FindProperty(nameof(ServerOptionsEntity.PayloadJson))!;
-		Assert.Equal("jsonb", payload.GetColumnType());
+        var payload = model.FindEntityType(typeof(ServerOptionsEntity))!
+            .FindProperty(nameof(ServerOptionsEntity.PayloadJson))!;
+        Assert.Equal("jsonb", payload.GetColumnType());
 
-		var optionsJson = model.FindEntityType(typeof(RealmEntity))!
-			.FindProperty(nameof(RealmEntity.OptionsJson))!;
-		Assert.Equal("jsonb", optionsJson.GetColumnType());
-		Assert.Equal("C", realms.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
-	}
+        var optionsJson = model.FindEntityType(typeof(RealmEntity))!
+            .FindProperty(nameof(RealmEntity.OptionsJson))!;
+        Assert.Equal("jsonb", optionsJson.GetColumnType());
+        Assert.Equal("C", realms.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
+    }
 
-	[Fact]
-	public void DefaultAndCustomPostgreSqlContexts_ApplyTheSameProviderRefinements()
-	{
-		var defaultModel = BuildDefaultPostgreSqlModel();
-		var customModel = BuildCombinedPostgreSqlModel();
+    [Fact]
+    public void DefaultAndCustomPostgreSqlContexts_ApplyTheSameProviderRefinements()
+    {
+        var defaultModel = BuildDefaultPostgreSqlModel();
+        var customModel = BuildCombinedPostgreSqlModel();
 
-		foreach (var entityType in ConfigurationEntityTypes)
-		{
-			var defaultEntity = defaultModel.FindEntityType(entityType)!;
-			var customEntity = customModel.FindEntityType(entityType)!;
+        foreach (var entityType in ConfigurationEntityTypes)
+        {
+            var defaultEntity = defaultModel.FindEntityType(entityType)!;
+            var customEntity = customModel.FindEntityType(entityType)!;
 
-			Assert.Equal(customEntity.GetTableName(), defaultEntity.GetTableName());
-			Assert.Equal(customEntity.GetSchema(), defaultEntity.GetSchema());
-		}
+            Assert.Equal(customEntity.GetTableName(), defaultEntity.GetTableName());
+            Assert.Equal(customEntity.GetSchema(), defaultEntity.GetSchema());
+        }
 
-		var defaultRealm = defaultModel.FindEntityType(typeof(RealmEntity))!;
-		var customRealm = customModel.FindEntityType(typeof(RealmEntity))!;
-		Assert.Equal(
-			customRealm.FindProperty(nameof(RealmEntity.OptionsJson))!.GetColumnType(),
-			defaultRealm.FindProperty(nameof(RealmEntity.OptionsJson))!.GetColumnType());
-		Assert.Equal(
-			customRealm.FindProperty(nameof(RealmEntity.Domain))!.GetCollation(),
-			defaultRealm.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
-	}
+        var defaultRealm = defaultModel.FindEntityType(typeof(RealmEntity))!;
+        var customRealm = customModel.FindEntityType(typeof(RealmEntity))!;
+        Assert.Equal(
+            customRealm.FindProperty(nameof(RealmEntity.OptionsJson))!.GetColumnType(),
+            defaultRealm.FindProperty(nameof(RealmEntity.OptionsJson))!.GetColumnType());
+        Assert.Equal(
+            customRealm.FindProperty(nameof(RealmEntity.Domain))!.GetCollation(),
+            defaultRealm.FindProperty(nameof(RealmEntity.Domain))!.GetCollation());
+    }
 
-	[Fact]
-	public void BothProviderModels_ExposeTheSameTables()
-	{
-		var sqliteTables = BuildCombinedSqliteModel().GetEntityTypes()
-			.Select(t => t.GetTableName()).ToHashSet(StringComparer.Ordinal);
-		var postgresTables = BuildCombinedPostgreSqlModel().GetEntityTypes()
-			.Select(t => t.GetTableName()).ToHashSet(StringComparer.Ordinal);
+    [Fact]
+    public void BothProviderModels_ExposeTheSameTables()
+    {
+        var sqliteTables = BuildCombinedSqliteModel().GetEntityTypes()
+            .Select(t => t.GetTableName()).ToHashSet(StringComparer.Ordinal);
+        var postgresTables = BuildCombinedPostgreSqlModel().GetEntityTypes()
+            .Select(t => t.GetTableName()).ToHashSet(StringComparer.Ordinal);
 
-		Assert.Equal(sqliteTables, postgresTables);
-	}
+        Assert.Equal(sqliteTables, postgresTables);
+    }
 
-	[Fact]
-	public void DefaultConfigurationDbContext_AppliesTheNeutralModel()
-	{
-		var options = new DbContextOptionsBuilder<ConfigurationDbContext>()
-			.UseSqlite("Data Source=:memory:")
-			.Options;
-		using var context = new ConfigurationDbContext(options);
+    [Fact]
+    public void DefaultConfigurationDbContext_AppliesTheNeutralModel()
+    {
+        var options = new DbContextOptionsBuilder<ConfigurationDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+        using var context = new ConfigurationDbContext(options);
 
-		var mapped = context.Model.GetEntityTypes().Select(t => t.ClrType).ToHashSet();
+        var mapped = context.Model.GetEntityTypes().Select(t => t.ClrType).ToHashSet();
 
-		Assert.Equal(ConfigurationEntityTypes.ToHashSet(), mapped);
-		Assert.Null(context.Model.FindEntityType(typeof(RealmEntity))!.GetSchema());
-	}
+        Assert.Equal(ConfigurationEntityTypes.ToHashSet(), mapped);
+        Assert.Null(context.Model.FindEntityType(typeof(RealmEntity))!.GetSchema());
+    }
 }

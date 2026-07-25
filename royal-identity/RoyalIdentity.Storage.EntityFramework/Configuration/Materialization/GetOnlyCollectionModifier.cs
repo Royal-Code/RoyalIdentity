@@ -21,44 +21,44 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 /// </summary>
 internal static class GetOnlyCollectionModifier
 {
-	public static void Apply(JsonTypeInfo typeInfo)
-	{
-		foreach (var property in typeInfo.Properties)
-		{
-			if (property.Set is not null || property.Get is null)
-				continue;
+    public static void Apply(JsonTypeInfo typeInfo)
+    {
+        foreach (var property in typeInfo.Properties)
+        {
+            if (property.Set is not null || property.Get is null)
+                continue;
 
-			var collectionInterface = FindCollectionInterface(property.PropertyType);
-			if (collectionInterface is null)
-				continue;
+            var collectionInterface = FindCollectionInterface(property.PropertyType);
+            if (collectionInterface is null)
+                continue;
 
-			var clear = collectionInterface.GetMethod("Clear")!;
-			var add = collectionInterface.GetMethod("Add")!;
-			var getter = property.Get;
+            var clear = collectionInterface.GetMethod("Clear")!;
+            var add = collectionInterface.GetMethod("Add")!;
+            var getter = property.Get;
 
-			property.Set = (target, value) =>
-			{
-				if (value is null)
-					throw new JsonException($"The configuration collection '{property.Name}' cannot be null.");
+            property.Set = (target, value) =>
+            {
+                if (value is null)
+                    throw new JsonException($"The configuration collection '{property.Name}' cannot be null.");
 
-				var existing = getter(target);
-				if (existing is null)
-					throw new JsonException($"The configuration collection '{property.Name}' has no target instance.");
+                var existing = getter(target);
+                if (existing is null)
+                    throw new JsonException($"The configuration collection '{property.Name}' has no target instance.");
 
-				clear.Invoke(existing, null);
-				foreach (var item in (IEnumerable)value)
-					add.Invoke(existing, [item]);
-			};
-		}
-	}
+                clear.Invoke(existing, null);
+                foreach (var item in (IEnumerable)value)
+                    add.Invoke(existing, [item]);
+            };
+        }
+    }
 
-	private static Type? FindCollectionInterface(Type type)
-	{
-		if (type == typeof(string))
-			return null;
+    private static Type? FindCollectionInterface(Type type)
+    {
+        if (type == typeof(string))
+            return null;
 
-		return type
-			.GetInterfaces()
-			.FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>));
-	}
+        return type
+            .GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>));
+    }
 }

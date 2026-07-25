@@ -7,20 +7,20 @@ namespace RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 /// </summary>
 public class UserAccountCreated(string realmId, string subjectId, string username) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the account username.
-	/// </summary>
-	public string Username { get; } = username;
+    /// <summary>
+    /// Gets the account username.
+    /// </summary>
+    public string Username { get; } = username;
 }
 
 /// <summary>
@@ -28,20 +28,20 @@ public class UserAccountCreated(string realmId, string subjectId, string usernam
 /// </summary>
 public class UserAccountUsernameChanged(string realmId, string subjectId, string username) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the new username.
-	/// </summary>
-	public string Username { get; } = username;
+    /// <summary>
+    /// Gets the new username.
+    /// </summary>
+    public string Username { get; } = username;
 }
 
 /// <summary>
@@ -49,25 +49,25 @@ public class UserAccountUsernameChanged(string realmId, string subjectId, string
 /// </summary>
 public class UserAccountEmailAdded(string realmId, string subjectId, string address, bool isPrimary) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the email address.
-	/// </summary>
-	public string Address { get; } = address;
+    /// <summary>
+    /// Gets the email address.
+    /// </summary>
+    public string Address { get; } = address;
 
-	/// <summary>
-	/// Gets whether the email became primary.
-	/// </summary>
-	public bool IsPrimary { get; } = isPrimary;
+    /// <summary>
+    /// Gets whether the email became primary.
+    /// </summary>
+    public bool IsPrimary { get; } = isPrimary;
 }
 
 /// <summary>
@@ -75,20 +75,20 @@ public class UserAccountEmailAdded(string realmId, string subjectId, string addr
 /// </summary>
 public class UserAccountPrimaryEmailChanged(string realmId, string subjectId, string address) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the new primary email address.
-	/// </summary>
-	public string Address { get; } = address;
+    /// <summary>
+    /// Gets the new primary email address.
+    /// </summary>
+    public string Address { get; } = address;
 }
 
 /// <summary>
@@ -96,20 +96,20 @@ public class UserAccountPrimaryEmailChanged(string realmId, string subjectId, st
 /// </summary>
 public class UserAccountEmailVerified(string realmId, string subjectId, string address) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the verified email address.
-	/// </summary>
-	public string Address { get; } = address;
+    /// <summary>
+    /// Gets the verified email address.
+    /// </summary>
+    public string Address { get; } = address;
 }
 
 /// <summary>
@@ -117,25 +117,25 @@ public class UserAccountEmailVerified(string realmId, string subjectId, string a
 /// </summary>
 public class UserAccountPhoneAdded(string realmId, string subjectId, string number, bool isPrimary) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the phone number.
-	/// </summary>
-	public string Number { get; } = number;
+    /// <summary>
+    /// Gets the phone number.
+    /// </summary>
+    public string Number { get; } = number;
 
-	/// <summary>
-	/// Gets whether the phone became primary.
-	/// </summary>
-	public bool IsPrimary { get; } = isPrimary;
+    /// <summary>
+    /// Gets whether the phone became primary.
+    /// </summary>
+    public bool IsPrimary { get; } = isPrimary;
 }
 
 /// <summary>
@@ -143,20 +143,20 @@ public class UserAccountPhoneAdded(string realmId, string subjectId, string numb
 /// </summary>
 public class UserAccountPhoneVerified(string realmId, string subjectId, string number) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the verified phone number.
-	/// </summary>
-	public string Number { get; } = number;
+    /// <summary>
+    /// Gets the verified phone number.
+    /// </summary>
+    public string Number { get; } = number;
 }
 
 /// <summary>
@@ -164,20 +164,20 @@ public class UserAccountPhoneVerified(string realmId, string subjectId, string n
 /// </summary>
 public class UserAccountRoleAdded(string realmId, string subjectId, string role) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the added role.
-	/// </summary>
-	public string Role { get; } = role;
+    /// <summary>
+    /// Gets the added role.
+    /// </summary>
+    public string Role { get; } = role;
 }
 
 /// <summary>
@@ -185,20 +185,20 @@ public class UserAccountRoleAdded(string realmId, string subjectId, string role)
 /// </summary>
 public class UserAccountRoleRemoved(string realmId, string subjectId, string role) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the removed role.
-	/// </summary>
-	public string Role { get; } = role;
+    /// <summary>
+    /// Gets the removed role.
+    /// </summary>
+    public string Role { get; } = role;
 }
 
 /// <summary>
@@ -208,20 +208,20 @@ public class UserAccountRoleRemoved(string realmId, string subjectId, string rol
 /// </summary>
 public class UserAccountPasswordChanged(string realmId, string subjectId, PasswordChangeReason reason) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets why the password was set, used to classify the audit category.
-	/// </summary>
-	public PasswordChangeReason Reason { get; } = reason;
+    /// <summary>
+    /// Gets why the password was set, used to classify the audit category.
+    /// </summary>
+    public PasswordChangeReason Reason { get; } = reason;
 }
 
 /// <summary>
@@ -229,20 +229,20 @@ public class UserAccountPasswordChanged(string realmId, string subjectId, Passwo
 /// </summary>
 public class UserAccountLocalCredentialLocked(string realmId, string subjectId, DateTimeOffset? lockoutEndAt) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets when lockout ends, or <c>null</c> for administrative unlock.
-	/// </summary>
-	public DateTimeOffset? LockoutEndAt { get; } = lockoutEndAt;
+    /// <summary>
+    /// Gets when lockout ends, or <c>null</c> for administrative unlock.
+    /// </summary>
+    public DateTimeOffset? LockoutEndAt { get; } = lockoutEndAt;
 }
 
 /// <summary>
@@ -250,15 +250,15 @@ public class UserAccountLocalCredentialLocked(string realmId, string subjectId, 
 /// </summary>
 public class UserAccountLocalCredentialUnlocked(string realmId, string subjectId) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 }
 
 /// <summary>
@@ -266,15 +266,15 @@ public class UserAccountLocalCredentialUnlocked(string realmId, string subjectId
 /// </summary>
 public class UserAccountActivated(string realmId, string subjectId) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 }
 
 /// <summary>
@@ -282,51 +282,51 @@ public class UserAccountActivated(string realmId, string subjectId) : DomainEven
 /// </summary>
 public class UserAccountDeactivated(string realmId, string subjectId) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 }
 
 /// <summary>
 /// Event raised when the account is administratively blocked.
 /// </summary>
 public class UserAccountBlocked(
-	string realmId,
-	string subjectId,
-	string? reason,
-	DateTimeOffset? startsAt,
-	DateTimeOffset? endsAt) : DomainEventBase
+    string realmId,
+    string subjectId,
+    string? reason,
+    DateTimeOffset? startsAt,
+    DateTimeOffset? endsAt) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the block reason.
-	/// </summary>
-	public string? Reason { get; } = reason;
+    /// <summary>
+    /// Gets the block reason.
+    /// </summary>
+    public string? Reason { get; } = reason;
 
-	/// <summary>
-	/// Gets when the block becomes effective, or <c>null</c> for immediately.
-	/// </summary>
-	public DateTimeOffset? StartsAt { get; } = startsAt;
+    /// <summary>
+    /// Gets when the block becomes effective, or <c>null</c> for immediately.
+    /// </summary>
+    public DateTimeOffset? StartsAt { get; } = startsAt;
 
-	/// <summary>
-	/// Gets when the block expires, or <c>null</c> for indefinite.
-	/// </summary>
-	public DateTimeOffset? EndsAt { get; } = endsAt;
+    /// <summary>
+    /// Gets when the block expires, or <c>null</c> for indefinite.
+    /// </summary>
+    public DateTimeOffset? EndsAt { get; } = endsAt;
 }
 
 /// <summary>
@@ -334,15 +334,15 @@ public class UserAccountBlocked(
 /// </summary>
 public class UserAccountUnblocked(string realmId, string subjectId) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 }
 
 /// <summary>
@@ -350,18 +350,18 @@ public class UserAccountUnblocked(string realmId, string subjectId) : DomainEven
 /// </summary>
 public class UserAccountPropertyValueChanged(string realmId, string subjectId, string claimType) : DomainEventBase
 {
-	/// <summary>
-	/// Gets the account realm.
-	/// </summary>
-	public string RealmId { get; } = realmId;
+    /// <summary>
+    /// Gets the account realm.
+    /// </summary>
+    public string RealmId { get; } = realmId;
 
-	/// <summary>
-	/// Gets the immutable subject identifier.
-	/// </summary>
-	public string SubjectId { get; } = subjectId;
+    /// <summary>
+    /// Gets the immutable subject identifier.
+    /// </summary>
+    public string SubjectId { get; } = subjectId;
 
-	/// <summary>
-	/// Gets the changed claim type.
-	/// </summary>
-	public string ClaimType { get; } = claimType;
+    /// <summary>
+    /// Gets the changed claim type.
+    /// </summary>
+    public string ClaimType { get; } = claimType;
 }

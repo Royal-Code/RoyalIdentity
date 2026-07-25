@@ -7,24 +7,24 @@ namespace RoyalIdentity.UserAccounts.Infrastructure.Gateways;
 /// </summary>
 public interface INotificationGateway
 {
-	/// <summary>
-	/// Delivers a password recovery message containing the raw recovery token.
-	/// </summary>
-	/// <param name="notification">The recovery delivery payload.</param>
-	/// <param name="ct">A cancellation token.</param>
-	Task SendPasswordRecoveryAsync(PasswordRecoveryNotification notification, CancellationToken ct = default);
+    /// <summary>
+    /// Delivers a password recovery message containing the raw recovery token.
+    /// </summary>
+    /// <param name="notification">The recovery delivery payload.</param>
+    /// <param name="ct">A cancellation token.</param>
+    Task SendPasswordRecoveryAsync(PasswordRecoveryNotification notification, CancellationToken ct = default);
 
-	/// <summary>
-	/// Delivers an email verification message containing the raw verification token.
-	/// </summary>
-	/// <param name="notification">The email verification delivery payload.</param>
-	/// <param name="ct">A cancellation token.</param>
-	Task SendEmailVerificationAsync(EmailVerificationNotification notification, CancellationToken ct = default);
+    /// <summary>
+    /// Delivers an email verification message containing the raw verification token.
+    /// </summary>
+    /// <param name="notification">The email verification delivery payload.</param>
+    /// <param name="ct">A cancellation token.</param>
+    Task SendEmailVerificationAsync(EmailVerificationNotification notification, CancellationToken ct = default);
 
-	/// <summary>
-	/// Delivers a phone verification message containing the raw verification token/code.
-	/// </summary>
-	/// <param name="notification">The phone verification delivery payload.</param>
-	/// <param name="ct">A cancellation token.</param>
-	Task SendPhoneVerificationAsync(PhoneVerificationNotification notification, CancellationToken ct = default);
+    /// <summary>
+    /// Delivers a phone verification message containing the raw verification token/code.
+    /// </summary>
+    /// <param name="notification">The phone verification delivery payload.</param>
+    /// <param name="ct">A cancellation token.</param>
+    Task SendPhoneVerificationAsync(PhoneVerificationNotification notification, CancellationToken ct = default);
 }

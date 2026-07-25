@@ -12,9 +12,9 @@ namespace RoyalIdentity.UserAccounts.Infrastructure.Gateways;
 /// <param name="Token">The raw verification token (single-use, transported once).</param>
 /// <param name="ExpiresAt">When the token expires.</param>
 public sealed record EmailVerificationNotification(
-	string RealmId,
-	string SubjectId,
-	string DisplayName,
-	string Address,
-	string Token,
-	DateTimeOffset ExpiresAt);
+    string RealmId,
+    string SubjectId,
+    string DisplayName,
+    string Address,
+    string Token,
+    DateTimeOffset ExpiresAt);

@@ -10,126 +10,126 @@ namespace Tests.Storage.Contracts;
 /// </summary>
 public abstract class AuthorizationCodeStoreContractTests : StorageContractTests
 {
-	// AC-01 + AC-02: a stored code is retrievable by its handle.
-	[Fact]
-	public async Task Store_ThenGet_ReturnsTheCode()
-	{
-		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
-		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
+    // AC-01 + AC-02: a stored code is retrievable by its handle.
+    [Fact]
+    public async Task Store_ThenGet_ReturnsTheCode()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
+        var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
 
-		await store.StoreAuthorizationCodeAsync(code, default);
-		var found = await store.GetAuthorizationCodeAsync(code.Code, default);
+        await store.StoreAuthorizationCodeAsync(code, default);
+        var found = await store.GetAuthorizationCodeAsync(code.Code, default);
 
-		Assert.NotNull(found);
-		Assert.Equal("client-a", found.ClientId);
-		Assert.Equal(harness.RealmA.Id, found.RealmId);
-	}
+        Assert.NotNull(found);
+        Assert.Equal("client-a", found.ClientId);
+        Assert.Equal(harness.RealmA.Id, found.RealmId);
+    }
 
-	// AC-02: absent lookup returns null. Load-bearing for the invalid_grant path of the code flow;
-	// closed in Fase 5 (DF25): lookups return null on absence.
-	[Fact]
-	public async Task Get_UnknownCode_ReturnsNull()
-	{
-		await using var harness = await CreateHarnessAsync();
+    // AC-02: absent lookup returns null. Load-bearing for the invalid_grant path of the code flow;
+    // closed in Fase 5 (DF25): lookups return null on absence.
+    [Fact]
+    public async Task Get_UnknownCode_ReturnsNull()
+    {
+        await using var harness = await CreateHarnessAsync();
 
-		var found = await harness.Storage.GetAuthorizationCodeStore(harness.RealmA)
-			.GetAuthorizationCodeAsync("contract-unknown-code", default);
+        var found = await harness.Storage.GetAuthorizationCodeStore(harness.RealmA)
+            .GetAuthorizationCodeAsync("contract-unknown-code", default);
 
-		Assert.Null(found);
-	}
+        Assert.Null(found);
+    }
 
-	// DF18: authorization-code handles are opaque and compare Ordinal.
-	[Fact]
-	public async Task Get_CodeDifferingOnlyByCase_ReturnsNull()
-	{
-		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
-		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
-		await store.StoreAuthorizationCodeAsync(code, default);
+    // DF18: authorization-code handles are opaque and compare Ordinal.
+    [Fact]
+    public async Task Get_CodeDifferingOnlyByCase_ReturnsNull()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
+        var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
+        await store.StoreAuthorizationCodeAsync(code, default);
 
-		var found = await store.GetAuthorizationCodeAsync(WithDifferentLetterCase(code.Code), default);
+        var found = await store.GetAuthorizationCodeAsync(WithDifferentLetterCase(code.Code), default);
 
-		Assert.Null(found);
-	}
+        Assert.Null(found);
+    }
 
-	// AC-02 (Fase 5/DF19): the read does not filter logical expiration — LoadCode owns the expiration
-	// rule; the atomic consume of Plano 3 may combine the check (P3 decision).
-	[Fact]
-	public async Task Get_ReturnsLogicallyExpiredCode()
-	{
-		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
-		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a",
-			creationTime: Start.AddHours(-1), lifetime: 60);
-		await store.StoreAuthorizationCodeAsync(code, default);
+    // AC-02 (Fase 5/DF19): the read does not filter logical expiration — LoadCode owns the expiration
+    // rule; the atomic consume of Plano 3 may combine the check (P3 decision).
+    [Fact]
+    public async Task Get_ReturnsLogicallyExpiredCode()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
+        var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a",
+            creationTime: Start.AddHours(-1), lifetime: 60);
+        await store.StoreAuthorizationCodeAsync(code, default);
 
-		var found = await store.GetAuthorizationCodeAsync(code.Code, default);
+        var found = await store.GetAuthorizationCodeAsync(code.Code, default);
 
-		Assert.NotNull(found);
-	}
+        Assert.NotNull(found);
+    }
 
-	// AC-03: after removal the code is no longer retrievable — the storage half of today's single-use
-	// behavior (the atomic consume replaces this pair in Plano 3 — DF15).
-	[Fact]
-	public async Task Remove_ThenGet_ReturnsNull()
-	{
-		await using var harness = await CreateHarnessAsync();
-		var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
-		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
-		await store.StoreAuthorizationCodeAsync(code, default);
+    // AC-03: after removal the code is no longer retrievable — the storage half of today's single-use
+    // behavior (the atomic consume replaces this pair in Plano 3 — DF15).
+    [Fact]
+    public async Task Remove_ThenGet_ReturnsNull()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var store = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
+        var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
+        await store.StoreAuthorizationCodeAsync(code, default);
 
-		await store.RemoveAuthorizationCodeAsync(code.Code, default);
+        await store.RemoveAuthorizationCodeAsync(code.Code, default);
 
-		Assert.Null(await store.GetAuthorizationCodeAsync(code.Code, default));
-	}
+        Assert.Null(await store.GetAuthorizationCodeAsync(code.Code, default));
+    }
 
-	// AC-03 (Fase 5/DF16/DF25 closed): removing an absent code is an idempotent no-op (administrative removal).
-	[Fact]
-	public async Task Remove_UnknownCode_CompletesWithoutError()
-	{
-		await using var harness = await CreateHarnessAsync();
+    // AC-03 (Fase 5/DF16/DF25 closed): removing an absent code is an idempotent no-op (administrative removal).
+    [Fact]
+    public async Task Remove_UnknownCode_CompletesWithoutError()
+    {
+        await using var harness = await CreateHarnessAsync();
 
-		await harness.Storage.GetAuthorizationCodeStore(harness.RealmA)
-			.RemoveAuthorizationCodeAsync("contract-unknown-code", default);
-	}
+        await harness.Storage.GetAuthorizationCodeStore(harness.RealmA)
+            .RemoveAuthorizationCodeAsync("contract-unknown-code", default);
+    }
 
-	// DF6: the same code handle in two realms is two independent records (the handle is generated by the
-	// model, so the collision is exercised by storing the same handle in both realm stores); removing in
-	// one realm keeps the other.
-	[Fact]
-	public async Task SameCodeHandle_InTwoRealms_IsIsolatedPerRealm()
-	{
-		await using var harness = await CreateHarnessAsync();
-		var storeA = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
-		var storeB = harness.Storage.GetAuthorizationCodeStore(harness.RealmB);
-		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
+    // DF6: the same code handle in two realms is two independent records (the handle is generated by the
+    // model, so the collision is exercised by storing the same handle in both realm stores); removing in
+    // one realm keeps the other.
+    [Fact]
+    public async Task SameCodeHandle_InTwoRealms_IsIsolatedPerRealm()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var storeA = harness.Storage.GetAuthorizationCodeStore(harness.RealmA);
+        var storeB = harness.Storage.GetAuthorizationCodeStore(harness.RealmB);
+        var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
 
-		await storeA.StoreAuthorizationCodeAsync(code, default);
-		await storeB.StoreAuthorizationCodeAsync(code, default);
+        await storeA.StoreAuthorizationCodeAsync(code, default);
+        await storeB.StoreAuthorizationCodeAsync(code, default);
 
-		await storeA.RemoveAuthorizationCodeAsync(code.Code, default);
+        await storeA.RemoveAuthorizationCodeAsync(code.Code, default);
 
-		Assert.Null(await storeA.GetAuthorizationCodeAsync(code.Code, default));
-		Assert.NotNull(await storeB.GetAuthorizationCodeAsync(code.Code, default));
-	}
+        Assert.Null(await storeA.GetAuthorizationCodeAsync(code.Code, default));
+        Assert.NotNull(await storeB.GetAuthorizationCodeAsync(code.Code, default));
+    }
 
-	// DF6: a code stored in one realm is not visible from another realm's store.
-	[Fact]
-	public async Task CodeStoredInOneRealm_IsNotVisibleInAnotherRealm()
-	{
-		await using var harness = await CreateHarnessAsync();
-		var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
-		await harness.Storage.GetAuthorizationCodeStore(harness.RealmA).StoreAuthorizationCodeAsync(code, default);
+    // DF6: a code stored in one realm is not visible from another realm's store.
+    [Fact]
+    public async Task CodeStoredInOneRealm_IsNotVisibleInAnotherRealm()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var code = NewAuthorizationCode(harness.RealmA, "client-a", "subject-a");
+        await harness.Storage.GetAuthorizationCodeStore(harness.RealmA).StoreAuthorizationCodeAsync(code, default);
 
-		var inB = await harness.Storage.GetAuthorizationCodeStore(harness.RealmB)
-			.GetAuthorizationCodeAsync(code.Code, default);
+        var inB = await harness.Storage.GetAuthorizationCodeStore(harness.RealmB)
+            .GetAuthorizationCodeAsync(code.Code, default);
 
-		Assert.Null(inB);
-	}
+        Assert.Null(inB);
+    }
 
-	public sealed class InMemory : AuthorizationCodeStoreContractTests
-	{
-		protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-	}
+    public sealed class InMemory : AuthorizationCodeStoreContractTests
+    {
+        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
+    }
 }

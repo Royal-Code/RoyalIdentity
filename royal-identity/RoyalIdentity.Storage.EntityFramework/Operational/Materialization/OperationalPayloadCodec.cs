@@ -20,27 +20,27 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 /// <param name="currentVersion">The version this build writes and reads.</param>
 internal sealed class OperationalPayloadCodec<TPayload>(string payloadName, int currentVersion)
 {
-	private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.General)
-	{
-		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-		RespectNullableAnnotations = true,
-	};
+    private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.General)
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        RespectNullableAnnotations = true,
+    };
 
-	public string Serialize(TPayload payload) => JsonSerializer.Serialize(payload, options);
+    public string Serialize(TPayload payload) => JsonSerializer.Serialize(payload, options);
 
-	public TPayload Deserialize(int version, string json)
-	{
-		if (version != currentVersion)
-			throw OperationalPayloadException.UnsupportedVersion(payloadName, version, currentVersion);
+    public TPayload Deserialize(int version, string json)
+    {
+        if (version != currentVersion)
+            throw OperationalPayloadException.UnsupportedVersion(payloadName, version, currentVersion);
 
-		try
-		{
-			return JsonSerializer.Deserialize<TPayload>(json, options)
-				?? throw OperationalPayloadException.EmptyPayload(payloadName);
-		}
-		catch (JsonException exception)
-		{
-			throw OperationalPayloadException.InvalidJson(payloadName, exception);
-		}
-	}
+        try
+        {
+            return JsonSerializer.Deserialize<TPayload>(json, options)
+                ?? throw OperationalPayloadException.EmptyPayload(payloadName);
+        }
+        catch (JsonException exception)
+        {
+            throw OperationalPayloadException.InvalidJson(payloadName, exception);
+        }
+    }
 }

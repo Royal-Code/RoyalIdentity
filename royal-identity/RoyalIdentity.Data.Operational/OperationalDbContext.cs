@@ -12,35 +12,35 @@ namespace RoyalIdentity.Data.Operational;
 /// </summary>
 public class OperationalDbContext : DbContext
 {
-	public OperationalDbContext(DbContextOptions<OperationalDbContext> options) : base(options)
-	{
-	}
+    public OperationalDbContext(DbContextOptions<OperationalDbContext> options) : base(options)
+    {
+    }
 
-	/// <summary>Constructor for derived provider contexts carrying their own options type.</summary>
-	protected OperationalDbContext(DbContextOptions options) : base(options)
-	{
-	}
+    /// <summary>Constructor for derived provider contexts carrying their own options type.</summary>
+    protected OperationalDbContext(DbContextOptions options) : base(options)
+    {
+    }
 
-	public DbSet<ProtocolArtifactEntity> ProtocolArtifacts => Set<ProtocolArtifactEntity>();
+    public DbSet<ProtocolArtifactEntity> ProtocolArtifacts => Set<ProtocolArtifactEntity>();
 
-	public DbSet<ConsentEntity> Consents => Set<ConsentEntity>();
+    public DbSet<ConsentEntity> Consents => Set<ConsentEntity>();
 
-	public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
+    public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
 
-	public DbSet<UserSessionClientEntity> UserSessionClients => Set<UserSessionClientEntity>();
+    public DbSet<UserSessionClientEntity> UserSessionClients => Set<UserSessionClientEntity>();
 
-	public DbSet<AuthorizeParametersEntity> AuthorizeParameters => Set<AuthorizeParametersEntity>();
+    public DbSet<AuthorizeParametersEntity> AuthorizeParameters => Set<AuthorizeParametersEntity>();
 
-	protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
-	{
-		base.OnModelCreating(modelBuilder);
-		ApplyOperationalModel(modelBuilder);
-	}
+    protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        ApplyOperationalModel(modelBuilder);
+    }
 
-	/// <summary>
-	/// Model hook (plan DF1/DF2): the default applies only the neutral mappings; provider contexts override it
-	/// to apply the full public mapping extension of exactly one provider.
-	/// </summary>
-	protected virtual void ApplyOperationalModel(ModelBuilder modelBuilder)
-		=> modelBuilder.ApplyRoyalIdentityOperationalMappings(new OperationalModelOptions());
+    /// <summary>
+    /// Model hook (plan DF1/DF2): the default applies only the neutral mappings; provider contexts override it
+    /// to apply the full public mapping extension of exactly one provider.
+    /// </summary>
+    protected virtual void ApplyOperationalModel(ModelBuilder modelBuilder)
+        => modelBuilder.ApplyRoyalIdentityOperationalMappings(new OperationalModelOptions());
 }

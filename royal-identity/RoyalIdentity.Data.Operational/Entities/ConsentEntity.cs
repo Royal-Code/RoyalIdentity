@@ -8,24 +8,24 @@ namespace RoyalIdentity.Data.Operational.Entities;
 /// </summary>
 public class ConsentEntity
 {
-	/// <summary>The realm this consent belongs to. A logical link by value (plan DF6).</summary>
-	public required string RealmId { get; set; }
+    /// <summary>The realm this consent belongs to. A logical link by value (plan DF6).</summary>
+    public required string RealmId { get; set; }
 
-	public required string SubjectId { get; set; }
+    public required string SubjectId { get; set; }
 
-	/// <summary>The client the consent was granted to. A logical link by value (plan DF6).</summary>
-	public required string ClientId { get; set; }
+    /// <summary>The client the consent was granted to. A logical link by value (plan DF6).</summary>
+    public required string ClientId { get; set; }
 
-	public DateTime CreatedAtUtc { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
-	/// <summary>
-	/// Absolute expiration, or <c>null</c> when the consent does not expire. A consent without expiration is
-	/// never removed by cleanup — only by explicit removal or realm purge (plan DF17).
-	/// </summary>
-	public DateTime? ExpiresAtUtc { get; set; }
+    /// <summary>
+    /// Absolute expiration, or <c>null</c> when the consent does not expire. A consent without expiration is
+    /// never removed by cleanup — only by explicit removal or realm purge (plan DF17).
+    /// </summary>
+    public DateTime? ExpiresAtUtc { get; set; }
 
-	public int PayloadVersion { get; set; }
+    public int PayloadVersion { get; set; }
 
-	/// <summary>The versioned payload envelope holding the consented scopes (plan DF30).</summary>
-	public required string ProtectedPayload { get; set; }
+    /// <summary>The versioned payload envelope holding the consented scopes (plan DF30).</summary>
+    public required string ProtectedPayload { get; set; }
 }

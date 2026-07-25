@@ -6,9 +6,9 @@ namespace RoyalIdentity.Data.Configuration;
 /// </summary>
 public sealed class ConfigurationModelOptions
 {
-	/// <summary>
-	/// Relational schema for the Configuration tables. <c>null</c> means no schema (SQLite); the PostgreSQL
-	/// mapping extension defaults it to <c>configuration</c> (plan DF18).
-	/// </summary>
-	public string? Schema { get; set; }
+    /// <summary>
+    /// Relational schema for the Configuration tables. <c>null</c> means no schema (SQLite); the PostgreSQL
+    /// mapping extension defaults it to <c>configuration</c> (plan DF18).
+    /// </summary>
+    public string? Schema { get; set; }
 }

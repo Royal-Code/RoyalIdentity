@@ -7,6 +7,6 @@ namespace RoyalIdentity.UserAccounts.Sqlite;
 /// </summary>
 public sealed class SqliteProviderMarker
 {
-	/// <summary>Anchor to the pure module assembly, enforced by architecture tests.</summary>
-	public static readonly System.Type ModuleAnchor = typeof(RoyalIdentity.UserAccounts.UserAccountsAssemblyMarker);
+    /// <summary>Anchor to the pure module assembly, enforced by architecture tests.</summary>
+    public static readonly System.Type ModuleAnchor = typeof(RoyalIdentity.UserAccounts.UserAccountsAssemblyMarker);
 }
