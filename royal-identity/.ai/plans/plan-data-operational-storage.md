@@ -37,7 +37,7 @@
   regras deste plano.
 - [plan-data-macro.md](plan-data-macro.md) — o Plano 3 persiste a família Operational depois de Configuration e
   antes da troca do backing dos testes.
-- [plan-data-storage-baseline.md](plan-data-storage-baseline.md) — decisões DF1–DF25, fronteiras e gates dos
+- [plan-data-storage-baseline.md](plan-data-storage-baseline.md) — decisões B-DF1–B-DF25, fronteiras e gates dos
   Planos 2/3/4.
 - [plan-data-storage-matrix.md](plan-data-storage-matrix.md) — catálogo normativo das operações AT/RT/AC/CN/SS/AP,
   mudanças MP-2/MP-3/MP-5/MP-6/MP-7 e ordem de implementação por store.
@@ -55,6 +55,13 @@
 - `RoyalIdentity/Contexts/Decorators/LoadCode.cs`, `LoadRefreshToken.cs`,
   `RoyalIdentity/Handlers/RefreshTokenHandler.cs` e `RoyalIdentity/Pipes.cs` — pontos atuais de consumo e
   concorrência.
+- `RoyalIdentity/Contracts/Storage/IAccessTokenStore.cs`, `Models/Tokens/AccessToken.cs`,
+  `Models/Tokens/RefreshToken.cs`, `Contracts/Models/RefreshTokenRequest.cs`, `Contracts/ITokenFactory.cs`,
+  `Contracts/Defaults/DefaultTokenFactory.cs` e `Handlers/RevocationHandler.cs` — identidade por `jti`, dependência
+  atual do access token anterior, factory pública, `at_hash` e comportamento de revogação.
+- `RoyalIdentity/Options/RealmOptions.cs`, `Responses/HttpResults/LoginPageResult.cs`,
+  `ConsentPageResult.cs`, `Endpoints/AuthorizeCallbackEndpoint.cs` e
+  `Users/Defaults/DefaultAuthorizationContextResolver.cs` — gate `StoreAuthorizationParameters` e callers de AP.
 - `old-is4/src/Storage/src/Stores/Serialization/ClaimLite.cs`,
   `old-is4/src/Storage/src/Models/RefreshToken.cs`,
   `old-is4/src/IdentityServer4/src/Stores/Default/DefaultGrantStore.cs`,
@@ -115,7 +122,7 @@
   dos hosts/testes pertence ao Plano 4.
 - **O runner migra apenas Configuration:** `RoyalIdentity.Migrations` aceita somente provider/conexão/seed da
   família Configuration.
-- **Resources continuam voláteis:** o bridge implementado no Plano 2 permanece necessário até o redesign DF22.
+- **Resources continuam voláteis:** o bridge implementado no Plano 2 permanece necessário até o redesign B-DF22.
 
 ### Lacunas, conflitos e restrições
 
@@ -130,6 +137,18 @@
   conforme DF16/DF40.
 - Cleanup não possui grace histórica, segue os predicados por lifecycle da DF17 e suporta os modos
   `Hosted`/`External`.
+- O comportamento atual de refresh não possui equivalência simples com o novo default `Current`:
+  `UpdateAccessTokenClaimsOnRefresh=false` renova o access token anterior no caminho comum sem resource subset,
+  preservando claims/audiences como um snapshot; quando há subset, mesmo `false` reexecuta a emissão. A mudança para
+  `Current` é intencional, afeta o caminho default comum e entra somente junto da refatoração completa da Fase 5.
+- `RefreshToken.AccessTokenId` sobrecarrega o claim `jti` com o id do access token anterior, enquanto
+  `RefreshTokenRequest.AccessToken` é input público obrigatório de `ITokenFactory`. O alvo remove a primeira
+  dependência, mas mantém o segundo apenas como fonte em memória da emissão, conforme DF41.
+- `RefreshTokenHandler` calcula hoje o `at_hash` do identity token sobre o access token anterior. A Fase 5 corrige
+  essa não conformidade para o token novo efetivamente devolvido, conforme DF42.
+- `RealmOptions.StoreAuthorizationParameters=false` desvia login/consent para query string e não usa AP. Binding,
+  digest, TTL e fail-closed do fluxo aplicam-se quando a opção está ligada; cleanup periódico continua removendo
+  linhas históricas mesmo se o realm mudar depois para `false`, conforme DF16/DF17.
 - A opção de janela de authorize interaction entra em `RealmOptions.Authentication`, portanto altera o grafo
   Configuration concluído no Plano 2. A mudança é aditiva no payload JSON e não requer migration relacional, mas
   precisa provar leitura de payload v1 anterior sem a propriedade e round-trip novo sem bump de versão.
@@ -162,6 +181,9 @@
 - `RoyalIdentity.Storage.EntityFramework.Sqlite` / `.PostgreSql` — mappings, contexts, migrations e registration
   extensions por provider.
 - `RoyalIdentity` — MP-2, MP-3, MP-5, options e consumidores dos fluxos de code/refresh/authorize parameters.
+- `RoyalIdentity/Models/Tokens/RefreshToken.cs`, `Contracts/Models/RefreshTokenRequest.cs`, `ITokenFactory` e
+  handlers de authorization-code/refresh — remoção pública de `AccessTokenId`/claim `jti`, preservação de
+  `RefreshTokenRequest.AccessToken` somente como fonte em memória e correção de `at_hash`.
 - `RoyalIdentity.Storage.InMemory` — somente adaptação transitória mínima exigida por mudanças de shape; sem TTL,
   particionamento ou aceites de atomicidade.
 - `RoyalIdentity.Migrations` — segunda família, uma ou duas conexões, sem auto-migrate no host.
@@ -194,7 +216,7 @@
 
 - Trocar o backing padrão de `RoyalIdentity.Server`, `Tests.Integration`, `Tests.Identity` ou demais testes HTTP —
   destino: `plan-data-test-migration.md` (Plano 4).
-- Persistir/redesenhar resources e scopes — bloqueado por DF22.
+- Persistir/redesenhar resources e scopes — bloqueado por B-DF22.
 - API/UI administrativa, writes de Configuration e coordenação completa da exclusão de realm —
   destino: plano administrativo/ADR própria.
 - UserAccounts e seus dados — família independente, acessível somente pela `.Integration`.
@@ -206,10 +228,17 @@
 - Sender-constrained tokens, DPoP/mTLS, famílias de refresh token e revogação automática por replay.
 - Executar migrations ou seed automaticamente no host.
 - Fornecer um `DbContext` combinado concreto; somente os mappings públicos que permitem ao consumidor criá-lo.
-- Adicionar lookup de sessão por subject (MP-9) sem um caller comprovado; revogação usa a operação em massa já
-  existente.
+- Adicionar lookup de sessão por subject (MP-9), explicitamente diferido pela DF43 enquanto não houver caller;
+  revogação usa a operação em massa já existente.
 
 ---
+
+### Convenção de referências de decisão
+
+- `DFn` identifica uma decisão deste plano Operational.
+- `B-DFn` identifica uma decisão de [plan-data-storage-baseline.md](plan-data-storage-baseline.md).
+- `C-DFn` identifica uma decisão de [plan-data-configuration-storage.md](plan-data-configuration-storage.md).
+- Referências a `DFn` sem prefixo nunca apontam implicitamente para outro plano.
 
 ## Decisões fechadas
 
@@ -220,43 +249,49 @@
   apontar para bancos distintos ou para o mesmo banco. Mappings ficam em extensões públicas, permitindo context
   combinado de terceiros sem fornecê-lo no produto. O gateway padrão cria um DbContext e uma instância de
   `DbConnection` por família mesmo quando as connection strings apontam para o mesmo banco; o pooling continua a
-  cargo do provider, sem compartilhamento explícito de conexão/transação. Fonte: DF2/DF3 do Plano 2 e documentação
+  cargo do provider, sem compartilhamento explícito de conexão/transação. Fonte: C-DF2/C-DF3 e documentação
   EF de transações cross-context.
 - **DF3 — Lifecycle:** DbContexts, factories e stores são scoped. `IStorageProvider.CreateSession()` cria um scope
-  real e `IStorageSession.Dispose()` o encerra; sessão não é transação global. Fonte: DF6/DF20 do Plano 2 e DF21 do
-  baseline.
+  real e `IStorageSession.Dispose()` o encerra; sessão não é transação global. Fonte: C-DF6/C-DF20 e B-DF21.
 - **DF4 — Providers e schemas:** SQLite e PostgreSQL são obrigatórios. PostgreSQL usa schema `operation`; SQLite
-  usa os mesmos nomes de tabela sem schema. Fonte: Plano 2 Q12/DF18 e macro-plan.
+  usa os mesmos nomes de tabela sem schema. Fonte: Plano 2 Q12/C-DF18 e macro-plan.
 - **DF5 — Isolamento:** toda PK/unique/query/mutação Operational inclui `RealmId` lógica ou fisicamente. Ids iguais
-  em realms diferentes coexistem. Fonte: DF6 do baseline.
+  em realms diferentes coexistem. Fonte: B-DF6.
 - **DF6 — Vínculos cross-family são lógicos:** não há FK Operational → Configuration nem transação entre famílias,
   pois os bancos podem ser distintos. `realmId`/`clientId` preservam comparação Ordinal. Fonte: DF2 deste plano,
-  DF18/DF21 do baseline.
+  B-DF18/B-DF21.
 - **DF7 — Criação:** access token, refresh token, authorization code e sessão são create-only; duplicidade falha
   visivelmente e nunca sobrescreve. Consent é upsert pela chave `(realm, subject, client)`. Fonte:
   AT-01/RT-01/AC-01/SS-01/CN-01.
 - **DF8 — Leituras e ausência:** lookups retornam `null` quando ausentes. Access token, refresh token, code, consent
   e sessão continuam materializáveis mesmo expirados/consumidos/inativos; somente authorize parameters filtra
-  expirado e retorna `null`. Fonte: DF19/DF25 e matriz.
+  expirado e retorna `null`. Fonte: B-DF19/B-DF25 e matriz.
 - **DF9 — Materialização:** toda leitura produz grafo independente; mutar o objeto devolvido não persiste sem
   operação explícita. Toda coleção e todo dado pertencente ao contrato Operational deve sobreviver ao round-trip;
-  claims seguem o contrato mínimo da DF34. Fonte: DF17 e Q1 Parte 1.
+  claims seguem o contrato mínimo da DF34. Fonte: B-DF17 e Q1 Parte 1.
 - **DF10 — Comparadores:** identificadores operacionais, subject, client, sid, scope e handles usam comparação
-  Ordinal/case-sensitive. Nenhuma collation default do provider redefine a semântica. Fonte: DF18.
+  Ordinal/case-sensitive. Nenhuma collation default do provider redefine a semântica. Fonte: B-DF18.
 - **DF11 — Authorization code:** o consumo no fluxo do token é single-use e atômico; recebe handle, client e
   redirect URI esperados, remove e retorna o code para apenas um concorrente. `null` cobre ausente, já consumido ou
   vínculo inválido sem revelar a causa. Expiração e PKCE continuam no pipeline depois do consumo; portanto, uma
   tentativa que obteve o code mas falhou nessas validações não o torna reutilizável. A remoção administrativa
-  continua idempotente. Fonte: DF15/MP-2 e Q4=A.
+  continua idempotente. A descrição observável do erro de redirect mismatch muda de `Invalid redirect_uri` para a
+  mesma descrição genérica de code inválido; o código OAuth continua `invalid_grant`, sem oracle de vínculo.
+  Fonte: B-DF15/MP-2 e Q4=A.
 - **DF12 — Refresh token:** a materialização inclui `state_version`. `TryConsume` usa estado + versão esperada e
   distingue transição vencedora, conflito concorrente e token já consumido; qualquer atualização posterior do
   refresh reutilizável também exige a versão esperada. A tolerância é política separada: conflito nunca é sucesso e
-  somente estado consumido rematerializado pode ser submetido à tolerância pelo caller. Fonte: DF15/MP-3 e Q5=A.
+  somente estado consumido rematerializado pode ser submetido à tolerância pelo caller. Fonte: B-DF15/MP-3 e Q5=A.
 - **DF13 — Access token:** reference access tokens são sempre persistidos e seguem AT-01..AT-04; remoção em massa
   usa tipo + subject + client Ordinal e é idempotente. JWTs seguem `JwtAccessTokenPersistenceMode` do realm
   (`None`, `Metadata` ou `Full`, default `None`); somente `Full` conserva o compact JWT. Persistir/remover um JWT não
   constitui revogação efetiva, pois validação stateless não consulta o store. Refresh não depende de uma linha do
-  access token anterior. Fonte: AT-01..AT-04, comparação com IS4 e decisão humana.
+  access token anterior. Todo access-token artifact usa `SHA-256(jti)` como lookup digest; no modelo atual o bearer
+  de reference token coincide com `jti`, enquanto o compact JWT nunca é lookup key. `RevocationHandler` recebe o
+  token bruto: reference encontra seu `jti`; JWT bruto não encontra metadata/full e continua sem revogação stateful.
+  O `jti` bruto não precisa de coluna projetada: o adapter rematerializa `Id`/`Token` a partir do argumento de lookup;
+  isso evita reexpor o bearer reference em claro. Fonte: AT-01..AT-04, `IAccessTokenStore`, comparação com IS4 e
+  decisão humana.
 - **DF14 — Consent:** scopes permanecem dentro do consent, preservando casing; ausência/removal são
   null/idempotente e upsert torna a última escrita efetiva. Fonte: CN-01..CN-03.
 - **DF15 — Sessão:** create-only; record-client deduplica por client Ordinal, preserva `FirstSeenAt` e atualiza
@@ -267,7 +302,10 @@
   ao menos 128 bits de entropia e colisão é regenerada internamente. O lifetime por realm é
   `AuthenticationOptions.AuthorizationInteractionLifetime`, inteiro em segundos, com default `600` e validação
   `> 0`. A expiração persistida é `now + lifetime seconds`; alterar a opção não reinterpreta registros existentes.
-  Fonte: MP-5, Q6=A e Q12=B.
+  O fluxo de write/read/delete usa essas regras somente quando `RealmOptions.StoreAuthorizationParameters=true`;
+  com `false`, login/consent mantêm os parâmetros na query string e resolver/callback não consultam o store. Cleanup
+  periódico continua elegível para linhas criadas anteriormente, independentemente do valor atual da opção. Fonte:
+  MP-5, Q6=A, Q12=B e comportamento atual de login/consent/callback.
 - **DF17 — Cleanup separado:** validação lógica não depende da execução do purge. Cleanup físico é por tipo, em
   batches e idempotente, sem grace de retenção histórica. Authorization code consumido é removido pela própria
   operação atômica; code abandonado, access token e authorize parameters tornam-se elegíveis ao expirar. Refresh
@@ -278,20 +316,20 @@
   grant/snapshot que seu modo exige e nunca prolonga a retenção da linha do access token anterior. A manutenção é
   reutilizável e suporta dois modos de execução explicitamente selecionados: hosted worker ou comando/job externo;
   exatamente um modo fica habilitado, nunca dois schedulers concorrentes pela configuração do produto. Fonte:
-  DF19/MP-6, DF31/DF32, Q7=A e Q8=C.
+  B-DF19/MP-6, DF31/DF32, Q7=A e Q8=C.
 - **DF18 — Realm deletion:** Configuration conserva tombstone/path/domain e Operational apaga fisicamente seus
   dados. Esta fase entrega o purge isolado por uma porta de manutenção em `Storage.EntityFramework`, expressa em
-  primitivas e fora de `IStorage`; coordenação com Configuration/UserAccounts continua futura. Fonte: DF20/MP-7 e
+  primitivas e fora de `IStorage`; coordenação com Configuration/UserAccounts continua futura. Fonte: B-DF20/MP-7 e
   Q9=A.
 - **DF19 — I/O:** todo acesso EF é assíncrono, propaga `CancellationToken` até o provider e não abre conexão em API
-  síncrona. Fonte: DF23.
+  síncrona. Fonte: B-DF23.
 - **DF20 — Ordenação:** nenhuma listagem Operational recebe order implícito; só se adiciona ordem quando existir
-  significado de negócio. Fonte: DF24.
+  significado de negócio. Fonte: B-DF24.
 - **DF21 — Gateway completo, mas opt-in:** após Operational, `Storage.EntityFramework` pode compor
   Configuration + Operational em `IStorage`/`IStorageProvider`/`IStorageSession`. O host padrão continua in-memory
-  até o Plano 4. Fonte: DF20 do Plano 2 e macro-plan.
+  até o Plano 4. Fonte: C-DF20 e macro-plan.
 - **DF22 — Configuration no gateway:** `IStorage.ServerOptions` usa o snapshot já implementado e não faz I/O
-  síncrono; realms/clients/keys vêm das portas Configuration; resources usam o bridge volátil DF22. Fonte:
+  síncrono; realms/clients/keys vêm das portas Configuration; resources usam o bridge volátil B-DF22. Fonte:
   Plano 2.
 - **DF23 — Migrations:** o host nunca executa `EnsureCreated`, `Migrate` ou seed. Migrations ficam nos providers,
   SQL é versionado e o runner geral aceita Configuration, Operational ou ambas. Cada família configura
@@ -301,14 +339,14 @@
   o runner executa um bootstrap idempotente **antes** de qualquer `MigrateAsync`: se a history legada default existe
   e a nova de Configuration não existe, move/renomeia a tabela preservando todas as linhas; se ambas existem, valida
   e falha fechado diante de ambiguidade, sem merge/delete automático; banco vazio cria diretamente as histories
-  novas. SQL manual versionado oferece a mesma transição. Fonte: DF11/DF16/DF21 do Plano 2 e documentação EF de
+  novas. SQL manual versionado oferece a mesma transição. Fonte: C-DF11/C-DF16/C-DF21 e documentação EF de
   migrations history.
 - **DF24 — Sem seed Operational:** dados operacionais nascem dos fluxos; runner não cria tokens, codes, consents ou
   sessões demo. Fixtures escrevem pelo data layer/store apropriado. Fonte: natureza da família e macro-plan.
 - **DF25 — Fake transitório:** não adicionar TTL, particionamento, payload protection, cleanup ou testes de
   concorrência ao fake. Mudanças mínimas de shape não o tornam referência de paridade. Fonte: ADR-018/matriz.
 - **DF26 — PAR e messages separados:** AP representa continuação interna multi-read; não é store de PAR nem
-  `IMessageStore`. Fonte: análise PAR e DF14 do baseline.
+  `IMessageStore`. Fonte: análise PAR e B-DF14.
 - **DF27 — Relógio:** timestamps de expiração, consumo, sessão e cleanup usam `TimeProvider` da composição, em UTC;
   nenhum store chama relógio de parede diretamente. Fonte: matriz/ADR-017.
 - **DF28 — Logs:** handles bearer, payloads, claims, subjects, connection strings e material de proteção não
@@ -318,7 +356,7 @@
   `OperationalStorageOptions` e `RefreshTokenOptions` alteram a família Configuration, mas não seu schema relacional.
   Propriedades ausentes no payload v1 materializam os defaults fechados; payload novo faz round-trip e
   `RealmOptionsPayloadSerializer.CurrentVersion` permanece `1`. Qualquer mudança que não satisfaça esses testes
-  exige reabrir a decisão de versão antes de implementar. Fonte: Q6/Q12, DF30–DF32, Plano 2 DF5/DF25 e
+  exige reabrir a decisão de versão antes de implementar. Fonte: Q6/Q12, DF30–DF32, C-DF5/C-DF25 e
   comportamento de membros JSON ausentes.
 - **DF30 — Proteção Operational por realm:** `RealmOptions.OperationalStorage.PayloadProtectionProfile` seleciona
   por id um profile registrado pelo host; o default serializável é o id `default`, não um algoritmo/protector
@@ -341,7 +379,10 @@
   `ClientEntity`, mapping/materializers e a coluna Configuration `update_access_token_claims_on_refresh`. Migrations
   Configuration novas de SQLite/PostgreSQL removem a coluna; migrations já publicadas do Plano 2 não são reescritas.
   Não se infere configuração de realm a partir de clients possivelmente divergentes: payload v1 ausente adota
-  `ClaimsMode.Current`, uma mudança de comportamento intencional e coberta por regressão. Fonte: decisão humana.
+  `ClaimsMode.Current`. Hoje o default `false` renova claims/audiences do access token anterior quando não há
+  resource subset e reemite quando há subset; portanto, `Current` muda intencionalmente o caminho default comum, não
+  apenas clients divergentes. A propriedade/mapping e a migration SQLite são removidos somente na Fase 5 junto da
+  nova emissão; PostgreSQL recebe a migration equivalente na Fase 7. Fonte: decisão humana e código atual.
 - **DF34 — Claim payload mínimo:** o contrato persistido de claim contém somente `Type`, `Value` e `ValueType`, como
   o `ClaimLite` do IS4. `Issuer`, `OriginalIssuer` e `Claim.Properties` não possuem semântica Operational; o
   materializador cria a claim com issuer canônico/default. Metadados `Properties` de outros modelos continuam
@@ -365,11 +406,13 @@
   a tolerância existente não é descrita como mecanismo de detecção de replay. Fonte: Q10=A.
 - **DF38 — Handles por digest:** authorization code, refresh token, authorize-parameters handle e o bearer handle
   de reference access token são localizados por digest SHA-256 determinístico com separação de domínio por
-  `artifact_type`; o valor bruto não é persistido. `realm_id` e tipo integram a identidade/consulta, portanto
-  digests iguais em realms ou tipos distintos não colidem semanticamente. `jti` continua uma projeção própria do
-  access token e JWT segue exclusivamente a DF31. O desenho mantém o precedente do IS4 para grants e o estende a
-  authorize parameters; HMAC não é introduzido porque os handles gerados têm alta entropia e não justificam
-  distribuição/rotação de uma chave no caminho crítico. Fonte: Q2=A e comparação com IS4.
+  `artifact_type`; o valor bruto não é persistido. Para `access_token`, a entrada é sempre o `jti`, conforme DF13;
+  o bearer reference coincide hoje com ele, e JWT metadata/full usa o mesmo domínio de `jti`, nunca o compact JWT.
+  O `jti`/bearer bruto também não recebe coluna projetada; o argumento de lookup rematerializa o identificador.
+  `realm_id` e tipo integram a identidade/consulta, portanto digests iguais em realms ou tipos distintos não colidem
+  semanticamente. O desenho mantém o precedente do IS4 para grants e o estende a authorize parameters; HMAC não é
+  introduzido porque os handles gerados têm alta entropia e não justificam distribuição/rotação de uma chave no
+  caminho crítico. Fonte: Q2=A, `IAccessTokenStore` e comparação com IS4.
 - **DF39 — Compatibilidade transitória por capability:** MP-2 e MP-3 são expostos por capability interfaces
   distintas dos contratos CRUD legados e implementadas obrigatoriamente pelo adapter EF. Enquanto o host default
   permanecer in-memory, o core detecta a ausência da capability e usa explicitamente o fluxo legado não atômico; o
@@ -380,6 +423,22 @@
   `AuthenticationOptions`, seguindo os lifetimes atuais de `Client`. O default é `600`, seu copy constructor e
   payload Configuration preservam o valor, e zero/negativo falha na validação. Payload RealmOptions v1 anterior
   materializa `600` sem bump de versão ou migration relacional. Fonte: Q12=B, Q6=A e DF29.
+- **DF41 — Refresh token sem identidade do access token anterior:** remover do modelo público
+  `RefreshToken.AccessTokenId`, o parâmetro `accessTokenId` do construtor e o claim `jti` que hoje representa o
+  access token anterior. O handle do refresh token continua sua própria identidade; não se cria outro `jti` para
+  substituir a sobrecarga removida. `RefreshTokenRequest.AccessToken` e a assinatura de
+  `ITokenFactory.CreateRefreshTokenAsync` permanecem: o objeto recém-emitido é somente fonte em memória dos
+  scopes/resource URIs autorizados e, em `Snapshot`, das claims a copiar para o payload próprio. Nenhum identificador
+  ou lookup do access token é persistido; refresh reutilizável deixa de reescrever claim `jti`. Fonte: modelos,
+  factory/handlers atuais e DF32.
+- **DF42 — `at_hash` no refresh:** quando o refresh emitir identity token, `AccessTokenToHash` recebe
+  `newAccessToken.Token`, exatamente o access token devolvido na mesma resposta, nunca o token anterior. O cálculo
+  independe de persistir o JWT e é coberto por regressão que usa valores antigo/novo distintos. Fonte:
+  `RefreshTokenHandler`, semântica OIDC de `at_hash` e DF31/DF32.
+- **DF43 — MP-9 explicitamente diferida:** lookup de sessão por subject não entra neste plano porque nenhum caller
+  foi comprovado; revogação continua pela operação em massa existente e testes capturam o `sid` do fluxo. A matriz
+  registra MP-9 como diferida/não requerida pelo P3, reabrível somente junto de um caller futuro. Fonte: inventário
+  da matriz e escopo decidido deste plano.
 
 ---
 
@@ -432,6 +491,26 @@
 - **Q12:** escolhida **B**. `AuthenticationOptions.AuthorizationInteractionLifetime` usa `int` em segundos, default
   `600`, seguindo os lifetimes atuais de `Client`.
 
+### 2026-07-24 — validação da revisão independente
+
+- **Sequenciamento da flag:** achado confirmado. A remoção de
+  `Client.UpdateAccessTokenClaimsOnRefresh`/mapping/coluna saiu das Fases 1/2 e foi movida para a Fase 5 junto da
+  ativação efetiva de `Current`/`Snapshot`; a migration PostgreSQL equivalente permanece na Fase 7.
+- **Mudança do default:** confirmada com nuance. `false` sem resource subset renova claims/audiences antigas
+  (snapshot-like), enquanto `false` com subset já reemite. `Current` continua decidido como novo default, agora
+  documentado como mudança intencional do caminho comum.
+- **Lookup de access token:** corrigido para digest sempre derivado de `jti`; bearer reference coincide hoje com
+  `jti`, e compact JWT nunca é chave nem mecanismo de revogação.
+- **Superfícies de refresh:** `RefreshToken.AccessTokenId`, parâmetro/claim `jti` e reescrita no token reutilizável
+  são removidos; `RefreshTokenRequest.AccessToken` permanece somente como fonte em memória.
+- **`at_hash`:** elevado a decisão/aceite de conformidade sobre o novo access token devolvido.
+- **Gate de AP:** TTL/digest/store realm-bound aplicam-se apenas com `StoreAuthorizationParameters=true`; o resolver
+  passa a obter o `Realm` atual e o modo `false` continua por query string.
+- **Ajustes de execução:** foram nomeados o teste de migrations history, os testes da flag e as implementações
+  test-only de `IStorage` afetadas por MP-5.
+- **Governança:** referências externas usam `B-DF`/`C-DF`; MP-9 foi fechada na matriz como diferida sem caller; a
+  descrição genérica de redirect mismatch foi registrada como mudança observável da DF11.
+
 ---
 
 ## Design alvo
@@ -443,7 +522,8 @@ O design abaixo materializa as decisões Q1–Q12 já fechadas; nenhuma alternat
 - `IOperationalStoreFactory` é a entrada scoped do adapter para criar stores realm-bound de access token, refresh
   token, authorization code, consent, sessão e authorize parameters.
 - `IStorage.AuthorizeParameters` é substituído por accessor realm-bound, alinhado aos demais stores. O nome exato
-  deve seguir o padrão existente (`GetAuthorizeParametersStore(Realm)`).
+  deve seguir o padrão existente (`GetAuthorizeParametersStore(Realm)`). Login, consent, resolver e callback só o
+  acessam quando `StoreAuthorizationParameters=true`; o resolver obtém o `Realm` atual, não apenas seu path.
 - MP-2 entra como capability de consumo condicional de authorization code conforme DF11/DF39.
 - MP-3 entra como capability de transição versionada de refresh token conforme DF12/DF39.
 - A janela de authorize interaction vive em `RealmOptions.Authentication` como
@@ -454,8 +534,10 @@ O design abaixo materializa as decisões Q1–Q12 já fechadas; nenhuma alternat
   exclusivos do realm. O profile é apenas um identificador público resolvido pelo adapter/host, nunca material
   criptográfico.
 - `RealmOptions.RefreshTokens.ClaimsMode` é a única política de origem das claims no refresh.
-  `Client.UpdateAccessTokenClaimsOnRefresh` e sua coluna Configuration são removidos conforme DF33; não existe
-  override por client.
+  `Client.UpdateAccessTokenClaimsOnRefresh` e sua coluna Configuration são removidos na Fase 5, junto da troca do
+  handler para `Current`/`Snapshot`, conforme DF33; não existe override por client.
+- `RefreshToken` perde `AccessTokenId`, o parâmetro correspondente e o claim `jti`; `RefreshTokenRequest.AccessToken`
+  permanece somente como fonte em memória para montar o grant/snapshot, sem lookup ou id persistido, conforme DF41.
 - O adapter expõe registration de profiles Operational nomeados. Exatamente um profile selecionado é usado para
   novas escritas de cada realm; o `protector_id` do envelope seleciona leitores legados.
 - A manutenção de cleanup/purge não vira CRUD administrativo nem transação cross-family. O adapter expõe a porta
@@ -475,8 +557,7 @@ JWT opcional. `artifact_type` integra toda PK/query/operação; as projeções p
 
 ```text
 operation.protocol_artifacts [artifact_type = access_token]
-  realm_id + artifact_type + lookup_digest PK [DF38; bearer de reference token]
-  token_id/jti projetado quando necessário ao domínio
+  realm_id + artifact_type + lookup_digest PK [DF38; SHA-256(jti)]
   subject_id, client_id, session_id
   access_token_type
   created_at_utc, expires_at_utc
@@ -489,6 +570,7 @@ operation.protocol_artifacts [artifact_type = refresh_token]
   state_version                            [DF12]
   claims_mode
   payload_version + protected_payload      [grant mínimo Current ou snapshot próprio]
+  sem access_token_id/claim jti             [DF41]
   index (realm_id, subject_id)
 
 operation.protocol_artifacts [artifact_type = authorization_code]
@@ -531,10 +613,15 @@ operation.authorize_parameters
   vínculos lógicos indexados; nenhuma relação adicional é inferida apenas porque duas colunas carregam o mesmo valor.
 - Reference access tokens sempre produzem artifact persistido. JWT produz nenhuma linha, metadata sem compact JWT ou
   payload completo conforme DF31; a policy efetiva é capturada na escrita e mudança posterior do realm não
-  reinterpreta artifacts existentes.
-- Refresh nunca guarda `AccessTokenId` como dependência observável. `Current` conserva o grant mínimo e reconsulta
-  sessão/UserAccounts/configuração; `Snapshot` conserva seu próprio snapshot. Ambos preservam subject/client/scopes/
-  resources originalmente autorizados e nunca ampliam o grant a partir de configuração atual.
+  reinterpreta artifacts existentes. O lookup digest de qualquer access-token artifact deriva de `jti`;
+  reference bearer coincide com ele no modelo atual, enquanto o compact JWT não participa da chave. `jti`/bearer
+  não fica em coluna: `GetAsync(jti)` fornece o valor necessário para rematerializar `AccessToken.Id`/`Token`.
+- Refresh não possui `AccessTokenId` nem claim `jti` do access token anterior. `Current` conserva o grant mínimo e
+  reconsulta sessão/UserAccounts/configuração; `Snapshot` conserva seu próprio snapshot. Ambos preservam
+  subject/client/scopes/resources originalmente autorizados e nunca ampliam o grant a partir de configuração atual.
+- Nenhuma linha de authorize parameters é criada quando `StoreAuthorizationParameters=false`; nesse modo,
+  login/consent/callback/resolver usam apenas a query string. TTL, fail-closed e lazy/periodic cleanup valem para
+  registros criados quando a opção estava ligada.
 - Índices de cleanup seguem os predicados da DF17: `protocol_artifacts` por
   `(artifact_type, expires_at_utc)` e refresh também por `(artifact_type, consumed_at_utc)`; consents/AP por
   `expires_at_utc`; sessions por `expires_at_utc` e `ended_at_utc`. Cleanup realm-bound/purge começa por `realm_id`.
@@ -627,6 +714,10 @@ Nenhum código do produto coordena commit entre ambos.
   falhas tenta `Plain`.
 - `JwtAccessTokenPersistence=Full` combinado com profile `Plain` exige opt-ins independentes e warning explícito,
   pois grava um bearer reutilizável em texto claro. O compact JWT nunca entra em coluna consultável, PK ou log.
+- Revogação por token bruto encontra reference token porque seu bearer coincide com `jti`; JWT metadata/full não é
+  encontrado pelo compact JWT e não simula revogação stateful.
+- Identity token emitido em refresh calcula `at_hash` exclusivamente sobre `newAccessToken.Token`, o token devolvido
+  na mesma resposta, conforme DF42.
 
 **Cleanup e purge:**
 
@@ -725,8 +816,8 @@ implementar stores.
   payload v1, sem migration relacional/bump automático.
 - Adicionar `OperationalStorageOptions` e `RefreshTokenOptions` a `RealmOptions`, com defaults/clone/serialização
   definidos pelas DF29–DF32.
-- Remover `Client.UpdateAccessTokenClaimsOnRefresh` do core e do materializador Configuration; preparar a migration
-  de remoção da coluna conforme DF33, sem reescrever migrations do Plano 2.
+- Manter temporariamente `Client.UpdateAccessTokenClaimsOnRefresh` e seu mapping em uso até a Fase 5; a nova opção
+  de realm é aditiva nesta fase e ainda não muda o handler.
 - Criar serializers/materializers versionados com round-trip completo e falha fechada.
 - Extrair/reusar primitivas genéricas de envelope/proteção do Plano 2 sem reutilizar
   `IKeyMaterialProtector` como contrato Operational.
@@ -745,14 +836,15 @@ implementar stores.
 - [ ] Criar `IOperationalStoreFactory` e seam de `DbContext` genérico.
 - [ ] Alterar interfaces/consumidores somente até o ponto em que compilam; manter o comportamento nas fases por
   store.
+- [ ] Adaptar explicitamente `MemoryStorage`, `SessionLifecycleTests.FakeSessionStorage` e
+  `SqliteConfigurationStorageHarness.ConfigurationCompositeStorage` ao accessor realm-bound de AP, sem atribuir ao
+  fake TTL, particionamento real ou aceites de MP-5.
 - [ ] Implementar as capability interfaces e o fallback transitório da DF39 sem dar aceites novos ao fake.
 - [ ] Validar que `AuthorizationInteractionLifetime` é positivo, usa segundos e materializa `600` quando ausente em
   payload v1.
 - [ ] Criar testes de model metadata, payload version e round-trip por tipo.
 - [ ] Cobrir payload Configuration v1 anterior sem as novas options, defaults `Jwt=None`/`Claims=Current`, profile
   default e round-trip novo ainda em version `1`.
-- [ ] Remover a opção do client em domínio/entity/mapping/materializers e testar leitura/migração de bancos com a
-  coluna legada antes de seu drop.
 - [ ] Testar profiles por realm: dois realms/protectors, rotação com leitor anterior, profile ausente, envelope/AAD
   adulterado e `Plain` explicitamente registrado.
 - [ ] Testar `ClaimPayload` mínimo e provar que properties próprias de authorization code continuam preservadas.
@@ -768,7 +860,8 @@ implementar stores.
   capability está ausente, e a registration EF valida sua presença.
 - Realm options continuam round-trip após as novas opções; payload v1 anterior materializa
   `AuthorizationInteractionLifetime=600` e os demais defaults sem migration relacional ou bump de payload version.
-- Não resta opção de refresh claims no `Client`; somente o realm determina `Current`/`Snapshot`.
+- `ClaimsMode` está disponível e serializável, mas a propriedade do client e o comportamento atual permanecem
+  intactos até a refatoração indivisível da Fase 5.
 - Nenhum secret de protector entra no payload Configuration; profile inexistente nunca cai para `Plain`.
 - Todo payload inválido/version desconhecida falha sem materialização parcial.
 
@@ -796,8 +889,6 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 
 - Criar extensão pública `ApplyRoyalIdentityOperationalSqliteMappings` e context/design-time factory.
 - Gerar migration inicial Operational SQLite sobre o model completo.
-- Gerar nova migration Configuration SQLite que remove `update_access_token_claims_on_refresh`; não alterar a
-  migration inicial já entregue pelo Plano 2.
 - Configurar uma migrations history table exclusiva para Operational no SQLite; não reutilizar a history padrão de
   Configuration quando as famílias compartilham o arquivo/banco. Configuration passa a usar
   `__ConfigurationMigrationsHistory` e Operational usa `__OperationalMigrationsHistory`.
@@ -817,9 +908,19 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 - [ ] Configurar e testar as histories SQLite de Configuration/Operational, inclusive no mesmo banco.
 - [ ] Atualizar runner, design-time factories e fixtures SQLite para consumir a mesma configuração centralizada de
   history.
+- [ ] Atualizar `SqliteConfigurationMigrationTests.Migrate_CreatesOnlyTheConfigurationTables` para excluir
+  `__ConfigurationMigrationsHistory`/`__OperationalMigrationsHistory` conforme o banco exercitado, sem mascarar
+  tabelas de negócio inesperadas.
 - [ ] Testar bootstrap SQLite: banco vazio; somente history legada; somente history nova; histories legada e nova
   simultâneas/ambíguas; repetição idempotente.
 - [ ] Implementar materialização completa de `AccessToken` e `Consent`.
+- [ ] Testar que `lookup_digest` de access token deriva sempre de `jti` em Reference/Metadata/Full; compact JWT
+  diferente de `jti` nunca participa da PK.
+- [ ] Provar que não existe coluna de `jti` bruto, que o bearer reference não entra em seu payload e que
+  `GetAsync(jti)` rematerializa `AccessToken.Id`/`Token` a partir do argumento; eventual `jti` dentro do compact JWT
+  permanece apenas no payload protegido de `Full`.
+- [ ] Cobrir revogação por token bruto: reference encontra/remove seu artifact; JWT metadata/full permanece sem
+  revogação stateful e a resposta RFC 7009 continua indistinguível.
 - [ ] Testar realms simultâneos com profiles de proteção e modos JWT diferentes sem cruzamento de policy/chaves.
 - [ ] Mapear expiration como dado, sem query filter.
 - [ ] Implementar remove em lote com contagem/efeito definido pela matriz.
@@ -832,7 +933,7 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalModel|FullyQua
 - Duplicidade de access-token id no mesmo realm falha e não sobrescreve; em realm diferente é aceita.
 - Reference token segue AT-01..AT-04 em todos os realms. JWT `None` não cria artifact; `Metadata` não contém o
   compact JWT; `Full` faz round-trip completo. Alterar a opção não reinterpreta linhas existentes.
-- A migration Configuration remove a coluna legada do client e os fluxos não consultam mais essa propriedade.
+- Reference/Metadata/Full persistidos são localizados por `jti`; somente o bearer reference coincide com essa chave.
 - SQLite registra migrations Configuration/Operational apenas nas histories nomeadas da DF23; banco legado é
   realocado antes de o EF avaliar pending migrations, sem perder/duplicar ids.
 - Lookup devolve token/consent expirado até cleanup explícito.
@@ -921,6 +1022,8 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionServic
 - [ ] Confirmar que code expirado ainda é materializado e é consumido/rejeitado pelo pipeline conforme alvo.
 - [ ] Manter remove administrativo ausente idempotente.
 - [ ] Atualizar testes do pipeline/token endpoint.
+- [ ] Fixar a mudança observável de redirect mismatch: `invalid_grant` permanece, mas a descrição deixa de ser
+  `Invalid redirect_uri` e passa à resposta genérica de code inválido conforme DF11.
 - [ ] Documentar que revogação de tokens já emitidos por reuse de code não é adicionada neste plano.
 
 **Critérios de aceite:**
@@ -928,6 +1031,7 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionServic
 - Nunca duas requests concorrentes chegam ao handler com o mesmo code.
 - Invalid client/redirect não fornece oracle mais detalhado e, por não satisfazer o predicado condicional, não
   remove o code.
+- Client/redirect mismatch compartilham a descrição genérica sem alterar o código OAuth `invalid_grant`.
 - Falha de PKCE ocorre depois do consume e não permite segunda tentativa com o mesmo code.
 - Fake continua transitório pelo fallback da DF39; aceite de atomicidade roda somente em EF.
 
@@ -955,6 +1059,9 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 
 - Implementar create-only/get/remove/remove-by-subject.
 - Persistir versão/estado conforme DF12 e realizar CAS por predicado + linhas afetadas.
+- Remover `Client.UpdateAccessTokenClaimsOnRefresh` somente agora, junto da ativação efetiva de
+  `RealmOptions.RefreshTokens.ClaimsMode`; remover também `ClientEntity`, mapping/materializers e gerar a migration
+  Configuration SQLite que descarta `update_access_token_claims_on_refresh`, sem editar migrations anteriores.
 - Mover a primeira transição para antes de efeitos de emissão que não podem ser revertidos.
 - Separar claramente:
   1. lookup/materialização;
@@ -962,7 +1069,10 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
   3. transição atômica;
   4. política de tolerância;
   5. emissão e eventual atualização do token reutilizável.
-- Remover a busca obrigatória do access token anterior por `AccessTokenId`.
+- Remover `RefreshToken.AccessTokenId`, o parâmetro de construtor e o claim `jti` sobrecarregado; eliminar a busca
+  obrigatória do access token anterior e a reescrita de `jti` no refresh reutilizável, conforme DF41.
+- Manter `RefreshTokenRequest.AccessToken` apenas como fonte em memória do grant/snapshot recém-emitido; a assinatura
+  de `ITokenFactory.CreateRefreshTokenAsync` não muda.
 - No modo `Current`, persistir no refresh somente o grant mínimo, reconstruir o principal protocolar a partir da
   sessão e reexecutar resolução de resources + emissão + `IUserClaimsProvider`. Scopes/resources atuais só podem
   restringir o conjunto originalmente autorizado, nunca ampliá-lo.
@@ -971,7 +1081,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 - Capturar `claims_mode` no refresh token emitido para que mudança posterior da opção do realm não altere a semântica
   de tokens existentes.
 - Calcular `at_hash`, quando aplicável, sobre o novo access token devolvido na resposta; o compact JWT anterior não
-  é requisito de refresh.
+  é requisito de refresh. Esta é a correção de conformidade da DF42, não apenas um detalhe de persistência.
 - Preservar exatamente os resultados atuais de tolerância sem chamar repetição tolerada de detecção de replay;
   famílias/revogação automática por replay/sender constraints permanecem diferidas conforme DF37.
 
@@ -983,11 +1093,22 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 - [ ] Modelar o grant mínimo de `Current` com subject/session/client/scopes/resource URIs e contexto protocolar
   necessário (`auth_time`, `idp`, `amr` e futuro `acr` quando suportado), sem snapshot de profile claims.
 - [ ] Modelar o snapshot próprio de `Snapshot` com `ClaimPayload` mínimo e sem compact JWT anterior.
-- [ ] Remover `AccessTokenId` como dependência de leitura/retenção e cobrir refresh após cleanup do access token
-  anterior.
+- [ ] Remover `AccessTokenId` de modelo/construtor/payload/handler, manter `RefreshTokenRequest.AccessToken` somente
+  como input em memória e cobrir refresh após cleanup do access token anterior.
+- [ ] Atualizar `DefaultTokenFactory`, `StorageContractTests.NewRefreshToken` e
+  `SessionLifecycleTests.SeedRefreshToken` para o construtor sem `accessTokenId`; provar que nenhum fixture reinsere
+  o claim `jti` removido.
+- [ ] Remover a flag do client em core/entity/mapping/materializers; atualizar
+  `ConfigurationModelClientCoverageTests`, `ConfigurationMaterializationClientTests` e `ConfigurationTestData`.
+- [ ] Gerar/testar a migration Configuration SQLite de drop da coluna legada na mesma mudança que ativa
+  `Current`/`Snapshot`.
 - [ ] Testar que `Current` reflete remoção/adição de claims do UserAccounts somente dentro do grant original.
 - [ ] Testar que `Snapshot` preserva as claims emitidas e que ambos os modos continuam aplicando active-user/session.
 - [ ] Testar que dois realms com modos diferentes não compartilham policy.
+- [ ] Testar explicitamente a mudança do caminho default legado (`false`, sem resource subset, equivalente a
+  snapshot) para `ClaimsMode.Current`, além do caminho legado com subset que já reemitia.
+- [ ] Testar que identity token de refresh contém `at_hash` calculado sobre o novo access token da resposta usando
+  tokens antigo/novo distintos, inclusive com `JwtAccessTokenPersistence=None`.
 - [ ] Testar expired/consumed lookup, tolerância zero, finita e infinita.
 - [ ] Testar revogação ordinal por subject e isolamento por realm.
 - [ ] Garantir que handle/payload nunca entra em log.
@@ -1005,12 +1126,18 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCode"
 - Falha anterior à transição não cria token novo; falha posterior tem comportamento documentado e testado.
 - `Current` é o default para payload RealmOptions v1 sem a nova propriedade; nenhuma opção do client interfere.
 - Nenhum refresh válido exige que a linha do access token anterior ainda exista.
+- `RefreshToken` não expõe/persiste `AccessTokenId` ou claim `jti` do access token anterior; a factory ainda recebe o
+  access token recém-emitido somente como fonte em memória.
+- `at_hash` do identity token corresponde ao access token novo devolvido na mesma resposta e difere do hash do
+  token anterior.
+- A flag do client, seus testes de mapping/materialização e sua coluna SQLite desaparecem apenas junto da nova
+  semântica, sem intervalo intermediário em que o handler fique sem política efetiva.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Storage --filter "FullyQualifiedName~RefreshToken|FullyQualifiedName~Atomic"
-dotnet test Tests.Identity --filter "FullyQualifiedName~RefreshToken"
+dotnet test Tests.Storage --filter "FullyQualifiedName~RefreshToken|FullyQualifiedName~Atomic|FullyQualifiedName~ConfigurationModelClient|FullyQualifiedName~ConfigurationMaterializationClient"
+dotnet test Tests.Identity --filter "FullyQualifiedName~RefreshToken|FullyQualifiedName~AtHash"
 dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 ```
 
@@ -1029,6 +1156,8 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 **O que/como:**
 
 - Tornar AP realm-bound em todos os callers.
+- Preservar `StoreAuthorizationParameters` como gate: `true` usa o store realm-bound; `false` conserva o fluxo por
+  query string sem write/read/delete no store.
 - Gerar handle com ao menos 128 bits, persistir somente seu digest conforme DF38 e regenerar colisões por generator
   injetável/testável.
 - Gravar `CreatedAt`/`ExpiresAt` absolutos; read repetível dentro da validade e `null` depois.
@@ -1041,6 +1170,11 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 **Tarefas:**
 
 - [ ] Migrar login, consent, resolver e callback para o accessor realm-bound.
+- [ ] Alterar `DefaultAuthorizationContextResolver` para obter `httpContext.GetCurrentRealm()` (não apenas
+  `GetRealmPath()`), respeitar `StoreAuthorizationParameters` e passar o realm ao accessor.
+- [ ] Cobrir `StoreAuthorizationParameters=true/false`: somente `true` cria/responde handle e aplica TTL;
+  `false` mantém query string e não invoca o store.
+- [ ] Comprovar que mudar o realm de `true` para `false` não impede o cleanup periódico de AP já expirado.
 - [ ] Cobrir clone/round-trip de `NameValueCollection`, inclusive chaves repetidas se suportadas pelo shape atual.
 - [ ] Injetar handle generator em teste para forçar colisão.
 - [ ] Criar opções de cleanup validadas (modo `Hosted`/`External`, intervalo e batch); a elegibilidade não possui
@@ -1055,6 +1189,8 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 **Critérios de aceite:**
 
 - Handle de AP em realm A não resolve em realm B.
+- Com `StoreAuthorizationParameters=false`, login/consent/resolver/callback não acessam AP e o fluxo por query
+  string continua funcional.
 - Alterar o TTL do realm não muda a expiração já gravada.
 - Colisão nunca sobrescreve nem escapa como falha aleatória.
 - Cleanup nunca remove refresh token ainda observável pela tolerância escolhida.
@@ -1184,6 +1320,7 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalMigrationRunne
 - [ ] Confirmar que fake não recebeu paridade Operational nova.
 - [ ] Confirmar que `UpdateAccessTokenClaimsOnRefresh` e sua coluna não permanecem em core, entities,
   materializers, mappings, migrations novas ou código de runtime.
+- [ ] Confirmar que MP-9 permanece explicitamente diferida na matriz, sem lookup por subject adicionado sem caller.
 - [ ] Registrar contagem final de contratos/aceites e arquivos.
 - [ ] Executar `git diff --check`.
 
@@ -1194,6 +1331,7 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalMigrationRunne
 - Full gateway EF é utilizável opt-in e não é default do host.
 - Runner/SQL operam uma ou duas famílias sem auto-migrate.
 - Matriz não contém MP-2/3/5/6/parte Operational de MP-7 pendentes.
+- MP-9 está fechada como diferida/não requerida pelo P3, e não como candidata ainda aguardando decisão.
 - O Plano 4 pode migrar testes sem redesenhar persistence contracts.
 
 **Testes:**
@@ -1219,15 +1357,15 @@ git diff --check
 
 | Objetivo | Fase(s) | Decisão(ões) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF40 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
+| Persistir Operational | 1–7 | DF1–DF10/DF23/DF29–DF43 | schema/model/materialização/histories equivalentes | contracts SQLite/PostgreSQL |
 | Access token + consent | 2, 6, 7 | DF7/DF8/DF13/DF14/DF17/DF30/DF31/DF38 | AT/CN completos, digests, modos JWT, profiles e cleanup independente | contract + provider acceptances |
-| Sessões | 3, 7 | DF15/DF27 | SS-01..SS-06, touch/revogação concorrentes | session contracts + ADR-017 regressions |
+| Sessões | 3, 7 | DF15/DF27/DF43 | SS-01..SS-06, touch/revogação concorrentes e MP-9 diferida | session contracts + ADR-017 regressions |
 | Code single-use | 1, 4, 7 | DF11/DF39 | um vencedor concorrente e fallback restrito ao fake | atomic code acceptance |
-| Refresh conditional | 1, 5, 7 | DF12/DF32–DF34/DF37/DF39 | transição/versão/tolerância, Current/Snapshot e sem dependência do AT | atomic refresh + claims-mode acceptance |
-| AP realm-bound + TTL | 1, 6, 7 | DF16/DF29/DF30/DF38/DF40 | realm, digest, expiração em segundos, colisão, fail-closed e payload Configuration compatível | AP acceptances |
+| Refresh conditional | 1, 5, 7 | DF12/DF32–DF34/DF37/DF39/DF41/DF42 | transição/versão/tolerância, Current/Snapshot, sem `AccessTokenId` e `at_hash` correto | atomic refresh + claims-mode/at-hash acceptance |
+| AP realm-bound + TTL | 1, 6, 7 | DF16/DF29/DF30/DF38/DF40 | gate `StoreAuthorizationParameters`, realm, digest, expiração em segundos, colisão e fail-closed | AP acceptances |
 | Cleanup/purge | 6, 7 | DF17/DF18 | batch por tipo, um modo de execução e purge isolado | cleanup/purge acceptances |
 | Gateway/lifecycle | 6–8 | DF3/DF21/DF22 | todos os membros, scopes reais, sem UoW global | StorageSession/full harness |
-| Migrations/operação | 2, 7, 8 | DF4/DF23/DF24/DF33 | histories por família, drop da opção do client, runner/SQL separados e uma/duas conexões | migration/runner/Podman |
+| Migrations/operação | 2, 5, 7, 8 | DF4/DF23/DF24/DF33 | histories por família, drop da opção do client junto da nova semântica, runner/SQL separados e uma/duas conexões | migration/runner/Podman |
 | Handoff Plano 4 | 8 | DF21/DF25 | EF completo sem alterar default | solução + OIDC opt-in |
 
 ---
@@ -1278,6 +1416,13 @@ git diff --check
     falha se alguma capability da DF39 estiver ausente.
 37. `AuthorizationInteractionLifetime` usa segundos, é sempre positivo e materializa `600` quando ausente no
     payload Configuration v1.
+38. Access-token artifact usa digest de `jti`, sem coluna bruta; compact JWT nunca é chave de lookup ou falsa
+    revogação stateful.
+39. Refresh token não carrega `AccessTokenId` nem claim `jti` do access token anterior.
+40. `at_hash` emitido em refresh corresponde ao access token novo devolvido na mesma resposta.
+41. AP só é acessado quando `StoreAuthorizationParameters=true`; o modo `false` permanece integralmente em query
+    string.
+42. A remoção da flag do client e sua coluna ocorre junto da ativação de `Current`/`Snapshot` na Fase 5, nunca antes.
 
 ---
 
@@ -1308,16 +1453,21 @@ git diff --check
 | Protection/profile inviabiliza leitura | profile ausente, rotação remove leitor ou AAD diverge | outage por realm | DF30 + envelope/protector id + testes multi-profile/rotação | Aberto |
 | Code é consumido duas vezes | get/remove ou transação fraca | emissão duplicada | MP-2 + teste com connections independentes | Aberto |
 | Invalid request consome code | contrato atômico ignora vínculo/ordem | DoS contra fluxo legítimo | predicado client/redirect da DF11 + pipeline tests | Aberto |
+| Client depende da descrição de redirect mismatch | `error_description` deixa de ser `Invalid redirect_uri` | integração observa texto diferente embora continue `invalid_grant` | mudança explícita DF11 + teste/documentação | Aberto |
 | Refresh emite antes de ganhar CAS | handler mantém ordem atual | tokens órfãos/duplicados | reorganizar Fase 5 | Aberto |
 | Refresh tolerance mascara replay | `TimeSpan.MaxValue`/janela ampla | divergência RFC 9700 | DF37 + backlog explícito | Aberto |
 | Lost update no refresh reutilizável | concorrência muda estado/payload após consumo | grant/token subsequente incorreto | versão condicional DF12 | Aberto |
 | Session client/touch perdem update | JSON/replace do agregado concorrente | logout/idle incorretos | tabela filha + operações condicionais | Aberto |
 | Cleanup remove dado observável | eligibility ignora tolerância/lifecycle | refresh/diagnóstico quebrado | predicados DF17 + fake clock tests | Aberto |
-| Refresh volta a depender do access token | handler conserva `AccessTokenId`/lookup legado | cleanup invalida refresh válido | DF32 + teste AT removido antes do refresh | Aberto |
+| Refresh volta a depender do access token | handler conserva `AccessTokenId`/lookup legado | cleanup invalida refresh válido | DF41 + teste AT removido antes do refresh | Aberto |
+| `at_hash` referencia token anterior | handler usa `accessToken.Token` em vez do token novo | identity token não corresponde à resposta | DF42 + regressão com tokens distintos | Aberto |
 | Current amplia o grant | emissão usa permissões atuais do client em vez do grant persistido | elevação de privilégio | interseção scopes/resources + testes negativos DF32 | Aberto |
 | Snapshot conserva claim revogada | modo escolhido reutiliza profile claim antiga | autorização obsoleta até expiração | default Current + escolha explícita/TTL do realm | Aberto |
 | Realm seleciona Full + Plain | JWT bearer fica legível no banco | reutilização após leak | opt-ins independentes + warning + DF30/DF31 | Aberto |
-| Drop da opção do client perde precedência implícita | clients antigos tinham valores divergentes | comportamento muda para Current | DF33 + migration/regressão/documentação explícita | Aberto |
+| Drop da opção do client muda o caminho default | `false` sem resource subset hoje renova claims antigas | comportamento global muda para Current | sequenciamento indivisível da Fase 5 + DF33 + regressão explícita | Aberto |
+| Migration da flag precede o novo handler | propriedade/coluna some antes de Current/Snapshot funcionar | build intermediário ou regressão de refresh | drop somente na Fase 5 junto do handler; PostgreSQL na Fase 7 | Aberto |
+| AP ignora `StoreAuthorizationParameters=false` | caller realm-bound acessa store incondicionalmente | query-string mode quebra ou cria estado indevido | gate DF16 + testes true/false | Aberto |
+| Lookup de access token mistura bearer/JWT | digest deriva do token bruto em vez de `jti` | metadata/full fica inalcançável ou colide semanticamente | DF13/DF38 + contratos por jti | Aberto |
 | Cleanup nunca roda | modo externo sem scheduler | crescimento ilimitado | seleção explícita DF17 + health/observabilidade operacional | Aberto |
 | Dois workers disputam cleanup | múltiplos nós | locks/carga | batches idempotentes e índices de expiry | Aberto |
 | Purge cruza realm | filtro incompleto/cascade | incidente multi-tenant | realm em PK/FK + cenário abrangente | Aberto |
@@ -1334,7 +1484,7 @@ git diff --check
 ## Diferidos e backlog
 
 - Troca do backing padrão dos testes/host e remoção do fallback transitório — `plan-data-test-migration.md`.
-- Persistência/redesign de resources/scopes — plano específico após DF22.
+- Persistência/redesign de resources/scopes — plano específico após B-DF22.
 - Coordenação idempotente de tombstone Configuration + purge Operational + UserAccounts — ADR/plano administrativo.
 - API administrativa e write model — plano próprio.
 - PAR/RFC 9126 e eventual `IAuthorizationRequestStore`/`IPushedAuthorizationRequestStore` —
@@ -1344,7 +1494,7 @@ git diff --check
 - Auditoria/outbox/forense durável.
 - Refresh-token families, replay revocation e sender constraint conforme DF37.
 - Aspire e agendamento/container de migrations/maintenance.
-- Lookup de sessão por subject (MP-9), enquanto não houver caller.
+- Lookup de sessão por subject (MP-9), diferido pela DF43 até existir caller comprovado.
 
 ---
 

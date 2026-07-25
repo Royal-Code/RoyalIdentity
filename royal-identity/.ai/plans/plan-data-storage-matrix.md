@@ -741,7 +741,7 @@ O fake não recebe TTL/particionamento (ADR-018); os itens 1-5 são testes de ac
 | MP-6 | Cleanup físico/TTL por tipo Operational (tokens, codes, consents, sessões), separado da leitura lógica | DF19 | P3 |
 | MP-7 | Semântica de exclusão de realm: tombstone Configuration + purge Operational + reserva de path/domain (não muda assinatura de `DeleteAsync`) | RL-07 / DF20 | P2/P3; seam cross-family em ADR própria futura |
 | MP-8 | Candidata (não requerida): remoção de `IResourceStore.GetAllResourcesAsync` sem caller | RS-01 | redesign de resources |
-| MP-9 | Candidata (não requerida): lookup de sessão por subject — somente se o P3 decidir; os testes capturam o `sid` do fluxo | Fase 4 (`FindSession`) | P3, se necessário |
+| MP-9 | **Diferida, não requerida pelo P3:** lookup de sessão por subject só será reaberto com caller comprovado; revogação usa a operação em massa existente e os testes capturam o `sid` do fluxo | Fase 4 (`FindSession`) | Plano do caller futuro |
 | MP-10 | Normalização lowercase de `Realm.Domain` no `RealmManager` (escrita) e nas bordas de consulta por domain; o adapter EF rejeita `SaveAsync` direto com domain não canônico; unicidade sobre o valor normalizado — comportamento novo, não paridade | RL-04 / DF18 | P2 |
 
 Os rejects de create-only (KY-01, AT-01, RT-01, AC-01, SS-01) não mudam contrato público — são constraints
