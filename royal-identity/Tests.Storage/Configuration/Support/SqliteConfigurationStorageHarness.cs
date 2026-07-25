@@ -294,7 +294,7 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
             => configuration.GetResourceStore(realm);
 
         public IUserSessionStore GetUserSessionStore(Realm realm)
-            => new UserSessionStore(GetData(realm).Sessions, clock);
+            => operational?.GetUserSessionStore(realm) ?? new UserSessionStore(GetData(realm).Sessions, clock);
 
         public void EnsureRealm(string realmId) => realmData.TryAdd(realmId, new RealmOperationalData());
 

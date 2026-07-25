@@ -103,12 +103,17 @@ internal sealed class SqliteOperationalFileDatabase : IAsyncDisposable
     public IOperationalStoreFactory StoresOf(AsyncServiceScope scope)
         => scope.ServiceProvider.GetRequiredService<IOperationalStoreFactory>();
 
-    public async Task<int> CountConsentsAsync()
+    public Task<int> CountConsentsAsync() => CountAsync("consents");
+
+    public Task<int> CountSessionClientsAsync() => CountAsync("user_session_clients");
+
+    /// <summary>Counts rows over its own connection, so the assertion never reads a change tracker.</summary>
+    public async Task<int> CountAsync(string table)
     {
         await using var connection = new SqliteConnection(ConnectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM consents;";
+        command.CommandText = $"SELECT COUNT(*) FROM {table};";
 
         return Convert.ToInt32(await command.ExecuteScalarAsync());
     }

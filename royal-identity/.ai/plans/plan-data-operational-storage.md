@@ -1,16 +1,16 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-2 concluídas
+## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-3 concluídas
 
 ## Progresso
 
-`██░░░░░░` **25%** - 2 de 8 fases
+`███░░░░░` **37,5%** - 3 de 8 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contratos, fronteiras e modelo Operational | Concluida |
 | Fase 2 - access tokens e consents sobre SQLite | Concluida |
-| Fase 3 - sessões SSO sobre SQLite | Não iniciada |
+| Fase 3 - sessões SSO sobre SQLite | Concluida |
 | Fase 4 - authorization codes e consumo atômico | Não iniciada |
 | Fase 5 - refresh tokens e transições condicionais | Não iniciada |
 | Fase 6 - authorize parameters, cleanup e purge de realm | Não iniciada |
@@ -1202,12 +1202,12 @@ git diff --check
 
 **Tarefas:**
 
-- [ ] Implementar create/find/record/end/touch/end-by-subject.
-- [ ] Preservar `SecurityStamp`, auth method/idp e expiração.
-- [ ] Garantir no-op para record/touch ausentes.
-- [ ] Evitar lost update entre record-client, touch e end.
-- [ ] Testar clients case-sensitive, timestamps e rematerialização.
-- [ ] Executar contratos existentes contra SQLite.
+- [x] Implementar create/find/record/end/touch/end-by-subject.
+- [x] Preservar `SecurityStamp`, auth method/idp e expiração.
+- [x] Garantir no-op para record/touch ausentes.
+- [x] Evitar lost update entre record-client, touch e end.
+- [x] Testar clients case-sensitive, timestamps e rematerialização.
+- [x] Executar contratos existentes contra SQLite.
 
 **Critérios de aceite:**
 
@@ -1227,7 +1227,50 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~DefaultUserSessionServic
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluída em 2026-07-25.** `dotnet test RoyalIdentity.sln` verde: 1017 aprovados, 9 ignorados (PostgreSQL
+opt-in), 0 falhas. `git diff --check` sem erros.
+
+**Arquivos criados**
+
+- `RoyalIdentity.Storage.EntityFramework/Operational/Stores/EntityFrameworkUserSessionStore.cs` — SS-01..SS-06
+  sobre `user_sessions` + `user_session_clients`.
+- Testes: `Tests.Storage/Operational/SqliteOperationalUserSessionTests` (13 aceites) e
+  `SqliteOperationalUserSessionConcurrencyTests` (4 aceites de concorrência real).
+
+**Arquivos alterados**
+
+- `EntityFrameworkOperationalStoreFactory` passou a receber `TimeProvider` e a devolver o session store;
+  `ConfigurationCompositeStorage.GetUserSessionStore` roteia ao EF quando a factory está presente.
+- `UserSessionStoreContractTests` ganhou a fixture `SqliteOperational` — os 15 contratos passaram sem alteração.
+- `SqliteOperationalFileDatabase` ganhou `CountAsync`/`CountSessionClientsAsync`, reusado pelos aceites de
+  concorrência.
+
+**Decisões tomadas na execução**
+
+- **A sessão não tem payload protegido.** Todo campo do modelo é coluna consultável e os clients são tabela
+  filha, então `record-client`, `touch` e `end` são operações condicionais set-based em vez de
+  read-modify-write sobre um blob — que é exatamente o que impede uma perder a alteração da outra. Há aceite
+  explícito de que gravar um client não reescreve a linha da sessão, e vice-versa.
+- **`ended_at_utc` é gravado condicionalmente a `IsActive`**, então repetir `End`/revogação preserva o primeiro
+  instante terminal (DF15/DF17). Uma sessão **criada já inativa** também recebe o instante terminal na criação:
+  sem isso, uma sessão inativa sem expiração não seria alcançada por nenhum predicado de cleanup.
+- **`RecordClientAsync` checa a existência da sessão antes do upsert**, para o no-op de SS-03 não depender de
+  engolir uma violação de FK. Se a sessão sumir no meio da corrida, o insert falha, o refresh subsequente não
+  encontra nada e o erro sobe — estado torto é reportado, não silenciado.
+- **Concorrência real coberta desde já**, com o mesmo shape da Fase 2 (banco em arquivo, pooling desligado, WAL,
+  scopes/contexts/conexões independentes e barreira assíncrona): 8 records do mesmo client convergem em uma
+  linha preservando `FirstSeenAt`, 6 revogações concorrentes somam exatamente uma transição efetiva, e records
+  de clients distintos não se perdem. **Verificado por mutação:** removendo a recuperação do upsert, 2 dos 4
+  testes falham.
+
+**Comandos executados**
+
+```powershell
+dotnet test Tests.Storage --filter "FullyQualifiedName~UserSession|FullyQualifiedName~SqliteOperational"
+dotnet test Tests.Identity
+dotnet test RoyalIdentity.sln
+git diff --check
+```
 
 ---
 

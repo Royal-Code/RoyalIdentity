@@ -21,7 +21,8 @@ internal sealed class EntityFrameworkOperationalStoreFactory(
     OperationalLookupDigest digest,
     AccessTokenPayloadSerializer accessTokenSerializer,
     ConsentPayloadSerializer consentSerializer,
-    OperationalPayloadProtection protection) : IOperationalStoreFactory
+    OperationalPayloadProtection protection,
+    TimeProvider clock) : IOperationalStoreFactory
 {
     public IAccessTokenStore GetAccessTokenStore(Realm realm)
     {
@@ -35,7 +36,11 @@ internal sealed class EntityFrameworkOperationalStoreFactory(
         return new EntityFrameworkUserConsentStore(realm, accessor, consentSerializer, protection);
     }
 
-    public IUserSessionStore GetUserSessionStore(Realm realm) => throw NotYetImplemented("SSO sessions", 3);
+    public IUserSessionStore GetUserSessionStore(Realm realm)
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        return new EntityFrameworkUserSessionStore(realm, accessor, clock);
+    }
 
     public IOperationalAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm)
         => throw NotYetImplemented("authorization codes", 4);
