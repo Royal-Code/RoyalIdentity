@@ -99,7 +99,7 @@ internal sealed class EntityFrameworkAccessTokenStore(
             jti,
             row.RealmId,
             row.ClientId,
-            (AccessTokenType)(row.AccessTokenType ?? (int)AccessTokenType.Jwt),
+            AccessTokenTypeOf(row),
             row.CreatedAtUtc,
             row.ExpiresAtUtc);
 
@@ -131,6 +131,22 @@ internal sealed class EntityFrameworkAccessTokenStore(
             .Where(artifact => artifact.SubjectId == subjectId)
             .Where(artifact => artifact.ClientId == clientId)
             .ExecuteDeleteAsync(ct);
+    }
+
+    /// <summary>
+    /// The persisted access-token type. It is never guessed: the type decides whether the token may be
+    /// presented as an opaque bearer at all, so a row missing it — or carrying a value this build does not
+    /// know — is corrupt data and fails closed rather than defaulting to something plausible.
+    /// </summary>
+    private static AccessTokenType AccessTokenTypeOf(ProtocolArtifactEntity row)
+    {
+        if (row.AccessTokenType is null || !Enum.IsDefined((AccessTokenType)row.AccessTokenType.Value))
+        {
+            throw OperationalPayloadException.IncoherentRecord(
+                nameof(AccessToken), "the persisted access token type is missing or unknown");
+        }
+
+        return (AccessTokenType)row.AccessTokenType.Value;
     }
 
     /// <summary>

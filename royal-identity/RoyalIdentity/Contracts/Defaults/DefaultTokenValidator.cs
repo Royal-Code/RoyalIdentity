@@ -8,6 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Models.Tokens;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -88,6 +89,20 @@ public class DefaultTokenValidator : ITokenValidator
         var token = await storage.GetAccessTokenStore(realm).GetAsync(jti, ct);
 
         if (token is null)
+        {
+            logger.LogError("Invalid reference token.");
+            return new(new ErrorDetails()
+            {
+                Error = Oidc.ProtectedResource.Errors.InvalidToken
+            });
+        }
+
+        // Only a reference token may be presented as an opaque bearer. A JWT access token is persisted for
+        // metadata/full or by the transitional in-memory backing, and its `jti` travels in the (unencrypted)
+        // JWT payload — so without this check anyone holding a JWT could read its `jti` and present it as a
+        // second bearer, skipping signature validation entirely. The response is deliberately the same as for
+        // an absent token, so it is no oracle about which jtis exist.
+        if (token.AccessTokenType is not AccessTokenType.Reference)
         {
             logger.LogError("Invalid reference token.");
             return new(new ErrorDetails()

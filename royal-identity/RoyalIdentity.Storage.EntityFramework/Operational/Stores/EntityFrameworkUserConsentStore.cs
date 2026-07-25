@@ -56,15 +56,16 @@ internal sealed class EntityFrameworkUserConsentStore(
         {
             // A concurrent writer inserted the same key between the update and this insert. The key constraint
             // is what prevents the duplicate; this caller simply becomes the later of the two writes.
-            db.Entry(row).State = EntityState.Detached;
-
             if (await UpdateAsync(consent, payloadVersion, protectedPayload, ct) is 0)
                 throw;
-
-            return;
         }
-
-        db.Entry(row).State = EntityState.Detached;
+        finally
+        {
+            // Always detach, including on cancellation or any other failure: a row left in Added state would
+            // be flushed by the next SaveChanges anywhere in this scope, silently completing an operation that
+            // did not succeed.
+            db.Entry(row).State = EntityState.Detached;
+        }
     }
 
     public async Task<Consent?> GetUserConsentAsync(string subjectId, string clientId, CancellationToken ct)

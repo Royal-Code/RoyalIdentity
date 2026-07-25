@@ -196,6 +196,29 @@ public class SqliteOperationalConsentTests
         Assert.Equal(["openid"], second!.GetValidScopes());
     }
 
+    // A cancelled or failed insert must leave nothing pending in the scope's change tracker. Otherwise the next
+    // SaveChanges anywhere in that scope would flush the row and silently complete an operation that did not
+    // succeed — the caller having been told it failed.
+    [Fact]
+    public async Task ACancelledInsert_LeavesNothingPendingInTheScope()
+    {
+        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        var store = harness.Storage.GetUserConsentStore(harness.RealmA);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await store.StoreUserConsentAsync(
+                NewConsent(harness.RealmA, "subject-cancelled", "client-a", null, "openid"), cancelled.Token));
+
+        // A later, unrelated write in the same scope must not drag the cancelled consent in with it.
+        await store.StoreUserConsentAsync(
+            NewConsent(harness.RealmA, "subject-other", "client-a", null, "openid"), default);
+
+        Assert.Equal(["subject-other"], (await RowsAsync(harness)).Select(row => row.SubjectId));
+        Assert.Null(await store.GetUserConsentAsync("subject-cancelled", "client-a", default));
+    }
+
     // DF19: a pre-cancelled token stops the operation before it reaches the provider.
     [Fact]
     public async Task PreCancelledToken_IsPropagatedToTheProvider()

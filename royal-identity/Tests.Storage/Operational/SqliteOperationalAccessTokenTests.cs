@@ -308,6 +308,29 @@ public class SqliteOperationalAccessTokenTests
         Assert.Empty(await ArtifactsAsync(harness, harness.RealmA));
     }
 
+    // The persisted type decides whether a token may be presented as an opaque bearer, so it is never guessed:
+    // a row whose access_token_type is missing or unknown is corrupt data and fails closed instead of
+    // materializing as a plausible default.
+    [Theory]
+    [InlineData(null)]
+    [InlineData(42)]
+    public async Task Get_WithAMissingOrUnknownAccessTokenType_FailsClosed(int? persistedType)
+    {
+        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        var store = harness.Storage.GetAccessTokenStore(harness.RealmA);
+        await store.StoreAsync(NewToken(harness.RealmA, "corrupt-type"), default);
+
+        await using (var context = harness.NewOperationalContext())
+        {
+            var row = await context.Set<ProtocolArtifactEntity>().SingleAsync();
+            row.AccessTokenType = persistedType;
+            await context.SaveChangesAsync();
+        }
+
+        await Assert.ThrowsAsync<OperationalPayloadException>(
+            async () => await harness.Storage.GetAccessTokenStore(harness.RealmA).GetAsync("corrupt-type", default));
+    }
+
     // DF9: what a read returns is an independent graph; mutating it never reaches the database.
     [Fact]
     public async Task MutatingAMaterializedToken_DoesNotPersistImplicitly()

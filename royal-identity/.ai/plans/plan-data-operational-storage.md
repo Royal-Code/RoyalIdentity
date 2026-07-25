@@ -1087,8 +1087,9 @@ dotnet test Tests.Architecture
 
 ### Resultado da Fase 2
 
-**Concluída em 2026-07-25.** `dotnet build RoyalIdentity.sln` e `dotnet test RoyalIdentity.sln` verdes: 975
-aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas. `git diff --check` sem erros.
+**Concluída em 2026-07-25**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet build
+RoyalIdentity.sln` e `dotnet test RoyalIdentity.sln` verdes: 985 aprovados, 9 ignorados (PostgreSQL opt-in),
+0 falhas. `git diff --check` sem erros.
 
 **Arquivos criados**
 
@@ -1140,6 +1141,35 @@ aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas. `git diff --check` sem err
 - **O script SQL manual de bootstrap é explicitamente two-step.** SQLite não tem DDL condicional; a versão
   idempotente e à prova dos quatro estados é a automatizada (`SqliteMigrationsHistoryBootstrap`), usada pelo
   runner e coberta por teste.
+
+**Ajustes aplicados após revisão externa (2026-07-25)**
+
+- **`jti` de JWT não é mais aceito como bearer opaco (achado de segurança, pré-existente).** O bearer sem ponto
+  vai para a validação de reference token, o store é indexado por `jti`, e `IncludeJwtId` é `true` por default —
+  então quem possuísse um JWT podia ler seu `jti` do payload (não cifrado) e apresentá-lo como um segundo bearer,
+  pulando a validação de assinatura. `DefaultTokenValidator.ValidateReferenceAccessTokenAsync` passou a exigir
+  `AccessTokenType.Reference`, com resposta idêntica à de handle inexistente (sem oracle). O defeito **não foi
+  introduzido pela Fase 2** — existe desde o fake in-memory, que persiste todo access token —, mas a Fase 2 o
+  tornou explícito ao persistir JWTs em `Metadata`/`Full`, e DF13 já dizia que persistir um JWT não é revogação.
+  Regressão em `Tests.Integration/Endpoints/ReferenceTokenBearerTests`: o `jti` é rejeitado exatamente como um
+  handle inexistente, o próprio JWT continua aceito e um reference token legítimo continua aceito. **Verificado
+  por mutação:** com a checagem desabilitada o teste falha.
+- **`access_token_type` passou a falhar fechado.** O fallback `null → Jwt` na materialização foi trocado por
+  validação: tipo ausente ou desconhecido é dado corrompido e levanta `OperationalPayloadException`. É o tipo que
+  decide se o token pode ser apresentado como bearer opaco, então adivinhá-lo era exatamente o risco acima.
+- **Aceite de concorrência de consent cumprido de verdade.** O relatório anterior alegava que isso pertencia às
+  Fases 4/5 — **estava errado**: o aceite é da Fase 2, e a seção de concorrência do plano exige scopes,
+  `DbContext`s e conexões independentes com barreira de início. `SqliteOperationalFileDatabase` provê banco em
+  arquivo, pooling desligado, WAL e barreira assíncrona (um `Barrier` bloqueante inania as próprias
+  continuations); `SqliteOperationalConsentConcurrencyTests` cobre 2 e 8 writers na mesma chave, writers em chaves
+  distintas e o caso determinístico de "quem termina depois vence". **Verificado por mutação:** removendo a
+  recuperação do upsert, 3 dos 4 testes falham.
+- **Estado residual do consent store.** O detach virou `finally`, então cancelamento ou qualquer falha não deixa a
+  linha em `Added` para ser gravada pelo próximo `SaveChanges` do mesmo scope. Coberto por teste que reutiliza o
+  scope após o cancelamento.
+- **Pontos do relatório mantidos:** `JwtAccessTokenPersistence=Full` na fixture (exercita o round-trip mais
+  completo; os três modos têm aceites próprios) e a factory parcial com `NotSupportedException` (o gateway
+  produtivo só é composto na Fase 6 — a condição é que nenhum desses caminhos sobreviva até lá).
 
 **Comandos executados**
 
