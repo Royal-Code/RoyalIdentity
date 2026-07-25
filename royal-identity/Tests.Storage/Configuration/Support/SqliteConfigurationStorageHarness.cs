@@ -276,7 +276,9 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
             => operational?.GetAccessTokenStore(realm) ?? new AccessTokenStore(GetData(realm).AccessTokens);
 
         public IRefreshTokenStore GetRefreshTokenStore(Realm realm)
-            => new RefreshTokenStore(GetData(realm).RefreshTokens);
+            => operational is null
+                ? new RefreshTokenStore(GetData(realm).RefreshTokens)
+                : operational.GetRefreshTokenStore(realm);
 
         public IAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm)
             => operational is null

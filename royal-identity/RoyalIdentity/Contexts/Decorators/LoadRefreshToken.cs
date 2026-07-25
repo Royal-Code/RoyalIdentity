@@ -83,22 +83,11 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
             return;
         }
 
-        /////////////////////////////////////////////
-        // check if refresh token has been consumed
-        /////////////////////////////////////////////
-        if (refreshToken.ConsumedTime.HasValue && 
-            client.RefreshTokenPostConsumedTimeTolerance != TimeSpan.MaxValue)
-        {
-            bool doNotAcceptConsumedToken = client.RefreshTokenPostConsumedTimeTolerance == TimeSpan.Zero
-                || refreshToken.ConsumedTime.HasExceeded(client.RefreshTokenPostConsumedTimeTolerance, clock.GetUtcNow().DateTime);
-
-            if (doNotAcceptConsumedToken)
-            {
-                logger.LogWarning("Rejecting refresh token because it has been consumed already.");
-                context.InvalidGrant("Refresh token has been consumed already.");
-                return;
-            }
-        }
+        // Consumption and the post-consumption tolerance are deliberately NOT checked here. The state read now
+        // can be stale by the time the token is actually consumed, so deciding on it would either reject a token
+        // another request had not consumed yet, or accept one it had. Both belong to the handler, next to the
+        // conditional transition, over the state that transition rematerializes
+        // (plan-data-operational-storage DF12/DF37).
 
         context.RefreshParameters.SetRefreshToken(refreshToken);
 

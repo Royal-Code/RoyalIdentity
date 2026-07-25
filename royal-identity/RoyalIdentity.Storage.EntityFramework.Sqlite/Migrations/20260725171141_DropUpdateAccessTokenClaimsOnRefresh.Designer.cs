@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 
@@ -10,9 +11,11 @@ using RoyalIdentity.Storage.EntityFramework.Sqlite;
 namespace RoyalIdentity.Storage.EntityFramework.Sqlite.Migrations
 {
     [DbContext(typeof(ConfigurationSqliteDbContext))]
-    partial class ConfigurationSqliteDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260725171141_DropUpdateAccessTokenClaimsOnRefresh")]
+    partial class DropUpdateAccessTokenClaimsOnRefresh
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");

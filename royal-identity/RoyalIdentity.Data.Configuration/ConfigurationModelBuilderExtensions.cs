@@ -84,7 +84,6 @@ public static class ConfigurationModelBuilderExtensions
             entity.Property(e => e.RefreshTokenExpiration).HasColumnName("refresh_token_expiration");
             entity.Property(e => e.RefreshTokenPostConsumedTimeToleranceTicks)
                 .HasColumnName("refresh_token_post_consumed_time_tolerance_ticks");
-            entity.Property(e => e.UpdateAccessTokenClaimsOnRefresh).HasColumnName("update_access_token_claims_on_refresh");
             entity.Property(e => e.AllowLogoutWithoutUserConfirmation).HasColumnName("allow_logout_without_user_confirmation");
             entity.Property(e => e.FrontChannelLogoutSessionRequired).HasColumnName("front_channel_logout_session_required");
             entity.Property(e => e.BackChannelLogoutSessionRequired).HasColumnName("back_channel_logout_session_required");

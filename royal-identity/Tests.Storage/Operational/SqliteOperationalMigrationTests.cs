@@ -70,8 +70,14 @@ public class SqliteOperationalMigrationTests
         var configurationApplied = await configuration.Database.GetAppliedMigrationsAsync();
         var operationalApplied = await operational.Database.GetAppliedMigrationsAsync();
 
-        Assert.All(configurationApplied, id => Assert.EndsWith("_InitialConfiguration", id, StringComparison.Ordinal));
-        Assert.All(operationalApplied, id => Assert.EndsWith("_InitialOperational", id, StringComparison.Ordinal));
+        // Each family sees only its own evolution line: no Operational id leaks into the Configuration history
+        // or the other way round, which is the whole point of the split.
+        Assert.Contains(configurationApplied, id => id.EndsWith("_InitialConfiguration", StringComparison.Ordinal));
+        Assert.DoesNotContain(configurationApplied, id => id.EndsWith("_InitialOperational", StringComparison.Ordinal));
+        Assert.Contains(operationalApplied, id => id.EndsWith("_InitialOperational", StringComparison.Ordinal));
+        Assert.All(
+            operationalApplied,
+            id => Assert.EndsWith("_InitialOperational", id, StringComparison.Ordinal));
         Assert.Empty(await configuration.Database.GetPendingMigrationsAsync());
         Assert.Empty(await operational.Database.GetPendingMigrationsAsync());
     }

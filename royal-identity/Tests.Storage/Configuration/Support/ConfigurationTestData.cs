@@ -68,7 +68,6 @@ internal static class ConfigurationTestData
             RequireClientSecret = false,
             RefreshTokenExpiration = TokenExpiration.Sliding,
             RefreshTokenPostConsumedTimeTolerance = TimeSpan.FromSeconds(42),
-            UpdateAccessTokenClaimsOnRefresh = true,
             AllowLogoutWithoutUserConfirmation = true,
             FrontChannelLogoutSessionRequired = false,
             BackChannelLogoutSessionRequired = false,

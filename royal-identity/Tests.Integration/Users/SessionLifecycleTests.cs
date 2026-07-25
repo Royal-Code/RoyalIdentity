@@ -272,8 +272,9 @@ public class SessionLifecycleTests
 
     private static void SeedRefreshToken(FakeSessionStorage storage, string token, string subjectId)
     {
+        // DF41: no identifier of a previous access token — the refresh token never depended on that row.
         storage.RefreshTokens[token] = new RoyalIdentity.Models.Tokens.RefreshToken(
-            subjectId, "sid", "jti", [], "client", "issuer", T0.UtcDateTime, 3600, token);
+            subjectId, "sid", [], "client", "issuer", T0.UtcDateTime, 3600, token);
     }
 
     private sealed class FakeRealmAccessor(RealmModel realm) : ICurrentRealmAccessor

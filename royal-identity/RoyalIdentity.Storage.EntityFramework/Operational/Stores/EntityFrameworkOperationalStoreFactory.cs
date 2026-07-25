@@ -21,6 +21,7 @@ internal sealed class EntityFrameworkOperationalStoreFactory(
     OperationalLookupDigest digest,
     AccessTokenPayloadSerializer accessTokenSerializer,
     AuthorizationCodePayloadSerializer authorizationCodeSerializer,
+    RefreshTokenPayloadSerializer refreshTokenSerializer,
     ConsentPayloadSerializer consentSerializer,
     OperationalPayloadProtection protection,
     TimeProvider clock) : IOperationalStoreFactory
@@ -51,7 +52,11 @@ internal sealed class EntityFrameworkOperationalStoreFactory(
     }
 
     public IOperationalRefreshTokenStore GetRefreshTokenStore(Realm realm)
-        => throw NotYetImplemented("refresh tokens", 5);
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        return new EntityFrameworkRefreshTokenStore(
+            realm, accessor, digest, refreshTokenSerializer, protection);
+    }
 
     public IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm)
         => throw NotYetImplemented("authorize parameters", 6);

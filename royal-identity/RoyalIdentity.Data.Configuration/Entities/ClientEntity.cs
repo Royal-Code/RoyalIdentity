@@ -72,8 +72,6 @@ public class ClientEntity
     /// <summary>Stores <c>RefreshTokenPostConsumedTimeTolerance</c> as <see cref="System.TimeSpan.Ticks"/>.</summary>
     public long RefreshTokenPostConsumedTimeToleranceTicks { get; set; }
 
-    public bool UpdateAccessTokenClaimsOnRefresh { get; set; }
-
     public bool AllowLogoutWithoutUserConfirmation { get; set; }
 
     public bool FrontChannelLogoutSessionRequired { get; set; }

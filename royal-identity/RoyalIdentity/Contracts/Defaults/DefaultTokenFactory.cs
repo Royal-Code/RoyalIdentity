@@ -186,7 +186,10 @@ public class DefaultTokenFactory : ITokenFactory
         var sid = request.User.GetSessionId();
         claims.Add(new Claim(JwtRegisteredClaimNames.Sid, sid));
 
-        claims.AddRange(await tokenClaimsService.GetIdentityTokenClaimsAsync(
+        // DF32: a snapshot renewal reproduces the claims of the grant, so it must not consult the provider here
+        // either — otherwise the identity token and the access token of the same response would disagree about
+        // the user.
+        claims.AddRange(request.SnapshotClaims ?? await tokenClaimsService.GetIdentityTokenClaimsAsync(
             request.User,
             request.Resources,
             client,
@@ -253,22 +256,59 @@ public class DefaultTokenFactory : ITokenFactory
         var issuer = request.HttpContext.GetServerIssuerUri(request.Client.Realm.Options);
         var tokenItSelf = CryptoRandom.CreateUniqueId();
         
+        // DF41: the newly issued access token is an in-memory source only — the grant it carries — and no
+        // identifier of it is persisted. A refresh never depends on that access token's row still existing.
+        var claimsMode = request.Client.Realm.Options.RefreshTokens.ClaimsMode;
+
         var refreshToken = new RefreshToken(
             request.Subject.GetSubjectId(),
             request.Subject.GetSessionId(),
-            request.AccessToken.Id,
             request.AccessToken.Scopes.ToList(),
             client.Id,
             issuer,
             clock.GetUtcNow().UtcDateTime,
-            lifetime, 
-            tokenItSelf);
+            lifetime,
+            tokenItSelf)
+        {
+            // DF32: the mode is captured now, so a later realm change does not reinterpret this token.
+            ClaimsMode = claimsMode,
+        };
 
         refreshToken.ResourceUris.AddRange(request.AccessToken.ResourceUris);
         refreshToken.RealmId = request.Client.Realm.Id;
+
+        // Current keeps only the protocol context needed to rebuild the principal; Snapshot additionally keeps
+        // the emitted claims, so a renewal can reproduce them without consulting the claims provider (DF32).
+        refreshToken.Claims.AddRange(claimsMode is RefreshTokenClaimsMode.Snapshot
+            ? request.AccessToken.Claims.Where(claim => !IsReissuedPerToken(claim.Type))
+            : request.AccessToken.Claims.Where(claim => ProtocolContextClaims.Contains(claim.Type)));
 
         await storage.GetRefreshTokenStore(request.Client.Realm).StoreAsync(refreshToken, ct);
 
         return refreshToken;
     }
+
+    /// <summary>
+    /// The protocol context a renewal needs to rebuild the principal in <c>Current</c> mode: who authenticated,
+    /// when, how and through which provider. Profile claims are deliberately absent — <c>Current</c> asks the
+    /// claims provider for those again on every renewal (DF32).
+    /// </summary>
+    private static readonly HashSet<string> ProtocolContextClaims = new(StringComparer.Ordinal)
+    {
+        JwtRegisteredClaimNames.Sub,
+        JwtRegisteredClaimNames.Sid,
+        JwtRegisteredClaimNames.AuthTime,
+        Jwt.ClaimTypes.IdentityProvider,
+        JwtRegisteredClaimNames.Amr,
+    };
+
+    /// <summary>
+    /// Claims that belong to one token instance and are minted again for every issuance, so keeping them in a
+    /// snapshot would only let a stale value leak into a renewed token.
+    /// </summary>
+    private static bool IsReissuedPerToken(string claimType)
+        => claimType is JwtRegisteredClaimNames.Jti
+            or JwtRegisteredClaimNames.Iat
+            or JwtRegisteredClaimNames.Exp
+            or JwtRegisteredClaimNames.Nbf;
 }

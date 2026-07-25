@@ -48,7 +48,6 @@ public sealed class RefreshTokenPayloadSerializer
         var token = new RefreshToken(
             ClaimValue(payload.Claims, JwtRegisteredClaimNames.Sub),
             ClaimValue(payload.Claims, JwtRegisteredClaimNames.Sid),
-            ClaimValue(payload.Claims, JwtRegisteredClaimNames.Jti),
             [.. payload.RequestedScopes],
             identity.ClientId,
             payload.Issuer,
@@ -62,7 +61,7 @@ public sealed class RefreshTokenPayloadSerializer
             AllowedSigningAlgorithms = [.. payload.AllowedSigningAlgorithms],
         };
 
-        // The constructor seeds sub/sid/jti; the persisted claim set is the authority, so it replaces them
+        // The constructor seeds sub/sid; the persisted claim set is the authority, so it replaces them
         // wholesale and the round-trip cannot gain or lose a claim.
         token.Claims.Clear();
         foreach (var claim in payload.Claims)

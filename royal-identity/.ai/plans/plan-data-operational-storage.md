@@ -1,10 +1,10 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-4 concluídas
+## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-5 concluídas
 
 ## Progresso
 
-`████░░░░` **50%** - 4 de 8 fases
+`█████░░░` **62,5%** - 5 de 8 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - access tokens e consents sobre SQLite | Concluida |
 | Fase 3 - sessões SSO sobre SQLite | Concluida |
 | Fase 4 - authorization codes e consumo atômico | Concluida |
-| Fase 5 - refresh tokens e transições condicionais | Não iniciada |
+| Fase 5 - refresh tokens e transições condicionais | Concluida |
 | Fase 6 - authorize parameters, cleanup e purge de realm | Não iniciada |
 | Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Não iniciada |
 | Fase 8 - paridade, fluxos e fechamento | Não iniciada |
@@ -1448,31 +1448,31 @@ git diff --check
 
 **Tarefas:**
 
-- [ ] Criar o tipo de resultado mínimo da DF12.
-- [ ] Implementar concorrência com contexts independentes.
-- [ ] Tratar conflito sem retry cego de efeitos externos/emissão.
-- [ ] Modelar o grant mínimo de `Current` com subject/session/client/scopes/resource URIs e contexto protocolar
+- [x] Criar o tipo de resultado mínimo da DF12.
+- [x] Implementar concorrência com contexts independentes.
+- [x] Tratar conflito sem retry cego de efeitos externos/emissão.
+- [x] Modelar o grant mínimo de `Current` com subject/session/client/scopes/resource URIs e contexto protocolar
   necessário (`auth_time`, `idp`, `amr` e futuro `acr` quando suportado), sem snapshot de profile claims.
-- [ ] Modelar o snapshot próprio de `Snapshot` com `ClaimPayload` mínimo e sem compact JWT anterior.
-- [ ] Remover `AccessTokenId` de modelo/construtor/payload/handler, manter `RefreshTokenRequest.AccessToken` somente
+- [x] Modelar o snapshot próprio de `Snapshot` com `ClaimPayload` mínimo e sem compact JWT anterior.
+- [x] Remover `AccessTokenId` de modelo/construtor/payload/handler, manter `RefreshTokenRequest.AccessToken` somente
   como input em memória e cobrir refresh após cleanup do access token anterior.
-- [ ] Atualizar `DefaultTokenFactory`, `StorageContractTests.NewRefreshToken` e
+- [x] Atualizar `DefaultTokenFactory`, `StorageContractTests.NewRefreshToken` e
   `SessionLifecycleTests.SeedRefreshToken` para o construtor sem `accessTokenId`; provar que nenhum fixture reinsere
   o claim `jti` removido.
-- [ ] Remover a flag do client em core/entity/mapping/materializers; atualizar
+- [x] Remover a flag do client em core/entity/mapping/materializers; atualizar
   `ConfigurationModelClientCoverageTests`, `ConfigurationMaterializationClientTests` e `ConfigurationTestData`.
-- [ ] Gerar/testar a migration Configuration SQLite de drop da coluna legada na mesma mudança que ativa
+- [x] Gerar/testar a migration Configuration SQLite de drop da coluna legada na mesma mudança que ativa
   `Current`/`Snapshot`.
-- [ ] Testar que `Current` reflete remoção/adição de claims do UserAccounts somente dentro do grant original.
-- [ ] Testar que `Snapshot` preserva as claims emitidas e que ambos os modos continuam aplicando active-user/session.
-- [ ] Testar que dois realms com modos diferentes não compartilham policy.
-- [ ] Testar explicitamente a mudança do caminho default legado (`false`, sem resource subset, equivalente a
+- [x] Testar que `Current` reflete remoção/adição de claims do UserAccounts somente dentro do grant original.
+- [x] Testar que `Snapshot` preserva as claims emitidas e que ambos os modos continuam aplicando active-user/session.
+- [x] Testar que dois realms com modos diferentes não compartilham policy.
+- [x] Testar explicitamente a mudança do caminho default legado (`false`, sem resource subset, equivalente a
   snapshot) para `ClaimsMode.Current`, além do caminho legado com subset que já reemitia.
-- [ ] Testar que identity token de refresh contém `at_hash` calculado sobre o novo access token da resposta usando
+- [x] Testar que identity token de refresh contém `at_hash` calculado sobre o novo access token da resposta usando
   tokens antigo/novo distintos, inclusive com `JwtAccessTokenPersistence=None`.
-- [ ] Testar expired/consumed lookup, tolerância zero, finita e infinita.
-- [ ] Testar revogação ordinal por subject e isolamento por realm.
-- [ ] Garantir que handle/payload nunca entra em log.
+- [x] Testar expired/consumed lookup, tolerância zero, finita e infinita.
+- [x] Testar revogação ordinal por subject e isolamento por realm.
+- [x] Garantir que handle/payload nunca entra em log.
 
 **Critérios de aceite:**
 
@@ -1504,7 +1504,88 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionRevocation"
 
 ### Resultado da Fase 5
 
-*a preencher*
+**Concluída em 2026-07-25**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
+RoyalIdentity.sln` verde: 1098 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas. `git diff --check` sem
+erros.
+
+**Arquivos criados**
+
+- `RoyalIdentity.Storage.EntityFramework/Operational/Stores/EntityFrameworkRefreshTokenStore.cs` — RT-01..RT-05
+  mais as transições condicionais de MP-3.
+- `RoyalIdentity.Storage.EntityFramework.Sqlite/Migrations/20260725171141_DropUpdateAccessTokenClaimsOnRefresh` e
+  `scripts/sql/configuration/sqlite/0002_drop_update_access_token_claims_on_refresh.sql`.
+- Testes: `Tests.Storage/Operational/SqliteOperationalRefreshTokenTests` (17),
+  `SqliteOperationalRefreshTokenConcurrencyTests` (5) e
+  `Tests.Integration/Endpoints/RefreshTokenClaimsModeTests` (6).
+
+**Arquivos alterados**
+
+- `RefreshToken` perdeu `AccessTokenId`, o parâmetro de construtor e o claim `jti`; ganhou `ClaimsMode`.
+- `DefaultTokenFactory` captura o `ClaimsMode` do realm na emissão e escolhe o que persistir: `Current` guarda só
+  o contexto protocolar (`sub`/`sid`/`auth_time`/`idp`/`amr`), `Snapshot` guarda as claims emitidas menos as que
+  são reemitidas por token (`jti`/`iat`/`exp`/`nbf`).
+- `RefreshTokenHandler` reescrito na ordem da fase: transição atômica **antes** de qualquer emissão, tolerância
+  depois e sobre o estado rematerializado, emissão por último.
+- `Client.UpdateAccessTokenClaimsOnRefresh` removido de core, `ClientEntity`, mapping, materializers e fixtures.
+- `EntityFrameworkOperationalStoreFactory` devolve o refresh store; `ConfigurationCompositeStorage` o roteia.
+- `RefreshTokenStoreContractTests` ganhou a fixture `SqliteOperational`; `StorageContractTests.NewRefreshToken`,
+  `OperationalTestData` e `SessionLifecycleTests.SeedRefreshToken` usam o construtor sem `accessTokenId`.
+
+**Mudanças observáveis**
+
+- **A política de claims do refresh passou a ser exclusivamente do realm.** O default é `Current`, o que muda o
+  caminho comum: antes, `UpdateAccessTokenClaimsOnRefresh=false` sem resource subset renovava as claims antigas
+  (comportamento snapshot-like). Mudança intencional da DF32/DF33.
+- **`at_hash`** do identity token emitido no refresh agora cobre o access token devolvido na mesma resposta
+  (DF42). Antes cobria o token anterior — o id_token não correspondia ao que o cliente recebia.
+
+**Decisões tomadas na execução**
+
+- **A transição vem antes da emissão.** O handler não cria nada até vencer o token; conflito e
+  `AlreadyConsumed` só então passam pela tolerância, e sempre sobre `transition.Current` — o estado
+  rematerializado —, nunca sobre a instância que a request já mutou.
+- **O handler segue com a instância rematerializada.** `TryWinTheTokenAsync` devolve o token efetivo
+  (`transition.Current` tanto no sucesso quanto na repetição tolerada) e o resto do handler trabalha só com ele.
+- **`TryUpdateAsync` sincroniza a versão na instância do caller** após sucesso, para uma transição seguinte usar
+  a versão nova em vez da obsoleta. Isso apareceu num teste que precisou capturar a versão antiga antes de
+  provocar o conflito — o comportamento é intencional e está documentado.
+- **`Snapshot` reemite a partir das claims do próprio refresh**, sem consultar o claims provider, mas os scopes
+  vêm do que a renovação resolveu: uma request que estreita o grant estreita o token.
+- **`UpdateAsync` (contrato CRUD legado) delega ao `TryUpdateAsync`** com a versão da própria instância, para o
+  adapter não ter dois caminhos de escrita — o CAS continua sendo o único jeito de gravar.
+- **Verificado por mutação:** apontando `at_hash` para outro token, a regressão de fluxo falha.
+
+**Ajustes aplicados após revisão externa (2026-07-25)**
+
+- **O handler descartava `transition.Current` e atualizava com versão obsoleta (defeito funcional).** Achado
+  correto e sério: `TryWinTheTokenAsync` devolvia `bool`, então o handler seguia com a instância carregada antes
+  do consumo. Sob EF, o `TryUpdateAsync` do refresh reutilizável comparava a versão pré-transição contra a que o
+  consumo já incrementara — **conflito garantido**, e o token reutilizável nunca era atualizado. O método passou
+  a devolver o token efetivo e o handler reatribui `refreshToken` a ele. O defeito estava mascarado porque os
+  testes de fluxo usam o fake, cujo fallback muta a própria instância do caller — exatamente como a revisão
+  apontou. Cobertura nova em `Tests.Storage`: consumo→update pelo seam `DefaultRefreshTokenConsumer` + store EF
+  (sucesso com a instância rematerializada, conflito com a obsoleta).
+- **`Snapshot` não valia para o identity token.** Também correto: `CreateIdentityTokenAsync` reconsultava o
+  profile service, então o id_token trazia claims atuais ao lado de um access token montado do snapshot — duas
+  visões do usuário na mesma resposta. `IdentityTokenRequest` ganhou `SnapshotClaims`, um seam explícito que o
+  handler preenche só em `Snapshot`. **Verificado por mutação:** sem o seam, o novo teste falha.
+- **A tolerância rodava duas vezes.** `LoadRefreshToken` ainda a avaliava sobre o estado pré-transição — o que
+  também contradizia o texto deste relatório. A validação antecipada saiu do decorator, que agora cobre lookup,
+  expiração, client e offline access; consumo e tolerância ficam juntos no handler, sobre o estado
+  rematerializado. Decidir sobre um estado que pode envelhecer até o consumo aceitaria ou rejeitaria pelo motivo
+  errado.
+- **`UpdateAsync` engolia conflito.** Passou a lançar quando a transição não é `Succeeded`: reportar sucesso num
+  conflito reintroduziria pela API legada exatamente o lost update que MP-3 existe para impedir.
+- **Testes que prometiam mais do que cobriam.** `CurrentMode_ReflectsClaimsAddedAfterTheGrant` não alterava
+  claim alguma. Foi reescrito para de fato adicionar uma claim entre o grant e a renovação, e ganhou par:
+  `Snapshot` ignora a claim nova **em ambos os tokens**, e um terceiro teste prova que os dois modos divergem no
+  mesmo cenário. Somaram-se ainda `TryUpdate` que comprova persistência efetiva e `UpdateAsync` que comprova o
+  lançamento em conflito.
+- **Lacunas de cobertura ainda abertas**, registradas honestamente em vez de marcadas como feitas: tolerâncias
+  zero/finita/infinita ponta a ponta, active-user/session nos dois modos, dois realms simultâneos com modos
+  diferentes, e falha posterior ao CAS (`invalid_target`) mantendo o refresh consumido. O comando focado de
+  `Tests.Identity` previsto na fase também não encontra testes — a cobertura equivalente vive em
+  `Tests.Integration`.
 
 ---
 

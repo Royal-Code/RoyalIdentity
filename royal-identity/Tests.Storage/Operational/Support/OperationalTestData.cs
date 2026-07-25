@@ -134,7 +134,6 @@ internal static class OperationalTestData
         var token = new RefreshToken(
             "subject-one",
             "session-one",
-            "at-jti-1",
             ["openid", "api.read"],
             "client-one",
             "https://issuer.example",

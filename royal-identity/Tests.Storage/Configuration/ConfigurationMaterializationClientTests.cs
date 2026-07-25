@@ -54,7 +54,6 @@ public class ConfigurationMaterializationClientTests
         Assert.Equal(original.RequireClientSecret, loaded.RequireClientSecret);
         Assert.Equal(original.RefreshTokenExpiration, loaded.RefreshTokenExpiration);
         Assert.Equal(original.RefreshTokenPostConsumedTimeTolerance, loaded.RefreshTokenPostConsumedTimeTolerance);
-        Assert.Equal(original.UpdateAccessTokenClaimsOnRefresh, loaded.UpdateAccessTokenClaimsOnRefresh);
         Assert.Equal(original.AllowLogoutWithoutUserConfirmation, loaded.AllowLogoutWithoutUserConfirmation);
         Assert.Equal(original.FrontChannelLogoutSessionRequired, loaded.FrontChannelLogoutSessionRequired);
         Assert.Equal(original.BackChannelLogoutSessionRequired, loaded.BackChannelLogoutSessionRequired);

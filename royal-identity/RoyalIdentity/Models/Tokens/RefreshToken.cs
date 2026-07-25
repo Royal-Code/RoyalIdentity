@@ -8,7 +8,6 @@ public class RefreshToken: TokenBase
     public RefreshToken(
         string subjectId,
         string sessionId,
-        string accessTokenId,
         ICollection<string> requestedScopes,
         string clientId,
         string issuer,
@@ -18,15 +17,9 @@ public class RefreshToken: TokenBase
     {
         Claims.Add(new Claim(JwtRegisteredClaimNames.Sub, subjectId));
         Claims.Add(new Claim(JwtRegisteredClaimNames.Sid, sessionId));
-        Claims.Add(new Claim(JwtRegisteredClaimNames.Jti, accessTokenId));
 
         RequestedScopes = requestedScopes;
     }
-
-    /// <summary>
-    /// Gets the access token id (jit).
-    /// </summary>
-    public string? AccessTokenId => Claims.Where(x => x.Type == JwtRegisteredClaimNames.Jti).Select(x => x.Value).SingleOrDefault();
 
     /// <summary>
     /// Gets or sets the requested scopes.
@@ -35,6 +28,22 @@ public class RefreshToken: TokenBase
     /// The requested scopes.
     /// </value>
     public ICollection<string> RequestedScopes { get; }
+
+    /// <summary>
+    /// <para>
+    ///     Where the claims of a token renewed with this refresh token come from
+    ///     (plan-data-operational-storage DF32). It is captured when the token is issued, from the realm policy
+    ///     in force at that moment, so changing <c>RealmOptions.RefreshTokens.ClaimsMode</c> later never
+    ///     reinterprets tokens that already exist.
+    /// </para>
+    /// <para>
+    ///     <see cref="RefreshTokenClaimsMode.Current"/> keeps only the minimal grant here and re-runs issuance
+    ///     against the current claims; <see cref="RefreshTokenClaimsMode.Snapshot"/> keeps in
+    ///     <see cref="TokenBase.Claims"/> everything needed to reproduce the emitted claims. Neither depends on
+    ///     the row of the access token that was issued alongside it (DF41).
+    /// </para>
+    /// </summary>
+    public RefreshTokenClaimsMode ClaimsMode { get; set; } = RefreshTokenClaimsMode.Current;
 
     /// <summary>
     /// RFC 8707 protected resource URIs authorized for refresh-token renewal.

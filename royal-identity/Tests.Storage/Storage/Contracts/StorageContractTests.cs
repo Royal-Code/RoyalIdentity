@@ -86,7 +86,8 @@ public abstract class StorageContractTests
     protected static RefreshToken NewRefreshToken(
         Realm realm, string handle, string subjectId, string clientId,
         DateTime? creationTime = null, int lifetime = 3600)
-        => new(subjectId, $"sid-{handle}", $"jti-{handle}", ["openid"], clientId, "https://issuer.contract.test",
+        // DF41: no accessTokenId — a refresh token never carried an identifier of the access token issued with it.
+        => new(subjectId, $"sid-{handle}", ["openid"], clientId, "https://issuer.contract.test",
             creationTime ?? Start, lifetime, handle)
         {
             RealmId = realm.Id,

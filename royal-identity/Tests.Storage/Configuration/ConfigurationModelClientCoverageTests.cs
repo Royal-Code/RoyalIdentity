@@ -43,7 +43,6 @@ public class ConfigurationModelClientCoverageTests
         [nameof(Client.RequireClientSecret)] = "column: require_client_secret",
         [nameof(Client.RefreshTokenExpiration)] = "column: refresh_token_expiration (enum as int)",
         [nameof(Client.RefreshTokenPostConsumedTimeTolerance)] = "column: refresh_token_post_consumed_time_tolerance_ticks",
-        [nameof(Client.UpdateAccessTokenClaimsOnRefresh)] = "column: update_access_token_claims_on_refresh",
         [nameof(Client.AllowLogoutWithoutUserConfirmation)] = "column: allow_logout_without_user_confirmation",
         [nameof(Client.FrontChannelLogoutSessionRequired)] = "column: front_channel_logout_session_required",
         [nameof(Client.BackChannelLogoutSessionRequired)] = "column: back_channel_logout_session_required",
