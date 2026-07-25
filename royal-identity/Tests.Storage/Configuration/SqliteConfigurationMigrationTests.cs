@@ -42,9 +42,12 @@ public class SqliteConfigurationMigrationTests
         var tables = new List<string>();
         await using (var command = database.Connection.CreateCommand())
         {
+            // Only EF's own bookkeeping is excluded — by the names of the DF23 topology, so an unexpected
+            // business table (Operational, resources) would still surface here.
             command.CommandText =
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' " +
-                "AND name NOT IN ('__EFMigrationsHistory', '__EFMigrationsLock') ORDER BY name;";
+                "AND name NOT IN ('__ConfigurationMigrationsHistory', '__OperationalMigrationsHistory', " +
+                "'__EFMigrationsHistory', '__EFMigrationsLock') ORDER BY name;";
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 tables.Add(reader.GetString(0));

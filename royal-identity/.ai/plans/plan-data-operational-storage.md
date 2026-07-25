@@ -1,15 +1,15 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fase 1 concluída
+## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-2 concluídas
 
 ## Progresso
 
-`█░░░░░░░` **12,5%** - 1 de 8 fases
+`██░░░░░░` **25%** - 2 de 8 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contratos, fronteiras e modelo Operational | Concluida |
-| Fase 2 - access tokens e consents sobre SQLite | Não iniciada |
+| Fase 2 - access tokens e consents sobre SQLite | Concluida |
 | Fase 3 - sessões SSO sobre SQLite | Não iniciada |
 | Fase 4 - authorization codes e consumo atômico | Não iniciada |
 | Fase 5 - refresh tokens e transições condicionais | Não iniciada |
@@ -1041,29 +1041,29 @@ git diff --check
 
 **Tarefas:**
 
-- [ ] Aplicar collation/índices SQLite compatíveis com comparação Ordinal.
-- [ ] Configurar e testar as histories SQLite de Configuration/Operational, inclusive no mesmo banco.
-- [ ] Atualizar runner, design-time factories e fixtures SQLite para consumir a mesma configuração centralizada de
+- [x] Aplicar collation/índices SQLite compatíveis com comparação Ordinal.
+- [x] Configurar e testar as histories SQLite de Configuration/Operational, inclusive no mesmo banco.
+- [x] Atualizar runner, design-time factories e fixtures SQLite para consumir a mesma configuração centralizada de
   history.
-- [ ] Atualizar `SqliteConfigurationMigrationTests.Migrate_CreatesOnlyTheConfigurationTables` para excluir
+- [x] Atualizar `SqliteConfigurationMigrationTests.Migrate_CreatesOnlyTheConfigurationTables` para excluir
   `__ConfigurationMigrationsHistory`/`__OperationalMigrationsHistory` conforme o banco exercitado, sem mascarar
   tabelas de negócio inesperadas.
-- [ ] Testar bootstrap SQLite: banco vazio; somente history legada; somente history nova; histories legada e nova
+- [x] Testar bootstrap SQLite: banco vazio; somente history legada; somente history nova; histories legada e nova
   simultâneas/ambíguas; repetição idempotente.
-- [ ] Implementar materialização completa de `AccessToken` e `Consent`.
-- [ ] Testar que `lookup_digest` de access token deriva sempre de `jti` em Reference/Metadata/Full; compact JWT
+- [x] Implementar materialização completa de `AccessToken` e `Consent`.
+- [x] Testar que `lookup_digest` de access token deriva sempre de `jti` em Reference/Metadata/Full; compact JWT
   diferente de `jti` nunca participa da PK.
-- [ ] Provar que não existe coluna de `jti` bruto, que o bearer reference não entra em seu payload e que
+- [x] Provar que não existe coluna de `jti` bruto, que o bearer reference não entra em seu payload e que
   `GetAsync(jti)` rematerializa `AccessToken.Id`/`Token` a partir do argumento; eventual `jti` dentro do compact JWT
   permanece apenas no payload protegido de `Full`.
-- [ ] Cobrir revogação por token bruto: reference encontra/remove seu artifact; JWT metadata/full permanece sem
+- [x] Cobrir revogação por token bruto: reference encontra/remove seu artifact; JWT metadata/full permanece sem
   revogação stateful e a resposta RFC 7009 continua indistinguível.
-- [ ] Testar realms simultâneos com profiles de proteção e modos JWT diferentes sem cruzamento de policy/chaves.
-- [ ] Mapear expiration como dado, sem query filter.
-- [ ] Implementar remove em lote com contagem/efeito definido pela matriz.
-- [ ] Testar ids colidentes entre realms e casings diferentes.
-- [ ] Testar mutação do objeto materializado sem persistência implícita.
-- [ ] Testar `CancellationToken` pré-cancelado e propagado ao comando EF.
+- [x] Testar realms simultâneos com profiles de proteção e modos JWT diferentes sem cruzamento de policy/chaves.
+- [x] Mapear expiration como dado, sem query filter.
+- [x] Implementar remove em lote com contagem/efeito definido pela matriz.
+- [x] Testar ids colidentes entre realms e casings diferentes.
+- [x] Testar mutação do objeto materializado sem persistência implícita.
+- [x] Testar `CancellationToken` pré-cancelado e propagado ao comando EF.
 
 **Critérios de aceite:**
 
@@ -1087,7 +1087,71 @@ dotnet test Tests.Architecture
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída em 2026-07-25.** `dotnet build RoyalIdentity.sln` e `dotnet test RoyalIdentity.sln` verdes: 975
+aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas. `git diff --check` sem erros.
+
+**Arquivos criados**
+
+- `RoyalIdentity.Storage.EntityFramework.Sqlite/` — `SqliteOperationalModelBuilderExtensions`
+  (`ApplyRoyalIdentityOperationalSqliteMappings`, com `BINARY` em todo identificador que sustenta chave, índice
+  ou filtro de igualdade), `OperationalSqliteDbContext`, `OperationalSqliteDesignTimeDbContextFactory`,
+  `SqliteMigrationsHistoryExtensions` (`UseConfigurationMigrationsHistory`/`UseOperationalMigrationsHistory`),
+  `SqliteMigrationsHistoryBootstrap` e `OperationalMigrations/20260725030157_InitialOperational`.
+- `RoyalIdentity.Storage.EntityFramework/Operational/Stores/` — `EntityFrameworkAccessTokenStore`,
+  `EntityFrameworkUserConsentStore` e `EntityFrameworkOperationalStoreFactory`.
+- `scripts/sql/operational/sqlite/0001_initial_operational.sql` e
+  `scripts/sql/migration-history/sqlite/0001_relocate_legacy_configuration_history.sql`.
+- Testes: `Tests.Storage/Operational/` — `SqliteOperationalAccessTokenTests` (17),
+  `SqliteOperationalConsentTests` (10), `SqliteOperationalMigrationTests` (10) e
+  `Support/` (`SqliteOperationalDatabase`, `SqliteOperationalStorageHarness`).
+
+**Arquivos alterados**
+
+- `AccessTokenPayloadSerializer.Serialize` recebe `persistCompactToken`, para o store expressar a diferença entre
+  `Metadata` e `Full` sem que o serializer conheça a option do realm.
+- `OperationalServiceCollectionExtensions` registra `IOperationalStoreFactory`.
+- `ConfigurationMigrationRunner` roda o bootstrap da history legada **antes** de `MigrateAsync` e passa a
+  configurar a history de Configuration pela topologia centralizada; `ConfigurationSqliteDesignTimeDbContextFactory`
+  idem, e o script SQL de Configuration foi regenerado (migrations já publicadas não foram reescritas).
+- `StorageContractHarness` ganhou o hook `ConfigureRealmOptions`; `ConfigurationCompositeStorage` aceita um
+  `IOperationalStoreFactory` opcional e roteia a ele os stores que a fase entregou.
+- `AccessTokenStoreContractTests`/`UserConsentStoreContractTests` ganharam a fixture `SqliteOperational`.
+- `SqliteConfigurationDatabase`, `SqliteConfigurationStorageHarness`, `ConfigurationMigrationRunnerTests` e
+  `SqliteConfigurationMigrationTests` passaram a usar a history nova.
+- `ConfigurationStorageBoundaryTests` reflete o provider SQLite com três project references e reforça que nenhum
+  provider referencia o core.
+
+**Decisões tomadas na execução**
+
+- **A fixture do harness liga `JwtAccessTokenPersistence=Full`.** Os contratos provider-neutral emitem access
+  tokens JWT, e um realm em default de produto (`None`) não persistiria nenhum — não haveria linha para AT-02 ler.
+  Os contratos descrevem o store, então a composição escolhe um realm que persiste; os três modos em si têm
+  aceites dedicados que os setam explicitamente.
+- **Reference token nunca persiste seu token string, mesmo em `Full`.** O store passa `persistCompactToken: false`
+  para `Reference` em vez de confiar na comparação `Token == Id`: se o modelo divergir, o bearer continua fora do
+  payload, e `Id`/`Token` sempre voltam do argumento de lookup (DF13).
+- **Upsert de consent é update → insert → update.** Provider-neutral, sem SQL específico: a chave composta é a
+  autoridade que impede duplicata, e o segundo update cobre o writer que perdeu a corrida do insert. O aceite
+  correspondente prova a convergência para uma linha; **concorrência real de múltiplas conexões continua reservada
+  às primitivas atômicas das Fases 4/5**, e a fixture SQLite compartilha uma conexão.
+- **`EntityFrameworkOperationalStoreFactory` lança `NotSupportedException` nomeando a fase** para sessões, codes,
+  refresh e AP. Nada em produção alcança esses membros porque o gateway EF completo só é composto na Fase 6
+  (DF21), e o composite de teste só roteia ao EF o que a fase entregou.
+- **O script SQL manual de bootstrap é explicitamente two-step.** SQLite não tem DDL condicional; a versão
+  idempotente e à prova dos quatro estados é a automatizada (`SqliteMigrationsHistoryBootstrap`), usada pelo
+  runner e coberta por teste.
+
+**Comandos executados**
+
+```powershell
+dotnet build RoyalIdentity.sln
+dotnet ef migrations add InitialOperational --project RoyalIdentity.Storage.EntityFramework.Sqlite --context OperationalSqliteDbContext --output-dir OperationalMigrations
+dotnet ef migrations script --project RoyalIdentity.Storage.EntityFramework.Sqlite --context OperationalSqliteDbContext
+dotnet test Tests.Architecture
+dotnet test Tests.Storage --filter "FullyQualifiedName~AccessToken|FullyQualifiedName~Consent|FullyQualifiedName~SqliteOperational"
+dotnet test RoyalIdentity.sln
+git diff --check
+```
 
 ---
 

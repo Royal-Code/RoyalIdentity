@@ -156,4 +156,10 @@ public abstract class AccessTokenStoreContractTests : StorageContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
     }
+
+    public sealed class SqliteOperational : AccessTokenStoreContractTests
+    {
+        protected override Task<StorageContractHarness> CreateHarnessAsync()
+            => Operational.Support.SqliteOperationalStorageHarness.CreateAsync();
+    }
 }

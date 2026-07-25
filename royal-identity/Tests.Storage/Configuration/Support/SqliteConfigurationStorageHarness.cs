@@ -13,6 +13,7 @@ using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Stores;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
+using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 using RoyalIdentity.Storage.InMemory;
@@ -63,6 +64,9 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
 
     public override Realm InternalRealm => internalRealm;
 
+    /// <summary>The harness scope, so a specialization can resolve the ports its provider registered.</summary>
+    internal IServiceProvider ScopedServices => scope.ServiceProvider;
+
     internal TContext DbContext => scope.ServiceProvider.GetRequiredService<TContext>();
 
     internal IConfigurationStoreFactory ConfigurationStores
@@ -71,7 +75,8 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
     protected static async Task<THarness> CreateCoreAsync<THarness>(
         IAsyncDisposable database,
         Action<ServiceCollection> configureProvider,
-        Func<HarnessState, THarness> createHarness)
+        Func<HarnessState, THarness> createHarness,
+        Action<RealmOptions>? configureRealmOptions = null)
         where THarness : ConfigurationStorageHarness<TContext>
     {
         var clock = new FakeClock(Start);
@@ -105,19 +110,24 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
                 UpdatedAtUtc = Start,
             });
 
+            var internalRealmOptions = new RealmOptions(serverOptions);
+            configureRealmOptions?.Invoke(internalRealmOptions);
             var internalRealm = new Realm(
                 "contract-internal",
                 "internal.contract.test",
                 "contract-internal",
                 "Contract Internal Realm",
                 true,
-                new RealmOptions(serverOptions));
+                internalRealmOptions);
             var realmPayload = realmSerializer.Serialize(internalRealm.Options);
             context.Realms.Add(ToEntity(internalRealm, realmPayload));
             await context.SaveChangesAsync();
 
             var factory = scope.ServiceProvider.GetRequiredService<IConfigurationStoreFactory>();
-            var storage = new ConfigurationCompositeStorage(factory, serverOptions, clock);
+            // Present only when the fixture registered the Operational family; the Configuration-only fixture
+            // keeps every Operational member in memory.
+            var operational = scope.ServiceProvider.GetService<IOperationalStoreFactory>();
+            var storage = new ConfigurationCompositeStorage(factory, serverOptions, clock, operational);
             storage.EnsureRealm(internalRealm.Id);
 
             var harness = createHarness(new HarnessState(
@@ -221,18 +231,27 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
             => resourceServers.GetOrAdd(realmId, _ => new(StringComparer.Ordinal))[server.Name] = server;
     }
 
+    /// <summary>
+    /// Composes the EF stores that already exist with test-local dictionaries for the ones that do not, so the
+    /// provider-neutral contracts run unchanged while the Operational family lands phase by phase. Passing no
+    /// <see cref="IOperationalStoreFactory"/> keeps every Operational member in memory (the Configuration-only
+    /// fixture of Plano 2); passing one routes the stores that phase delivered to EF.
+    /// </summary>
     protected sealed class ConfigurationCompositeStorage : IStorage
     {
         private readonly IConfigurationStoreFactory configuration;
+        private readonly IOperationalStoreFactory? operational;
         private readonly ConcurrentDictionary<string, RealmOperationalData> realmData = new(StringComparer.Ordinal);
         private readonly TimeProvider clock;
 
         public ConfigurationCompositeStorage(
             IConfigurationStoreFactory configuration,
             ServerOptions serverOptions,
-            TimeProvider clock)
+            TimeProvider clock,
+            IOperationalStoreFactory? operational = null)
         {
             this.configuration = configuration;
+            this.operational = operational;
             this.clock = clock;
             ServerOptions = new ServerOptions(serverOptions);
             Realms = new CoordinatedRealmStore(configuration.Realms, EnsureRealm, RemoveRealm);
@@ -252,8 +271,9 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
         /// </summary>
         public IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm) => authorizeParameters;
 
+        // Fase 2 delivered these two over EF; the rest still come from the transitional dictionaries.
         public IAccessTokenStore GetAccessTokenStore(Realm realm)
-            => new AccessTokenStore(GetData(realm).AccessTokens);
+            => operational?.GetAccessTokenStore(realm) ?? new AccessTokenStore(GetData(realm).AccessTokens);
 
         public IRefreshTokenStore GetRefreshTokenStore(Realm realm)
             => new RefreshTokenStore(GetData(realm).RefreshTokens);
@@ -262,7 +282,7 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
             => new AuthorizationCodeStore(GetData(realm).AuthorizationCodes);
 
         public IUserConsentStore GetUserConsentStore(Realm realm)
-            => new UserConsentStore(GetData(realm).Consents);
+            => operational?.GetUserConsentStore(realm) ?? new UserConsentStore(GetData(realm).Consents);
 
         public IKeyStore GetKeyStore(Realm realm)
             => configuration.GetKeyStore(realm);
@@ -360,7 +380,8 @@ internal sealed class SqliteConfigurationStorageHarness
             database,
             services =>
             {
-                services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(database.Connection));
+                services.AddDbContext<ConfigurationSqliteDbContext>(options => options
+                    .UseSqlite(database.Connection, sqlite => sqlite.UseConfigurationMigrationsHistory()));
                 services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
             },
             state => new SqliteConfigurationStorageHarness(state));

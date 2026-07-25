@@ -53,18 +53,30 @@ public abstract class StorageContractHarness : IAsyncDisposable
     public abstract ValueTask DisposeAsync();
 
     /// <summary>
+    /// Hook for a backing whose realms need options the contracts do not set themselves — for instance an
+    /// Operational provider that must persist JWT access tokens for the AT-* scenarios to have a row to read.
+    /// The default leaves the realm at product defaults.
+    /// </summary>
+    protected virtual void ConfigureRealmOptions(RealmOptions options)
+    {
+    }
+
+    /// <summary>
     /// Creates and persists a new non-internal realm through the public contract (RL-06), so the scenario
     /// exercises the same path a provider must support.
     /// </summary>
     public async Task<Realm> CreateRealmAsync(string suffix)
     {
+        var options = new RealmOptions(Storage.ServerOptions);
+        ConfigureRealmOptions(options);
+
         var realm = new Realm(
             $"contract-realm-{suffix}",
             $"{suffix}.contract.test",
             $"contract-{suffix}",
             $"Contract Realm {suffix}",
             false,
-            new RealmOptions(Storage.ServerOptions));
+            options);
 
         await Storage.Realms.SaveAsync(realm);
         return realm;

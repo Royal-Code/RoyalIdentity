@@ -197,6 +197,45 @@ public class ConfigurationMigrationRunnerTests
         }
     }
 
+    /// <summary>
+    /// Operational plan DF23: a database left by Plano 2 carries EF's default history. The runner must relocate
+    /// it before EF consults the newly configured one — otherwise the history reads as empty and the run tries
+    /// to recreate tables that already exist.
+    /// </summary>
+    [Fact]
+    public async Task Runner_OnALegacyDatabase_RelocatesTheHistoryAndDoesNotReapplyMigrations()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"royalidentity-legacy-{Guid.NewGuid():N}.db");
+        var connectionString = $"Data Source={databasePath};Pooling=False";
+        try
+        {
+            // A database exactly as Plano 2 left it: migrated under EF's default history name.
+            await using (var legacy = new ConfigurationSqliteDbContext(
+                new DbContextOptionsBuilder<ConfigurationSqliteDbContext>().UseSqlite(connectionString).Options))
+            {
+                await legacy.Database.MigrateAsync();
+            }
+
+            await ConfigurationMigrationRunner.RunAsync(new MigrationRunnerOptions
+            {
+                ConfigurationProvider = ConfigurationDatabaseProvider.Sqlite,
+                ConfigurationConnection = connectionString,
+                Seed = ConfigurationSeedMode.None,
+            });
+
+            await using var context = Context(databasePath);
+            Assert.Empty(await context.Database.GetPendingMigrationsAsync());
+            Assert.Contains(
+                await context.Database.GetAppliedMigrationsAsync(),
+                id => id.EndsWith("_InitialConfiguration", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (File.Exists(databasePath))
+                File.Delete(databasePath);
+        }
+    }
+
     private static MigrationRunnerOptions Options(
         string databasePath,
         ConfigurationSeedMode seed,
@@ -214,9 +253,13 @@ public class ConfigurationMigrationRunnerTests
     private static ConfigurationProductSeedOptions ProductSeedOptions()
         => new() { ServerAdminRedirectUris = ProductRedirectUris };
 
+    // The verification context reads the same centralized history the runner writes (Operational plan DF23);
+    // otherwise it would look at EF's default table and report every applied migration as still pending.
     private static ConfigurationSqliteDbContext Context(string databasePath)
         => new(new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
-            .UseSqlite($"Data Source={databasePath};Pooling=False")
+            .UseSqlite(
+                $"Data Source={databasePath};Pooling=False",
+                sqlite => sqlite.UseConfigurationMigrationsHistory())
             .Options);
 
     private static KeyParameters ToKey(SigningKeyEntity row, string material)

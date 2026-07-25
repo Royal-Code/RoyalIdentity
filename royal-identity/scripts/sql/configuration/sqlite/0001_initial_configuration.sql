@@ -1,5 +1,5 @@
-﻿CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
-    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+﻿CREATE TABLE IF NOT EXISTS "__ConfigurationMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___ConfigurationMigrationsHistory" PRIMARY KEY,
     "ProductVersion" TEXT NOT NULL
 );
 
@@ -120,7 +120,7 @@ CREATE UNIQUE INDEX "ux_realms_path" ON "realms" ("path");
 
 CREATE INDEX "ix_signing_keys_realm_created" ON "signing_keys" ("realm_id", "created_utc");
 
-INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+INSERT INTO "__ConfigurationMigrationsHistory" ("MigrationId", "ProductVersion")
 VALUES ('20260722164339_InitialConfiguration', '10.0.10');
 
 COMMIT;

@@ -36,8 +36,10 @@ internal sealed class SqliteConfigurationDatabase : IConfigurationTestDatabase<C
 
     public ConfigurationSqliteDbContext NewContext()
     {
+        // The history table comes from the centralized topology (Operational plan DF23), the same one the
+        // runner and the design-time factory use, so the fixture cannot drift from production.
         var options = new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
-            .UseSqlite(connection)
+            .UseSqlite(connection, sqlite => sqlite.UseConfigurationMigrationsHistory())
             .Options;
 
         return new ConfigurationSqliteDbContext(options);
@@ -45,7 +47,8 @@ internal sealed class SqliteConfigurationDatabase : IConfigurationTestDatabase<C
 
     public void AddStorage(ServiceCollection services)
     {
-        services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(connection));
+        services.AddDbContext<ConfigurationSqliteDbContext>(options => options
+            .UseSqlite(connection, sqlite => sqlite.UseConfigurationMigrationsHistory()));
         services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
     }
 

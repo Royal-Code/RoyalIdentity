@@ -18,7 +18,14 @@ public sealed class AccessTokenPayloadSerializer
     private readonly OperationalPayloadCodec<AccessTokenPayload> codec =
         new(nameof(AccessToken), CurrentVersion);
 
-    public (int Version, string Json) Serialize(AccessToken token)
+    /// <param name="token">The token to serialize.</param>
+    /// <param name="persistCompactToken">
+    /// Whether the compact JWT belongs in the payload. Only <c>JwtAccessTokenPersistence.Full</c> asks for it;
+    /// <c>Metadata</c> keeps the queryable graph without the bearer (plan DF31). A reference token never
+    /// persists its token string either way, because it coincides with the <c>jti</c> lookup argument
+    /// (plan DF13/DF38).
+    /// </param>
+    public (int Version, string Json) Serialize(AccessToken token, bool persistCompactToken = true)
     {
         ArgumentNullException.ThrowIfNull(token);
 
@@ -27,9 +34,9 @@ public sealed class AccessTokenPayloadSerializer
             Issuer = token.Issuer,
             TokenType = token.TokenType,
             Confirmation = token.Confirmation,
-            // DF13/DF38: the reference bearer coincides with the jti, which is the lookup argument, so it is
-            // never copied here. Only a compact JWT — which differs from the jti — is persisted.
-            Token = string.Equals(token.Token, token.Id, StringComparison.Ordinal) ? null : token.Token,
+            Token = persistCompactToken && !string.Equals(token.Token, token.Id, StringComparison.Ordinal)
+                ? token.Token
+                : null,
             Audiences = [.. token.Audiences],
             AllowedSigningAlgorithms = [.. token.AllowedSigningAlgorithms],
             ResourceUris = [.. token.ResourceUris],

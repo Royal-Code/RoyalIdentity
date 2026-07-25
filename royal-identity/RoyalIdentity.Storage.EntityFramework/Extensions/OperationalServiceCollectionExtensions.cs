@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using RoyalIdentity.Storage.EntityFramework.Operational;
 using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Operational.Protection;
+using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 
 namespace RoyalIdentity.Storage.EntityFramework.Extensions;
 
@@ -41,6 +42,7 @@ public static class OperationalServiceCollectionExtensions
         services.TryAddSingleton<OperationalPayloadProtectorResolver>();
         services.TryAddSingleton<OperationalPayloadProtection>();
         services.TryAddScoped<IOperationalDbContextAccessor, OperationalDbContextAccessor<TContext>>();
+        services.TryAddScoped<IOperationalStoreFactory, EntityFrameworkOperationalStoreFactory>();
 
         return services;
     }

@@ -84,17 +84,22 @@ public class ConfigurationStorageBoundaryTests
     }
 
     [Theory]
-    [InlineData("RoyalIdentity.Storage.EntityFramework.Sqlite/RoyalIdentity.Storage.EntityFramework.Sqlite.csproj")]
-    [InlineData("RoyalIdentity.Storage.EntityFramework.PostgreSql/RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj")]
-    public void Providers_ProjectGraph_References_Adapter_And_Data_Only(string providerProject)
+    [InlineData("RoyalIdentity.Storage.EntityFramework.Sqlite/RoyalIdentity.Storage.EntityFramework.Sqlite.csproj", 3)]
+    [InlineData("RoyalIdentity.Storage.EntityFramework.PostgreSql/RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj", 2)]
+    public void Providers_ProjectGraph_References_Adapter_And_Data_Only(string providerProject, int expectedReferences)
     {
+        // A provider references the adapter plus the pure Data projects of the families it maps. SQLite maps
+        // both today; PostgreSQL gains Operational in Fase 7.
         var projectReferences = ProjectReferenceReader.ReadProjectReferences(providerProject);
 
-        Assert.Equal(2, projectReferences.Count);
+        Assert.Equal(expectedReferences, projectReferences.Count);
         Assert.Contains(projectReferences, r => r.EndsWith(
             "RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj", StringComparison.Ordinal));
         Assert.Contains(projectReferences, r => r.EndsWith(
             "RoyalIdentity.Data.Configuration/RoyalIdentity.Data.Configuration.csproj", StringComparison.Ordinal));
+        Assert.All(
+            projectReferences,
+            r => Assert.DoesNotContain("RoyalIdentity/RoyalIdentity.csproj", r, StringComparison.Ordinal));
     }
 
     [Fact]

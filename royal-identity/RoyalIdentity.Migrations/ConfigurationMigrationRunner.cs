@@ -17,6 +17,10 @@ public static class ConfigurationMigrationRunner
         if (options.Seed.HasFlag(ConfigurationSeedMode.Product))
             options.ProductSeed.Validate();
 
+        // Operational plan DF23: a database migrated by Plano 2 still carries EF's default history. Relocate it
+        // BEFORE EF consults the newly configured one, or the history looks empty and every table is recreated.
+        await BootstrapMigrationsHistoryAsync(options, ct);
+
         await using var context = CreateContext(options);
         await context.Database.MigrateAsync(ct);
 
@@ -42,12 +46,27 @@ public static class ConfigurationMigrationRunner
         }
     }
 
+    /// <summary>
+    /// Moves a legacy <c>__EFMigrationsHistory</c> onto the Configuration history name. Idempotent, and it
+    /// fails closed when both exist. PostgreSQL gets its equivalent in Fase 7 of the Operational plan; until
+    /// then a PostgreSQL database keeps the history the schema puts it in.
+    /// </summary>
+    private static async Task BootstrapMigrationsHistoryAsync(MigrationRunnerOptions options, CancellationToken ct)
+    {
+        if (options.ConfigurationProvider is not ConfigurationDatabaseProvider.Sqlite)
+            return;
+
+        await new SqliteMigrationsHistoryBootstrap().RunAsync(options.ConfigurationConnection, ct);
+    }
+
     private static ConfigurationDbContext CreateContext(MigrationRunnerOptions options)
         => options.ConfigurationProvider switch
         {
             ConfigurationDatabaseProvider.Sqlite => new ConfigurationSqliteDbContext(
                 new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
-                    .UseSqlite(options.ConfigurationConnection)
+                    .UseSqlite(
+                        options.ConfigurationConnection,
+                        sqlite => sqlite.UseConfigurationMigrationsHistory())
                     .Options),
             ConfigurationDatabaseProvider.PostgreSql => new ConfigurationPostgreSqlDbContext(
                 new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
