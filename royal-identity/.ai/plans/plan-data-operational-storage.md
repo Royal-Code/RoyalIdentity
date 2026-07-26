@@ -1,10 +1,10 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-7 concluídas
+## Status: CONCLUÍDO - Q1-Q12 fechadas; Fases 1-8 concluídas
 
 ## Progresso
 
-`███████░` **87,5%** - 7 de 8 fases
+`████████` **100%** - 8 de 8 fases
 
 | Fase | Estado |
 |---|---|
@@ -15,7 +15,7 @@
 | Fase 5 - refresh tokens e transições condicionais | Concluida |
 | Fase 6 - authorize parameters, cleanup e purge de realm | Concluida |
 | Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Concluida |
-| Fase 8 - paridade, fluxos e fechamento | Não iniciada |
+| Fase 8 - paridade, fluxos e fechamento | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -1990,20 +1990,23 @@ falhas**. `git diff --check` sem erros.
 
 **Tarefas:**
 
-- [ ] Rodar build/test focal e solução completa.
-- [ ] Rodar PostgreSQL real.
-- [ ] Inspecionar migrations e SQL por secrets/dados demo.
-- [ ] Confirmar que o adapter EF nunca usa o fallback da DF39.
-- [ ] Confirmar que fake não recebeu paridade Operational nova.
-- [ ] Confirmar que `UpdateAccessTokenClaimsOnRefresh` e sua coluna não permanecem em core, entities,
+- [x] Rodar build/test focal e solução completa.
+- [x] Rodar PostgreSQL real.
+- [x] Inspecionar migrations e SQL por secrets/dados demo.
+- [x] Confirmar que o adapter EF nunca usa o fallback da DF39.
+- [x] Confirmar que fake não recebeu paridade Operational nova.
+- [x] Confirmar que `UpdateAccessTokenClaimsOnRefresh` e sua coluna não permanecem em core, entities,
   materializers, mappings, migrations novas ou código de runtime.
-- [ ] Confirmar que MP-9 permanece explicitamente diferida na matriz, sem lookup por subject adicionado sem caller.
-- [ ] Registrar contagem final de contratos/aceites e arquivos.
-- [ ] Executar `git diff --check`.
+- [x] Confirmar que MP-9 permanece explicitamente diferida na matriz, sem lookup por subject adicionado sem caller.
+- [x] Registrar contagem final de contratos/aceites e arquivos.
+- [x] Executar `git diff --check`.
 
 **Critérios de aceite:**
 
-- Todos os contratos preservados e aceites substitutos verdes em ambos os providers.
+- Todos os contratos preservados e aceites substitutos verdes em ambos os providers. "Em ambos os providers"
+  significa o cenário rodando de fato nos dois — não uma classe SQLite mais a afirmação de que o outro provider
+  se comportaria igual. Classes de aceite duplicadas que apenas reexercitam semântica já coberta pelos contratos
+  neutros nos dois providers não contam como pendência.
 - Code/refresh concorrentes possuem resultado determinístico e falsificável.
 - Full gateway EF é utilizável opt-in e não é default do host.
 - Runner/SQL operam uma ou duas famílias sem auto-migrate.
@@ -2026,7 +2029,136 @@ git diff --check
 
 ### Resultado da Fase 8
 
-*a preencher*
+**Concluída em 2026-07-26**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
+RoyalIdentity.sln` verde: **1215 aprovados, 38 ignorados** (37 PostgreSQL opt-in + 1 UserAccounts), 0 falhas.
+Contra PostgreSQL 17 real via Podman: **37 aprovados, 0 falhas**. `git diff --check` sem erros.
+
+**O que a fase encontrou**
+
+A fase não era só de verificação: exercitar um fluxo OIDC completo sobre o gateway EF expôs **três defeitos de
+produto que o backing in-memory mascarava**, todos porque o fake entrega instâncias compartilhadas e
+efetivamente singleton onde um store real entrega objetos novos por request.
+
+- **Dependência cativa impedia compor o gateway.** `IClientSecretChecker` era singleton e carrega os secret
+  evaluators, que alcançam `IStorage`. Com o `IStorage` scoped do EF o container recusa a composição inteira —
+  o host simplesmente não subia. Passou a transient, como todo o resto dos contratos ao redor.
+- **O issuer derivado era malformado.** `GetServerIssuerUri` fazia `uri += uri.EnsureTrailingSlash() + realm`,
+  produzindo `http://hosthttp://host/demo`. Ninguém notou porque o teste de discovery só verificava que a chave
+  `issuer` existia, nunca o valor.
+- **A correção do issuer dependia de um cache que só o fake fornecia.** O valor calculado era gravado de volta em
+  `RealmOptions.IssuerUri`, e `DefaultTokenValidator` lia esse campo como `ValidIssuer`. Com o fake, a primeira
+  request populava o objeto compartilhado e as seguintes validavam contra ele; com EF, cada request
+  materializa options novas, o campo vem nulo e **todo token é rejeitado**. O write-back saiu — ele também
+  fixava o issuer no host da primeira request — e o validator passou a derivar o issuer pelo `HttpContext`,
+  exatamente como a emissão faz.
+
+Os três estão cobertos por regressão, e as duas do issuer foram **verificadas por mutação**: restaurando cada
+defeito, os aceites correspondentes falham.
+
+**Arquivos criados**
+
+- `Tests.Integration/Prepare/EntityFrameworkStorageAppFactory.cs` — host opt-in sobre o gateway EF completo, com
+  ambas as famílias em um SQLite migrado e semeado pelo runner de produção.
+- `Tests.Integration/Endpoints/EntityFrameworkStorageOidcFlowTests.cs` (3) — authorize → login → code → token →
+  userinfo → refresh, com asserções sobre as linhas Operational em cada etapa.
+- `Tests.Integration/Endpoints/IssuerUriTests.cs` (4) — regressão do issuer derivado.
+
+**Arquivos alterados**
+
+- `RoyalIdentity/Extensions/ServiceCollectionExtensions.cs`, `Extensions/HttpContextExtensions.cs` e
+  `Contracts/Defaults/DefaultTokenValidator.cs` — os três defeitos acima.
+- `RoyalIdentity.Migrations/Program.cs` — a entrada virou `MigrationRunnerProgram` num namespace do produto:
+  dois assemblies com `Program` global não podem ser referenciados juntos, e o runner agora é referenciado por
+  um projeto de teste que também referencia o host.
+- `Tests.Integration/Realm/RealmOptionsPhase4Tests.cs` — o cenário validava um token fora de request e dependia
+  do write-back; passou a configurar `IssuerUri` explicitamente, que é o jeito suportado de fixá-lo.
+
+**Auditorias de fechamento**
+
+- **Fallback da DF39 inalcançável pelo adapter EF:** `OperationalContractsShapeTests` já prova que a factory EF
+  só produz stores com as capabilities e que os consumers tomam o caminho atômico para tudo que ela produz.
+- **Fake sem paridade nova:** nenhuma implementação de `ISingleUseAuthorizationCodeStore`/
+  `IVersionedRefreshTokenStore` em `RoyalIdentity.Storage.InMemory` (ADR-018).
+- **`UpdateAccessTokenClaimsOnRefresh`:** fora de core, entities, materializers e mappings. Sobrevive apenas nas
+  migrations históricas (que não se editam), nas migrations/scripts que a removem, num comentário que explica a
+  origem da opção e nos testes que provam sua ausência.
+- **MP-9 diferida:** `IUserSessionStore` não ganhou lookup por subject; `EndSessionsForSubjectAsync` é revogação
+  com caller real (ADR-017), não leitura.
+- **Padrões proibidos:** nenhum `EnsureCreated`/`Migrate` fora do runner e dos testes; get+remove de code
+  confinado ao fallback; `UpdateAsync` genérico de refresh só dentro do consumer; AP sempre realm-bound.
+- **Migrations e SQL:** nenhum `INSERT` além das histories — a única exceção é o rebuild de tabela do SQLite,
+  que move dados existentes. Nenhum secret, chave ou dado demo.
+
+**Ajustes aplicados após revisão externa (2026-07-26)**
+
+- **O critério multi-provider contradizia a lacuna registrada.** Achado correto, e a lacuna estava mal medida:
+  ao conferir item a item, o que faltava de fato no PostgreSQL era só **CT e disposal** — o resto do escopo
+  (create-only, code single-use, refresh transition, AP, cleanup/purge, profiles, modos JWT/claims) já rodava
+  lá. Em vez de reescrever o critério para caber na lacuna, fechei a lacuna: propagação de cancelamento entrou
+  na suíte de paridade (roda nos dois) e o disposal de sessão ganhou aceite PostgreSQL. O critério ganhou a
+  definição do que "em ambos os providers" exige, e a fase passou a listar a cobertura provider a provider numa
+  tabela verificável.
+- **A tabela de riscos marcava tudo como Fechado, inclusive resíduos.** Também correto — era zelo mal
+  colocado. Os estados passaram a distinguir Fechado / Mitigado / Aceito / Diferido, com a legenda explícita, e
+  cinco linhas foram reclassificadas: tolerância de refresh (Diferido, DF37/backlog), Snapshot com claim
+  revogada e `Full + Plain` (Aceito, comportamento possível por opt-in explícito), cleanup externo sem
+  scheduler e disputa entre workers (Mitigado — a seleção explícita existe, health/observabilidade e lock
+  distribuído não).
+- **Macro-plano e roadmap ainda diziam que o Plano 3 era o próximo.** Correto: eu havia atualizado as tabelas e
+  esquecido os cabeçalhos e a seção "Em andamento". Ambos apontam para o Plano 4, e o Plano 3 ganhou entrada de
+  conclusão nos dois documentos.
+- **`AGENTS.md`/`CLAUDE.md` afirmavam que todas as suítes seguem in-memory.** Errado da minha parte:
+  `Tests.Storage` roda sobre EF desde a Fase 2. O texto passou a dizer o que é verdade — o host padrão e a
+  composição de `Tests.Integration` é que continuam in-memory.
+- **`AnIssuedToken_ValidatesAgainstTheDerivedIssuer` não emitia nem validava token.** Correto. Em vez de
+  renomear, ficou autocontido: roda o authorization code flow, confere o `iss` do token emitido e o apresenta a
+  um endpoint protegido, que valida assinatura e issuer.
+- **A fixture EF vazava `ROYALIDENTITY_EF_FIXTURE_AES_KEY` no processo.** Correto. Passou a guardar o valor
+  anterior e restaurá-lo no descarte.
+
+**Handoff para o Plano 4**
+
+O Plano 4 troca o backing padrão de testes e host. O que já está pronto para ele:
+
+- **Composição de referência:** `EntityFrameworkStorageAppFactory` é o exemplo executável de host sobre EF —
+  registro das duas famílias, snapshot source, resource bridge, protection profile, cleanup mode e gateway.
+- **Seeds:** `ConfigurationSeed` (`Product`/`Demo`) cobre realms, clients e chaves; `UserAccountsModuleSeed`
+  cobre contas. O edge de usuários é seam independente e não precisa mudar junto.
+- **Grupos de teste a migrar, em ordem de risco:** (1) contratos neutros — já rodam nos dois backings sem
+  alteração; (2) suítes provider-parametrizadas (AP, cleanup, purge, paridade) — só precisam de mais uma
+  especialização; (3) aceites específicos do SQLite ainda não generalizados (tokens, sessões, consents, códigos);
+  (4) `Tests.Integration`, cuja troca de default é o objetivo do plano.
+- **O que remover ao final:** o fallback transitório da DF39 nos dois consumers, junto com o fake — nunca antes,
+  porque hoje é o que mantém o backing padrão funcionando.
+- **Persistence contracts não precisam ser redesenhados:** os contratos de store, as capabilities e o seam de
+  gateway/lifetime já estão no formato que o Plano 4 consome.
+
+**Cobertura por provider**
+
+Cada aceite exclusivo do P3 listado no escopo desta fase roda nos dois providers:
+
+| Aceite do escopo | SQLite | PostgreSQL |
+|---|---|---|
+| Duplicidade create-only | contratos + `SqliteOperational*Tests` | contratos + `ConcurrentWritersOfTheSameHandle_ProduceOneRow` |
+| Code single-use concorrente | `SqliteOperationalAuthorizationCodeConcurrencyTests` | `PostgreSqlOperationalConcurrencyTests` |
+| Refresh transition concorrente | `SqliteOperationalRefreshTokenConcurrencyTests` | `PostgreSqlOperationalConcurrencyTests` |
+| AP realm/TTL/expiração/colisão | `OperationalAuthorizeParametersTests.Sqlite` | `PostgreSqlAuthorizeParametersTests` |
+| Cleanup e purge por realm | `OperationalCleanupTests.Sqlite` / `OperationalPurgeRealmTests.Sqlite` | agregados PostgreSQL das mesmas suítes |
+| Profiles por realm, rotação e falha fechada | `OperationalPayloadProtectionTests` (sem banco, vale para os dois) + paridade | idem + agregado de paridade |
+| JWT `None`/`Metadata`/`Full` e refresh `Current`/`Snapshot` | `OperationalProviderParityTests.Sqlite` | agregado `PostgreSqlOperationalParityTests` |
+| CT e disposal real | paridade + `EntityFrameworkStorageGatewayTests` | paridade + `PostgreSqlStorageGatewayTests` |
+
+**Lacunas conhecidas**
+
+- Cinco grupos de aceite continuam só no SQLite (`SqliteOperationalAccessTokenTests`,
+  `SqliteOperationalRefreshTokenTests`, `SqliteOperationalUserSessionTests`, `SqliteOperationalConsentTests` e as
+  de código). Elas não cobrem semântica ausente no PostgreSQL — cada comportamento que exercitam também é
+  exercitado lá pelos contratos neutros ou pela suíte de paridade —, mas generalizá-las daria uma segunda leitura
+  independente da mesma semântica.
+- O aceite de upgrade do Plano 2 compõe bootstrap e `MigrateAsync` manualmente; falta um equivalente
+  atravessando o runner produtivo.
+- O fluxo OIDC sobre EF roda em SQLite. A equivalência com PostgreSQL está coberta por contratos, paridade,
+  concorrência e gateway, não por um fluxo HTTP completo sobre aquele provider.
 
 ---
 
@@ -2129,39 +2261,43 @@ git diff --check
 
 ## Riscos
 
+Estados: **Fechado** — o gatilho não existe mais e há teste que o impede de voltar. **Mitigado** — reduzido ao
+que o plano se propôs, com resíduo conhecido e nomeado. **Aceito** — o comportamento permanece possível por
+decisão explícita de produto. **Diferido** — endereçado por outro plano/backlog, não por este.
+
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Payload perde dado contratual | serializer não cobre grafo completo | token/consent/code muda ao ler | DF34 + versionamento/round-trip por modelo | Aberto |
-| Option aditiva quebra payload Configuration v1 | serializer/default não materializa ausência | realms existentes falham ou mudam de comportamento | DF29 + fixture de payload v1 anterior sem a propriedade | Aberto |
-| Bearer handle vaza pelo banco | valor bruto vira PK/log | credencial reutilizável | digest DF38 + redaction DF28 | Aberto |
-| Protection/profile inviabiliza leitura | profile ausente, rotação remove leitor ou AAD diverge | outage por realm | DF30 + envelope/protector id + testes multi-profile/rotação | Aberto |
-| Code é consumido duas vezes | get/remove ou transação fraca | emissão duplicada | MP-2 + teste com connections independentes | Aberto |
-| Invalid request consome code | contrato atômico ignora vínculo/ordem | DoS contra fluxo legítimo | predicado client/redirect da DF11 + pipeline tests | Aberto |
-| Client depende da descrição de redirect mismatch | `error_description` deixa de ser `Invalid redirect_uri` | integração observa texto diferente embora continue `invalid_grant` | mudança explícita DF11 + teste/documentação | Aberto |
-| Refresh emite antes de ganhar CAS | handler mantém ordem atual | tokens órfãos/duplicados | reorganizar Fase 5 | Aberto |
-| Refresh tolerance mascara replay | `TimeSpan.MaxValue`/janela ampla | divergência RFC 9700 | DF37 + backlog explícito | Aberto |
-| Lost update no refresh reutilizável | concorrência muda estado/payload após consumo | grant/token subsequente incorreto | versão condicional DF12 | Aberto |
-| Session client/touch perdem update | JSON/replace do agregado concorrente | logout/idle incorretos | tabela filha + operações condicionais | Aberto |
-| Cleanup remove dado observável | eligibility ignora tolerância/lifecycle | refresh/diagnóstico quebrado | predicados DF17 + fake clock tests | Aberto |
-| Refresh volta a depender do access token | handler conserva `AccessTokenId`/lookup legado | cleanup invalida refresh válido | DF41 + teste AT removido antes do refresh | Aberto |
-| `at_hash` referencia token anterior | handler usa `accessToken.Token` em vez do token novo | identity token não corresponde à resposta | DF42 + regressão com tokens distintos | Aberto |
-| Current amplia o grant | emissão usa permissões atuais do client em vez do grant persistido | elevação de privilégio | interseção scopes/resources + testes negativos DF32 | Aberto |
-| Snapshot conserva claim revogada | modo escolhido reutiliza profile claim antiga | autorização obsoleta até expiração | default Current + escolha explícita/TTL do realm | Aberto |
-| Realm seleciona Full + Plain | JWT bearer fica legível no banco | reutilização após leak | opt-ins independentes + warning + DF30/DF31 | Aberto |
-| Drop da opção do client muda o caminho default | `false` sem resource subset hoje renova claims antigas | comportamento global muda para Current | sequenciamento indivisível da Fase 5 + DF33 + regressão explícita | Aberto |
-| Migration da flag precede o novo handler | propriedade/coluna some antes de Current/Snapshot funcionar | build intermediário ou regressão de refresh | drop somente na Fase 5 junto do handler; PostgreSQL na Fase 7 | Aberto |
-| AP ignora `StoreAuthorizationParameters=false` | caller realm-bound acessa store incondicionalmente | query-string mode quebra ou cria estado indevido | gate DF16 + testes true/false | Aberto |
-| Lookup de access token mistura bearer/JWT | digest deriva do token bruto em vez de `jti` | metadata/full fica inalcançável ou colide semanticamente | DF13/DF38 + contratos por jti | Aberto |
-| Cleanup nunca roda | modo externo sem scheduler | crescimento ilimitado | seleção explícita DF17 + health/observabilidade operacional | Aberto |
-| Dois workers disputam cleanup | múltiplos nós | locks/carga | batches idempotentes e índices de expiry | Aberto |
-| Purge cruza realm | filtro incompleto/cascade | incidente multi-tenant | realm em PK/FK + cenário abrangente | Aberto |
-| Combined context diverge | mapping provider fica no context concreto | customização de terceiro quebra | extensões públicas + model tests | Aberto |
-| SQLite passa, PostgreSQL falha | estratégia atômica/provider difere | falso sinal de produção | aceites reais PostgreSQL 17 | Aberto |
-| Fake aparenta garantia EF | fallback não documentado | testes/default escondem corrida | DF39 + assert de que EF não usa fallback | Aberto |
-| Runner sugere atomicidade conjunta | duas conexões falham parcialmente | operação confusa | resultado por família + sem transação distribuída | Aberto |
-| Histories de migrations se misturam | providers dependem da history default ou configuram somente Operational | diagnóstico/rollback/scripts acoplados | topologia explícita da DF23 para ambas as famílias + teste same-database | Aberto |
-| Mudança da history reaplica migrations Configuration | EF consulta o novo local antes de realocar a history legada | tentativa de recriar tabelas/indisponibilidade | bootstrap pré-`MigrateAsync`, preservação de ids, casos legado/novo/ambíguo e SQL manual | Aberto |
-| SQL diverge da migration | model muda sem regenerar | deploy manual incompleto | pending-model/script tests | Aberto |
+| Payload perde dado contratual | serializer não cobre grafo completo | token/consent/code muda ao ler | DF34 + versionamento/round-trip por modelo | Fechado |
+| Option aditiva quebra payload Configuration v1 | serializer/default não materializa ausência | realms existentes falham ou mudam de comportamento | DF29 + fixture de payload v1 anterior sem a propriedade | Fechado |
+| Bearer handle vaza pelo banco | valor bruto vira PK/log | credencial reutilizável | digest DF38 + redaction DF28 | Fechado |
+| Protection/profile inviabiliza leitura | profile ausente, rotação remove leitor ou AAD diverge | outage por realm | DF30 + envelope/protector id + testes multi-profile/rotação | Fechado |
+| Code é consumido duas vezes | get/remove ou transação fraca | emissão duplicada | MP-2 + teste com connections independentes | Fechado |
+| Invalid request consome code | contrato atômico ignora vínculo/ordem | DoS contra fluxo legítimo | predicado client/redirect da DF11 + pipeline tests | Fechado |
+| Client depende da descrição de redirect mismatch | `error_description` deixa de ser `Invalid redirect_uri` | integração observa texto diferente embora continue `invalid_grant` | mudança explícita DF11 + teste/documentação | Fechado |
+| Refresh emite antes de ganhar CAS | handler mantém ordem atual | tokens órfãos/duplicados | reorganizar Fase 5 | Fechado |
+| Refresh tolerance mascara replay | `TimeSpan.MaxValue`/janela ampla | divergência RFC 9700 | DF37 + backlog explícito | Diferido |
+| Lost update no refresh reutilizável | concorrência muda estado/payload após consumo | grant/token subsequente incorreto | versão condicional DF12 | Fechado |
+| Session client/touch perdem update | JSON/replace do agregado concorrente | logout/idle incorretos | tabela filha + operações condicionais | Fechado |
+| Cleanup remove dado observável | eligibility ignora tolerância/lifecycle | refresh/diagnóstico quebrado | predicados DF17 + fake clock tests | Fechado |
+| Refresh volta a depender do access token | handler conserva `AccessTokenId`/lookup legado | cleanup invalida refresh válido | DF41 + teste AT removido antes do refresh | Fechado |
+| `at_hash` referencia token anterior | handler usa `accessToken.Token` em vez do token novo | identity token não corresponde à resposta | DF42 + regressão com tokens distintos | Fechado |
+| Current amplia o grant | emissão usa permissões atuais do client em vez do grant persistido | elevação de privilégio | interseção scopes/resources + testes negativos DF32 | Fechado |
+| Snapshot conserva claim revogada | modo escolhido reutiliza profile claim antiga | autorização obsoleta até expiração | default Current + escolha explícita/TTL do realm | Aceito |
+| Realm seleciona Full + Plain | JWT bearer fica legível no banco | reutilização após leak | opt-ins independentes + warning + DF30/DF31 | Aceito |
+| Drop da opção do client muda o caminho default | `false` sem resource subset hoje renova claims antigas | comportamento global muda para Current | sequenciamento indivisível da Fase 5 + DF33 + regressão explícita | Fechado |
+| Migration da flag precede o novo handler | propriedade/coluna some antes de Current/Snapshot funcionar | build intermediário ou regressão de refresh | drop somente na Fase 5 junto do handler; PostgreSQL na Fase 7 | Fechado |
+| AP ignora `StoreAuthorizationParameters=false` | caller realm-bound acessa store incondicionalmente | query-string mode quebra ou cria estado indevido | gate DF16 + testes true/false | Fechado |
+| Lookup de access token mistura bearer/JWT | digest deriva do token bruto em vez de `jti` | metadata/full fica inalcançável ou colide semanticamente | DF13/DF38 + contratos por jti | Fechado |
+| Cleanup nunca roda | modo externo sem scheduler | crescimento ilimitado | seleção explícita DF17; health/observabilidade permanecem pendentes | Mitigado |
+| Dois workers disputam cleanup | múltiplos nós | locks/carga | batches idempotentes e índices de expiry | Mitigado |
+| Purge cruza realm | filtro incompleto/cascade | incidente multi-tenant | realm em PK/FK + cenário abrangente | Fechado |
+| Combined context diverge | mapping provider fica no context concreto | customização de terceiro quebra | extensões públicas + model tests | Fechado |
+| SQLite passa, PostgreSQL falha | estratégia atômica/provider difere | falso sinal de produção | aceites reais PostgreSQL 17 | Fechado |
+| Fake aparenta garantia EF | fallback não documentado | testes/default escondem corrida | DF39 + assert de que EF não usa fallback | Fechado |
+| Runner sugere atomicidade conjunta | duas conexões falham parcialmente | operação confusa | resultado por família + sem transação distribuída | Fechado |
+| Histories de migrations se misturam | providers dependem da history default ou configuram somente Operational | diagnóstico/rollback/scripts acoplados | topologia explícita da DF23 para ambas as famílias + teste same-database | Fechado |
+| Mudança da history reaplica migrations Configuration | EF consulta o novo local antes de realocar a history legada | tentativa de recriar tabelas/indisponibilidade | bootstrap pré-`MigrateAsync`, preservação de ids, casos legado/novo/ambíguo e SQL manual | Fechado |
+| SQL diverge da migration | model muda sem regenerar | deploy manual incompleto | pending-model/script tests | Fechado |
 
 ---
 

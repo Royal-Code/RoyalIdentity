@@ -213,6 +213,41 @@ public abstract class OperationalProviderParityTests : OperationalParitySuite
         Assert.Equal(2, (await ArtifactsAsync(harness, realm)).Count);
     }
 
+    // DF19: a pre-cancelled token stops the operation before it reaches the provider — on every provider, and
+    // across every store, because cancellation is honored by the adapter and not by a provider's driver.
+    [Fact]
+    public async Task PreCancelledToken_IsPropagated_ByEveryStore()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var realm = harness.RealmA;
+        await harness.Storage.GetAccessTokenStore(realm)
+            .StoreAsync(NewAccessToken(realm, "cancel-jti"), default);
+        await harness.Storage.GetRefreshTokenStore(realm)
+            .StoreAsync(NewRefreshToken(realm, "cancel-rt", RefreshTokenClaimsMode.Current), default);
+
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await harness.Storage.GetAccessTokenStore(realm).GetAsync("cancel-jti", cancelled.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await harness.Storage.GetAccessTokenStore(realm).RemoveAsync("cancel-jti", cancelled.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await harness.Storage.GetRefreshTokenStore(realm).GetAsync("cancel-rt", cancelled.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await harness.Storage.GetUserSessionStore(realm)
+                .FindByIdAsync("cancel-session", cancelled.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await harness.Storage.GetUserConsentStore(realm)
+                .GetUserConsentAsync("subject-a", "client-a", cancelled.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await harness.Storage.GetAuthorizationCodeStore(realm)
+                .GetAuthorizationCodeAsync("cancel-code", cancelled.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await harness.Storage.GetAuthorizeParametersStore(realm)
+                .ReadAsync("cancel-handle", cancelled.Token));
+    }
+
     /// <summary>SQLite runs this suite unconditionally; it is the baseline the other provider must match.</summary>
     public sealed class Sqlite : OperationalProviderParityTests
     {

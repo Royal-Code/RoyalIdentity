@@ -46,7 +46,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();
         services.AddTransient<IBackChannelLogoutNotifier, DefaultBackChannelLogoutNotifier>();
         services.AddTransient<IBearerTokenLocator, DefaultBearerTokenLocator>();
-        services.AddSingleton<IClientSecretChecker, DefaultClientSecretChecker>();
+        // Transient, like every other contract here: it holds the secret evaluators, which reach IStorage. As a
+        // singleton it captured them, and with a scoped storage backing — the EF gateway — that is a captive
+        // dependency the container refuses outright. The in-memory fake hid it by being effectively singleton
+        // throughout (plan-data-operational-storage Fase 8).
+        services.AddTransient<IClientSecretChecker, DefaultClientSecretChecker>();
         services.AddTransient<ICodeFactory, DefaultCodeFactory>();
         services.AddTransient<IConsentService, DefaultConsentService>();
         services.AddTransient<IEventDispatcher, DefaultEventDispatcher>();

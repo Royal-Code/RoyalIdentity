@@ -95,6 +95,10 @@ public class RealmOptionsPhase4Tests : IClassFixture<AppFactory>
         var secret = CryptoRandom.CreateUniqueId();
 
         realm.Options.AccessTokenJwtType = "realm-token+jwt";
+        // The scenario validates the token outside a request, where the issuer cannot be derived from the host.
+        // Configuring it explicitly is the supported way to pin it, and it keeps this scenario about the JWT
+        // type rather than about which host happened to serve an earlier request.
+        realm.Options.IssuerUri = "https://token-validator.contract.test";
         await storage.Realms.SaveAsync(realm);
 
         AddClient(memoryStorage, realm, clientId, secret);

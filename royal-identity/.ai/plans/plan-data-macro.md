@@ -1,6 +1,6 @@
 # Macro-plano: Persistência de dados do IdP e aposentadoria do fake
 
-## Status: EM EXECUÇÃO — Planos 0, 1 e 2 concluídos; Plano 3 é o próximo e ainda não foi criado
+## Status: EM EXECUÇÃO — Planos 0, 1, 2 e 3 concluídos; Plano 4 é o próximo e ainda não foi criado
 
 Este documento organiza os próximos planos de dados após:
 
@@ -32,7 +32,7 @@ com SQLite/PostgreSQL, preservando as fronteiras da ADR-013:
 | 0 | `plan-users-accounts-sqlite-hardening.md` | Fechar retry, migrations e seed do módulo `UserAccounts`. **CONCLUÍDO.** |
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos atuais e comportamento do `MemoryStorage`. **CONCLUÍDO (2026-07-22, 5/5 fases).** |
 | 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. **CONCLUÍDO (2026-07-22, 7/7 fases).** |
-| 3 | `plan-data-operational-storage.md` | Persistir dados operacionais do IdP. |
+| 3 | `plan-data-operational-storage.md` | Persistir dados operacionais do IdP. **CONCLUÍDO (2026-07-26, 8/8 fases).** |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real. |
 | 5 | `plan-data-caching.md` | Adicionar cache sobre os stores EF quando a semântica estiver estável. |
 | 6 | `plan-data-audit-outbox.md` | Store durável de auditoria e outbox seletivo, se ainda fizer sentido. |
@@ -83,7 +83,8 @@ O Plano 2 foi concluído consumindo a matriz sem re-inferir semântica; o Plano 
 Saída entregue: modelo Configuration puro, mappings/migrations SQLite e PostgreSQL, stores EF de
 ServerOptions/realms/clients/keys, snapshot assíncrono defensivo, protectors explícitos, runner/seed/SQL separado
 do host e paridade P2 validada contra PostgreSQL 17 real. O host padrão permanece in-memory e o adapter não
-registra um `IStorage` parcial; a composição produtiva completa continua bloqueada pelo Plano 3.
+registra um `IStorage` parcial. A composição produtiva completa (`AddEntityFrameworkStorage`) foi entregue
+pelo Plano 3; trocar o default do host e das suítes é o Plano 4.
 
 **Escopo:** dados de configuração duráveis e de baixa rotatividade.
 
@@ -128,6 +129,13 @@ seed opcional rodam em `RoyalIdentity.Migrations`, nunca no host; SQL revisável
 ---
 
 ## Plano 3 - `plan-data-operational-storage.md`
+
+**CONCLUÍDO (2026-07-26, 8/8 fases.)** Saída entregue: família Operational sobre EF nos dois providers, code
+single-use e transição condicional de refresh sob concorrência real, authorize parameters realm-bound com TTL
+absoluto, cleanup/purge sob modo de execução explícito, proteção de payload por realm, histories de migrations
+separadas por família e o gateway `AddEntityFrameworkStorage()` completo. O host padrão e a composição de
+`Tests.Integration` continuam in-memory, e o fallback transitório dos consumers segue vivo enquanto esse default
+existir; trocar ambos é o Plano 4.
 
 **Escopo:** dados operacionais de alta rotatividade.
 

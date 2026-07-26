@@ -1,5 +1,6 @@
 ﻿// Ignore Spelling: jti
 
+using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Extensions;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
@@ -16,20 +17,34 @@ public class DefaultTokenValidator : ITokenValidator
 {
     private readonly IKeyManager keys;
     private readonly IStorage storage;
+    private readonly IHttpContextAccessor httpContextAccessor;
     private readonly ILogger logger;
     private readonly TimeProvider clock;
 
     public DefaultTokenValidator(
         IKeyManager keys,
         IStorage storage,
+        IHttpContextAccessor httpContextAccessor,
         ILogger<DefaultTokenValidator> logger,
         TimeProvider clock)
     {
         this.keys = keys;
         this.storage = storage;
+        this.httpContextAccessor = httpContextAccessor;
         this.logger = logger;
         this.clock = clock;
     }
+
+    /// <summary>
+    /// The issuer a token of this realm must carry, computed the same way issuance computes it. Reading
+    /// <c>options.IssuerUri</c> alone only worked while a backing handed out one shared options instance that
+    /// an earlier request had populated; with a real store the field is null and every token would be rejected
+    /// (plan-data-operational-storage Fase 8).
+    /// </summary>
+    private string? ExpectedIssuer(Realm realm)
+        => realm.Options.IssuerUri.IsPresent()
+            ? realm.Options.IssuerUri
+            : httpContextAccessor.HttpContext?.GetServerIssuerUri(realm.Options);
 
     public async Task<TokenEvaluationResult> ValidateJwtAccessTokenAsync(
         Realm realm, string jwt, string? expectedScope = null, string? audience = null, CancellationToken ct = default)
@@ -232,7 +247,7 @@ public class DefaultTokenValidator : ITokenValidator
 
         var parameters = new TokenValidationParameters
         {
-            ValidIssuer = realm.Options.IssuerUri,
+            ValidIssuer = ExpectedIssuer(realm),
             IssuerSigningKeys = validationsKeys.Keys,
             ValidateLifetime = validateLifetime
         };

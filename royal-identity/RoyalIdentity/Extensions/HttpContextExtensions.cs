@@ -185,7 +185,7 @@ public static class HttpContextExtensions
         {
             var realm = context.GetRealmPath();
             if (realm.IsPresent())
-                uri += uri.EnsureTrailingSlash() + realm;
+                uri = uri.EnsureTrailingSlash() + realm;
         }
 
         if (uri.EndsWith('/'))
@@ -193,9 +193,10 @@ public static class HttpContextExtensions
         if (options.LowerCaseIssuerUri)
             uri = uri.ToLowerInvariant();
 
-        if(!options.MutualTls.Enabled)
-            options.IssuerUri = uri;
-
+        // Deliberately not written back into `options.IssuerUri`. Caching it there pinned the issuer to
+        // whichever host served the first request, and made correctness depend on the backing handing out one
+        // shared options instance: with a real store every request materializes fresh options, so the cache
+        // would be empty exactly where a consumer expected it (plan-data-operational-storage Fase 8).
         return uri;
     }
 

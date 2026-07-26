@@ -42,13 +42,21 @@ async snapshot; explicit Plain/Data Protection/AES key protectors; dedicated mig
 provider-neutral P2 contracts and acceptances validated against PostgreSQL 17 real). Treat each as the
 implemented target architecture before changing the area it covers.
 
-There is no active implementation plan. The next macro-plan item is the draft
-`.ai/plans/plan-data-operational-storage.md` (Plan 3), whose Q1-Q12 must be answered and converted into closed
-decisions before implementation starts. Until it and the test-migration plan are complete,
-resources/scopes remain volatile per baseline DF22, the default host remains in-memory, and the Configuration
-adapter must not be promoted as a partial production `IStorage`/`IStorageProvider`. The complete EF gateway is
-composed only when Operational exists; new work must consume `.ai/plans/plan-data-storage-matrix.md` without
-re-inferring its closed semantics.
+There is no active implementation plan. `.ai/plans/plan-data-operational-storage.md` (Plan 3) is COMPLETE
+(2026-07-26, 8/8): the Operational family is persisted over SQLite and PostgreSQL, authorization codes are
+single-use and refresh transitions conditional under real concurrency, authorize parameters are realm-bound with
+an absolute TTL, cleanup/purge exist behind an explicitly selected execution mode, and the complete EF gateway
+(`AddEntityFrameworkStorage`) composes both families. The next macro-plan item is
+`.ai/plans/plan-data-test-migration.md` (Plan 4), which swaps the default backing.
+
+Until Plan 4 is complete, resources/scopes remain volatile per baseline DF22, and **the default host and the
+default composition of `Tests.Integration` remain in-memory**. `Tests.Storage` already runs on EF — SQLite
+always, PostgreSQL opt-in — for the contract, parity, concurrency, migration and gateway suites; what is still
+in-memory is the host wiring, with `Tests.Integration/Prepare/EntityFrameworkStorageAppFactory` as the opt-in
+reference composition and the only integration suite on it. The transitional non-atomic fallback in
+`DefaultAuthorizationCodeConsumer`/`DefaultRefreshTokenConsumer` exists for that in-memory default and is
+removed together with it, never before (ADR-018). New work must consume
+`.ai/plans/plan-data-storage-matrix.md` without re-inferring its closed semantics.
 
 Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:

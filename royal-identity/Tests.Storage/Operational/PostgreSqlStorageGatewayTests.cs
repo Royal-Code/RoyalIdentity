@@ -96,6 +96,30 @@ public class PostgreSqlStorageGatewayTests
         Assert.NotNull(await readerStorage.GetAccessTokenStore(readerRealm).GetAsync("gateway-at", default));
     }
 
+    // Disposal is a real resource concern on PostgreSQL, where a leaked scope means a leaked connection.
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public async Task DisposingTheSession_DisposesTheScopeAndItsContexts()
+    {
+        await using var composition = await GatewayComposition.CreateAsync();
+        var provider = composition.Services.GetRequiredService<IStorageProvider>();
+
+        var session = provider.CreateSession();
+        var storage = session.GetStorage();
+        var realm = await composition.LoadRealmAsync(storage);
+        var accessTokens = storage.GetAccessTokenStore(realm);
+        var realms = storage.Realms;
+
+        session.Dispose();
+
+        // The stores captured before disposal are backed by disposed contexts, in both families.
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            async () => await accessTokens.GetAsync("gateway-at", default));
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            async () => await realms.GetByIdAsync("gateway-realm", default));
+        Assert.Throws<ObjectDisposedException>(session.GetStorage);
+    }
+
     /// <summary>The production composition under test: both EF families over one PostgreSQL database.</summary>
     private sealed class GatewayComposition : IAsyncDisposable
     {
