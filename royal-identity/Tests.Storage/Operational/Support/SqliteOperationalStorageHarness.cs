@@ -61,9 +61,6 @@ internal sealed class SqliteOperationalStorageHarness
                 if (handleGenerator is not null)
                     services.AddSingleton(handleGenerator);
 
-                if (cleanup is not null)
-                    services.Configure(cleanup);
-
                 services.AddDbContext<ConfigurationSqliteDbContext>(options => options
                     .UseSqlite(database.Connection, sqlite => sqlite.UseConfigurationMigrationsHistory()));
                 services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
@@ -71,6 +68,11 @@ internal sealed class SqliteOperationalStorageHarness
                 services.AddDbContext<OperationalSqliteDbContext>(options => options
                     .UseSqlite(database.Connection, sqlite => sqlite.UseOperationalMigrationsHistory()));
                 services.AddEntityFrameworkOperationalStorage<OperationalSqliteDbContext>();
+                services.AddEntityFrameworkOperationalCleanup(options =>
+                {
+                    options.Mode = CleanupExecutionMode.External;
+                    cleanup?.Invoke(options);
+                });
 
                 // The Plain profile warns on construction, so the fixture needs logging registered.
                 services.AddLogging();

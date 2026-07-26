@@ -48,8 +48,6 @@ public static class OperationalServiceCollectionExtensions
         services.TryAddSingleton<IAuthorizeParametersHandleGenerator, CryptoRandomAuthorizeParametersHandleGenerator>();
         services.TryAddScoped<IOperationalDbContextAccessor, OperationalDbContextAccessor<TContext>>();
         services.TryAddScoped<IOperationalStoreFactory, EntityFrameworkOperationalStoreFactory>();
-        services.TryAddScoped<IOperationalMaintenance, EntityFrameworkOperationalMaintenance>();
-        services.AddOptions<OperationalCleanupOptions>();
 
         return services;
     }
@@ -90,6 +88,8 @@ public static class OperationalServiceCollectionExtensions
             throw new InvalidOperationException($"Invalid operational cleanup options: {string.Join(" ", errors)}");
 
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddScoped<IOperationalMaintenance, EntityFrameworkOperationalMaintenance>();
+        services.AddOptions<OperationalCleanupOptions>();
         services.AddSingleton(new OperationalCleanupRegistration(options.Mode));
         services.Configure(configure);
         services.AddSingleton<IValidateOptions<OperationalCleanupOptions>>(

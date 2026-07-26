@@ -1665,7 +1665,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizeParametersGa
 ### Resultado da Fase 6
 
 **Concluída em 2026-07-25**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
-RoyalIdentity.sln` verde: 1172 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas — +59 casos sobre a Fase 5.
+RoyalIdentity.sln` verde: 1173 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas — +60 casos sobre a Fase 5.
 `git diff --check` sem erros.
 
 **Arquivos criados**
@@ -1681,8 +1681,8 @@ RoyalIdentity.sln` verde: 1172 aprovados, 9 ignorados (PostgreSQL opt-in), 0 fal
 - `.../Operational/Maintenance/OperationalCleanupRegistration.cs` — marcador da seleção de modo mais o
   `IValidateOptions` que valida a configuração efetiva.
 - Testes: `Tests.Storage/Operational/SqliteOperationalAuthorizeParametersTests` (10),
-  `SqliteOperationalCleanupTests` (13), `SqliteOperationalPurgeRealmTests` (4),
-  `OperationalCleanupWorkerTests` (4), `Tests.Storage/Storage/EntityFrameworkStorageGatewayTests` (14),
+  `SqliteOperationalCleanupTests` (12), `SqliteOperationalPurgeRealmTests` (4),
+  `OperationalCleanupWorkerTests` (4), `Tests.Storage/Storage/EntityFrameworkStorageGatewayTests` (15),
   `Tests.Integration/Endpoints/AuthorizeParametersGateTests` (8).
 
 **Arquivos alterados**
@@ -1762,6 +1762,11 @@ RoyalIdentity.sln` verde: 1172 aprovados, 9 ignorados (PostgreSQL opt-in), 0 fal
   repetir a passagem avança independentemente de quais foram escolhidas.
 - **O comando de `Tests.Identity` documentado na fase foi removido** em vez de mantido como lacuna: como a
   revisão observou, não é lacuna funcional, é comando errado.
+- **A porta de manutenção ainda podia ser resolvida sem selecionar o modo quando usada fora do gateway.**
+  Fechado: `IOperationalMaintenance` e suas opções agora são registrados somente por
+  `AddEntityFrameworkOperationalCleanup`; registrar apenas o adapter Operational expõe os stores, não uma
+  manutenção em `Unspecified`. O harness seleciona `External` explicitamente, e um aceite cobre os dois lados
+  dessa composição.
 
 ---
 

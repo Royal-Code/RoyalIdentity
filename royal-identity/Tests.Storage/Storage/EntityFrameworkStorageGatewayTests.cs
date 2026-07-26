@@ -300,6 +300,27 @@ public class EntityFrameworkStorageGatewayTests
         Assert.Empty(services);
     }
 
+    // The maintenance port is also used directly by an external command/job, without the complete IStorage
+    // gateway. Registering the Operational stores alone must not expose a cleanup that never selected its mode.
+    [Fact]
+    public void OperationalStorage_WithoutASelectedCleanupMode_DoesNotExposeMaintenance()
+    {
+        var services = new ServiceCollection();
+
+        services.AddEntityFrameworkOperationalStorage<OperationalSqliteDbContext>();
+
+        Assert.DoesNotContain(
+            services,
+            descriptor => descriptor.ServiceType == typeof(IOperationalMaintenance));
+
+        services.AddEntityFrameworkOperationalCleanup(cleanup =>
+            cleanup.Mode = CleanupExecutionMode.External);
+
+        Assert.Contains(
+            services,
+            descriptor => descriptor.ServiceType == typeof(IOperationalMaintenance));
+    }
+
     /// <summary>
     /// The production composition under test: both EF families over one SQLite database, the snapshot bootstrapped
     /// like the host does, and the gateway added by its public opt-in.
