@@ -7,14 +7,14 @@ namespace Tests.Storage.Configuration;
 
 public class PostgreSqlConfigurationMigrationTests
 {
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public async Task Runner_Twice_CreatesEquivalentSchemaAndIdempotentProductSeed()
     {
         var options = new MigrationRunnerOptions
         {
             ConfigurationProvider = ConfigurationDatabaseProvider.PostgreSql,
-            ConfigurationConnection = ConfigurationPostgreSqlTestEnvironment.ConnectionString,
+            ConfigurationConnection = StoragePostgreSqlTestEnvironment.ConnectionString,
             Seed = ConfigurationSeedMode.Product,
             KeyProtector = ConfigurationKeyProtector.Plain,
             ProductSeed = new ConfigurationProductSeedOptions
@@ -28,14 +28,18 @@ public class PostgreSqlConfigurationMigrationTests
 
         await using var context = new ConfigurationPostgreSqlDbContext(
             new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
-                .UseNpgsql(ConfigurationPostgreSqlTestEnvironment.ConnectionString)
+                // DF23: the history lives in the `configuration` schema, so reading it needs the same
+                // configuration the runner used — the entities' schema does not imply it.
+                .UseNpgsql(
+                    StoragePostgreSqlTestEnvironment.ConnectionString,
+                    npgsql => npgsql.UseConfigurationMigrationsHistory())
                 .Options);
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
         Assert.Equal(3, await context.Realms.CountAsync());
         Assert.Equal(1, await context.Clients.CountAsync(client => client.ClientId == "server_admin"));
         Assert.Equal(3, await context.SigningKeys.CountAsync());
 
-        await using var connection = new NpgsqlConnection(ConfigurationPostgreSqlTestEnvironment.ConnectionString);
+        await using var connection = new NpgsqlConnection(StoragePostgreSqlTestEnvironment.ConnectionString);
         await connection.OpenAsync();
         var script = await File.ReadAllTextAsync(Path.Combine(
             FindRepositoryRoot(),

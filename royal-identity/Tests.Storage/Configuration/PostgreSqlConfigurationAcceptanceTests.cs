@@ -9,15 +9,15 @@ namespace Tests.Storage.Configuration;
 /// <summary>Runs the provider acceptance scenarios introduced by Phases 4/5 against PostgreSQL.</summary>
 public class PostgreSqlConfigurationAcceptanceTests
 {
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public Task StoreAcceptances() => ProviderFactRunner.RunAsync(new PostgreSqlStoreAcceptances());
 
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public Task KeyAcceptances() => ProviderFactRunner.RunAsync(new PostgreSqlKeyAcceptances());
 
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public Task SnapshotAcceptances() => ProviderFactRunner.RunAsync(new PostgreSqlSnapshotAcceptances());
 

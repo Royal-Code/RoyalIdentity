@@ -6,6 +6,18 @@ public enum ConfigurationDatabaseProvider
     PostgreSql,
 }
 
+/// <summary>
+/// Which storage families this run migrates (plan DF23). They evolve independently and keep independent
+/// histories, so migrating one never implies the other — even when they share a database.
+/// </summary>
+[Flags]
+public enum StorageFamilySelection
+{
+    Configuration = 1,
+    Operational = 2,
+    All = Configuration | Operational,
+}
+
 [Flags]
 public enum ConfigurationSeedMode
 {
@@ -27,6 +39,8 @@ public sealed class MigrationRunnerOptions
     public const string Usage =
         "Usage: RoyalIdentity.Migrations --configuration-provider <sqlite|postgresql> " +
         "(--configuration-connection <value> | --configuration-connection-env <name>) " +
+        "[--families <configuration|operational|all>] " +
+        "[--operational-connection <value> | --operational-connection-env <name>] " +
         "[--seed <none|product|demo|all>] " +
         "[--server-admin-redirect-uri <absolute-uri> ...] " +
         "[--key-protector <plain|aes|data-protection>] " +
@@ -34,9 +48,30 @@ public sealed class MigrationRunnerOptions
         "[--data-protection-key-ring <directory>] " +
         "[--data-protection-app-name <name>]";
 
+    /// <summary>
+    /// The provider of both families. One deployment does not mix providers: the families may live in different
+    /// databases, but a SQLite Configuration next to a PostgreSQL Operational is not a supported topology.
+    /// </summary>
     public required ConfigurationDatabaseProvider ConfigurationProvider { get; init; }
 
     public required string ConfigurationConnection { get; init; }
+
+    /// <summary>Which families this run migrates. Defaults to Configuration alone.</summary>
+    public StorageFamilySelection Families { get; init; } = StorageFamilySelection.Configuration;
+
+    /// <summary>
+    /// The Operational connection. <c>null</c> means the families share one database, which is the topology
+    /// where the two histories of DF23 actually have to keep them apart.
+    /// </summary>
+    public string? OperationalConnection { get; init; }
+
+    /// <summary>The connection the Operational family migrates over, sharing the Configuration one by default.</summary>
+    public string ResolvedOperationalConnection => OperationalConnection ?? ConfigurationConnection;
+
+    /// <summary>Whether both families were pointed at the same connection string.</summary>
+    public bool SharesOneDatabase
+        => Families is StorageFamilySelection.All
+            && string.Equals(ResolvedOperationalConnection, ConfigurationConnection, StringComparison.Ordinal);
 
     public ConfigurationSeedMode Seed { get; init; }
 
@@ -67,7 +102,21 @@ public sealed class MigrationRunnerOptions
 
         var values = ParseValues(args);
         var provider = ParseProvider(Required(values, "--configuration-provider"));
-        var connection = ResolveConnection(values);
+        var connection = ResolveConnection(
+            values, "--configuration-connection", "--configuration-connection-env", required: true)!;
+        var familiesValue = Optional(values, "--families");
+        var families = familiesValue is null
+            ? StorageFamilySelection.Configuration
+            : ParseFamilies(familiesValue);
+        var operationalConnection = ResolveConnection(
+            values, "--operational-connection", "--operational-connection-env", required: false);
+
+        if (operationalConnection is not null && !families.HasFlag(StorageFamilySelection.Operational))
+        {
+            throw new MigrationRunnerUsageException(
+                "An Operational connection was given but the Operational family was not selected.");
+        }
+
         var seedValue = Optional(values, "--seed");
         var seed = seedValue is null ? ConfigurationSeedMode.None : ParseSeed(seedValue);
         var protectorValue = Optional(values, "--key-protector");
@@ -75,6 +124,11 @@ public sealed class MigrationRunnerOptions
 
         if (seed is not ConfigurationSeedMode.None && protector is null)
             throw new MigrationRunnerUsageException("--key-protector is required when --seed is enabled.");
+
+        // The seed is Configuration data. Operational holds only what a live protocol flow produces, so there is
+        // nothing to seed there and asking for it means the command was misunderstood (plan DF19).
+        if (seed is not ConfigurationSeedMode.None && !families.HasFlag(StorageFamilySelection.Configuration))
+            throw new MigrationRunnerUsageException("--seed applies to the Configuration family only.");
 
         var aesKeyEnvironmentVariable = Optional(values, "--aes-key-env");
         var dataProtectionKeyRing = Optional(values, "--data-protection-key-ring");
@@ -104,6 +158,8 @@ public sealed class MigrationRunnerOptions
         {
             ConfigurationProvider = provider,
             ConfigurationConnection = connection,
+            Families = families,
+            OperationalConnection = operationalConnection,
             Seed = seed,
             KeyProtector = protector,
             ProductSeed = new ConfigurationProductSeedOptions
@@ -123,6 +179,9 @@ public sealed class MigrationRunnerOptions
             "--configuration-provider",
             "--configuration-connection",
             "--configuration-connection-env",
+            "--families",
+            "--operational-connection",
+            "--operational-connection-env",
             "--seed",
             "--server-admin-redirect-uri",
             "--key-protector",
@@ -159,17 +218,34 @@ public sealed class MigrationRunnerOptions
         return values;
     }
 
-    private static string ResolveConnection(IReadOnlyDictionary<string, List<string>> values)
+    /// <summary>
+    /// Resolves a connection from either its direct option or the environment variable that holds it. Giving
+    /// both is refused rather than silently preferring one; when <paramref name="required"/> is false, giving
+    /// neither means the caller did not ask for that connection.
+    /// </summary>
+    private static string? ResolveConnection(
+        IReadOnlyDictionary<string, List<string>> values,
+        string directOption,
+        string environmentOption,
+        bool required)
     {
-        var direct = Optional(values, "--configuration-connection");
-        var environmentName = Optional(values, "--configuration-connection-env");
-        if (string.IsNullOrWhiteSpace(direct) == string.IsNullOrWhiteSpace(environmentName))
+        var direct = Optional(values, directOption);
+        var environmentName = Optional(values, environmentOption);
+        var hasDirect = !string.IsNullOrWhiteSpace(direct);
+        var hasEnvironment = !string.IsNullOrWhiteSpace(environmentName);
+
+        if (hasDirect && hasEnvironment)
+            throw new MigrationRunnerUsageException($"Specify only one of {directOption} or {environmentOption}.");
+
+        if (!hasDirect && !hasEnvironment)
         {
-            throw new MigrationRunnerUsageException(
-                "Specify exactly one of --configuration-connection or --configuration-connection-env.");
+            return required
+                ? throw new MigrationRunnerUsageException(
+                    $"Specify exactly one of {directOption} or {environmentOption}.")
+                : null;
         }
 
-        if (!string.IsNullOrWhiteSpace(direct))
+        if (hasDirect)
             return direct;
 
         var connection = Environment.GetEnvironmentVariable(environmentName!);
@@ -178,6 +254,15 @@ public sealed class MigrationRunnerOptions
                 $"Environment variable '{environmentName}' is missing or empty.");
         return connection;
     }
+
+    private static StorageFamilySelection ParseFamilies(string value)
+        => value.ToLowerInvariant() switch
+        {
+            "configuration" => StorageFamilySelection.Configuration,
+            "operational" => StorageFamilySelection.Operational,
+            "all" or "both" => StorageFamilySelection.All,
+            _ => throw new MigrationRunnerUsageException("Unsupported storage family selection."),
+        };
 
     private static ConfigurationDatabaseProvider ParseProvider(string value)
         => value.ToLowerInvariant() switch

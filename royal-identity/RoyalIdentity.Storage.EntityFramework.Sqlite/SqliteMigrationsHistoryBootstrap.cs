@@ -3,19 +3,6 @@ using RoyalIdentity.Storage.EntityFramework.Migrations;
 
 namespace RoyalIdentity.Storage.EntityFramework.Sqlite;
 
-/// <summary>What the bootstrap found and did.</summary>
-public enum MigrationsHistoryBootstrapOutcome
-{
-    /// <summary>Neither the legacy nor the Configuration history exists — a database that was never migrated.</summary>
-    NoHistory,
-
-    /// <summary>The legacy history existed and was moved, preserving every applied migration id.</summary>
-    Relocated,
-
-    /// <summary>Only the Configuration history exists — the move already happened, so this run is a no-op.</summary>
-    AlreadyRelocated,
-}
-
 /// <summary>
 /// <para>
 ///     Moves a SQLite database migrated by Plano 2 off EF's default <c>__EFMigrationsHistory</c> and onto the

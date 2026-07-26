@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using RoyalIdentity.Storage.EntityFramework.Migrations;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 using Tests.Storage.Operational.Support;
 

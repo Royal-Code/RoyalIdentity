@@ -1,10 +1,10 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-6 concluídas
+## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-7 concluídas
 
 ## Progresso
 
-`██████░░` **75%** - 6 de 8 fases
+`███████░` **87,5%** - 7 de 8 fases
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - authorization codes e consumo atômico | Concluida |
 | Fase 5 - refresh tokens e transições condicionais | Concluida |
 | Fase 6 - authorize parameters, cleanup e purge de realm | Concluida |
-| Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Não iniciada |
+| Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Concluida |
 | Fase 8 - paridade, fluxos e fechamento | Não iniciada |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -1796,22 +1796,22 @@ provider produtivo.
 
 **Tarefas:**
 
-- [ ] Testar context separado e context combinado PostgreSQL.
-- [ ] Testar histories distintas ao executar Configuration + Operational no mesmo banco SQLite e PostgreSQL.
-- [ ] Atualizar runner, design-time factories e fixtures PostgreSQL para consumir a mesma configuração centralizada
+- [x] Testar context separado e context combinado PostgreSQL.
+- [x] Testar histories distintas ao executar Configuration + Operational no mesmo banco SQLite e PostgreSQL.
+- [x] Atualizar runner, design-time factories e fixtures PostgreSQL para consumir a mesma configuração centralizada
   de history.
-- [ ] Testar bootstrap PostgreSQL: banco vazio; somente history legada; somente history nova; ambas presentes/
+- [x] Testar bootstrap PostgreSQL: banco vazio; somente history legada; somente history nova; ambas presentes/
   ambíguas; repetição idempotente e preservação integral dos migration ids.
-- [ ] Implementar estratégia provider-specific de MP-2/MP-3 com a mesma semântica SQLite.
-- [ ] Testar migration from-empty, pending model changes e SQL versionado.
-- [ ] Testar upgrade Configuration do schema do Plano 2, preservando clients e removendo somente a coluna obsoleta.
-- [ ] Regenerar/revalidar os scripts idempotentes Configuration contra a nova history e versionar os scripts de
+- [x] Implementar estratégia provider-specific de MP-2/MP-3 com a mesma semântica SQLite.
+- [x] Testar migration from-empty, pending model changes e SQL versionado.
+- [x] Testar upgrade Configuration do schema do Plano 2, preservando clients e removendo somente a coluna obsoleta.
+- [x] Regenerar/revalidar os scripts idempotentes Configuration contra a nova history e versionar os scripts de
   bootstrap sem alterar migrations de domínio já geradas.
-- [ ] Testar runner: Configuration-only, Operational-only, ambas/mesmo banco e ambas/bancos distintos.
-- [ ] Confirmar que o gateway com mesmo banco mantém dois DbContexts/conexões sem compartilhar transação.
-- [ ] Garantir que Operational rejeita seed.
-- [ ] Criar/estender script de PostgreSQL efêmero reutilizando o precedente local.
-- [ ] Validar logs/erros redigidos.
+- [x] Testar runner: Configuration-only, Operational-only, ambas/mesmo banco e ambas/bancos distintos.
+- [x] Confirmar que o gateway com mesmo banco mantém dois DbContexts/conexões sem compartilhar transação.
+- [x] Garantir que Operational rejeita seed.
+- [x] Criar/estender script de PostgreSQL efêmero reutilizando o precedente local.
+- [x] Validar logs/erros redigidos.
 
 **Critérios de aceite:**
 
@@ -1832,13 +1832,95 @@ provider produtivo.
 
 ```powershell
 dotnet test Tests.Storage
-dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalMigrationRunner"
+dotnet test Tests.Storage --filter "FullyQualifiedName~StorageMigrationRunnerTests"
 ./scripts/Test-OperationalPostgreSql.ps1
 ```
 
 ### Resultado da Fase 7
 
-*a preencher*
+**Concluída em 2026-07-26.** `dotnet test RoyalIdentity.sln` verde: 1196 aprovados, 33 ignorados (32 PostgreSQL
+opt-in + 1 UserAccounts), 0 falhas. Contra um PostgreSQL 17 real via Podman
+(`./scripts/Test-OperationalPostgreSql.ps1`): **32 aprovados, 0 falhas**. `git diff --check` sem erros.
+
+**Arquivos criados**
+
+- `RoyalIdentity.Storage.EntityFramework.PostgreSql/PostgreSqlOperationalModelBuilderExtensions.cs`,
+  `OperationalPostgreSqlDbContext.cs`, `OperationalPostgreSqlDesignTimeDbContextFactory.cs` — schema
+  `operation`, payloads `text`, collation `C` em todo identificador.
+- `.../PostgreSqlMigrationsHistoryExtensions.cs` — `UseConfigurationMigrationsHistory`/
+  `UseOperationalMigrationsHistory` sobre a topologia centralizada.
+- `.../PostgreSqlMigrationsHistoryBootstrap.cs` — realocação da history legada de `public` para
+  `configuration`, idempotente e fail-closed em ambiguidade.
+- `.../OperationalMigrations/20260726011041_InitialOperational` e
+  `.../Migrations/20260726011051_DropUpdateAccessTokenClaimsOnRefresh`.
+- `RoyalIdentity.Storage.EntityFramework/Migrations/MigrationsHistoryBootstrapOutcome.cs` — o resultado do
+  bootstrap saiu do provider SQLite para o adapter, porque a decisão é a mesma em todo provider.
+- `RoyalIdentity.Migrations/StorageMigrationRunner.cs` — seleção de famílias e relatório por família.
+- Scripts: `scripts/sql/operational/postgresql/0001_initial_operational.sql`,
+  `scripts/sql/configuration/postgresql/0002_drop_update_access_token_claims_on_refresh.sql`,
+  `scripts/sql/migration-history/postgresql/0001_relocate_legacy_configuration_history.sql`,
+  `scripts/Test-OperationalPostgreSql.ps1`.
+- Testes: `PostgreSqlOperationalContractTests` (6 agregados), `OperationalProviderParityTests` (8 no SQLite +
+  agregado PostgreSQL), `PostgreSqlOperationalConcurrencyTests` (3), `PostgreSqlOperationalMigrationTests` (9),
+  `PostgreSqlStorageGatewayTests` (3), `StorageMigrationRunnerTests` (12), mais os fixtures
+  `PostgreSqlOperationalDatabase`, `PostgreSqlOperationalStorageHarness`,
+  `PostgreSqlOperationalConcurrencyDatabase` e `IOperationalParityHarness`.
+
+**Arquivos alterados**
+
+- `ConfigurationPostgreSqlDesignTimeDbContextFactory` e `ConfigurationMigrationRunner` passaram a configurar a
+  history explicitamente; o bootstrap PostgreSQL entrou no runner ao lado do SQLite.
+- `MigrationRunnerOptions` ganhou `--families` e a conexão Operational (direta ou por variável de ambiente),
+  com `ResolvedOperationalConnection`/`SharesOneDatabase`; `--seed` é recusado sem a família Configuration.
+- `MigrationRunnerDiagnostics` virou público e redige **as duas** conexões; `Program` reporta família a família
+  e devolve 1 quando alguma falha.
+- `scripts/sql/configuration/postgresql/0001_initial_configuration.sql` foi regenerado contra a nova history
+  (o `.cs` da migration de domínio não foi tocado).
+- `ProviderFactRunner` passou a executar `[Theory]` com cada `[InlineData]`.
+- `ConfigurationStorageBoundaryTests`: o provider PostgreSQL agora referencia as duas famílias Data, como o
+  SQLite — o próprio teste já previa isso para esta fase.
+- `StoragePostgreSqlTestEnvironment`/`StoragePostgreSqlFactAttribute` (antes `ConfigurationPostgreSql*`): um
+  servidor serve as duas famílias, que é justamente a topologia interessante. A variável de ambiente manteve o
+  nome para não quebrar scripts e setups locais.
+
+**Mudanças observáveis**
+
+- **A history Configuration em PostgreSQL mudou de `public` para `configuration`.** Um banco do Plano 2 precisa
+  passar pelo bootstrap (código ou script) antes do primeiro `MigrateAsync`; sem isso o EF lê uma history vazia
+  e tenta recriar tudo. O aceite de upgrade cobre exatamente esse caminho.
+- **O runner devolve 1 quando uma família falha** e imprime uma linha por família. Antes imprimia uma única
+  mensagem de sucesso.
+
+**Decisões tomadas na execução**
+
+- **MP-2/MP-3 não precisaram de estratégia provider-specific, e essa é a conclusão — não uma omissão.** A tarefa
+  previa implementá-la; a implementação existente usa apenas primitivas neutras (contagem de linhas afetadas de
+  um delete/update condicional), que o PostgreSQL satisfaz com a mesma semântica. Em vez de introduzir um
+  caminho específico sem necessidade, a fase provou a equivalência: `PostgreSqlOperationalConcurrencyTests` roda
+  8 consumidores concorrentes do mesmo code e 8 transições da mesma versão contra um PostgreSQL real, com
+  conexões, scopes e contexts independentes, e exige exatamente um vencedor.
+- **Payloads Operational são `text`, não `jsonb`.** `jsonb` é para os payloads de Configuration, que são
+  documentos JSON legíveis; um envelope protegido é opaco e nunca é consultado por dentro (DF30).
+- **`OperationalProviderParityTests` existe para responder "os providers concordam?"**, que é uma pergunta
+  diferente de "o store se comporta". Os aceites específicos de cada provider continuam onde estão; a suíte de
+  paridade cobre o que um schema/tipo/collation diferente quebraria em silêncio — os três modos JWT, os dois
+  modos de claims do refresh, o protector por realm e a comparação Ordinal.
+- **A suíte de contratos neutra roda inteira sobre PostgreSQL** por classes privadas + agregados
+  `[StoragePostgreSqlFact]`, o padrão já usado em Configuration: sem a conexão opt-in os cenários são pulados,
+  não quebrados.
+- **O `Assert.True` do bootstrap revelou um erro do próprio teste**, não do código: aplicar `MigrateAsync()` no
+  context legado rodava também a migration nova, então o "banco do Plano 2" já vinha sem a coluna obsoleta. O
+  aceite passou a migrar via `IMigrator` até `InitialConfiguration`, que é o estado real de onde o upgrade parte.
+
+**Lacunas conhecidas**
+
+- Os aceites específicos do SQLite (`SqliteOperationalAccessTokenTests` e afins) não foram generalizados para
+  rodar nos dois providers; sobre PostgreSQL rodam a suíte de contratos, a de paridade, a de concorrência, a de
+  migrations e a do gateway. Generalizar as ~10 classes restantes é refatoração mecânica de escopo próprio, não
+  cobertura ausente dos critérios desta fase.
+- O bootstrap PostgreSQL identifica a history legada em `public` literalmente, não pelo `search_path` da
+  conexão. É o schema que o EF usa quando o modelo não declara default — que é o caso — mas um deployment que
+  tenha movido a history para outro schema por conta própria precisa resolvê-la manualmente.
 
 ---
 

@@ -5,6 +5,7 @@ using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Data.Operational;
 using RoyalIdentity.Data.Operational.Entities;
+using RoyalIdentity.Storage.EntityFramework.PostgreSql;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 
 namespace Tests.Architecture;
@@ -51,12 +52,34 @@ public class OperationalModelExtensibilityTests
         }
     }
 
+    // The PostgreSQL combined context (Fase 7): both families in one model, each applying its own provider
+    // extension, which is what puts them in the `configuration` and `operation` schemas.
+    private sealed class CombinedPostgreSqlDbContext(DbContextOptions<CombinedPostgreSqlDbContext> options)
+        : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyRoyalIdentityConfigurationPostgreSqlMappings();
+            modelBuilder.ApplyRoyalIdentityOperationalPostgreSqlMappings();
+        }
+    }
+
     private static IModel BuildCombinedModel()
     {
         var options = new DbContextOptionsBuilder<CombinedDbContext>()
             .UseSqlite("Data Source=:memory:")
             .Options;
         using var context = new CombinedDbContext(options);
+        return context.GetService<IDesignTimeModel>().Model;
+    }
+
+    private static IModel BuildCombinedPostgreSqlModel()
+    {
+        var options = new DbContextOptionsBuilder<CombinedPostgreSqlDbContext>()
+            .UseNpgsql("Host=model-only;Database=model-only")
+            .Options;
+        using var context = new CombinedPostgreSqlDbContext(options);
         return context.GetService<IDesignTimeModel>().Model;
     }
 
@@ -108,5 +131,56 @@ public class OperationalModelExtensibilityTests
         var tables = model.GetEntityTypes().Select(t => t.GetTableName()!).ToList();
 
         Assert.Equal(tables.Count, tables.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    // Fase 7: the separate PostgreSQL Operational context applies its own extension and lands in `operation`.
+    [Fact]
+    public void OperationalPostgreSqlDbContext_MapsTheFamilyIntoTheOperationSchema()
+    {
+        var options = new DbContextOptionsBuilder<OperationalPostgreSqlDbContext>()
+            .UseNpgsql("Host=model-only;Database=model-only")
+            .Options;
+        using var context = new OperationalPostgreSqlDbContext(options);
+        var model = context.GetService<IDesignTimeModel>().Model;
+
+        Assert.Equal(OperationalEntityTypes.ToHashSet(), model.GetEntityTypes().Select(t => t.ClrType).ToHashSet());
+        Assert.All(
+            OperationalEntityTypes,
+            entityType => Assert.Equal("operation", model.FindEntityType(entityType)!.GetSchema()));
+    }
+
+    // DF4/DF23: combined in one model, the two families still occupy their own schemas — which is exactly what
+    // keeps their tables, and their migrations histories, from meeting.
+    [Fact]
+    public void CombinedPostgreSqlContext_KeepsEachFamilyInItsOwnSchema()
+    {
+        var model = BuildCombinedPostgreSqlModel();
+
+        Assert.Equal(
+            ConfigurationEntityTypes.Concat(OperationalEntityTypes).ToHashSet(),
+            model.GetEntityTypes().Select(t => t.ClrType).ToHashSet());
+        Assert.All(
+            ConfigurationEntityTypes,
+            entityType => Assert.Equal("configuration", model.FindEntityType(entityType)!.GetSchema()));
+        Assert.All(
+            OperationalEntityTypes,
+            entityType => Assert.Equal("operation", model.FindEntityType(entityType)!.GetSchema()));
+
+        // No default schema is declared, so nothing silently pulls a family — or the history table — elsewhere.
+        Assert.Null(model.GetDefaultSchema());
+    }
+
+    [Fact]
+    public void CombinedPostgreSqlContext_KeepsTheTwoFamiliesUnrelated()
+    {
+        var model = BuildCombinedPostgreSqlModel();
+        var configurationTypes = ConfigurationEntityTypes.ToHashSet();
+
+        foreach (var entityType in OperationalEntityTypes)
+        {
+            var foreignKeys = model.FindEntityType(entityType)!.GetForeignKeys();
+
+            Assert.DoesNotContain(foreignKeys, fk => configurationTypes.Contains(fk.PrincipalEntityType.ClrType));
+        }
     }
 }

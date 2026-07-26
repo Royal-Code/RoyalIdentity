@@ -10,7 +10,10 @@ public sealed class ConfigurationPostgreSqlDesignTimeDbContextFactory
     public ConfigurationPostgreSqlDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
-            .UseNpgsql("Host=localhost;Database=royalidentity_design_time;Username=postgres;Password=not-used")
+            .UseNpgsql(
+                "Host=localhost;Database=royalidentity_design_time;Username=postgres;Password=not-used",
+                // DF23: the history table is configured explicitly; the entities' schema does not imply it.
+                npgsql => npgsql.UseConfigurationMigrationsHistory())
             .Options;
 
         return new ConfigurationPostgreSqlDbContext(options);

@@ -1,4 +1,10 @@
-﻿CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+﻿DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'configuration') THEN
+        CREATE SCHEMA configuration;
+    END IF;
+END $EF$;
+CREATE TABLE IF NOT EXISTS configuration."__EFMigrationsHistory" (
     "MigrationId" character varying(150) NOT NULL,
     "ProductVersion" character varying(32) NOT NULL,
     CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
@@ -8,7 +14,7 @@ START TRANSACTION;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
         IF NOT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'configuration') THEN
             CREATE SCHEMA configuration;
         END IF;
@@ -17,7 +23,7 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE TABLE configuration.realms (
         id text COLLATE "C" NOT NULL,
         path text COLLATE "C" NOT NULL,
@@ -35,7 +41,7 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE TABLE configuration.server_options (
         id smallint NOT NULL,
         payload_version integer NOT NULL,
@@ -49,7 +55,7 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE TABLE configuration.clients (
         realm_id text COLLATE "C" NOT NULL,
         client_id text COLLATE "C" NOT NULL,
@@ -93,7 +99,7 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE TABLE configuration.signing_keys (
         realm_id text COLLATE "C" NOT NULL,
         key_id text COLLATE "C" NOT NULL,
@@ -114,7 +120,7 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE TABLE configuration.client_claims (
         realm_id text COLLATE "C" NOT NULL,
         client_id text COLLATE "C" NOT NULL,
@@ -132,7 +138,7 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE TABLE configuration.client_secrets (
         realm_id text COLLATE "C" NOT NULL,
         client_id text COLLATE "C" NOT NULL,
@@ -149,7 +155,7 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE TABLE configuration.client_string_values (
         realm_id text COLLATE "C" NOT NULL,
         client_id text COLLATE "C" NOT NULL,
@@ -164,29 +170,29 @@ END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE UNIQUE INDEX ux_realms_domain ON configuration.realms (domain);
     END IF;
 END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE UNIQUE INDEX ux_realms_path ON configuration.realms (path);
     END IF;
 END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
     CREATE INDEX ix_signing_keys_realm_created ON configuration.signing_keys (realm_id, created_utc);
     END IF;
 END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
-    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    IF NOT EXISTS(SELECT 1 FROM configuration."__EFMigrationsHistory" WHERE "MigrationId" = '20260722233806_InitialConfiguration') THEN
+    INSERT INTO configuration."__EFMigrationsHistory" ("MigrationId", "ProductVersion")
     VALUES ('20260722233806_InitialConfiguration', '10.0.10');
     END IF;
 END $EF$;

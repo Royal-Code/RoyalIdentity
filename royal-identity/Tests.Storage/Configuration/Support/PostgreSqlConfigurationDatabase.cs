@@ -30,7 +30,7 @@ internal sealed class PostgreSqlConfigurationDatabase
 
     public static async Task<PostgreSqlConfigurationDatabase> CreateMigratedAsync()
     {
-        var administrativeConnectionString = ConfigurationPostgreSqlTestEnvironment.ConnectionString;
+        var administrativeConnectionString = StoragePostgreSqlTestEnvironment.ConnectionString;
         var databaseName = $"royalidentity_configuration_{Guid.NewGuid():N}";
         await using (var connection = new NpgsqlConnection(administrativeConnectionString))
         {

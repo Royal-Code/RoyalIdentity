@@ -3,20 +3,51 @@ using Microsoft.Extensions.Logging;
 
 namespace RoyalIdentity.Migrations;
 
-internal static class MigrationRunnerDiagnostics
+/// <summary>
+/// Redacts anything secret from what the runner prints (plan DF28). It is public so the guarantee can be
+/// asserted directly: a provider error message routinely echoes the connection string that produced it, and
+/// that string carries the password.
+/// </summary>
+public static class MigrationRunnerDiagnostics
 {
     public static string Sanitize(string message, MigrationRunnerOptions? options)
     {
         if (options is null)
             return message;
 
-        var sanitized = message.Replace(
-            options.ConfigurationConnection,
-            "[REDACTED CONNECTION]",
-            StringComparison.Ordinal);
+        var sanitized = message;
+
+        // Both connections are redacted: a run may carry two, and a message from the Operational family would
+        // otherwise leak the credentials of a database the Configuration redaction never looks at.
+        foreach (var connection in Connections(options))
+            sanitized = Redact(sanitized, connection, out var invalid) is var redacted && invalid
+                ? "A connection string given to the migration runner is invalid."
+                : redacted;
+
+        if (!string.IsNullOrWhiteSpace(options.AesKeyEnvironmentVariable))
+        {
+            var aesKey = Environment.GetEnvironmentVariable(options.AesKeyEnvironmentVariable);
+            if (!string.IsNullOrEmpty(aesKey))
+                sanitized = sanitized.Replace(aesKey, "[REDACTED]", StringComparison.Ordinal);
+        }
+
+        return sanitized;
+    }
+
+    /// <summary>The distinct connections this run may have touched — one when both families share a database.</summary>
+    private static IEnumerable<string> Connections(MigrationRunnerOptions options)
+        => new[] { options.ConfigurationConnection, options.ResolvedOperationalConnection }
+            .Where(connection => !string.IsNullOrWhiteSpace(connection))
+            .Distinct(StringComparer.Ordinal);
+
+    private static string Redact(string message, string connection, out bool invalidConnection)
+    {
+        var sanitized = message.Replace(connection, "[REDACTED CONNECTION]", StringComparison.Ordinal);
+        invalidConnection = false;
+
         try
         {
-            var builder = new DbConnectionStringBuilder { ConnectionString = options.ConfigurationConnection };
+            var builder = new DbConnectionStringBuilder { ConnectionString = connection };
             foreach (var name in new[] { "Password", "Pwd" })
             {
                 if (builder.TryGetValue(name, out var value) && value is not null)
@@ -30,14 +61,7 @@ internal static class MigrationRunnerDiagnostics
         catch (ArgumentException)
         {
             // Invalid connection strings are themselves rejected by the provider; never echo the original value.
-            sanitized = "The Configuration connection string is invalid.";
-        }
-
-        if (!string.IsNullOrWhiteSpace(options.AesKeyEnvironmentVariable))
-        {
-            var aesKey = Environment.GetEnvironmentVariable(options.AesKeyEnvironmentVariable);
-            if (!string.IsNullOrEmpty(aesKey))
-                sanitized = sanitized.Replace(aesKey, "[REDACTED]", StringComparison.Ordinal);
+            invalidConnection = true;
         }
 
         return sanitized;

@@ -47,16 +47,24 @@ public static class ConfigurationMigrationRunner
     }
 
     /// <summary>
-    /// Moves a legacy <c>__EFMigrationsHistory</c> onto the Configuration history name. Idempotent, and it
-    /// fails closed when both exist. PostgreSQL gets its equivalent in Fase 7 of the Operational plan; until
-    /// then a PostgreSQL database keeps the history the schema puts it in.
+    /// Moves a legacy <c>__EFMigrationsHistory</c> onto the Configuration history of DF23 — by name on SQLite,
+    /// by schema on PostgreSQL. Idempotent on both, and both fail closed when the two histories coexist.
     /// </summary>
     private static async Task BootstrapMigrationsHistoryAsync(MigrationRunnerOptions options, CancellationToken ct)
     {
-        if (options.ConfigurationProvider is not ConfigurationDatabaseProvider.Sqlite)
-            return;
+        switch (options.ConfigurationProvider)
+        {
+            case ConfigurationDatabaseProvider.Sqlite:
+                await new SqliteMigrationsHistoryBootstrap().RunAsync(options.ConfigurationConnection, ct);
+                break;
 
-        await new SqliteMigrationsHistoryBootstrap().RunAsync(options.ConfigurationConnection, ct);
+            case ConfigurationDatabaseProvider.PostgreSql:
+                await new PostgreSqlMigrationsHistoryBootstrap().RunAsync(options.ConfigurationConnection, ct);
+                break;
+
+            default:
+                throw new InvalidOperationException("Unsupported Configuration provider.");
+        }
     }
 
     private static ConfigurationDbContext CreateContext(MigrationRunnerOptions options)
@@ -70,7 +78,9 @@ public static class ConfigurationMigrationRunner
                     .Options),
             ConfigurationDatabaseProvider.PostgreSql => new ConfigurationPostgreSqlDbContext(
                 new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
-                    .UseNpgsql(options.ConfigurationConnection)
+                    .UseNpgsql(
+                        options.ConfigurationConnection,
+                        npgsql => npgsql.UseConfigurationMigrationsHistory())
                     .Options),
             _ => throw new InvalidOperationException("Unsupported Configuration provider."),
         };

@@ -7,23 +7,23 @@ namespace Tests.Storage.Configuration;
 /// <summary>
 /// Runs the exact provider-neutral P2 scenarios against PostgreSQL. The concrete suites stay private so xUnit
 /// does not discover their inherited facts when the opt-in connection is unavailable; each public aggregate
-/// is skipped by <see cref="ConfigurationPostgreSqlFactAttribute"/> in that case.
+/// is skipped by <see cref="StoragePostgreSqlFactAttribute"/> in that case.
 /// </summary>
 public class PostgreSqlConfigurationContractTests
 {
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public Task ClientContracts() => ProviderFactRunner.RunAsync(new PostgreSqlClientContracts());
 
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public Task KeyContracts() => ProviderFactRunner.RunAsync(new PostgreSqlKeyContracts());
 
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public Task RealmContracts() => ProviderFactRunner.RunAsync(new PostgreSqlRealmContracts());
 
-    [ConfigurationPostgreSqlFact]
+    [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
     public Task ResourceContracts() => ProviderFactRunner.RunAsync(new PostgreSqlResourceContracts());
 
