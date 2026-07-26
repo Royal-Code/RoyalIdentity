@@ -1788,7 +1788,8 @@ provider produtivo.
 - Gerar migration inicial Operational PostgreSQL e scripts SQL revisáveis/idempotentes conforme o padrão P2.
 - Gerar nova migration Configuration PostgreSQL que remove `update_access_token_claims_on_refresh`, equivalente à
   SQLite e sem editar migrations anteriores.
-- Estender `RoyalIdentity.Migrations` para selecionar famílias e aceitar uma ou duas conexões.
+- Estender `RoyalIdentity.Migrations` para selecionar famílias, aceitar uma ou duas conexões e declarar
+  explicitamente a topologia compartilhada/separada quando duas conexões alcançam o mesmo banco.
 - Quando ambas apontam ao mesmo banco, aplicar Configuration e Operational sequencialmente; quando distintas,
   reportar falha por família sem sugerir atomicidade conjunta.
 - Criar fixture PostgreSQL opt-in e script Podman com PostgreSQL 17 e porta host dinâmica diferente de 5432.
@@ -1839,7 +1840,7 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~StorageMigrationRunnerTes
 ### Resultado da Fase 7
 
 **Concluída em 2026-07-26**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
-RoyalIdentity.sln` verde: 1202 aprovados, 37 ignorados (36 PostgreSQL opt-in + 1 UserAccounts), 0 falhas.
+RoyalIdentity.sln` verde: 1207 aprovados, 37 ignorados (36 PostgreSQL opt-in + 1 UserAccounts), 0 falhas.
 Contra um PostgreSQL 17 real via Podman (`./scripts/Test-OperationalPostgreSql.ps1`): **36 aprovados, 0
 falhas**. `git diff --check` sem erros.
 
@@ -1865,7 +1866,7 @@ falhas**. `git diff --check` sem erros.
   `OperationalAuthorizeParametersTests`, `OperationalCleanupTests` e `OperationalPurgeRealmTests` (as quatro
   provider-parametrizadas: SQLite sempre, PostgreSQL por agregado opt-in),
   `PostgreSqlOperationalConcurrencyTests` (3), `PostgreSqlOperationalMigrationTests` (9),
-  `PostgreSqlStorageGatewayTests` (3), `StorageMigrationRunnerTests` (16), `MigrationsSnapshotDriftTests` (4),
+  `PostgreSqlStorageGatewayTests` (3), `StorageMigrationRunnerTests` (19), `MigrationsSnapshotDriftTests` (4),
   mais os fixtures `PostgreSqlOperationalDatabase`, `PostgreSqlOperationalStorageHarness`,
   `PostgreSqlOperationalConcurrencyDatabase`, `IOperationalParityHarness` e `OperationalParitySuite`.
 
@@ -1873,8 +1874,9 @@ falhas**. `git diff --check` sem erros.
 
 - `ConfigurationPostgreSqlDesignTimeDbContextFactory` e `ConfigurationMigrationRunner` passaram a configurar a
   history explicitamente; o bootstrap PostgreSQL entrou no runner ao lado do SQLite.
-- `MigrationRunnerOptions` ganhou `--families` e a conexão Operational (direta ou por variável de ambiente),
-  com `ResolvedOperationalConnection`/`SharesOneDatabase`; `--seed` é recusado sem a família Configuration.
+- `MigrationRunnerOptions` ganhou `--families`, a conexão Operational (direta ou por variável de ambiente) e
+  `--database-topology <shared|separate>`, com `ResolvedOperationalConnection`/
+  `ResolvedDatabaseTopology`/`SharesOneDatabase`; `--seed` é recusado sem a família Configuration.
 - `MigrationRunnerDiagnostics` virou público e redige **as duas** conexões; `Program` reporta família a família
   e devolve 1 quando alguma falha.
 - `scripts/sql/configuration/postgresql/0001_initial_configuration.sql` foi regenerado contra a nova history
@@ -1927,7 +1929,9 @@ falhas**. `git diff --check` sem erros.
   plano diz não existir, e que esconderia um banco Operational saudável atrás de uma falha alheia. Agora
   `failureStopsTheRun = options.SharesOneDatabase`: mesmo banco interrompe (aplicar sobre um Configuration que
   acabou de falhar migraria um banco em estado desconhecido), bancos distintos seguem e reportam cada família.
-  Dois aceites novos cobrem as duas direções.
+  A topologia não é inferida pela igualdade textual das connection strings: uma conexão resolve como `Shared`,
+  duas como `Separate`, e `--database-topology shared` declara o caso em que credenciais/opções diferentes
+  alcançam o mesmo banco. Aceites cobrem as duas direções e o fail-stop com duas strings distintas.
 - **A lacuna dos aceites SQLite incluía cobertura exigida pela fase.** Correto, e a justificativa anterior
   ("refatoração mecânica") não sustentava: TTL, expiração fail-closed, colisão de handle, cleanup e purge estão
   fora dos contratos neutros por decisão documentada, então o critério "SQLite/PostgreSQL concordam em TTL e

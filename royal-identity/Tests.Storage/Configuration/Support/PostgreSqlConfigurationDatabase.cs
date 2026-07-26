@@ -84,20 +84,6 @@ internal sealed class PostgreSqlConfigurationDatabase
         services.AddEntityFrameworkConfigurationStorage<ConfigurationPostgreSqlDbContext>();
     }
 
-    /// <summary>Whether a migrations history table exists in the given schema, so a fixture can prove where it is.</summary>
-    public async Task<bool> HasMigrationsHistoryAsync(string schema)
-    {
-        await using var connection = new NpgsqlConnection(ConnectionString);
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand(
-            "SELECT COUNT(*) FROM information_schema.tables " +
-            "WHERE table_schema = @schema AND table_name = '__EFMigrationsHistory'",
-            connection);
-        command.Parameters.AddWithValue("schema", schema);
-
-        return Convert.ToInt64(await command.ExecuteScalarAsync()) > 0;
-    }
-
     public async ValueTask DisposeAsync()
     {
         await using var connection = new NpgsqlConnection(administrativeConnectionString);

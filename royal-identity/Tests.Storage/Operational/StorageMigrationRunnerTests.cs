@@ -46,13 +46,15 @@ public class StorageMigrationRunnerTests : IDisposable
     private static MigrationRunnerOptions Options(
         string configurationConnection,
         StorageFamilySelection families,
-        string? operationalConnection = null)
+        string? operationalConnection = null,
+        StorageDatabaseTopology? databaseTopology = null)
         => new()
         {
             ConfigurationProvider = ConfigurationDatabaseProvider.Sqlite,
             ConfigurationConnection = configurationConnection,
             Families = families,
             OperationalConnection = operationalConnection,
+            DatabaseTopology = databaseTopology,
         };
 
     private static async Task<List<string>> TableNamesAsync(string connectionString)
@@ -179,6 +181,27 @@ public class StorageMigrationRunnerTests : IDisposable
         Assert.Equal(StorageMigrationStatus.NotAttempted, report.For(StorageFamilySelection.Operational).Status);
     }
 
+    // Two different connection strings can still reach one physical database, for example through distinct
+    // Configuration and Operational credentials. Explicit topology, not textual equality, controls fail-stop.
+    [Fact]
+    public async Task WhenSharedTopologyUsesDifferentConnectionStrings_AFailureStillStopsTheRun()
+    {
+        const string unreachableConfiguration =
+            "Data Source=/this/path/does/not/exist/royalidentity.db;Default Timeout=1";
+        const string differentlyFormattedSameTarget =
+            "Default Timeout=2;Data Source=/this/path/does/not/exist/royalidentity.db";
+
+        var report = await StorageMigrationRunner.RunAsync(Options(
+            unreachableConfiguration,
+            StorageFamilySelection.All,
+            differentlyFormattedSameTarget,
+            StorageDatabaseTopology.Shared));
+
+        Assert.False(report.Succeeded);
+        Assert.Equal(StorageMigrationStatus.Failed, report.For(StorageFamilySelection.Configuration).Status);
+        Assert.Equal(StorageMigrationStatus.NotAttempted, report.For(StorageFamilySelection.Operational).Status);
+    }
+
     // Over TWO databases it does not: coupling them would be exactly the joint atomicity that does not exist,
     // and would hide a perfectly healthy Operational database behind an unrelated failure.
     [Fact]
@@ -245,6 +268,7 @@ public class StorageMigrationRunnerTests : IDisposable
 
         Assert.Equal(StorageFamilySelection.All, options.Families);
         Assert.Equal("Host=o;Database=o", options.ResolvedOperationalConnection);
+        Assert.Equal(StorageDatabaseTopology.Separate, options.ResolvedDatabaseTopology);
         Assert.False(options.SharesOneDatabase);
     }
 
@@ -260,7 +284,65 @@ public class StorageMigrationRunnerTests : IDisposable
         ]);
 
         Assert.Equal("Data Source=shared.db", options.ResolvedOperationalConnection);
+        Assert.Equal(StorageDatabaseTopology.Shared, options.ResolvedDatabaseTopology);
         Assert.True(options.SharesOneDatabase);
+    }
+
+    [Fact]
+    public void Parse_ExplicitSharedTopology_AllowsDifferentConnectionsForOneDatabase()
+    {
+        var options = MigrationRunnerOptions.Parse(
+        [
+            "--configuration-provider", "postgresql",
+            "--configuration-connection", "Host=db;Database=identity;Username=configuration",
+            "--families", "all",
+            "--operational-connection", "Host=db;Database=identity;Username=operation",
+            "--database-topology", "shared",
+        ]);
+
+        Assert.Equal(StorageDatabaseTopology.Shared, options.ResolvedDatabaseTopology);
+        Assert.True(options.SharesOneDatabase);
+    }
+
+    [Fact]
+    public void Parse_RejectsSeparateTopologyWithoutAnOperationalConnection()
+    {
+        var failure = Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
+        [
+            "--configuration-provider", "postgresql",
+            "--configuration-connection", "Host=db;Database=configuration",
+            "--families", "all",
+            "--database-topology", "separate",
+        ]));
+
+        Assert.Contains("requires an Operational connection", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Runner_RejectsSeparateTopologyWithoutAnOperationalConnection_InDirectOptions()
+    {
+        var options = Options(
+            NewConnectionString(),
+            StorageFamilySelection.All,
+            databaseTopology: StorageDatabaseTopology.Separate);
+
+        var failure = await Assert.ThrowsAsync<MigrationRunnerUsageException>(
+            () => StorageMigrationRunner.RunAsync(options));
+
+        Assert.Contains("requires an Operational connection", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Parse_RejectsTopologyWhenBothFamiliesAreNotSelected()
+    {
+        var failure = Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
+        [
+            "--configuration-provider", "sqlite",
+            "--configuration-connection", "Data Source=configuration.db",
+            "--database-topology", "shared",
+        ]));
+
+        Assert.Contains("both storage families", failure.Message, StringComparison.Ordinal);
     }
 
     // An Operational connection without the Operational family would silently do nothing.

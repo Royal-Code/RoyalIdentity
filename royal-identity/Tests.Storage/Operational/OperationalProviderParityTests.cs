@@ -12,10 +12,10 @@ namespace Tests.Storage.Operational;
 
 /// <summary>
 /// The per-realm policies of the Operational family, asserted identically on every provider (plan Fase 7).
-/// The provider-neutral contract suite already covers casing, duplicates, absence, TTL and counts on both;
-/// what remains — and what a schema/type/collation difference could silently break — are the three JWT
-/// persistence modes (DF31), the two refresh claims modes (DF32/DF33) and the per-realm protection profile
-/// (DF30). These scenarios exist to answer one question: do the providers agree?
+/// The provider-neutral contracts and the EF parity suites cover casing, duplicates, absence, TTL and counts on
+/// both providers. What remains here — and what a schema/type/collation difference could silently break — are
+/// the three JWT persistence modes (DF31), the two refresh claims modes (DF32/DF33) and the per-realm protection
+/// profile (DF30). These scenarios exist to answer one question: do the providers agree?
 /// </summary>
 public abstract class OperationalProviderParityTests : OperationalParitySuite
 {

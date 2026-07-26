@@ -7,6 +7,17 @@ public enum ConfigurationDatabaseProvider
 }
 
 /// <summary>
+/// Whether Configuration and Operational are two migration families in one physical database or live in
+/// independent databases. This is deployment topology, not something connection-string equality can prove:
+/// one database may legitimately be reached with different credentials or connection options.
+/// </summary>
+public enum StorageDatabaseTopology
+{
+    Shared,
+    Separate,
+}
+
+/// <summary>
 /// Which storage families this run migrates (plan DF23). They evolve independently and keep independent
 /// histories, so migrating one never implies the other — even when they share a database.
 /// </summary>
@@ -41,12 +52,15 @@ public sealed class MigrationRunnerOptions
         "(--configuration-connection <value> | --configuration-connection-env <name>) " +
         "[--families <configuration|operational|all>] " +
         "[--operational-connection <value> | --operational-connection-env <name>] " +
+        "[--database-topology <shared|separate>] " +
         "[--seed <none|product|demo|all>] " +
         "[--server-admin-redirect-uri <absolute-uri> ...] " +
         "[--key-protector <plain|aes|data-protection>] " +
         "[--aes-key-env <name>] " +
         "[--data-protection-key-ring <directory>] " +
-        "[--data-protection-app-name <name>]";
+        "[--data-protection-app-name <name>]. " +
+        "Topology defaults to shared with one connection and separate with two; specify " +
+        "--database-topology shared when different connections reach the same physical database.";
 
     /// <summary>
     /// The provider of both families. One deployment does not mix providers: the families may live in different
@@ -68,10 +82,25 @@ public sealed class MigrationRunnerOptions
     /// <summary>The connection the Operational family migrates over, sharing the Configuration one by default.</summary>
     public string ResolvedOperationalConnection => OperationalConnection ?? ConfigurationConnection;
 
-    /// <summary>Whether both families were pointed at the same connection string.</summary>
+    /// <summary>
+    /// Explicit deployment topology. When omitted, one connection means <see cref="StorageDatabaseTopology.Shared"/>
+    /// and two connections mean <see cref="StorageDatabaseTopology.Separate"/>. Supplying
+    /// <see cref="StorageDatabaseTopology.Shared"/> supports one physical database reached through two different
+    /// connection strings, such as distinct Configuration and Operational credentials.
+    /// </summary>
+    public StorageDatabaseTopology? DatabaseTopology { get; init; }
+
+    /// <summary>The explicit topology, or the deterministic one/two-connection default.</summary>
+    public StorageDatabaseTopology ResolvedDatabaseTopology
+        => DatabaseTopology
+            ?? (OperationalConnection is null
+                ? StorageDatabaseTopology.Shared
+                : StorageDatabaseTopology.Separate);
+
+    /// <summary>Whether both selected families are declared to live in one physical database.</summary>
     public bool SharesOneDatabase
         => Families is StorageFamilySelection.All
-            && string.Equals(ResolvedOperationalConnection, ConfigurationConnection, StringComparison.Ordinal);
+            && ResolvedDatabaseTopology is StorageDatabaseTopology.Shared;
 
     public ConfigurationSeedMode Seed { get; init; }
 
@@ -110,13 +139,16 @@ public sealed class MigrationRunnerOptions
             : ParseFamilies(familiesValue);
         var operationalConnection = ResolveConnection(
             values, "--operational-connection", "--operational-connection-env", required: false);
+        var topologyValue = Optional(values, "--database-topology");
+        StorageDatabaseTopology? databaseTopology = topologyValue is null
+            ? null
+            : ParseDatabaseTopology(topologyValue);
 
         if (operationalConnection is not null && !families.HasFlag(StorageFamilySelection.Operational))
         {
             throw new MigrationRunnerUsageException(
                 "An Operational connection was given but the Operational family was not selected.");
         }
-
         var seedValue = Optional(values, "--seed");
         var seed = seedValue is null ? ConfigurationSeedMode.None : ParseSeed(seedValue);
         var protectorValue = Optional(values, "--key-protector");
@@ -154,12 +186,13 @@ public sealed class MigrationRunnerOptions
             throw new MigrationRunnerUsageException(
                 "--data-protection-key-ring is required for the Data Protection protector.");
 
-        return new MigrationRunnerOptions
+        var options = new MigrationRunnerOptions
         {
             ConfigurationProvider = provider,
             ConfigurationConnection = connection,
             Families = families,
             OperationalConnection = operationalConnection,
+            DatabaseTopology = databaseTopology,
             Seed = seed,
             KeyProtector = protector,
             ProductSeed = new ConfigurationProductSeedOptions
@@ -170,6 +203,29 @@ public sealed class MigrationRunnerOptions
             DataProtectionKeyRing = dataProtectionKeyRing,
             DataProtectionApplicationName = dataProtectionApplicationName,
         };
+        options.ValidateDatabaseTopology();
+
+        return options;
+    }
+
+    /// <summary>
+    /// Validates the topology independently from command-line parsing because callers may construct these
+    /// options directly and invoke <see cref="StorageMigrationRunner"/>.
+    /// </summary>
+    internal void ValidateDatabaseTopology()
+    {
+        if (DatabaseTopology is not null && Families is not StorageFamilySelection.All)
+        {
+            throw new MigrationRunnerUsageException(
+                "--database-topology applies only when both storage families are selected.");
+        }
+        if (Families is StorageFamilySelection.All
+            && ResolvedDatabaseTopology is StorageDatabaseTopology.Separate
+            && OperationalConnection is null)
+        {
+            throw new MigrationRunnerUsageException(
+                "The Separate database topology requires an Operational connection.");
+        }
     }
 
     private static Dictionary<string, List<string>> ParseValues(string[] args)
@@ -182,6 +238,7 @@ public sealed class MigrationRunnerOptions
             "--families",
             "--operational-connection",
             "--operational-connection-env",
+            "--database-topology",
             "--seed",
             "--server-admin-redirect-uri",
             "--key-protector",
@@ -270,6 +327,14 @@ public sealed class MigrationRunnerOptions
             "sqlite" => ConfigurationDatabaseProvider.Sqlite,
             "postgresql" or "postgres" => ConfigurationDatabaseProvider.PostgreSql,
             _ => throw new MigrationRunnerUsageException("Unsupported Configuration provider."),
+        };
+
+    private static StorageDatabaseTopology ParseDatabaseTopology(string value)
+        => value.ToLowerInvariant() switch
+        {
+            "shared" => StorageDatabaseTopology.Shared,
+            "separate" => StorageDatabaseTopology.Separate,
+            _ => throw new MigrationRunnerUsageException("Unsupported database topology."),
         };
 
     private static ConfigurationSeedMode ParseSeed(string value)

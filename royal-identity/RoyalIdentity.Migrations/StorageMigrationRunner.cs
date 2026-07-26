@@ -51,14 +51,15 @@ public static class StorageMigrationRunner
         MigrationRunnerOptions options, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(options);
+        options.ValidateDatabaseTopology();
 
         List<StorageMigrationFamilyResult> results = [];
         var stopped = false;
 
-        // Whether a failure in one family stops the next. Over one database it does: applying Operational on
-        // top of a Configuration that just failed migrates a database in an unknown state. Over two databases it
-        // does not — coupling them there would be exactly the joint atomicity this plan says does not exist
-        // (plan DF23), and it would hide a perfectly healthy Operational database behind an unrelated failure.
+        // Whether a failure in one family stops the next. This is driven by the declared physical topology,
+        // never inferred from connection-string equality: one database may use distinct credentials for each
+        // family. Over one database a Configuration failure leaves that database in an unknown state. Over two
+        // databases, coupling them would be exactly the joint atomicity this plan says does not exist (DF23).
         var failureStopsTheRun = options.SharesOneDatabase;
 
         foreach (var family in new[] { StorageFamilySelection.Configuration, StorageFamilySelection.Operational })
