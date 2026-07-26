@@ -183,8 +183,19 @@ public class OperationalModelTests
         Assert.True(HasIndexOn(Entity<UserSessionEntity>(), nameof(UserSessionEntity.EndedAtUtc)));
         Assert.True(HasIndexOn(
             Entity<AuthorizeParametersEntity>(),
-            nameof(AuthorizeParametersEntity.RealmId),
             nameof(AuthorizeParametersEntity.ExpiresAtUtc)));
+    }
+
+    // DF17/DF18: every realm-bound sweep and the whole purge filter on realm_id, and each of those tables has
+    // it as the leading key column — so no index beyond the primary key is needed for them.
+    [Fact]
+    public void RealmBoundSweeps_AreServedByThePrimaryKey()
+    {
+        Assert.Equal(nameof(ProtocolArtifactEntity.RealmId), KeyProperties<ProtocolArtifactEntity>()[0]);
+        Assert.Equal(nameof(ConsentEntity.RealmId), KeyProperties<ConsentEntity>()[0]);
+        Assert.Equal(nameof(UserSessionEntity.RealmId), KeyProperties<UserSessionEntity>()[0]);
+        Assert.Equal(nameof(UserSessionClientEntity.RealmId), KeyProperties<UserSessionClientEntity>()[0]);
+        Assert.Equal(nameof(AuthorizeParametersEntity.RealmId), KeyProperties<AuthorizeParametersEntity>()[0]);
     }
 
     // AT-04/RT-05: subject-scoped removals never scan another artifact type or another realm.

@@ -114,7 +114,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
             migrationBuilder.CreateIndex(
                 name: "ix_authorize_parameters_expiration",
                 table: "authorize_parameters",
-                columns: new[] { "realm_id", "expires_at_utc" });
+                column: "expires_at_utc");
 
             migrationBuilder.CreateIndex(
                 name: "ix_consents_expiration",

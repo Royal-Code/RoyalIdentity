@@ -35,7 +35,11 @@ public sealed class DefaultAuthorizationContextResolver(
             logger.LogDebug("returnUrl is valid");
 
             var parameters = returnUrl.ReadQueryStringAsNameValueCollection();
-            if (parameters.TryGet(Oidc.Routes.Params.Authorization, out var messageStoreId))
+
+            // DF16: the store is only consulted when the realm keeps authorize parameters server-side. With the
+            // option off, the parameters travel in the query string and nothing here touches the store.
+            if (realm.Options.StoreAuthorizationParameters
+                && parameters.TryGet(Oidc.Routes.Params.Authorization, out var messageStoreId))
             {
                 parameters = await storage.GetAuthorizeParametersStore(realm).ReadAsync(messageStoreId, ct) ?? [];
             }

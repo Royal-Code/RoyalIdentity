@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
+using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 using Tests.Storage.Configuration.Support;
@@ -42,7 +43,14 @@ internal sealed class SqliteOperationalStorageHarness
 
     public static async Task<StorageContractHarness> CreateAsync() => await CreateConcreteAsync();
 
-    internal static async Task<SqliteOperationalStorageHarness> CreateConcreteAsync()
+    /// <param name="handleGenerator">
+    /// Replaces the authorize-parameters handle generator, so a scenario can stage a collision instead of
+    /// waiting for one (plan DF16).
+    /// </param>
+    /// <param name="cleanup">Configures the maintenance options this fixture exposes.</param>
+    internal static async Task<SqliteOperationalStorageHarness> CreateConcreteAsync(
+        IAuthorizeParametersHandleGenerator? handleGenerator = null,
+        Action<OperationalCleanupOptions>? cleanup = null)
     {
         var database = await SqliteOperationalDatabase.CreateMigratedAsync();
 
@@ -50,6 +58,12 @@ internal sealed class SqliteOperationalStorageHarness
             database,
             services =>
             {
+                if (handleGenerator is not null)
+                    services.AddSingleton(handleGenerator);
+
+                if (cleanup is not null)
+                    services.Configure(cleanup);
+
                 services.AddDbContext<ConfigurationSqliteDbContext>(options => options
                     .UseSqlite(database.Connection, sqlite => sqlite.UseConfigurationMigrationsHistory()));
                 services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();

@@ -114,4 +114,10 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
     }
+
+    public sealed class SqliteOperational : AuthorizeParametersStoreContractTests
+    {
+        protected override Task<StorageContractHarness> CreateHarnessAsync()
+            => Operational.Support.SqliteOperationalStorageHarness.CreateAsync();
+    }
 }

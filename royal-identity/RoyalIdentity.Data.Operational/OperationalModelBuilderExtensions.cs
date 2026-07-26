@@ -124,8 +124,10 @@ public static class OperationalModelBuilderExtensions
             entity.Property(e => e.ExpiresAtUtc).HasColumnName("expires_at_utc");
             entity.Property(e => e.PayloadVersion).HasColumnName("payload_version");
             entity.Property(e => e.ProtectedPayload).HasColumnName("protected_payload");
-            entity.HasIndex(e => new { e.RealmId, e.ExpiresAtUtc })
-                .HasDatabaseName("ix_authorize_parameters_expiration");
+            // Cleanup predicate (plan DF17): the global sweep filters on expiration alone, so that is the
+            // leading column. Everything realm-bound — the store's reads/deletes and the purge — is already
+            // served by the primary key, which starts with realm_id.
+            entity.HasIndex(e => e.ExpiresAtUtc).HasDatabaseName("ix_authorize_parameters_expiration");
         });
 
         return modelBuilder;

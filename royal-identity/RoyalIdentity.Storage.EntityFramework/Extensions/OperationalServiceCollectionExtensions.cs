@@ -5,8 +5,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Storage.EntityFramework.Operational;
 using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
+using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 using RoyalIdentity.Storage.EntityFramework.Operational.Protection;
 using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
+using RoyalIdentity.Storage.EntityFramework.Storage;
+using RoyalIdentity.Contracts.Storage;
 
 namespace RoyalIdentity.Storage.EntityFramework.Extensions;
 
@@ -41,8 +44,67 @@ public static class OperationalServiceCollectionExtensions
         services.TryAddSingleton<AuthorizeParametersPayloadSerializer>();
         services.TryAddSingleton<OperationalPayloadProtectorResolver>();
         services.TryAddSingleton<OperationalPayloadProtection>();
+        services.TryAddSingleton<IAuthorizeParametersHandleGenerator, CryptoRandomAuthorizeParametersHandleGenerator>();
         services.TryAddScoped<IOperationalDbContextAccessor, OperationalDbContextAccessor<TContext>>();
         services.TryAddScoped<IOperationalStoreFactory, EntityFrameworkOperationalStoreFactory>();
+        services.TryAddScoped<IOperationalMaintenance, EntityFrameworkOperationalMaintenance>();
+        services.AddOptions<OperationalCleanupOptions>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// <para>
+    ///     Configures the Operational maintenance and, in <see cref="CleanupExecutionMode.Hosted"/>, registers
+    ///     the worker that drives it. In <see cref="CleanupExecutionMode.External"/> no worker is registered and
+    ///     the same <see cref="IOperationalMaintenance"/> is left for a command or job — so the two schedulers
+    ///     can never both be running (plan DF17).
+    /// </para>
+    /// <para>
+    ///     Invalid options fail here rather than at the first pass: a cleanup that silently never runs is the
+    ///     failure mode worth preventing.
+    /// </para>
+    /// </summary>
+    public static IServiceCollection AddEntityFrameworkOperationalCleanup(
+        this IServiceCollection services, Action<OperationalCleanupOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var options = new OperationalCleanupOptions();
+        configure(options);
+
+        var errors = options.Validate();
+        if (errors.Count is not 0)
+            throw new InvalidOperationException($"Invalid operational cleanup options: {string.Join(" ", errors)}");
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.Configure(configure);
+
+        if (options.Mode is CleanupExecutionMode.Hosted)
+            services.AddHostedService<OperationalCleanupWorker>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// <para>
+    ///     Composes the complete production gateway — <c>IStorage</c>, <c>IStorageProvider</c> and
+    ///     <c>IStorageSession</c> — over Configuration EF plus Operational EF (plan DF21). It is an explicit
+    ///     opt-in: the default host stays in-memory until Plano 4.
+    /// </para>
+    /// <para>
+    ///     Both families must already be registered. The Operational family is the one that carries the atomic
+    ///     capabilities MP-2/MP-3, which its store contracts guarantee at compile time (plan DF46) — so a
+    ///     composition built this way can never reach the transitional fallback.
+    /// </para>
+    /// </summary>
+    public static IServiceCollection AddEntityFrameworkStorage(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddScoped<IStorage, EntityFrameworkStorage>();
+        services.TryAddSingleton<IStorageProvider, EntityFrameworkStorageProvider>();
 
         return services;
     }

@@ -48,7 +48,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
 
                     b.HasKey("RealmId", "HandleDigest");
 
-                    b.HasIndex("RealmId", "ExpiresAtUtc")
+                    b.HasIndex("ExpiresAtUtc")
                         .HasDatabaseName("ix_authorize_parameters_expiration");
 
                     b.ToTable("authorize_parameters", (string)null);

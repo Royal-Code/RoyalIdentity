@@ -1,10 +1,10 @@
 # Plan: Persistência EF dos dados operacionais do IdP (`plan-data-operational-storage`)
 
-## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-5 concluídas
+## Status: EM EXECUÇÃO - Q1-Q12 fechadas; Fases 1-6 concluídas
 
 ## Progresso
 
-`█████░░░` **62,5%** - 5 de 8 fases
+`██████░░` **75%** - 6 de 8 fases
 
 | Fase | Estado |
 |---|---|
@@ -13,7 +13,7 @@
 | Fase 3 - sessões SSO sobre SQLite | Concluida |
 | Fase 4 - authorization codes e consumo atômico | Concluida |
 | Fase 5 - refresh tokens e transições condicionais | Concluida |
-| Fase 6 - authorize parameters, cleanup e purge de realm | Não iniciada |
+| Fase 6 - authorize parameters, cleanup e purge de realm | Concluida |
 | Fase 7 - PostgreSQL, migrations, runner e gateway EF completo | Não iniciada |
 | Fase 8 - paridade, fluxos e fechamento | Não iniciada |
 
@@ -1620,22 +1620,22 @@ erros.
 
 **Tarefas:**
 
-- [ ] Migrar login, consent, resolver e callback para o accessor realm-bound.
-- [ ] Alterar `DefaultAuthorizationContextResolver` para obter `httpContext.GetCurrentRealm()` (não apenas
+- [x] Migrar login, consent, resolver e callback para o accessor realm-bound.
+- [x] Alterar `DefaultAuthorizationContextResolver` para obter `httpContext.GetCurrentRealm()` (não apenas
   `GetRealmPath()`), respeitar `StoreAuthorizationParameters` e passar o realm ao accessor.
-- [ ] Cobrir `StoreAuthorizationParameters=true/false`: somente `true` cria/responde handle e aplica TTL;
+- [x] Cobrir `StoreAuthorizationParameters=true/false`: somente `true` cria/responde handle e aplica TTL;
   `false` mantém query string e não invoca o store.
-- [ ] Comprovar que mudar o realm de `true` para `false` não impede o cleanup periódico de AP já expirado.
-- [ ] Cobrir clone/round-trip de `NameValueCollection`, inclusive chaves repetidas se suportadas pelo shape atual.
-- [ ] Injetar handle generator em teste para forçar colisão.
-- [ ] Criar opções de cleanup validadas (modo `Hosted`/`External`, intervalo e batch); a elegibilidade não possui
+- [x] Comprovar que mudar o realm de `true` para `false` não impede o cleanup periódico de AP já expirado.
+- [x] Cobrir clone/round-trip de `NameValueCollection`, inclusive chaves repetidas se suportadas pelo shape atual.
+- [x] Injetar handle generator em teste para forçar colisão.
+- [x] Criar opções de cleanup validadas (modo `Hosted`/`External`, intervalo e batch); a elegibilidade não possui
   grace configurável.
-- [ ] Comprovar que `Hosted` registra um único worker, `External` não registra worker e ambos reutilizam a mesma
+- [x] Comprovar que `Hosted` registra um único worker, `External` não registra worker e ambos reutilizam a mesma
   manutenção.
-- [ ] Implementar e testar índices alinhados aos predicados reais de cleanup global/realm-bound da DF17.
-- [ ] Implementar lazy AP cleanup sem transformar delete falho em retorno de payload expirado.
-- [ ] Semear todas as tabelas em dois realms, purgar um e provar isolamento.
-- [ ] Criar `EntityFrameworkStorage`/provider/session e testes de scope/disposal com dois DbContexts.
+- [x] Implementar e testar índices alinhados aos predicados reais de cleanup global/realm-bound da DF17.
+- [x] Implementar lazy AP cleanup sem transformar delete falho em retorno de payload expirado.
+- [x] Semear todas as tabelas em dois realms, purgar um e provar isolamento.
+- [x] Criar `EntityFrameworkStorage`/provider/session e testes de scope/disposal com dois DbContexts.
 
 **Critérios de aceite:**
 
@@ -1662,7 +1662,74 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~Login|FullyQualifiedN
 
 ### Resultado da Fase 6
 
-*a preencher*
+**Concluída em 2026-07-25.** `dotnet test RoyalIdentity.sln` verde: 1160 aprovados, 9 ignorados (PostgreSQL
+opt-in), 0 falhas — +47 casos sobre a Fase 5. `git diff --check` sem erros.
+
+**Arquivos criados**
+
+- `RoyalIdentity.Storage.EntityFramework/Operational/Stores/EntityFrameworkAuthorizeParametersStore.cs` —
+  MP-5/AP-01..AP-03: TTL absoluto, leitura fail-closed com remoção lazy, delete idempotente.
+- `.../Operational/Stores/IAuthorizeParametersHandleGenerator.cs` — seam injetável (`CryptoRandom` de 16 bytes)
+  para encenar colisão em teste em vez de esperar por uma.
+- `.../Operational/Maintenance/IOperationalMaintenance.cs`, `OperationalCleanupOptions.cs`,
+  `EntityFrameworkOperationalMaintenance.cs`, `OperationalCleanupWorker.cs` — MP-6/MP-7.
+- `.../Storage/EntityFrameworkStorage.cs` e `EntityFrameworkStorageProvider.cs` — gateway completo, provider e
+  session.
+- Testes: `Tests.Storage/Operational/SqliteOperationalAuthorizeParametersTests` (10),
+  `SqliteOperationalCleanupTests` (11), `SqliteOperationalPurgeRealmTests` (4),
+  `Tests.Storage/Storage/EntityFrameworkStorageGatewayTests` (10),
+  `Tests.Integration/Endpoints/AuthorizeParametersGateTests` (6).
+
+**Arquivos alterados**
+
+- `DefaultAuthorizationContextResolver` passou a exigir `TryGetCurrentRealm` e a consultar o store **apenas**
+  quando `StoreAuthorizationParameters` está ligado.
+- `OperationalServiceCollectionExtensions` ganhou `AddEntityFrameworkOperationalCleanup` (valida as opções na
+  composição e registra o worker só em `Hosted`) e `AddEntityFrameworkStorage` (gateway opt-in).
+- `EntityFrameworkOperationalStoreFactory` completou os seis membros; o helper `NotYetImplemented` saiu.
+- `OperationalModelBuilderExtensions`: `ix_authorize_parameters_expiration` passou de
+  `(realm_id, expires_at_utc)` para `(expires_at_utc)`; a migration SQLite inicial e o snapshot acompanham.
+- `AuthorizeParametersStoreContractTests` ganhou a fixture `SqliteOperational`; o harness de contrato roteia AP
+  para o Operational quando presente.
+
+**Mudanças observáveis**
+
+- **Nenhuma no comportamento de produção padrão:** o host continua in-memory, e `AddEntityFrameworkStorage()` é
+  opt-in explícito. O que mudou de fato é que o gate `StoreAuthorizationParameters=false` agora vale também no
+  resolver — antes ele lia o store mesmo com a opção desligada, se um handle aparecesse na returnUrl.
+
+**Decisões tomadas na execução**
+
+- **`MaxRefreshTokenPostConsumedTolerance` é `null` por padrão, e isso é a leitura conservadora.** A tolerância
+  real é dado de Configuration por client, e Operational pode viver em outro banco (DF6) — não dá para juntar as
+  duas na query. Sem máximo configurado, refresh consumido só sai quando expira, igual a um que ninguém
+  consumiu. Isso também cobre `TimeSpan.MaxValue`, o ajuste de token reutilizável.
+- **A sessão é um *lifetime*, não uma unidade de trabalho.** `EntityFrameworkStorageSession` só descarta o
+  escopo DI; não há commit, porque Configuration e Operational podem estar em bancos diferentes e nenhuma
+  transação abrange os dois. Os aceites provam que uma escrita numa sessão é visível em outra sem commit algum.
+- **`IStorage.ServerOptions` vem do snapshot publicado.** O membro é síncrono e não pode abrir conexão; o aceite
+  usa um `DbCommandInterceptor` que conta comandos e exige zero — e, para o contador não ser vacuamente zero,
+  faz em seguida uma leitura real pelo mesmo gateway e exige contagem positiva.
+- **O índice de AP estava desalinhado do predicado real.** O plano fixa "consents/AP por `expires_at_utc`", mas
+  o índice fora criado como `(realm_id, expires_at_utc)`. O sweep global filtra só por expiração, então a coluna
+  líder errada tornava o índice inútil justamente para o único predicado que o usaria; tudo que é realm-bound
+  (leituras/deletes do store e o purge) já é servido pela PK, que começa em `realm_id`. Corrigido no mapping, na
+  migration inicial (ainda não liberada) e no snapshot, com teste novo amarrando cada sweep realm-bound à PK.
+- **O purge apaga `user_session_clients` explicitamente antes das sessões**, mesmo com a FK em cascata, para a
+  contagem do relatório ser honesta em providers em que o cascade não roda no banco.
+- **Verificado por mutação:** removendo o gate de `LoginPageResult`, de `AuthorizeCallbackEndpoint` e de
+  `DefaultAuthorizationContextResolver`, cada um derruba exatamente o aceite correspondente.
+
+**Lacunas conhecidas**
+
+- `ConsentPageResult` tem o mesmo gate de `LoginPageResult` e não ganhou aceite próprio: a linha é idêntica e o
+  caminho de consent exige um client com `RequireConsent` e login efetivo no realm de teste. Fica para a Fase 8,
+  que fecha os fluxos ponta a ponta.
+- O worker `OperationalCleanupWorker` é coberto pelo registro (`Hosted` registra exatamente um, `External`
+  nenhum) e pela manutenção que ele chama, mas não por um teste que o execute em loop com `PeriodicTimer` sob
+  clock falso.
+- O comando focado de `Tests.Identity` previsto na fase continua sem casos: a cobertura do resolver vive em
+  `Tests.Integration`, onde há realm, storage e HttpContext reais.
 
 ---
 

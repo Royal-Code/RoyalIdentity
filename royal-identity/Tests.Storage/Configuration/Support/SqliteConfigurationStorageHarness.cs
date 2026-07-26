@@ -269,7 +269,10 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
         /// the realm-bound accessor of MP-5, with no partitioning and no TTL: those are acceptances of the
         /// Operational EF provider, not of this composite (plan-data-operational-storage DF25).
         /// </summary>
-        public IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm) => authorizeParameters;
+        public IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm)
+            => operational is null
+                ? authorizeParameters
+                : operational.GetAuthorizeParametersStore(realm);
 
         // Fase 2 delivered these two over EF; the rest still come from the transitional dictionaries.
         public IAccessTokenStore GetAccessTokenStore(Realm realm)

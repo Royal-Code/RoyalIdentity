@@ -23,6 +23,8 @@ internal sealed class EntityFrameworkOperationalStoreFactory(
     AuthorizationCodePayloadSerializer authorizationCodeSerializer,
     RefreshTokenPayloadSerializer refreshTokenSerializer,
     ConsentPayloadSerializer consentSerializer,
+    AuthorizeParametersPayloadSerializer authorizeParametersSerializer,
+    IAuthorizeParametersHandleGenerator handleGenerator,
     OperationalPayloadProtection protection,
     TimeProvider clock) : IOperationalStoreFactory
 {
@@ -59,8 +61,9 @@ internal sealed class EntityFrameworkOperationalStoreFactory(
     }
 
     public IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm)
-        => throw NotYetImplemented("authorize parameters", 6);
-
-    private static NotSupportedException NotYetImplemented(string store, int phase)
-        => new($"The Operational EF store for {store} lands in Fase {phase} of plan-data-operational-storage.");
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        return new EntityFrameworkAuthorizeParametersStore(
+            realm, accessor, handleGenerator, digest, authorizeParametersSerializer, protection, clock);
+    }
 }
