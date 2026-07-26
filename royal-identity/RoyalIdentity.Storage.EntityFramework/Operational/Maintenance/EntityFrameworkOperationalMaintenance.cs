@@ -23,28 +23,36 @@ internal sealed class EntityFrameworkOperationalMaintenance(
 
         // Expired artifacts of every kind: an abandoned authorization code, an access token past its lifetime.
         // A consumed authorization code is already gone — the atomic consumption removed it (plan DF11).
+        //
+        // The comparison is strict on purpose: the core treats these three lifetimes as exceeded only when
+        // `now > expiration` (`DateTimeExtensions.HasExceeded`/`HasExpired`). Using `<=` here would delete, at
+        // the boundary instant itself, a record the validators still accept.
         var accessTokens = await DeleteBatchAsync(
-            Artifacts(ProtocolArtifactTypes.AccessToken).Where(artifact => artifact.ExpiresAtUtc <= now),
+            Artifacts(ProtocolArtifactTypes.AccessToken).Where(artifact => artifact.ExpiresAtUtc < now),
             batchSize, ct);
 
         var authorizationCodes = await DeleteBatchAsync(
-            Artifacts(ProtocolArtifactTypes.AuthorizationCode).Where(artifact => artifact.ExpiresAtUtc <= now),
+            Artifacts(ProtocolArtifactTypes.AuthorizationCode).Where(artifact => artifact.ExpiresAtUtc < now),
             batchSize, ct);
 
         var refreshTokens = await DeleteBatchAsync(RefreshTokensEligible(now), batchSize, ct);
 
         // A consent without an expiration is never eligible: only an explicit removal or a realm purge takes it.
         var consents = await DeleteBatchAsync(
-            Set<ConsentEntity>().Where(consent => consent.ExpiresAtUtc != null && consent.ExpiresAtUtc <= now),
+            Set<ConsentEntity>().Where(consent => consent.ExpiresAtUtc != null && consent.ExpiresAtUtc < now),
             batchSize, ct);
 
         // A session is eligible once it expired or reached its terminal state; its clients go with it through
-        // the owning foreign key.
+        // the owning foreign key. Sessions are the one inclusive boundary of the family, and deliberately so:
+        // `DefaultUserSessionService` ends an SSO session at `now >= expiresAt`, so at the boundary instant the
+        // session is already over.
         var sessions = await DeleteBatchAsync(
             Set<UserSessionEntity>().Where(session =>
                 (session.ExpiresAtUtc != null && session.ExpiresAtUtc <= now) || session.EndedAtUtc != null),
             batchSize, ct);
 
+        // Authorize parameters are inclusive for the same reason: the store's own read is fail-closed at
+        // `ExpiresAtUtc <= now`, so at the boundary the record already reads as absent.
         var authorizeParameters = await DeleteBatchAsync(
             Set<AuthorizeParametersEntity>().Where(record => record.ExpiresAtUtc <= now),
             batchSize, ct);
@@ -88,6 +96,11 @@ internal sealed class EntityFrameworkOperationalMaintenance(
     /// A refresh token is eligible once it expires. A consumed one is additionally eligible after the largest
     /// tolerance this deployment may have configured — never before, or cleanup would delete a token some
     /// client would still accept (plan DF17). With no configured maximum, only expiration applies.
+    /// <para>
+    /// Both comparisons are strict, mirroring the handler: <c>RefreshTokenHandler.IsWithinTolerance</c> accepts
+    /// while <c>!(now &gt; consumedAt + tolerance)</c>, so at exactly <c>consumedAt + tolerance</c> the token is
+    /// still accepted and must still exist.
+    /// </para>
     /// </summary>
     private IQueryable<ProtocolArtifactEntity> RefreshTokensEligible(DateTime now)
     {
@@ -95,18 +108,19 @@ internal sealed class EntityFrameworkOperationalMaintenance(
         var tolerance = options.Value.MaxRefreshTokenPostConsumedTolerance;
 
         if (tolerance is not { } window || window == TimeSpan.MaxValue)
-            return artifacts.Where(artifact => artifact.ExpiresAtUtc <= now);
+            return artifacts.Where(artifact => artifact.ExpiresAtUtc < now);
 
         var consumedBefore = now - window;
 
         return artifacts.Where(artifact =>
-            artifact.ExpiresAtUtc <= now
-            || (artifact.ConsumedAtUtc != null && artifact.ConsumedAtUtc <= consumedBefore));
+            artifact.ExpiresAtUtc < now
+            || (artifact.ConsumedAtUtc != null && artifact.ConsumedAtUtc < consumedBefore));
     }
 
     /// <summary>
-    /// Deletes at most <paramref name="batchSize"/> rows of the query. The ordering is by expiration so the
-    /// oldest go first, which keeps repeated passes making progress instead of revisiting the same rows.
+    /// Deletes at most <paramref name="batchSize"/> rows of the query. There is no ordering: the rows a pass
+    /// removes leave the eligible set, so repeating the pass always makes progress regardless of which ones it
+    /// picked.
     /// </summary>
     private static async Task<int> DeleteBatchAsync<TEntity>(
         IQueryable<TEntity> eligible, int batchSize, CancellationToken ct)

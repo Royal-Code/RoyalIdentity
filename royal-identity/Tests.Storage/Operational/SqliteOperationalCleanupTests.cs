@@ -144,9 +144,60 @@ public class SqliteOperationalCleanupTests
         Assert.Equal(0, (await Maintenance(harness).CleanupAsync(Start.AddMinutes(29), 100)).RefreshTokens);
         Assert.NotNull(await store.GetAsync("rt-consumed", default));
 
+        // Exactly at the boundary the handler still accepts the token, so cleanup must still keep it:
+        // `IsWithinTolerance` accepts while `!(now > consumedAt + tolerance)`.
+        Assert.Equal(0, (await Maintenance(harness).CleanupAsync(Start.AddMinutes(30), 100)).RefreshTokens);
+        Assert.NotNull(await store.GetAsync("rt-consumed", default));
+
         // Past it.
         Assert.Equal(1, (await Maintenance(harness).CleanupAsync(Start.AddMinutes(31), 100)).RefreshTokens);
         Assert.Null(await store.GetAsync("rt-consumed", default));
+    }
+
+    /// <summary>
+    /// The cleanup boundary must agree with the core, record type by record type. Access tokens, codes,
+    /// consents and refresh tokens are validated with a strict <c>now &gt; expiration</c>, so at the expiration
+    /// instant itself they are still valid and must survive the pass. Sessions and authorize parameters are
+    /// inclusive on both sides — `DefaultUserSessionService` ends at `now >= expiresAt` and the AP read is
+    /// fail-closed at `<=` — so at the boundary they are already gone and cleanup may take them.
+    /// </summary>
+    [Fact]
+    public async Task Cleanup_AtTheExactExpirationInstant_AgreesWithTheCoreValidators()
+    {
+        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        var realm = harness.RealmA;
+        realm.Options.Authentication.AuthorizationInteractionLifetime = 60;
+
+        await harness.Storage.GetAccessTokenStore(realm).StoreAsync(NewAccessToken(realm, "at-boundary", 60), default);
+        await harness.Storage.GetAuthorizationCodeStore(realm)
+            .StoreAuthorizationCodeAsync(NewCode(realm, 60), default);
+        await harness.Storage.GetRefreshTokenStore(realm)
+            .StoreAsync(NewRefreshToken(realm, "rt-boundary", 60), default);
+        await harness.Storage.GetUserConsentStore(realm)
+            .StoreUserConsentAsync(NewConsent(realm, "subject-boundary", Start.AddSeconds(60)), default);
+        await harness.Storage.GetUserSessionStore(realm)
+            .CreateAsync(NewSession("sid-boundary", expiresAt: Start.AddSeconds(60)));
+        await harness.Storage.GetAuthorizeParametersStore(realm)
+            .WriteAsync(new System.Collections.Specialized.NameValueCollection { ["client_id"] = "a" }, default);
+
+        var atTheBoundary = await Maintenance(harness).CleanupAsync(Start.AddSeconds(60), 100);
+
+        // Strict: still valid to the core, so still here.
+        Assert.Equal(0, atTheBoundary.AccessTokens);
+        Assert.Equal(0, atTheBoundary.AuthorizationCodes);
+        Assert.Equal(0, atTheBoundary.RefreshTokens);
+        Assert.Equal(0, atTheBoundary.Consents);
+        // Inclusive: already over to the core, so already eligible.
+        Assert.Equal(1, atTheBoundary.UserSessions);
+        Assert.Equal(1, atTheBoundary.AuthorizeParameters);
+
+        // One tick past the boundary the strict ones become eligible too.
+        var afterwards = await Maintenance(harness).CleanupAsync(Start.AddSeconds(60).AddTicks(1), 100);
+
+        Assert.Equal(1, afterwards.AccessTokens);
+        Assert.Equal(1, afterwards.AuthorizationCodes);
+        Assert.Equal(1, afterwards.RefreshTokens);
+        Assert.Equal(1, afterwards.Consents);
     }
 
     // DF17: a consent without expiration is never eligible; only an explicit removal or a purge takes it.
@@ -268,7 +319,7 @@ public class SqliteOperationalCleanupTests
     public void CleanupOptions_Validate_RejectsIncoherentConfiguration()
     {
         Assert.Contains(
-            new OperationalCleanupOptions { BatchSize = 0 }.Validate(),
+            new OperationalCleanupOptions { Mode = CleanupExecutionMode.External, BatchSize = 0 }.Validate(),
             error => error.Contains("BatchSize", StringComparison.Ordinal));
 
         Assert.Contains(
@@ -276,9 +327,18 @@ public class SqliteOperationalCleanupTests
             error => error.Contains("Interval", StringComparison.Ordinal));
 
         Assert.Contains(
-            new OperationalCleanupOptions { MaxRefreshTokenPostConsumedTolerance = TimeSpan.FromMinutes(-1) }.Validate(),
+            new OperationalCleanupOptions
+            {
+                Mode = CleanupExecutionMode.External,
+                MaxRefreshTokenPostConsumedTolerance = TimeSpan.FromMinutes(-1),
+            }.Validate(),
             error => error.Contains("Tolerance", StringComparison.Ordinal));
 
-        Assert.Empty(new OperationalCleanupOptions().Validate());
+        // DF17: an absent selection is a configuration error, not a default.
+        Assert.Contains(
+            new OperationalCleanupOptions().Validate(),
+            error => error.Contains("Mode", StringComparison.Ordinal));
+
+        Assert.Empty(new OperationalCleanupOptions { Mode = CleanupExecutionMode.External }.Validate());
     }
 }

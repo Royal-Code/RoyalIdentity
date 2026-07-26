@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RoyalIdentity.Storage.EntityFramework.Operational;
 using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
@@ -61,8 +62,10 @@ public static class OperationalServiceCollectionExtensions
     ///     can never both be running (plan DF17).
     /// </para>
     /// <para>
-    ///     Invalid options fail here rather than at the first pass: a cleanup that silently never runs is the
-    ///     failure mode worth preventing.
+    ///     There is no default mode: omitting the choice fails here, and so does selecting it twice — a second
+    ///     call would leave the scheduler of the first registration running under the options of the second.
+    ///     Invalid options fail here rather than at the first pass, and the <b>effective</b> options are
+    ///     validated again when they are resolved, so a later <c>Configure</c> cannot slip past this.
     /// </para>
     /// </summary>
     public static IServiceCollection AddEntityFrameworkOperationalCleanup(
@@ -70,6 +73,14 @@ public static class OperationalServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
+
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(OperationalCleanupRegistration)))
+        {
+            throw new InvalidOperationException(
+                "The operational cleanup execution mode was already selected by this composition. " +
+                "Selecting it twice is ambiguous: the scheduler of the first call would keep running under " +
+                "the options of the second.");
+        }
 
         var options = new OperationalCleanupOptions();
         configure(options);
@@ -79,7 +90,10 @@ public static class OperationalServiceCollectionExtensions
             throw new InvalidOperationException($"Invalid operational cleanup options: {string.Join(" ", errors)}");
 
         services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(new OperationalCleanupRegistration(options.Mode));
         services.Configure(configure);
+        services.AddSingleton<IValidateOptions<OperationalCleanupOptions>>(
+            new OperationalCleanupOptionsValidator(options.Mode));
 
         if (options.Mode is CleanupExecutionMode.Hosted)
             services.AddHostedService<OperationalCleanupWorker>();
@@ -98,10 +112,23 @@ public static class OperationalServiceCollectionExtensions
     ///     capabilities MP-2/MP-3, which its store contracts guarantee at compile time (plan DF46) — so a
     ///     composition built this way can never reach the transitional fallback.
     /// </para>
+    /// <para>
+    ///     A cleanup execution mode must have been selected first (plan DF17). Persisting operational data with
+    ///     no scheduler and no external job is not a default worth allowing: the data would grow forever, and
+    ///     nothing would say so.
+    /// </para>
     /// </summary>
     public static IServiceCollection AddEntityFrameworkStorage(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        if (!services.Any(descriptor => descriptor.ServiceType == typeof(OperationalCleanupRegistration)))
+        {
+            throw new InvalidOperationException(
+                "The complete EF gateway requires an explicit operational cleanup execution mode. Call " +
+                $"{nameof(AddEntityFrameworkOperationalCleanup)} choosing {nameof(CleanupExecutionMode.Hosted)} " +
+                $"or {nameof(CleanupExecutionMode.External)} before {nameof(AddEntityFrameworkStorage)}.");
+        }
 
         services.TryAddScoped<IStorage, EntityFrameworkStorage>();
         services.TryAddSingleton<IStorageProvider, EntityFrameworkStorageProvider>();

@@ -9,6 +9,7 @@ using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
+using RoyalIdentity.Responses.HttpResults;
 using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
 
@@ -165,6 +166,41 @@ public class AuthorizeParametersGateTests : IClassFixture<AppFactory>
         Assert.NotNull(await storage.GetAuthorizeParametersStore(realm).ReadAsync(handle, default));
     }
 
+    // The consent screen has the same gate as login, and the critério da fase names it explicitly.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ConsentPageResult_HonoursTheGate(bool storeAuthorizationParameters)
+    {
+        var realm = await CreateGatedRealmAsync(storeAuthorizationParameters);
+        using var scope = factory.Services.CreateScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
+
+        var httpContext = CallbackHttpContext(scope, realm, "?client_id=gate_client&response_type=code");
+        var context = new AuthorizeContext(httpContext, httpContext.Request.Query.AsNameValueCollection(), null!);
+
+        await new ConsentPageResult(context).ExecuteAsync(httpContext);
+
+        var returnUrl = ReturnUrlOf(realm.Options.UI.ConsentParameter, httpContext);
+        var parameters = returnUrl.ReadQueryStringAsNameValueCollection();
+        var handle = parameters[Oidc.Routes.Params.Authorization];
+
+        if (storeAuthorizationParameters)
+        {
+            Assert.NotNull(handle);
+            Assert.Null(parameters["client_id"]);
+            Assert.Equal(
+                "gate_client",
+                (await storage.GetAuthorizeParametersStore(realm).ReadAsync(handle, default))!["client_id"]);
+        }
+        else
+        {
+            Assert.Null(handle);
+            Assert.Equal("gate_client", parameters["client_id"]);
+            Assert.Equal("code", parameters["response_type"]);
+        }
+    }
+
     private const string RedirectUri = "https://gate.example/callback";
 
     /// <summary>Creates a realm with the gate in the requested position and a client able to reach the login page.</summary>
@@ -242,11 +278,25 @@ public class AuthorizeParametersGateTests : IClassFixture<AppFactory>
             .ResolveAsync(returnUrl);
     }
 
+    /// <summary>The screen redirect carries the callback URL in the realm's configured screen parameter.</summary>
+    private static string ReturnUrlOf(string parameterName, HttpContext httpContext)
+    {
+        Assert.Equal(StatusCodes.Status302Found, httpContext.Response.StatusCode);
+
+        var location = httpContext.Response.Headers.Location.ToString();
+        var returnUrl = location.ReadQueryStringAsNameValueCollection()[parameterName];
+
+        Assert.NotNull(returnUrl);
+        return returnUrl;
+    }
+
     private static DefaultHttpContext CallbackHttpContext(
         IServiceScope scope, RoyalIdentity.Models.Realm realm, string queryString)
     {
         var httpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
         httpContext.Request.Method = HttpMethods.Get;
+        httpContext.Request.Scheme = "https";
+        httpContext.Request.Host = new HostString("gate.contract.test");
         httpContext.Request.QueryString = new QueryString(queryString);
         httpContext.Items[Server.RealmCurrentKey] = realm;
 

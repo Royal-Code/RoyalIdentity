@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using RoyalIdentity.Configuration;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Data.Configuration.Entities;
@@ -229,10 +230,73 @@ public class EntityFrameworkStorageGatewayTests
                 cleanup.Interval = TimeSpan.Zero;
             }));
         var batch = Assert.Throws<InvalidOperationException>(() =>
-            services.AddEntityFrameworkOperationalCleanup(cleanup => cleanup.BatchSize = 0));
+            services.AddEntityFrameworkOperationalCleanup(cleanup =>
+            {
+                cleanup.Mode = CleanupExecutionMode.External;
+                cleanup.BatchSize = 0;
+            }));
 
         Assert.Contains("Interval", interval.Message, StringComparison.Ordinal);
         Assert.Contains("BatchSize", batch.Message, StringComparison.Ordinal);
+        Assert.Empty(services);
+    }
+
+    // DF17: omitting the choice is a configuration error, never a silent default on either side.
+    [Fact]
+    public void Cleanup_WithoutSelectingAMode_FailsAtRegistration()
+    {
+        var services = new ServiceCollection();
+
+        var missing = Assert.Throws<InvalidOperationException>(() =>
+            services.AddEntityFrameworkOperationalCleanup(cleanup => cleanup.BatchSize = 100));
+
+        Assert.Contains("Mode", missing.Message, StringComparison.Ordinal);
+        Assert.Empty(services);
+    }
+
+    // Selecting twice would leave the scheduler of the first call running under the options of the second.
+    [Fact]
+    public void Cleanup_SelectedTwice_FailsAtRegistration()
+    {
+        var services = new ServiceCollection();
+        services.AddEntityFrameworkOperationalCleanup(cleanup => cleanup.Mode = CleanupExecutionMode.Hosted);
+
+        var second = Assert.Throws<InvalidOperationException>(() =>
+            services.AddEntityFrameworkOperationalCleanup(cleanup => cleanup.Mode = CleanupExecutionMode.External));
+
+        Assert.Contains("already selected", second.Message, StringComparison.Ordinal);
+        // The first selection stands, worker included — nothing was half-applied.
+        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IHostedService));
+    }
+
+    // The validation must hold over the effective options, not over the instance the registration inspected.
+    [Fact]
+    public void Cleanup_ConfiguredAgainAfterRegistration_FailsWhenTheOptionsAreResolved()
+    {
+        var services = new ServiceCollection();
+        services.AddEntityFrameworkOperationalCleanup(cleanup => cleanup.Mode = CleanupExecutionMode.Hosted);
+        // A later Configure that flips the mode: the worker is registered but the options would say otherwise.
+        services.Configure<OperationalCleanupOptions>(cleanup => cleanup.Mode = CleanupExecutionMode.External);
+
+        using var provider = services.BuildServiceProvider();
+
+        var failure = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<OperationalCleanupOptions>>().Value);
+
+        Assert.Contains("registered 'Hosted'", failure.Message, StringComparison.Ordinal);
+    }
+
+    // The complete gateway is a production composition: persisting operational data with no scheduler at all is
+    // not something to discover in production.
+    [Fact]
+    public void Gateway_WithoutASelectedCleanupMode_RefusesToCompose()
+    {
+        var services = new ServiceCollection();
+
+        var refusal = Assert.Throws<InvalidOperationException>(services.AddEntityFrameworkStorage);
+
+        Assert.Contains(nameof(CleanupExecutionMode.Hosted), refusal.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(CleanupExecutionMode.External), refusal.Message, StringComparison.Ordinal);
         Assert.Empty(services);
     }
 
@@ -285,8 +349,9 @@ public class EntityFrameworkStorageGatewayTests
                 OperationalStorageOptions.DefaultPayloadProtectionProfile, [.. GatewayProtectorKey]);
             collection.AddAesKeyMaterialProtector(options => options.Key = [.. GatewayProtectorKey]);
 
-            if (cleanup is not null)
-                collection.AddEntityFrameworkOperationalCleanup(cleanup);
+            // The gateway refuses to compose without an explicit choice, so the fixture makes one.
+            collection.AddEntityFrameworkOperationalCleanup(
+                cleanup ?? (options => options.Mode = CleanupExecutionMode.External));
 
             collection.AddEntityFrameworkStorage();
 

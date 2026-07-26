@@ -1655,15 +1655,18 @@ erros.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Storage --filter "FullyQualifiedName~AuthorizeParameters|FullyQualifiedName~Cleanup|FullyQualifiedName~PurgeRealm|FullyQualifiedName~StorageSession"
-dotnet test Tests.Identity --filter "FullyQualifiedName~AuthorizationContext"
-dotnet test Tests.Integration --filter "FullyQualifiedName~Login|FullyQualifiedName~Consent|FullyQualifiedName~AuthorizeCallback"
+dotnet test Tests.Storage --filter "FullyQualifiedName~AuthorizeParameters|FullyQualifiedName~Cleanup|FullyQualifiedName~PurgeRealm|FullyQualifiedName~StorageGateway"
+dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizeParametersGate|FullyQualifiedName~Login|FullyQualifiedName~Consent"
 ```
+
+> O comando de `Tests.Identity` previsto no rascunho da fase foi removido: a cobertura do resolver exige realm,
+> storage e `HttpContext` reais e vive em `Tests.Integration`. O filtro documentado não selecionava caso algum.
 
 ### Resultado da Fase 6
 
-**Concluída em 2026-07-25.** `dotnet test RoyalIdentity.sln` verde: 1160 aprovados, 9 ignorados (PostgreSQL
-opt-in), 0 falhas — +47 casos sobre a Fase 5. `git diff --check` sem erros.
+**Concluída em 2026-07-25**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
+RoyalIdentity.sln` verde: 1172 aprovados, 9 ignorados (PostgreSQL opt-in), 0 falhas — +59 casos sobre a Fase 5.
+`git diff --check` sem erros.
 
 **Arquivos criados**
 
@@ -1675,10 +1678,12 @@ opt-in), 0 falhas — +47 casos sobre a Fase 5. `git diff --check` sem erros.
   `EntityFrameworkOperationalMaintenance.cs`, `OperationalCleanupWorker.cs` — MP-6/MP-7.
 - `.../Storage/EntityFrameworkStorage.cs` e `EntityFrameworkStorageProvider.cs` — gateway completo, provider e
   session.
+- `.../Operational/Maintenance/OperationalCleanupRegistration.cs` — marcador da seleção de modo mais o
+  `IValidateOptions` que valida a configuração efetiva.
 - Testes: `Tests.Storage/Operational/SqliteOperationalAuthorizeParametersTests` (10),
-  `SqliteOperationalCleanupTests` (11), `SqliteOperationalPurgeRealmTests` (4),
-  `Tests.Storage/Storage/EntityFrameworkStorageGatewayTests` (10),
-  `Tests.Integration/Endpoints/AuthorizeParametersGateTests` (6).
+  `SqliteOperationalCleanupTests` (13), `SqliteOperationalPurgeRealmTests` (4),
+  `OperationalCleanupWorkerTests` (4), `Tests.Storage/Storage/EntityFrameworkStorageGatewayTests` (14),
+  `Tests.Integration/Endpoints/AuthorizeParametersGateTests` (8).
 
 **Arquivos alterados**
 
@@ -1697,6 +1702,9 @@ opt-in), 0 falhas — +47 casos sobre a Fase 5. `git diff --check` sem erros.
 - **Nenhuma no comportamento de produção padrão:** o host continua in-memory, e `AddEntityFrameworkStorage()` é
   opt-in explícito. O que mudou de fato é que o gate `StoreAuthorizationParameters=false` agora vale também no
   resolver — antes ele lia o store mesmo com a opção desligada, se um handle aparecesse na returnUrl.
+- **`CleanupExecutionMode` não tem mais default.** Uma composição que chamava `AddEntityFrameworkOperationalCleanup`
+  sem escolher o modo passa a falhar; antes caía silenciosamente em `External`, que é justamente o modo em que
+  nada é agendado.
 
 **Decisões tomadas na execução**
 
@@ -1720,16 +1728,40 @@ opt-in), 0 falhas — +47 casos sobre a Fase 5. `git diff --check` sem erros.
 - **Verificado por mutação:** removendo o gate de `LoginPageResult`, de `AuthorizeCallbackEndpoint` e de
   `DefaultAuthorizationContextResolver`, cada um derruba exatamente o aceite correspondente.
 
-**Lacunas conhecidas**
+**Ajustes aplicados após revisão externa (2026-07-25)**
 
-- `ConsentPageResult` tem o mesmo gate de `LoginPageResult` e não ganhou aceite próprio: a linha é idêntica e o
-  caminho de consent exige um client com `RequireConsent` e login efetivo no realm de teste. Fica para a Fase 8,
-  que fecha os fluxos ponta a ponta.
-- O worker `OperationalCleanupWorker` é coberto pelo registro (`Hosted` registra exatamente um, `External`
-  nenhum) e pela manutenção que ele chama, mas não por um teste que o execute em loop com `PeriodicTimer` sob
-  clock falso.
-- O comando focado de `Tests.Identity` previsto na fase continua sem casos: a cobertura do resolver vive em
-  `Tests.Integration`, onde há realm, storage e HttpContext reais.
+- **O cleanup apagava, no instante exato do limite, registros que o core ainda aceita (defeito funcional).**
+  Achado correto. O core compara com `>` estrito (`DateTimeExtensions.HasExceeded`/`HasExpired`,
+  `RefreshTokenHandler.IsWithinTolerance`), e o cleanup usava `<=`. Exatamente em `ConsumedAt + tolerance` o
+  handler aceitava o refresh token e o cleanup já podia apagá-lo; o mesmo valia para access token, code e
+  consent, cujo `ExpiresAtUtc` é gravado como `CreationTime + Lifetime` — o mesmo valor que o validador compara.
+  Os quatro passaram a `<`. **Sessão e AP ficaram inclusivos de propósito** e agora com o porquê registrado no
+  código: `DefaultUserSessionService` encerra em `now >= expiresAt` e a leitura de AP é fail-closed em `<=`, ou
+  seja, no instante do limite ambos já estão fora para o core. Aceite novo cobre os seis tipos no instante exato
+  e um tick depois; o de tolerância ganhou o minuto 30 que faltava. **Verificado por mutação:** voltando o
+  access token a `<=`, o aceite de fronteira falha.
+- **A seleção do modo de cleanup não estava garantida.** Também correto, em dois níveis. `Mode` tinha default
+  `External`, então uma composição podia subir sem worker e sem job externo, acumulando dados para sempre; e a
+  validação rodava sobre uma instância temporária, então `Hosted` seguido de `External` deixava o worker
+  registrado sob opções que diziam o contrário. Correções: `CleanupExecutionMode.Unspecified` virou o default e
+  é rejeitado por `Validate()`; `AddEntityFrameworkOperationalCleanup` recusa a segunda seleção;
+  `OperationalCleanupOptionsValidator` valida as opções **efetivas** e confronta o modo resolvido com o
+  registrado, falhando quando um `Configure` posterior os separa; e `AddEntityFrameworkStorage` recusa compor
+  sem seleção explícita. Cinco aceites novos.
+- **O caminho produtivo do worker não tinha teste.** Fechado: `OperationalCleanupWorkerTests` dirige o worker
+  pelo próprio seam de registro e cobre tick periódico, um scope por passagem, batch/instante configurados,
+  continuação depois de passagem que falha e parada por cancelamento. Um `TimeProvider` com instante fixo e
+  timers reais mantém a asserção do `now` determinística sem depender de relógio de parede.
+- **Faltava aceite próprio de `ConsentPageResult`.** Fechado com um teste direto sobre o result, com storage
+  observável, nos dois lados do gate. **Verificado por mutação.** O fluxo de consent ponta a ponta continua na
+  Fase 8.
+- **A contagem de testes do relatório estava desatualizada.** Correto: o número fora medido antes do último caso
+  acrescentado à fase. Corrigido — e a suíte agora está em 1172 com os aceites desta revisão.
+- **O comentário do batching afirmava ordenação inexistente.** Correto: não há `OrderBy`. O comentário foi
+  corrigido para dizer o que de fato garante progresso — as linhas removidas saem do conjunto elegível, então
+  repetir a passagem avança independentemente de quais foram escolhidas.
+- **O comando de `Tests.Identity` documentado na fase foi removido** em vez de mantido como lacuna: como a
+  revisão observou, não é lacuna funcional, é comando errado.
 
 ---
 

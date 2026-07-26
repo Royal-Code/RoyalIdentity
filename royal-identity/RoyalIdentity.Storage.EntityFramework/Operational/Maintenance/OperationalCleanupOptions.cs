@@ -3,6 +3,12 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 /// <summary>Which scheduler drives the cleanup. Exactly one, never both (plan DF17).</summary>
 public enum CleanupExecutionMode
 {
+    /// <summary>
+    /// No scheduler chosen. This is the default so that omitting the choice fails validation instead of
+    /// silently landing on one of the two (plan DF17: an absent configuration must fail).
+    /// </summary>
+    Unspecified = 0,
+
     /// <summary>A hosted worker inside this process runs the cleanup on the configured interval.</summary>
     Hosted,
 
@@ -20,8 +26,12 @@ public enum CleanupExecutionMode
 /// </summary>
 public sealed class OperationalCleanupOptions
 {
-    /// <summary>Which scheduler runs the maintenance. The composition must choose explicitly.</summary>
-    public CleanupExecutionMode Mode { get; set; } = CleanupExecutionMode.External;
+    /// <summary>
+    /// Which scheduler runs the maintenance. There is no default: the composition must choose, because both
+    /// possible defaults are wrong to assume — one starts a worker nobody asked for, the other lets the data
+    /// grow forever.
+    /// </summary>
+    public CleanupExecutionMode Mode { get; set; } = CleanupExecutionMode.Unspecified;
 
     /// <summary>How often the hosted worker runs. Ignored in <see cref="CleanupExecutionMode.External"/>.</summary>
     public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(15);
@@ -54,6 +64,8 @@ public sealed class OperationalCleanupOptions
 
         if (!Enum.IsDefined(Mode))
             errors.Add("Cleanup.Mode is not a valid execution mode.");
+        else if (Mode is CleanupExecutionMode.Unspecified)
+            errors.Add("Cleanup.Mode must be selected explicitly, either Hosted or External.");
 
         if (Mode is CleanupExecutionMode.Hosted && Interval <= TimeSpan.Zero)
             errors.Add("Cleanup.Interval must be greater than zero when the hosted worker is enabled.");
