@@ -6,9 +6,9 @@ namespace RoyalIdentity.Storage.EntityFramework.PostgreSql;
 
 /// <summary>
 /// Public PostgreSQL mapping extension for the Operational family (plan DF1/DF2): applies the neutral mappings
-/// plus the PostgreSQL refinements — the <c>operation</c> schema (plan DF4), <c>jsonb</c> payloads and the
-/// byte-wise <c>C</c> collation. Default and custom/combined contexts call this same extension; a model applies
-/// exactly one provider extension per family.
+/// plus the PostgreSQL refinements — the <c>operation</c> schema (plan DF4), opaque <c>text</c> payloads and
+/// the byte-wise <c>C</c> collation. Default and custom/combined contexts call this same extension; a model
+/// applies exactly one provider extension per family.
 /// </summary>
 public static class PostgreSqlOperationalModelBuilderExtensions
 {

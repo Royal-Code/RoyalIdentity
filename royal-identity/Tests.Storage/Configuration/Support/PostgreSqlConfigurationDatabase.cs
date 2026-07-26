@@ -28,7 +28,8 @@ internal sealed class PostgreSqlConfigurationDatabase
 
     public string ConnectionString { get; }
 
-    public static async Task<PostgreSqlConfigurationDatabase> CreateMigratedAsync()
+    /// <summary>Creates an empty isolated database, without applying any migration.</summary>
+    public static async Task<PostgreSqlConfigurationDatabase> CreateEmptyAsync()
     {
         var administrativeConnectionString = StoragePostgreSqlTestEnvironment.ConnectionString;
         var databaseName = $"royalidentity_configuration_{Guid.NewGuid():N}";
@@ -44,10 +45,16 @@ internal sealed class PostgreSqlConfigurationDatabase
             Database = databaseName,
             Pooling = false,
         };
-        var database = new PostgreSqlConfigurationDatabase(
+
+        return new PostgreSqlConfigurationDatabase(
             administrativeConnectionString,
             databaseName,
             builder.ConnectionString);
+    }
+
+    public static async Task<PostgreSqlConfigurationDatabase> CreateMigratedAsync()
+    {
+        var database = await CreateEmptyAsync();
 
         try
         {
@@ -62,15 +69,33 @@ internal sealed class PostgreSqlConfigurationDatabase
         }
     }
 
+    // DF23: every place that builds options for migrations configures the history explicitly — the entities'
+    // schema does not imply it. A fixture that skipped this would migrate into public."__EFMigrationsHistory"
+    // and stay green while proving the opposite of what it claims.
     public ConfigurationPostgreSqlDbContext NewContext()
         => new(new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(ConnectionString, npgsql => npgsql.UseConfigurationMigrationsHistory())
             .Options);
 
     public void AddStorage(ServiceCollection services)
     {
-        services.AddDbContext<ConfigurationPostgreSqlDbContext>(options => options.UseNpgsql(ConnectionString));
+        services.AddDbContext<ConfigurationPostgreSqlDbContext>(options => options
+            .UseNpgsql(ConnectionString, npgsql => npgsql.UseConfigurationMigrationsHistory()));
         services.AddEntityFrameworkConfigurationStorage<ConfigurationPostgreSqlDbContext>();
+    }
+
+    /// <summary>Whether a migrations history table exists in the given schema, so a fixture can prove where it is.</summary>
+    public async Task<bool> HasMigrationsHistoryAsync(string schema)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM information_schema.tables " +
+            "WHERE table_schema = @schema AND table_name = '__EFMigrationsHistory'",
+            connection);
+        command.Parameters.AddWithValue("schema", schema);
+
+        return Convert.ToInt64(await command.ExecuteScalarAsync()) > 0;
     }
 
     public async ValueTask DisposeAsync()

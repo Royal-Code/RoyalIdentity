@@ -164,17 +164,55 @@ public class StorageMigrationRunnerTests : IDisposable
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
     }
 
-    // A failing family is reported on its own, and the next one is not silently applied on top of it.
+    // Over ONE database a failure stops the run: migrating Operational on top of a Configuration that just
+    // failed would migrate a database in an unknown state.
     [Fact]
-    public async Task WhenAFamilyFails_ItIsReportedAlone_AndTheNextIsNotAttempted()
+    public async Task WhenAFamilyFails_OverOneDatabase_TheNextIsNotAttempted()
     {
-        var report = await StorageMigrationRunner.RunAsync(
-            Options("Data Source=/this/path/does/not/exist/royalidentity.db", StorageFamilySelection.All));
+        const string unreachable = "Data Source=/this/path/does/not/exist/royalidentity.db";
+
+        var report = await StorageMigrationRunner.RunAsync(Options(unreachable, StorageFamilySelection.All));
 
         Assert.False(report.Succeeded);
         Assert.Equal(StorageMigrationStatus.Failed, report.For(StorageFamilySelection.Configuration).Status);
         Assert.NotNull(report.For(StorageFamilySelection.Configuration).Failure);
         Assert.Equal(StorageMigrationStatus.NotAttempted, report.For(StorageFamilySelection.Operational).Status);
+    }
+
+    // Over TWO databases it does not: coupling them would be exactly the joint atomicity that does not exist,
+    // and would hide a perfectly healthy Operational database behind an unrelated failure.
+    [Fact]
+    public async Task WhenAFamilyFails_OverTwoDatabases_TheOtherIsStillAttempted()
+    {
+        const string unreachable = "Data Source=/this/path/does/not/exist/royalidentity.db";
+        var operational = NewConnectionString();
+
+        var report = await StorageMigrationRunner.RunAsync(
+            Options(unreachable, StorageFamilySelection.All, operational));
+
+        Assert.False(report.Succeeded);
+        Assert.Equal(StorageMigrationStatus.Failed, report.For(StorageFamilySelection.Configuration).Status);
+        // The Operational database is untouched by the Configuration failure, and says so.
+        Assert.Equal(StorageMigrationStatus.Applied, report.For(StorageFamilySelection.Operational).Status);
+        Assert.Contains("protocol_artifacts", await TableNamesAsync(operational));
+    }
+
+    // And the same holds the other way round: an Operational failure never invalidates a Configuration that
+    // already applied to its own database.
+    [Fact]
+    public async Task WhenTheSecondFamilyFails_OverTwoDatabases_TheFirstIsStillReportedApplied()
+    {
+        var configuration = NewConnectionString();
+
+        var report = await StorageMigrationRunner.RunAsync(Options(
+            configuration,
+            StorageFamilySelection.All,
+            "Data Source=/this/path/does/not/exist/royalidentity.db"));
+
+        Assert.False(report.Succeeded);
+        Assert.Equal(StorageMigrationStatus.Applied, report.For(StorageFamilySelection.Configuration).Status);
+        Assert.Equal(StorageMigrationStatus.Failed, report.For(StorageFamilySelection.Operational).Status);
+        Assert.Contains("realms", await TableNamesAsync(configuration));
     }
 
     // DF19: the seed is Configuration data; asking for it on Operational alone means the command was misread.

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -9,6 +9,7 @@ using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 using RoyalIdentity.Users;
 using Tests.Storage.Operational.Support;
+using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 
 namespace Tests.Storage.Operational;
 
@@ -18,11 +19,14 @@ namespace Tests.Storage.Operational;
 /// observable through the configured tolerance, anything that has not expired yet. There is no retention grace:
 /// a record becomes eligible when it stops being observable, not a configurable while later.
 /// </summary>
-public class SqliteOperationalCleanupTests
+public abstract class OperationalCleanupTests : OperationalParitySuite
 {
     private static readonly DateTime Start = Tests.Storage.Support.StorageContractHarness.Start;
 
-    private static IOperationalMaintenance Maintenance(SqliteOperationalStorageHarness harness)
+    /// <summary>One microsecond — the coarsest timestamp resolution among the providers this product ships.</summary>
+    private static readonly TimeSpan SmallestRepresentableStep = TimeSpan.FromTicks(10);
+
+    private static IOperationalMaintenance Maintenance(IOperationalParityHarness harness)
         => harness.ScopedServices.GetRequiredService<IOperationalMaintenance>();
 
     private static AccessToken NewAccessToken(Realm realm, string jti, int lifetime = 3600)
@@ -78,7 +82,7 @@ public class SqliteOperationalCleanupTests
         ExpiresAt = expiresAt,
     };
 
-    private static async Task<int> CountAsync<TEntity>(SqliteOperationalStorageHarness harness)
+    private static async Task<int> CountAsync<TEntity>(IOperationalParityHarness harness)
         where TEntity : class
     {
         await using var context = harness.NewOperationalContext();
@@ -90,7 +94,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_RemovesExpiredArtifacts_AndKeepsLiveOnes()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         await harness.Storage.GetAccessTokenStore(realm).StoreAsync(NewAccessToken(realm, "at-expired", 60), default);
         await harness.Storage.GetAccessTokenStore(realm).StoreAsync(NewAccessToken(realm, "at-live", 86400), default);
@@ -112,7 +116,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_WithoutAConfiguredTolerance_KeepsAConsumedButUnexpiredRefreshToken()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         var store = harness.Storage.GetRefreshTokenStore(realm);
         await store.StoreAsync(NewRefreshToken(realm, "rt-consumed", 86400), default);
@@ -131,7 +135,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_WithAConfiguredTolerance_RemovesAConsumedTokenOnlyAfterTheWindow()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync(
+        await using var harness = await CreateHarnessAsync(
             cleanup: options => options.MaxRefreshTokenPostConsumedTolerance = TimeSpan.FromMinutes(30));
         var realm = harness.RealmA;
         var store = harness.Storage.GetRefreshTokenStore(realm);
@@ -164,7 +168,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_AtTheExactExpirationInstant_AgreesWithTheCoreValidators()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         realm.Options.Authentication.AuthorizationInteractionLifetime = 60;
 
@@ -191,8 +195,11 @@ public class SqliteOperationalCleanupTests
         Assert.Equal(1, atTheBoundary.UserSessions);
         Assert.Equal(1, atTheBoundary.AuthorizeParameters);
 
-        // One tick past the boundary the strict ones become eligible too.
-        var afterwards = await Maintenance(harness).CleanupAsync(Start.AddSeconds(60).AddTicks(1), 100);
+        // The smallest instant past the boundary every provider can actually represent: PostgreSQL's
+        // `timestamptz` resolves to the microsecond, so a single tick would round back onto the boundary and
+        // measure the column's precision instead of the predicate.
+        var afterwards = await Maintenance(harness).CleanupAsync(
+            Start.AddSeconds(60).Add(SmallestRepresentableStep), 100);
 
         Assert.Equal(1, afterwards.AccessTokens);
         Assert.Equal(1, afterwards.AuthorizationCodes);
@@ -204,7 +211,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_RemovesExpiredConsents_ButNeverOnesWithoutExpiration()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         var store = harness.Storage.GetUserConsentStore(realm);
         await store.StoreUserConsentAsync(NewConsent(realm, "subject-expired", Start.AddMinutes(1)), default);
@@ -221,7 +228,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_RemovesEndedAndExpiredSessions_WithTheirClients()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         var store = harness.Storage.GetUserSessionStore(realm);
         await store.CreateAsync(NewSession("sid-active"));
@@ -241,7 +248,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_RemovesExpiredAuthorizeParameters()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         realm.Options.Authentication.AuthorizationInteractionLifetime = 60;
         await harness.Storage.GetAuthorizeParametersStore(realm)
@@ -257,7 +264,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_RemovesAuthorizeParameters_EvenAfterTheRealmTurnedTheGateOff()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         realm.Options.Authentication.AuthorizationInteractionLifetime = 60;
         realm.Options.StoreAuthorizationParameters = true;
@@ -274,7 +281,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_RespectsTheBatchSize_AndRepeatingMakesProgress()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         for (var index = 0; index < 5; index++)
             await harness.Storage.GetAccessTokenStore(realm).StoreAsync(NewAccessToken(realm, $"at-{index}", 60), default);
@@ -290,7 +297,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_IsIdempotent()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         await harness.Storage.GetAccessTokenStore(harness.RealmA)
             .StoreAsync(NewAccessToken(harness.RealmA, "at-expired", 60), default);
 
@@ -302,7 +309,7 @@ public class SqliteOperationalCleanupTests
     [Fact]
     public async Task Cleanup_OfTheAccessToken_LeavesTheRefreshTokenUsable()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var realm = harness.RealmA;
         await harness.Storage.GetAccessTokenStore(realm).StoreAsync(NewAccessToken(realm, "at-expired", 60), default);
         await harness.Storage.GetRefreshTokenStore(realm)
@@ -340,5 +347,34 @@ public class SqliteOperationalCleanupTests
             error => error.Contains("Mode", StringComparison.Ordinal));
 
         Assert.Empty(new OperationalCleanupOptions { Mode = CleanupExecutionMode.External }.Validate());
+    }
+
+    /// <summary>SQLite runs this suite unconditionally; it is the baseline the other provider must match.</summary>
+    public sealed class Sqlite : OperationalCleanupTests
+    {
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => SqliteParityHarness.CreateAsync(handleGenerator, cleanup);
+    }
+}
+
+/// <summary>
+/// The same suite over PostgreSQL. The concrete suite stays private so xUnit does not discover its scenarios
+/// when the opt-in connection is unavailable.
+/// </summary>
+public class PostgreSqlCleanupTests
+{
+    [Tests.Storage.Configuration.StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public Task Cleanup()
+        => Tests.Storage.Configuration.Support.ProviderFactRunner.RunAsync(new PostgreSqlSuite());
+
+    private sealed class PostgreSqlSuite : OperationalCleanupTests
+    {
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => PostgreSqlParityHarness.CreateAsync(handleGenerator, cleanup);
     }
 }

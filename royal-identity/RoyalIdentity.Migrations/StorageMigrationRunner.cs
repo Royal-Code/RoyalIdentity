@@ -55,6 +55,12 @@ public static class StorageMigrationRunner
         List<StorageMigrationFamilyResult> results = [];
         var stopped = false;
 
+        // Whether a failure in one family stops the next. Over one database it does: applying Operational on
+        // top of a Configuration that just failed migrates a database in an unknown state. Over two databases it
+        // does not — coupling them there would be exactly the joint atomicity this plan says does not exist
+        // (plan DF23), and it would hide a perfectly healthy Operational database behind an unrelated failure.
+        var failureStopsTheRun = options.SharesOneDatabase;
+
         foreach (var family in new[] { StorageFamilySelection.Configuration, StorageFamilySelection.Operational })
         {
             if (!options.Families.HasFlag(family))
@@ -81,7 +87,7 @@ public static class StorageMigrationRunner
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 results.Add(new StorageMigrationFamilyResult(family, StorageMigrationStatus.Failed, exception));
-                stopped = true;
+                stopped = failureStopsTheRun;
             }
         }
 

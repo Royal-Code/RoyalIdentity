@@ -1838,9 +1838,10 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~StorageMigrationRunnerTes
 
 ### Resultado da Fase 7
 
-**Concluída em 2026-07-26.** `dotnet test RoyalIdentity.sln` verde: 1196 aprovados, 33 ignorados (32 PostgreSQL
-opt-in + 1 UserAccounts), 0 falhas. Contra um PostgreSQL 17 real via Podman
-(`./scripts/Test-OperationalPostgreSql.ps1`): **32 aprovados, 0 falhas**. `git diff --check` sem erros.
+**Concluída em 2026-07-26**, com os ajustes da revisão externa aplicados no mesmo dia. `dotnet test
+RoyalIdentity.sln` verde: 1202 aprovados, 37 ignorados (36 PostgreSQL opt-in + 1 UserAccounts), 0 falhas.
+Contra um PostgreSQL 17 real via Podman (`./scripts/Test-OperationalPostgreSql.ps1`): **36 aprovados, 0
+falhas**. `git diff --check` sem erros.
 
 **Arquivos criados**
 
@@ -1860,11 +1861,13 @@ opt-in + 1 UserAccounts), 0 falhas. Contra um PostgreSQL 17 real via Podman
   `scripts/sql/configuration/postgresql/0002_drop_update_access_token_claims_on_refresh.sql`,
   `scripts/sql/migration-history/postgresql/0001_relocate_legacy_configuration_history.sql`,
   `scripts/Test-OperationalPostgreSql.ps1`.
-- Testes: `PostgreSqlOperationalContractTests` (6 agregados), `OperationalProviderParityTests` (8 no SQLite +
-  agregado PostgreSQL), `PostgreSqlOperationalConcurrencyTests` (3), `PostgreSqlOperationalMigrationTests` (9),
-  `PostgreSqlStorageGatewayTests` (3), `StorageMigrationRunnerTests` (12), mais os fixtures
-  `PostgreSqlOperationalDatabase`, `PostgreSqlOperationalStorageHarness`,
-  `PostgreSqlOperationalConcurrencyDatabase` e `IOperationalParityHarness`.
+- Testes: `PostgreSqlOperationalContractTests` (6 agregados), `OperationalProviderParityTests`,
+  `OperationalAuthorizeParametersTests`, `OperationalCleanupTests` e `OperationalPurgeRealmTests` (as quatro
+  provider-parametrizadas: SQLite sempre, PostgreSQL por agregado opt-in),
+  `PostgreSqlOperationalConcurrencyTests` (3), `PostgreSqlOperationalMigrationTests` (9),
+  `PostgreSqlStorageGatewayTests` (3), `StorageMigrationRunnerTests` (16), `MigrationsSnapshotDriftTests` (4),
+  mais os fixtures `PostgreSqlOperationalDatabase`, `PostgreSqlOperationalStorageHarness`,
+  `PostgreSqlOperationalConcurrencyDatabase`, `IOperationalParityHarness` e `OperationalParitySuite`.
 
 **Arquivos alterados**
 
@@ -1912,12 +1915,45 @@ opt-in + 1 UserAccounts), 0 falhas. Contra um PostgreSQL 17 real via Podman
   context legado rodava também a migration nova, então o "banco do Plano 2" já vinha sem a coluna obsoleta. O
   aceite passou a migrar via `IMigrator` até `InitialConfiguration`, que é o estado real de onde o upgrade parte.
 
+**Ajustes aplicados após revisão externa (2026-07-26)**
+
+- **As fixtures PostgreSQL de Configuration ainda usavam a history legada em `public`.** Achado correto e
+  incômodo: contradizia diretamente a afirmação deste relatório de que todas as fixtures consomem a topologia
+  centralizada, e a suíte podia continuar verde criando `public.__EFMigrationsHistory`. Os três registros de
+  context (`PostgreSqlConfigurationDatabase.NewContext`, `.AddStorage` e o harness) passaram a configurar a
+  history, e o aceite do runner passou a exigir a tabela em `configuration` **e** a ausência dela em `public`.
+- **O runner acoplava bancos distintos.** Também correto. `stopped` era ativado em qualquer falha, então uma
+  falha em Configuration impedia Operational mesmo em outro banco — exatamente a atomicidade conjunta que este
+  plano diz não existir, e que esconderia um banco Operational saudável atrás de uma falha alheia. Agora
+  `failureStopsTheRun = options.SharesOneDatabase`: mesmo banco interrompe (aplicar sobre um Configuration que
+  acabou de falhar migraria um banco em estado desconhecido), bancos distintos seguem e reportam cada família.
+  Dois aceites novos cobrem as duas direções.
+- **A lacuna dos aceites SQLite incluía cobertura exigida pela fase.** Correto, e a justificativa anterior
+  ("refatoração mecânica") não sustentava: TTL, expiração fail-closed, colisão de handle, cleanup e purge estão
+  fora dos contratos neutros por decisão documentada, então o critério "SQLite/PostgreSQL concordam em TTL e
+  contagens" não estava provado. As três suítes citadas viraram provider-parametrizadas
+  (`OperationalAuthorizeParametersTests`, `OperationalCleanupTests`, `OperationalPurgeRealmTests`), com
+  especialização SQLite que roda sempre e agregado PostgreSQL opt-in — mesmos cenários, sem duplicação.
+- **O teste do SQL manual era falso positivo parcial.** Correto: o runner migrava tudo antes, então `0001` virava
+  no-op e `0002` nunca rodava. Aceite novo em banco vazio executa a sequência inteira duas vezes e exige a
+  coluna obsoleta ausente, duas migrations registradas e nenhuma pendente — sem o runner ter tocado no banco.
+- **`has-pending-model-changes` virou gate automatizado.** `MigrationsSnapshotDriftTests` compara modelo contra
+  snapshot nos quatro contexts, o que `GetPendingMigrationsAsync` não faz: um mapping alterado sem migration
+  passa naquele e falha neste.
+- **O XML dizia `jsonb` enquanto o código usa `text`.** Corrigido; o código estava certo.
+- **O PostgreSQL expôs uma diferença real de precisão.** Ao rodar o aceite de fronteira nos dois providers,
+  `AddTicks(1)` voltava para o próprio limite: `timestamptz` resolve ao microssegundo. O passo virou 1 µs, com o
+  porquê no código — o menor incremento que todo provider deste produto representa. Nenhum efeito de produto:
+  lifetimes e TTLs são em segundos.
+
 **Lacunas conhecidas**
 
-- Os aceites específicos do SQLite (`SqliteOperationalAccessTokenTests` e afins) não foram generalizados para
-  rodar nos dois providers; sobre PostgreSQL rodam a suíte de contratos, a de paridade, a de concorrência, a de
-  migrations e a do gateway. Generalizar as ~10 classes restantes é refatoração mecânica de escopo próprio, não
-  cobertura ausente dos critérios desta fase.
+- As demais classes de aceite específicas do SQLite (`SqliteOperationalAccessTokenTests`,
+  `SqliteOperationalRefreshTokenTests`, sessões, consents e códigos) continuam só no SQLite. Sobre PostgreSQL
+  rodam a suíte de contratos, a de paridade, AP/cleanup/purge, concorrência, migrations e gateway — os critérios
+  desta fase. Generalizar o resto é escopo próprio.
+- O aceite de upgrade compõe bootstrap e `MigrateAsync` manualmente; falta um equivalente atravessando o runner
+  produtivo de ponta a ponta.
 - O bootstrap PostgreSQL identifica a history legada em `public` literalmente, não pelo `search_path` da
   conexão. É o schema que o EF usa quando o modelo não declara default — que é o caso — mas um deployment que
   tenha movido a history para outro schema por conta própria precisa resolvê-la manualmente.

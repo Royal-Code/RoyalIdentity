@@ -24,8 +24,11 @@ internal sealed class PostgreSqlConfigurationStorageHarness
             database,
             services =>
             {
-                services.AddDbContext<ConfigurationPostgreSqlDbContext>(
-                    options => options.UseNpgsql(database.ConnectionString));
+                services.AddDbContext<ConfigurationPostgreSqlDbContext>(options => options
+                    .UseNpgsql(
+                        database.ConnectionString,
+                        // DF23: the same centralized history the fixture migrated with.
+                        npgsql => npgsql.UseConfigurationMigrationsHistory()));
                 services.AddEntityFrameworkConfigurationStorage<ConfigurationPostgreSqlDbContext>();
             },
             state => new PostgreSqlConfigurationStorageHarness(state));

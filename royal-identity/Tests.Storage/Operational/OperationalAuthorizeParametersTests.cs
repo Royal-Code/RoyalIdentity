@@ -1,4 +1,4 @@
-using System.Collections.Specialized;
+﻿using System.Collections.Specialized;
 using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Data.Operational.Entities;
@@ -6,6 +6,7 @@ using RoyalIdentity.Models;
 using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using Tests.Storage.Operational.Support;
+using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 
 namespace Tests.Storage.Operational;
 
@@ -15,7 +16,7 @@ namespace Tests.Storage.Operational;
 /// regeneration on collision. The shared semantics live in the provider-neutral
 /// <c>AuthorizeParametersStoreContractTests</c>.
 /// </summary>
-public class SqliteOperationalAuthorizeParametersTests
+public abstract class OperationalAuthorizeParametersTests : OperationalParitySuite
 {
     private static readonly OperationalLookupDigest Digest = new();
 
@@ -27,7 +28,7 @@ public class SqliteOperationalAuthorizeParametersTests
             ["scope"] = "openid profile",
         };
 
-    private static async Task<List<AuthorizeParametersEntity>> RowsAsync(SqliteOperationalStorageHarness harness)
+    private static async Task<List<AuthorizeParametersEntity>> RowsAsync(IOperationalParityHarness harness)
     {
         await using var context = harness.NewOperationalContext();
 
@@ -38,7 +39,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task Write_StoresAnAbsoluteExpiration_FromTheRealmLifetime()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         harness.RealmA.Options.Authentication.AuthorizationInteractionLifetime = 120;
         var now = harness.Clock.GetUtcNow().UtcDateTime;
 
@@ -53,7 +54,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task ChangingTheLifetime_DoesNotMoveAnAlreadyStoredExpiration()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         harness.RealmA.Options.Authentication.AuthorizationInteractionLifetime = 60;
         var handle = await harness.Storage.GetAuthorizeParametersStore(harness.RealmA)
             .WriteAsync(NewParameters(), default);
@@ -71,7 +72,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task Read_AfterTheWindow_IsFailClosed_AndRemovesTheRecord()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         harness.RealmA.Options.Authentication.AuthorizationInteractionLifetime = 60;
         var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
         var handle = await store.WriteAsync(NewParameters(), default);
@@ -89,7 +90,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task Read_WithinTheWindow_IsRepeatable()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         harness.RealmA.Options.Authentication.AuthorizationInteractionLifetime = 600;
         var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
         var handle = await store.WriteAsync(NewParameters(), default);
@@ -104,7 +105,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task Write_PersistsOnlyTheDigestOfTheHandle()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
 
         var handle = await harness.Storage.GetAuthorizeParametersStore(harness.RealmA)
             .WriteAsync(NewParameters("secret-client"), default);
@@ -120,7 +121,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task Write_ProducesAHandleWithAtLeast128Bits()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
 
         var handles = new List<string>();
@@ -136,7 +137,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task AHandleOfOneRealm_DoesNotResolveInAnother()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var handle = await harness.Storage.GetAuthorizeParametersStore(harness.RealmA)
             .WriteAsync(NewParameters(), default);
 
@@ -149,7 +150,7 @@ public class SqliteOperationalAuthorizeParametersTests
     public async Task Write_OnCollision_RegeneratesInsteadOfOverwritingOrFailing()
     {
         var generator = new ScriptedHandleGenerator(["collision", "collision", "unique"]);
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync(generator);
+        await using var harness = await CreateHarnessAsync(generator);
         var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
 
         var first = await store.WriteAsync(NewParameters("first"), default);
@@ -167,7 +168,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task Write_RoundTripsRepeatedKeys()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var parameters = NewParameters();
         parameters.Add("resource", "https://api.example/orders");
         parameters.Add("resource", "https://api.example/invoices");
@@ -187,7 +188,7 @@ public class SqliteOperationalAuthorizeParametersTests
     [Fact]
     public async Task Delete_IsIdempotent()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         var store = harness.Storage.GetAuthorizeParametersStore(harness.RealmA);
         var handle = await store.WriteAsync(NewParameters(), default);
 
@@ -205,5 +206,34 @@ public class SqliteOperationalAuthorizeParametersTests
         private int index;
 
         public string Generate() => handles[Math.Min(index++, handles.Count - 1)];
+    }
+
+    /// <summary>SQLite runs this suite unconditionally; it is the baseline the other provider must match.</summary>
+    public sealed class Sqlite : OperationalAuthorizeParametersTests
+    {
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => SqliteParityHarness.CreateAsync(handleGenerator, cleanup);
+    }
+}
+
+/// <summary>
+/// The same suite over PostgreSQL. The concrete suite stays private so xUnit does not discover its scenarios
+/// when the opt-in connection is unavailable.
+/// </summary>
+public class PostgreSqlAuthorizeParametersTests
+{
+    [Tests.Storage.Configuration.StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public Task AuthorizeParameters()
+        => Tests.Storage.Configuration.Support.ProviderFactRunner.RunAsync(new PostgreSqlSuite());
+
+    private sealed class PostgreSqlSuite : OperationalAuthorizeParametersTests
+    {
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => PostgreSqlParityHarness.CreateAsync(handleGenerator, cleanup);
     }
 }

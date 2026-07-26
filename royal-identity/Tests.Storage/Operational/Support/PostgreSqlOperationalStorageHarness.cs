@@ -61,9 +61,6 @@ internal sealed class PostgreSqlOperationalStorageHarness
                 if (handleGenerator is not null)
                     services.AddSingleton(handleGenerator);
 
-                if (cleanup is not null)
-                    services.Configure(cleanup);
-
                 services.AddDbContext<ConfigurationPostgreSqlDbContext>(options => options
                     .UseNpgsql(database.ConnectionString, npgsql => npgsql.UseConfigurationMigrationsHistory()));
                 services.AddEntityFrameworkConfigurationStorage<ConfigurationPostgreSqlDbContext>();
@@ -71,6 +68,11 @@ internal sealed class PostgreSqlOperationalStorageHarness
                 services.AddDbContext<OperationalPostgreSqlDbContext>(options => options
                     .UseNpgsql(database.ConnectionString, npgsql => npgsql.UseOperationalMigrationsHistory()));
                 services.AddEntityFrameworkOperationalStorage<OperationalPostgreSqlDbContext>();
+                services.AddEntityFrameworkOperationalCleanup(options =>
+                {
+                    options.Mode = CleanupExecutionMode.External;
+                    cleanup?.Invoke(options);
+                });
 
                 // The Plain profile warns on construction, so the fixture needs logging registered.
                 services.AddLogging();

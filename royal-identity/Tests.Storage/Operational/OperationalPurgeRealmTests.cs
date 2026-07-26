@@ -1,4 +1,4 @@
-using System.Collections.Specialized;
+﻿using System.Collections.Specialized;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +10,7 @@ using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 using RoyalIdentity.Users;
 using Tests.Storage.Operational.Support;
+using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 
 namespace Tests.Storage.Operational;
 
@@ -18,15 +19,15 @@ namespace Tests.Storage.Operational;
 /// record of one realm, is repeatable, and never reaches Configuration — the realm tombstone and its
 /// path/domain reservation live there and must survive.
 /// </summary>
-public class SqliteOperationalPurgeRealmTests
+public abstract class OperationalPurgeRealmTests : OperationalParitySuite
 {
     private static readonly DateTime Start = Tests.Storage.Support.StorageContractHarness.Start;
 
-    private static IOperationalMaintenance Maintenance(SqliteOperationalStorageHarness harness)
+    private static IOperationalMaintenance Maintenance(IOperationalParityHarness harness)
         => harness.ScopedServices.GetRequiredService<IOperationalMaintenance>();
 
     /// <summary>Writes one row into every Operational table of a realm.</summary>
-    private static async Task SeedEveryTableAsync(SqliteOperationalStorageHarness harness, Realm realm, string suffix)
+    private static async Task SeedEveryTableAsync(IOperationalParityHarness harness, Realm realm, string suffix)
     {
         var accessToken = new AccessToken(
             "client-a", "https://issuer.contract.test", AccessTokenType.Reference, Start, 3600,
@@ -81,7 +82,7 @@ public class SqliteOperationalPurgeRealmTests
             .WriteAsync(new NameValueCollection { ["client_id"] = "client-a" }, default);
     }
 
-    private static async Task<int> CountAsync<TEntity>(SqliteOperationalStorageHarness harness, string realmId)
+    private static async Task<int> CountAsync<TEntity>(IOperationalParityHarness harness, string realmId)
         where TEntity : class
     {
         await using var context = harness.NewOperationalContext();
@@ -96,7 +97,7 @@ public class SqliteOperationalPurgeRealmTests
     [Fact]
     public async Task Purge_RemovesEveryOperationalRecordOfTheRealm_AndOnlyThatRealm()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         await SeedEveryTableAsync(harness, harness.RealmA, "a");
         await SeedEveryTableAsync(harness, harness.RealmB, "b");
 
@@ -125,26 +126,25 @@ public class SqliteOperationalPurgeRealmTests
     [Fact]
     public async Task Purge_DoesNotTouchConfiguration()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         await SeedEveryTableAsync(harness, harness.RealmA, "a");
 
         await Maintenance(harness).PurgeRealmAsync(harness.RealmA.Id);
 
-        await using var context = harness.NewOperationalContext();
-        // The Configuration tables live in the same SQLite file in this fixture, which makes the assertion real
-        // rather than a tautology of separate databases.
-        var realms = await harness.DbContext.Set<RealmEntity>().AsNoTracking().CountAsync();
-        var clients = await harness.DbContext.Set<ClientEntity>().AsNoTracking().CountAsync();
+        // Both families live in the same database in these fixtures, which makes the assertion real rather than
+        // a tautology of separate databases.
+        var realms = await harness.CountConfigurationAsync<RealmEntity>();
+        var clients = await harness.CountConfigurationAsync<ClientEntity>();
 
         Assert.True(realms > 0, "the realm rows must survive the Operational purge");
         Assert.NotNull(await harness.Storage.Realms.GetByIdAsync(harness.RealmA.Id, default));
-        Assert.Equal(clients, await harness.DbContext.Set<ClientEntity>().AsNoTracking().CountAsync());
+        Assert.Equal(clients, await harness.CountConfigurationAsync<ClientEntity>());
     }
 
     [Fact]
     public async Task Purge_IsIdempotent()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         await SeedEveryTableAsync(harness, harness.RealmA, "a");
 
         Assert.NotEqual(0, (await Maintenance(harness).PurgeRealmAsync(harness.RealmA.Id)).Total);
@@ -156,7 +156,7 @@ public class SqliteOperationalPurgeRealmTests
     [Fact]
     public async Task Purge_WithCollidingIdsAcrossRealms_RemovesOnlyTheTargetRealm()
     {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
+        await using var harness = await CreateHarnessAsync();
         // The very same handles in both realms.
         await SeedEveryTableAsync(harness, harness.RealmA, "shared");
         await SeedEveryTableAsync(harness, harness.RealmB, "shared");
@@ -166,5 +166,34 @@ public class SqliteOperationalPurgeRealmTests
         Assert.Null(await harness.Storage.GetAccessTokenStore(harness.RealmA).GetAsync("at-shared", default));
         Assert.NotNull(await harness.Storage.GetAccessTokenStore(harness.RealmB).GetAsync("at-shared", default));
         Assert.NotNull(await harness.Storage.GetUserSessionStore(harness.RealmB).FindByIdAsync("sid-shared"));
+    }
+
+    /// <summary>SQLite runs this suite unconditionally; it is the baseline the other provider must match.</summary>
+    public sealed class Sqlite : OperationalPurgeRealmTests
+    {
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => SqliteParityHarness.CreateAsync(handleGenerator, cleanup);
+    }
+}
+
+/// <summary>
+/// The same suite over PostgreSQL. The concrete suite stays private so xUnit does not discover its scenarios
+/// when the opt-in connection is unavailable.
+/// </summary>
+public class PostgreSqlPurgeRealmTests
+{
+    [Tests.Storage.Configuration.StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public Task PurgeRealm()
+        => Tests.Storage.Configuration.Support.ProviderFactRunner.RunAsync(new PostgreSqlSuite());
+
+    private sealed class PostgreSqlSuite : OperationalPurgeRealmTests
+    {
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => PostgreSqlParityHarness.CreateAsync(handleGenerator, cleanup);
     }
 }

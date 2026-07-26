@@ -4,6 +4,8 @@ using RoyalIdentity.Data.Operational.Entities;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
+using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
+using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using Tests.Storage.Operational.Support;
 
 namespace Tests.Storage.Operational;
@@ -15,11 +17,9 @@ namespace Tests.Storage.Operational;
 /// persistence modes (DF31), the two refresh claims modes (DF32/DF33) and the per-realm protection profile
 /// (DF30). These scenarios exist to answer one question: do the providers agree?
 /// </summary>
-public abstract class OperationalProviderParityTests
+public abstract class OperationalProviderParityTests : OperationalParitySuite
 {
     private static readonly DateTime Start = Tests.Storage.Support.StorageContractHarness.Start;
-
-    private protected abstract Task<IOperationalParityHarness> CreateHarnessAsync();
 
     private static AccessToken NewAccessToken(Realm realm, string jti, string? compactToken = null)
     {
@@ -216,8 +216,10 @@ public abstract class OperationalProviderParityTests
     /// <summary>SQLite runs this suite unconditionally; it is the baseline the other provider must match.</summary>
     public sealed class Sqlite : OperationalProviderParityTests
     {
-        private protected override Task<IOperationalParityHarness> CreateHarnessAsync()
-            => SqliteParityHarness.CreateAsync();
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => SqliteParityHarness.CreateAsync(handleGenerator, cleanup);
     }
 }
 
@@ -233,7 +235,9 @@ public class PostgreSqlOperationalParityTests
 
     private sealed class PostgreSqlParity : OperationalProviderParityTests
     {
-        private protected override Task<IOperationalParityHarness> CreateHarnessAsync()
-            => PostgreSqlParityHarness.CreateAsync();
+        private protected override Task<IOperationalParityHarness> CreateHarnessAsync(
+            IAuthorizeParametersHandleGenerator? handleGenerator = null,
+            Action<OperationalCleanupOptions>? cleanup = null)
+            => PostgreSqlParityHarness.CreateAsync(handleGenerator, cleanup);
     }
 }
