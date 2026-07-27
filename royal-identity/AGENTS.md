@@ -42,18 +42,20 @@ async snapshot; explicit Plain/Data Protection/AES key protectors; dedicated mig
 provider-neutral P2 contracts and acceptances validated against PostgreSQL 17 real). Treat each as the
 implemented target architecture before changing the area it covers.
 
-There is no active implementation plan. `.ai/plans/plan-data-operational-storage.md` (Plan 3) is COMPLETE
+The active implementation plan is `.ai/plans/plan-data-test-migration.md` (Plan 4; Fases 1-3 complete).
+`.ai/plans/plan-data-operational-storage.md` (Plan 3) is COMPLETE
 (2026-07-26, 8/8): the Operational family is persisted over SQLite and PostgreSQL, authorization codes are
 single-use and refresh transitions conditional under real concurrency, authorize parameters are realm-bound with
 an absolute TTL, cleanup/purge exist behind an explicitly selected execution mode, and the complete EF gateway
-(`AddEntityFrameworkStorage`) composes both families. The next macro-plan item is
-`.ai/plans/plan-data-test-migration.md` (Plan 4), which swaps the default backing.
+(`AddEntityFrameworkStorage`) composes both families. Plan 4 is swapping the default backing.
 
-Until Plan 4 is complete, resources/scopes remain volatile per baseline DF22, and **the default host and the
-default composition of `Tests.Integration` remain in-memory**. `Tests.Storage` already runs on EF — SQLite
-always, PostgreSQL opt-in — for the contract, parity, concurrency, migration and gateway suites; what is still
-in-memory is the host wiring, with `Tests.Integration/Prepare/EntityFrameworkStorageAppFactory` as the opt-in
-reference composition and the only integration suite on it. The transitional non-atomic fallback in
+Until Plan 4 is complete, resources/scopes remain volatile per baseline DF22. The production
+`RoyalIdentity.Server` is PostgreSQL-only and externally provisioned, while `RoyalIdentity.Demo` is a
+self-provisioned SQLite in-memory executable. **The default composition of `Tests.Integration` still uses
+`Tests.Host` with the in-memory fake**; `Tests.Integration/Prepare/EntityFrameworkStorageAppFactory` remains an
+opt-in reference composition until the default test fixture changes. `Tests.Storage` runs on EF — SQLite always,
+PostgreSQL opt-in — for the contract, parity, concurrency, migration and gateway suites. The transitional
+non-atomic fallback in
 `DefaultAuthorizationCodeConsumer`/`DefaultRefreshTokenConsumer` exists for that in-memory default and is
 removed together with it, never before (ADR-018). New work must consume
 `.ai/plans/plan-data-storage-matrix.md` without re-inferring its closed semantics.

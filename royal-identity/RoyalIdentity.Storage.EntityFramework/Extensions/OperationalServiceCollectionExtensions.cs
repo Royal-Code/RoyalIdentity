@@ -189,4 +189,16 @@ public static class OperationalServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Validates every enabled realm's selected Operational payload profile during startup. Register this after
+    /// <c>AddOpenIdConnectProviderServices</c>, which owns the initial Configuration snapshot hosted service.
+    /// </summary>
+    public static IServiceCollection AddOperationalPayloadProfileStartupValidation(
+        this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddHostedService<OperationalPayloadProfilesStartupValidator>();
+        return services;
+    }
 }

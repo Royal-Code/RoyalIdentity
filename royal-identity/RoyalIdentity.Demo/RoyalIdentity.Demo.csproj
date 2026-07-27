@@ -1,11 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<ItemGroup>
 		<ProjectReference Include="..\RoyalIdentity.Razor\RoyalIdentity.Razor.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework\RoyalIdentity.Storage.EntityFramework.csproj" />
-		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.PostgreSql\RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.Sqlite\RoyalIdentity.Storage.EntityFramework.Sqlite.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
-		<ProjectReference Include="..\RoyalIdentity.UserAccounts.PostgreSql\RoyalIdentity.UserAccounts.PostgreSql.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.UserAccounts.Sqlite\RoyalIdentity.UserAccounts.Sqlite.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Migrations\RoyalIdentity.Migrations.csproj" />
 		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
 	</ItemGroup>
 

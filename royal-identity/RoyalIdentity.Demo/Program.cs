@@ -1,11 +1,11 @@
+using RoyalIdentity.Demo.Components;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.Components.Layout;
-using RoyalIdentity.Server.Components;
 
-namespace RoyalIdentity.Server;
+namespace RoyalIdentity.Demo;
 
-/// <summary>Production PostgreSQL entry point for RoyalIdentity.</summary>
-public class ServerProgram
+/// <summary>Self-contained, ephemeral SQLite demo entry point.</summary>
+public class DemoProgram
 {
     public static async Task Main(string[] args)
     {
@@ -20,7 +20,7 @@ public class ServerProgram
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
         builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddHostServices(builder.Configuration, builder.Environment);
+        builder.Services.AddRoyalIdentityDemo();
 
         var app = builder.Build();
 

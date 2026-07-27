@@ -1,16 +1,16 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fases 1-2 concluídas em 2026-07-27; Fase 3 pendente
+## Status: EM ANDAMENTO - Fases 1-3 concluídas em 2026-07-27; Fase 4 pendente
 
 ## Progresso
 
-`██░░░░░░░` **22%** - 2 de 9 fases
+`███░░░░░░` **33%** - 3 de 9 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contrato de configuração e composição | Concluida |
 | Fase 2 - provisionamento externo das três famílias | Concluida |
-| Fase 3 - composições reais e fail-fast do Server/Demo | Pendente |
+| Fase 3 - composições reais e fail-fast do Server/Demo | Concluida |
 | Fase 4 - fixture SQLite unificada, handles e seeds | Pendente |
 | Fase 5 - migração de login, profile, authorize e token | Pendente |
 | Fase 6 - migração dos fluxos restantes e troca do default | Pendente |
@@ -881,87 +881,87 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo invoca o
 
 **Tarefas:**
 
-- [ ] Referenciar no Server somente EF/PostgreSQL, `UserAccounts.Integration`/PostgreSQL, Razor e core; proibir
+- [x] Referenciar no Server somente EF/PostgreSQL, `UserAccounts.Integration`/PostgreSQL, Razor e core; proibir
   SQLite, Demo, Migrations, InMemory e `Data.*`.
-- [ ] Substituir os top-level statements do Server por um entry point público nomeado
+- [x] Substituir os top-level statements do Server por um entry point público nomeado
   `RoyalIdentity.Server.ServerProgram`, não estático e com `Main` estático. Não manter ao lado dele um `Program`
   global gerado implicitamente; permitir `WebApplicationFactory<RoyalIdentity.Server.ServerProgram>` e deixar
   somente o `Program` de `Tests.Host` no namespace global.
-- [ ] Depois da conversão para `ServerProgram`, remover o alias `RoyalIdentityServer` do `ProjectReference` de
+- [x] Depois da conversão para `ServerProgram`, remover o alias `RoyalIdentityServer` do `ProjectReference` de
   `Tests.Integration`, os `extern alias` consumidores e o guard transitório que exige esse alias. Substituí-lo por
   guard que prove o entry point nomeado e a ausência de `Program` global público/gerado no Server.
-- [ ] Adicionar em `Tests.Architecture` um teste default e sem I/O que monte a composição real do Server com
+- [x] Adicionar em `Tests.Architecture` um teste default e sem I/O que monte a composição real do Server com
   Configuration, Operational e `UserAccounts` PostgreSQL e construa o provider com `ValidateOnBuild = true` e
   `ValidateScopes = true`, sem iniciar hosted services nem abrir conexão.
-- [ ] No teste do grafo produtivo, provar resolução única de `IStorage`/`IUserDirectory` e ausência de initializer
+- [x] No teste do grafo produtivo, provar resolução única de `IStorage`/`IUserDirectory` e ausência de initializer
   SQLite demo, runner ou serviço que execute migration/seed; permitir referência de teste ao Server somente para
   exercitar essa composition root.
-- [ ] Configurar ASP.NET Data Protection e o protector de signing keys compatível com o provisionamento, preservando
+- [x] Configurar ASP.NET Data Protection e o protector de signing keys compatível com o provisionamento, preservando
   DF20 e a futura substituição por KMS.
-- [ ] Registrar contexts PostgreSQL de Configuration/Operational com histories corretas e as três connection
+- [x] Registrar contexts PostgreSQL de Configuration/Operational com histories corretas e as três connection
   strings explícitas definidas na Fase 1.
-- [ ] Registrar snapshot source e materializar o `ConfigurationSnapshotRefreshOptions` concreto a partir da
+- [x] Registrar snapshot source e materializar o `ConfigurationSnapshotRefreshOptions` concreto a partir da
   configuração já validada na Fase 1; remover o valor fixo do backing in-memory e manter o resource bridge sem
   profile ou branch Demo.
-- [ ] Alimentar `AddEntityFrameworkOperationalCleanup(...)` a partir do mesmo
+- [x] Alimentar `AddEntityFrameworkOperationalCleanup(...)` a partir do mesmo
   `OperationalCleanupOptions`/seção validada na Fase 1, garantindo que o modo usado para escolher o scheduler seja
   idêntico ao modo efetivo resolvido por `IOptions`; não usar literal duplicado.
-- [ ] Registrar Operational storage, profiles e exatamente um modo de cleanup.
-- [ ] Registrar o gateway `AddEntityFrameworkStorage()` completo.
-- [ ] Registrar `UserAccounts.PostgreSql`, fonte configurável de options por realm conforme DF23 e
+- [x] Registrar Operational storage, profiles e exatamente um modo de cleanup.
+- [x] Registrar o gateway `AddEntityFrameworkStorage()` completo.
+- [x] Registrar `UserAccounts.PostgreSql`, fonte configurável de options por realm conforme DF23 e
   `AddUserAccountsForRoyalIdentity()`.
-- [ ] Criar `RoyalIdentity.Demo` como projeto web próprio na solução, similar ao Server na superfície HTTP/UI, mas
+- [x] Criar `RoyalIdentity.Demo` como projeto web próprio na solução, similar ao Server na superfície HTTP/UI, mas
   sem referência entre os dois executáveis.
-- [ ] Referenciar diretamente no Demo EF/SQLite, `UserAccounts.Integration`/SQLite,
+- [x] Referenciar diretamente no Demo EF/SQLite, `UserAccounts.Integration`/SQLite,
   `RoyalIdentity.Migrations`, Razor e core; proibir Server/InMemory e qualquer `ProjectReference`, uso em source,
   configuração ou registro de DI direto de PostgreSQL/`Data.*`. Aceitar e documentar que essas assemblies entram
   transitivamente por `RoyalIdentity.Migrations`, sem serem usadas pelo Demo.
-- [ ] Implementar composição fixa `AddRoyalIdentityDemo()` (ou nome equivalente), sem options de provider/conexão:
+- [x] Implementar composição fixa `AddRoyalIdentityDemo()` (ou nome equivalente), sem options de provider/conexão:
   Configuration + Operational compartilham SQLite in-memory nomeado/keep-alive e `UserAccounts` usa outro.
-- [ ] Abrir as conexões keep-alive nomeadas antes do provisionamento e implementar initializer do Demo que invoca
+- [x] Abrir as conexões keep-alive nomeadas antes do provisionamento e implementar initializer do Demo que invoca
   `StorageMigrationRunner` com SQLite, as três famílias e `ConfigurationSeedMode.Demo` antes de liberar tráfego;
   resources usam a bridge e contas usam os casos de uso públicos de `UserAccounts`.
-- [ ] Manter o conjunto de realms do Demo deliberadamente mínimo: semear somente `demo_realm`, seus clients,
+- [x] Manter o conjunto de realms do Demo deliberadamente mínimo: semear somente `demo_realm`, seus clients,
   resources, contas e signing keys; não usar `ConfigurationSeedMode.All` nem criar os realms internos `server`,
   `account` e `admin`.
-- [ ] Garantir que o seed do Demo crie signing keys efêmeras utilizáveis para todos os realms habilitados e que o
+- [x] Garantir que o seed do Demo crie signing keys efêmeras utilizáveis para todos os realms habilitados e que o
   runtime consiga desprotegê-las com o mesmo protector da execução, sem criar política de rotação.
-- [ ] Reutilizar a implementação `ConfigurationSeed` existente no runner; o Demo apenas seleciona o modo Demo e não
+- [x] Reutilizar a implementação `ConfigurationSeed` existente no runner; o Demo apenas seleciona o modo Demo e não
   duplica primitivas nem usa entidades `Data.*` em seu próprio source.
-- [ ] Configurar Data Protection efêmero do Demo em diretório temporário exclusivo por processo, com application
+- [x] Configurar Data Protection efêmero do Demo em diretório temporário exclusivo por processo, com application
   name fixo e os mesmos purposes usados pelo protector runtime. Criar/abrir o key ring antes de invocar o runner,
   fazer initializer e runtime resolverem a configuração compatível durante toda a vida do host e remover o
   diretório temporário somente no teardown. Não expor option obrigatória ao usuário do Demo.
-- [ ] Escolher um modo de cleanup Operational fixo para o Demo, sem options obrigatórias para quem o executa.
-- [ ] Fazer Demo, Server e `Tests.Host` usarem `UseRoyalIdentityProtocol(...)`, mantendo UI/static
+- [x] Escolher um modo de cleanup Operational fixo para o Demo, sem options obrigatórias para quem o executa.
+- [x] Fazer Demo, Server e `Tests.Host` usarem `UseRoyalIdentityProtocol(...)`, mantendo UI/static
   files/antiforgery e detalhes de hosting em cada entry point.
-- [ ] Adicionar um teste estreito em `Tests.Integration` que hospede o `RoyalIdentity.Demo` real por
+- [x] Adicionar um teste estreito em `Tests.Integration` que hospede o `RoyalIdentity.Demo` real por
   `WebApplicationFactory<RoyalIdentity.Demo.DemoProgram>`, sem passar por `Tests.Host`, e execute o fluxo OIDC demo.
-- [ ] Implementar o entry point real como tipo público nomeado
+- [x] Implementar o entry point real como tipo público nomeado
   `RoyalIdentity.Demo.DemoProgram`, não estático e com `Main` estático, em vez de top-level statements +
   `public partial class Program` global. Isso permite usá-lo como argumento genérico da `WebApplicationFactory` e
   evita colisão `CS0433` com o `Program` global já exposto por `Tests.Host`; seguir o princípio do entry point
   nomeado `MigrationRunnerProgram`.
-- [ ] Provar por guard que Demo não referencia Server e não possui referência direta/uso em source/registro de
+- [x] Provar por guard que Demo não referencia Server e não possui referência direta/uso em source/registro de
   PostgreSQL ou `Data.*`; aceitar explicitamente o caminho transitivo Demo → Migrations → providers/Data, sem
   seleção nem execução de PostgreSQL pelo Demo. Provar também que Server não referencia Demo/SQLite/Migrations e
   que não existe caminho inverso Migrations → Demo. Reutilizar a técnica de
   `ConfigurationStorageBoundaryTests.Core_DoesNotReference_DataOrAdapter`: combinar leitura dos
   `ProjectReference` diretos com `Assembly.GetReferencedAssemblies()` para detectar uso compilado real após a poda
   do compilador, sem rejeitar a dependência transitiva aceita.
-- [ ] Remover `AddInMemoryStorage()` e a referência `RoyalIdentity.Storage.InMemory` do Server.
-- [ ] Preservar as validações funcionais de snapshot/signing keys, sem implementar readiness de schema e sem
+- [x] Remover `AddInMemoryStorage()` e a referência `RoyalIdentity.Storage.InMemory` do Server.
+- [x] Preservar as validações funcionais de snapshot/signing keys, sem implementar readiness de schema e sem
   `GetPendingMigrations*`, `EnsureCreated*`, `Migrate*` ou seed.
-- [ ] Validar todos os profiles Operational selecionados pelos realms do snapshot antes do tráfego.
-- [ ] Preservar bootstrap de snapshot, `SigningKeyStartupValidator` e ordem
+- [x] Validar todos os profiles Operational selecionados pelos realms do snapshot antes do tráfego.
+- [x] Preservar bootstrap de snapshot, `SigningKeyStartupValidator` e ordem
   `UseRealmDiscovery` antes de `UseAuthentication`.
-- [ ] Cobrir protector incompatível, profile ausente, key inválida e `IUserSecurityStateProvider` exigido por
+- [x] Cobrir protector incompatível, profile ausente, key inválida e `IUserSecurityStateProvider` exigido por
   policy; não criar teste de migrations pendentes no host.
-- [ ] Documentar e fornecer comando/script local para PostgreSQL 17 via Podman, execução prévia do runner e startup
+- [x] Documentar e fornecer comando/script local para PostgreSQL 17 via Podman, execução prévia do runner e startup
   do Server; manter três chaves de conexão explícitas, ainda que apontem para o mesmo banco, e não versionar senha.
-- [ ] Cobrir startup do Demo a partir de memória vazia, provar que somente `demo_realm` foi semeado e executar um
+- [x] Cobrir startup do Demo a partir de memória vazia, provar que somente `demo_realm` foi semeado e executar um
   fluxo OIDC completo com conta real nesse realm.
-- [ ] No teste do Demo, comprovar que as signing keys criadas pelo initializer são desprotegidas pelo runtime e que
+- [x] No teste do Demo, comprovar que as signing keys criadas pelo initializer são desprotegidas pelo runtime e que
   o diretório temporário do key ring é removido somente depois do encerramento da factory.
 
 **Critérios de aceite — 3A/Server:** inicia sobre PostgreSQL previamente provisionado e resolve exatamente um
@@ -994,7 +994,30 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostComposition|Fully
 
 ### Resultado da Fase 3
 
-*a preencher*
+Concluída em 2026-07-27. O `RoyalIdentity.Server` passou a ser um composition root exclusivamente PostgreSQL,
+com entry point nomeado `ServerProgram`, três conexões explícitas, Configuration/Operational EF,
+`UserAccounts` real, Data Protection, cleanup e validações fail-fast; não referencia nem executa
+SQLite/InMemory/Migrations/Demo. O grafo completo é construído sem I/O com `ValidateOnBuild`/`ValidateScopes`.
+
+Foi criado o executável independente `RoyalIdentity.Demo`, fixo e sem configuração de storage: Configuration e
+Operational compartilham um SQLite in-memory nomeado, `UserAccounts` usa outro, e um initializer abre os
+keep-alives, executa o runner reutilizável, seleciona somente o seed Demo e cria a conta real pelo caso de uso
+público do módulo. O key ring Data Protection é exclusivo da execução e removido no teardown. O teste
+`SqliteDemo` provou startup vazio, somente `demo_realm`, login, authorization code, emissão de access/ID token e
+compatibilidade da signing key semeada com o runtime.
+
+O teste real `scripts/Test-ServerPostgreSql.ps1` executou PostgreSQL 17 via Podman, aplicou as três famílias pelo
+runner e iniciou o Server com sucesso. Essa validação revelou dois defeitos mascarados pelo SQLite/fake e ambos
+foram corrigidos: o pool de `UserAccountsDbContext` capturava um dispatcher scoped, e o
+`SigningKeyStartupValidator` consultava keys enquanto o reader de realms ainda estava aberto no mesmo contexto
+Npgsql. Também foi adicionado fail-fast para profiles Operational selecionados e indisponíveis.
+
+Comandos finais: `dotnet build RoyalIdentity.sln --no-restore` (sucesso);
+`dotnet test Tests.Architecture/Tests.Architecture.csproj --no-build` (56/56);
+`dotnet test Tests.Storage/Tests.Storage.csproj --no-restore` (589 aprovados, 43 opt-in ignorados);
+`dotnet test Tests.Integration/Tests.Integration.csproj --no-build` (283/283);
+`dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-restore` (194 aprovados, 1 opt-in ignorado); e
+`./scripts/Test-ServerPostgreSql.ps1` (PostgreSQL 17 + runner + Server aprovados).
 
 ---
 

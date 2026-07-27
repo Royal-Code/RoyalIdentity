@@ -10,8 +10,8 @@ namespace RoyalIdentity.Storage.EntityFramework.Storage;
 
 /// <summary>
 /// The complete EF gateway: Configuration and Operational composed behind one <see cref="IStorage"/>
-/// (plan DF21/DF22). It is an explicit opt-in — the default host stays in-memory until Plano 4 — and it requires
-/// both families: there is no production mode with Operational EF and Configuration missing.
+/// (plan DF21/DF22). It is composed by the production Server and the SQLite Demo after Plano 4 Fase 3, and it
+/// requires both families: there is no production mode with Operational EF and Configuration missing.
 /// <para>
 /// The two families keep their own <c>DbContext</c> and connection even when they point at the same database
 /// (plan DF2), so nothing here coordinates a commit between them: this type is composition, not a unit of work.

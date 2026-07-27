@@ -14,6 +14,8 @@
 		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework\RoyalIdentity.Storage.EntityFramework.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.Sqlite\RoyalIdentity.Storage.EntityFramework.Sqlite.csproj" />
 		<ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.PostgreSql\RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Server\RoyalIdentity.Server.csproj" />
+		<ProjectReference Include="..\RoyalIdentity.Demo\RoyalIdentity.Demo.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -18,7 +18,13 @@ public sealed class SigningKeyStartupValidator(IServiceProvider applicationServi
         var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
         var keyManager = scope.ServiceProvider.GetRequiredService<IKeyManager>();
 
+        // Materialize before asking the key store. EF providers may use the same scoped DbContext for both
+        // stores; querying keys while the realm reader is still open causes overlapping commands on Npgsql.
+        List<RoyalIdentity.Models.Realm> realms = [];
         await foreach (var realm in storage.Realms.GetAllAsync(cancellationToken))
+            realms.Add(realm);
+
+        foreach (var realm in realms)
         {
             if (!realm.Enabled)
                 continue;

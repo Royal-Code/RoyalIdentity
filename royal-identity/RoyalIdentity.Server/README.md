@@ -1,18 +1,60 @@
-# RoyalIdentity.Server
+# RoyalIdentity Server — local PostgreSQL
 
-`RoyalIdentity.Server` é o host produtivo fixo em PostgreSQL. O processo web não aplica migrations nem seed.
+`RoyalIdentity.Server` is a PostgreSQL-only host. It never creates a database, applies migrations or seeds data;
+run the migration runner first. The commands below use one local PostgreSQL 17 database while still supplying the
+three explicit DbContext connections required by the Server.
 
-Durante a transição da Fase 1 para a Fase 3 do `plan-data-test-migration`, o backing runtime ainda é in-memory,
-mas a configuração PostgreSQL alvo já é validada no startup. Por isso, as três connection strings vazias do
-`appsettings.json` fazem o processo falhar fechado até receber valores por configuração externa:
+Choose a local password in the current PowerShell session (do not commit it), then start PostgreSQL:
 
-- `RoyalIdentity__Connections__Configuration__ConnectionString`
-- `RoyalIdentity__Connections__Operational__ConnectionString`
-- `RoyalIdentity__Connections__UserAccounts__ConnectionString`
+```powershell
+$env:RI_POSTGRES_PASSWORD = "<choose-a-local-password>"
+podman run --name royalidentity-postgres --rm -d `
+  -e POSTGRES_USER=royalidentity `
+  -e POSTGRES_PASSWORD=$env:RI_POSTGRES_PASSWORD `
+  -e POSTGRES_DB=royalidentity `
+  -p 5432:5432 `
+  docker.io/library/postgres:17
+```
 
-Os valores podem ser iguais no ambiente local, mas as três chaves permanecem obrigatórias. Não versione senha:
-forneça os valores por variável de ambiente, user-secrets ou secret store.
+Prepare the three explicit connections and a persistent Data Protection key ring:
 
-As seções `RoyalIdentity:Snapshot` e `RoyalIdentity:Cleanup` também são vinculadas e validadas nesta etapa, mas
-só passam a controlar os serviços persistentes quando a composição PostgreSQL substituir o backing in-memory na
-Fase 3. Essa fase também entrega o runbook Podman → runner → Server.
+```powershell
+$env:RI_CONFIGURATION_CONNECTION = "Host=localhost;Port=5432;Database=royalidentity;Username=royalidentity;Password=$env:RI_POSTGRES_PASSWORD"
+$env:RI_OPERATIONAL_CONNECTION = $env:RI_CONFIGURATION_CONNECTION
+$env:RI_USER_ACCOUNTS_CONNECTION = $env:RI_CONFIGURATION_CONNECTION
+$env:RI_DATA_PROTECTION_KEY_RING = Join-Path (Get-Location) ".local-data-protection"
+```
+
+Provision all storage families and the product seed:
+
+```powershell
+dotnet run --project RoyalIdentity.Migrations -- `
+  --provider postgresql `
+  --families all `
+  --configuration-connection-env RI_CONFIGURATION_CONNECTION `
+  --operational-connection-env RI_OPERATIONAL_CONNECTION `
+  --user-accounts-connection-env RI_USER_ACCOUNTS_CONNECTION `
+  --database-topology shared `
+  --seed product `
+  --server-admin-redirect-uri https://localhost:7185/callback `
+  --key-protector data-protection `
+  --data-protection-key-ring $env:RI_DATA_PROTECTION_KEY_RING `
+  --data-protection-app-name RoyalIdentity.Server
+```
+
+Pass the same connections and Data Protection identity to the Server:
+
+```powershell
+$env:RoyalIdentity__Connections__Configuration__ConnectionString = $env:RI_CONFIGURATION_CONNECTION
+$env:RoyalIdentity__Connections__Operational__ConnectionString = $env:RI_OPERATIONAL_CONNECTION
+$env:RoyalIdentity__Connections__UserAccounts__ConnectionString = $env:RI_USER_ACCOUNTS_CONNECTION
+$env:RoyalIdentity__DataProtection__KeyRingPath = $env:RI_DATA_PROTECTION_KEY_RING
+$env:RoyalIdentity__DataProtection__ApplicationName = "RoyalIdentity.Server"
+$env:RoyalIdentity__DataProtection__OperationalPayloadProfileId = "default"
+dotnet run --project RoyalIdentity.Server
+```
+
+Stop the local database with `podman stop royalidentity-postgres`.
+
+To validate the complete disposable sequence (PostgreSQL 17 → runner → Server startup) without keeping local
+state, run `./scripts/Test-ServerPostgreSql.ps1`.

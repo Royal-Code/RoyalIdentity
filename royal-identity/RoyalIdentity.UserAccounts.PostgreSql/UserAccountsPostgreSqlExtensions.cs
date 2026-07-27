@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RoyalCode.WorkContext.EntityFramework.Configurations;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.PostgreSql;
@@ -25,5 +26,24 @@ public static class UserAccountsPostgreSqlExtensions
             .ConfigureNpgsqlOptions(options =>
                 options.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
             .ConfigureUserAccounts();
+    }
+
+    /// <summary>
+    /// Registers the module with one explicit PostgreSQL connection string supplied by the composition root.
+    /// This avoids introducing a second configuration key when the host already owns a typed connection option.
+    /// </summary>
+    public static IWorkContextBuilder<UserAccountsPostgreSqlDbContext> AddUserAccountsPostgreSqlConnection(
+        this IServiceCollection services,
+        string connectionString)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        var builder = services.AddWorkContext<UserAccountsPostgreSqlDbContext>();
+        services.AddDbContext<UserAccountsPostgreSqlDbContext>((_, options) => options.UseNpgsql(
+            connectionString,
+            npgsql => npgsql.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName)));
+
+        return builder.ConfigureUserAccounts();
     }
 }

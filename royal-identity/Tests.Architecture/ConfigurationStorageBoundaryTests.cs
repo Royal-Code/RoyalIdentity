@@ -145,7 +145,6 @@ public class ConfigurationStorageBoundaryTests
         [
             "RoyalIdentity/RoyalIdentity.csproj",
             "RoyalIdentity.Razor/RoyalIdentity.Razor.csproj",
-            "RoyalIdentity.Storage.InMemory/RoyalIdentity.Storage.InMemory.csproj", // transitional until Plan 4 Fase 3
             "RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj",
             "RoyalIdentity.Storage.EntityFramework.PostgreSql/RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj",
             "RoyalIdentity.UserAccounts.Integration/RoyalIdentity.UserAccounts.Integration.csproj",
@@ -178,7 +177,7 @@ public class ConfigurationStorageBoundaryTests
     }
 
     [Fact]
-    public void IntegrationTests_ReferenceServerThroughTheNamedAlias()
+    public void Server_UsesNamedEntryPoint_WithoutAssemblyAliasOrGlobalProgram()
     {
         var projectPath = Path.Combine(
             ProjectReferenceReader.FindRepositoryRoot(),
@@ -193,7 +192,15 @@ public class ConfigurationStorageBoundaryTests
                 .Replace('\\', '/')
                 .EndsWith("RoyalIdentity.Server/RoyalIdentity.Server.csproj", StringComparison.Ordinal));
 
-        Assert.Equal("RoyalIdentityServer", serverReference.Element("Aliases")?.Value);
+        Assert.Null(serverReference.Element("Aliases"));
+
+        var serverAssembly = typeof(RoyalIdentity.Server.ServerProgram).Assembly;
+        Assert.Null(serverAssembly.GetType("Program"));
+        Assert.True(typeof(RoyalIdentity.Server.ServerProgram).IsPublic);
+        Assert.False(typeof(RoyalIdentity.Server.ServerProgram).IsAbstract);
+        Assert.NotNull(typeof(RoyalIdentity.Server.ServerProgram).GetMethod(
+            nameof(RoyalIdentity.Server.ServerProgram.Main),
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static));
     }
 
     [Fact]

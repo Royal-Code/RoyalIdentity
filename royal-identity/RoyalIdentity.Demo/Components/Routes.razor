@@ -1,4 +1,4 @@
-<Router AppAssembly="typeof(ServerProgram).Assembly" AdditionalAssemblies="new []{ typeof(AccountLayout).Assembly }">
+<Router AppAssembly="typeof(DemoProgram).Assembly" AdditionalAssemblies="new []{ typeof(AccountLayout).Assembly }">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>

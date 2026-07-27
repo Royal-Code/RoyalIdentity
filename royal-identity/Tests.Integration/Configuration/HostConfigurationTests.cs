@@ -1,12 +1,10 @@
-extern alias RoyalIdentityServer;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using RoyalIdentity.Configuration;
-using RoyalIdentityServer::RoyalIdentity.Server.Configuration;
+using RoyalIdentity.Server.Configuration;
 using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 using RoyalIdentity.UserAccounts.Integration;
 

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RoyalCode.WorkContext.EntityFramework.Configurations;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.Sqlite;
@@ -25,6 +26,25 @@ public static class UserAccountsSqliteExtensions
             .ConfigureSqliteOptions(options =>
                 options.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
             .ConfigureUserAccounts();
+    }
+
+    /// <summary>
+    /// Registers the module with one explicit SQLite connection string supplied by the composition root.
+    /// The caller owns any keep-alive connection required by a named in-memory database.
+    /// </summary>
+    public static IWorkContextBuilder<UserAccountsSqliteDbContext> AddUserAccountsSqliteConnection(
+        this IServiceCollection services,
+        string connectionString)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        var builder = services.AddWorkContext<UserAccountsSqliteDbContext>();
+        services.AddDbContext<UserAccountsSqliteDbContext>((_, options) => options.UseSqlite(
+            connectionString,
+            sqlite => sqlite.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName)));
+
+        return builder.ConfigureUserAccounts();
     }
 
     /// <summary>
