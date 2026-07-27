@@ -501,6 +501,7 @@ colisão. Cada migration reporta sucesso/falha próprio; falha intermediária n�
 ```text
 RoyalIdentity.Server/
   binding, validação, composição web e startup
+  -> entry point público nomeado RoyalIdentity.Server.ServerProgram
   -> RoyalIdentity.Storage.EntityFramework
   -> provider EF PostgreSql
   -> RoyalIdentity.UserAccounts.Integration
@@ -510,6 +511,7 @@ RoyalIdentity.Server/
   -X-> RoyalIdentity.Migrations
   -X-> RoyalIdentity.Storage.InMemory
   -X-> RoyalIdentity.Data.*
+  -X-> Program público/gerado no namespace global
 
 RoyalIdentity.Migrations/
   aplica schemas Sqlite/PostgreSql e seed Configuration None|Product|Demo|All
@@ -819,6 +821,13 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo invoca o
 
 - [ ] Referenciar no Server somente EF/PostgreSQL, `UserAccounts.Integration`/PostgreSQL, Razor e core; proibir
   SQLite, Demo, Migrations, InMemory e `Data.*`.
+- [ ] Substituir os top-level statements do Server por um entry point público nomeado
+  `RoyalIdentity.Server.ServerProgram`, não estático e com `Main` estático. Não manter ao lado dele um `Program`
+  global gerado implicitamente; permitir `WebApplicationFactory<RoyalIdentity.Server.ServerProgram>` e deixar
+  somente o `Program` de `Tests.Host` no namespace global.
+- [ ] Depois da conversão para `ServerProgram`, remover o alias `RoyalIdentityServer` do `ProjectReference` de
+  `Tests.Integration`, os `extern alias` consumidores e o guard transitório que exige esse alias. Substituí-lo por
+  guard que prove o entry point nomeado e a ausência de `Program` global público/gerado no Server.
 - [ ] Adicionar em `Tests.Architecture` um teste default e sem I/O que monte a composição real do Server com
   Configuration, Operational e `UserAccounts` PostgreSQL e construa o provider com `ValidateOnBuild = true` e
   `ValidateScopes = true`, sem iniciar hosted services nem abrir conexão.
@@ -897,6 +906,8 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo invoca o
 `IStorage` EF e um `IUserDirectory` de `UserAccounts`; configuração inválida falha antes de aceitar request; o
 projeto não referencia SQLite/Demo/InMemory/Migrations/Data e não executa migration/seed. A composição PostgreSQL
 completa é construída por teste default com validação de scopes/build, sem I/O e sem serviços de bootstrap demo.
+Seu entry point público é `RoyalIdentity.Server.ServerProgram`, hospedável diretamente por `WebApplicationFactory`
+sem alias de assembly e sem declarar outro `Program` no namespace global.
 
 **Critérios de aceite — 3B/Demo:** inicia sem configuração de storage sobre SQLite in-memory vazio, invoca o runner
 com migrations + seed Demo, cria signing keys efêmeras desprotegíveis pelo runtime com key ring temporário por
@@ -1322,6 +1333,8 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
     público no namespace global que possa colidir com `Tests.Host.Program`.
 34. O seed do Demo cria somente `demo_realm` e seus dados funcionais; os realms internos Product não são copiados
     para a experiência demo.
+35. O entry point público do Server é `RoyalIdentity.Server.ServerProgram`; `Tests.Integration` referencia o
+    assembly normalmente, sem `extern alias`, e somente `Tests.Host` mantém um `Program` no namespace global.
 
 ---
 
@@ -1329,6 +1342,8 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 
 - DF17-DF30 foram aplicadas e eventuais desvios estão registrados nos resultados das fases.
 - `RoyalIdentity.Server` inicia exclusivamente sobre PostgreSQL e não oferece selector/fallback SQLite/in-memory.
+- `RoyalIdentity.Server.ServerProgram` é hospedável diretamente por `WebApplicationFactory` sem alias de assembly
+  nem `Program` global concorrente.
 - `RoyalIdentity.Demo` inicia sem configuração de storage sobre SQLite in-memory, invoca o runner compartilhado com
   o modo Demo, usa o mesmo key ring temporário no initializer/runtime e conclui o fluxo OIDC em `demo_realm`, único
   realm semeado. `RoyalIdentity.Demo.DemoProgram` é hospedável sem colisão com `Tests.Host.Program`. Dependências
@@ -1358,7 +1373,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Initializer e runtime do Demo usam key rings diferentes | diretório temporário é criado tarde, recriado ou removido antes do shutdown | signing keys do seed ficam ilegíveis ainda na mesma execução | criar key ring por processo antes do runner, compartilhar application name/purposes e remover somente no teardown | Aberto |
 | Banco não foi provisionado antes do host | operador inicia Server sem executar o runner | falha funcional no primeiro bootstrap/acesso | runbook externo, erro sanitizado e nenhuma tentativa automática de migration | Aberto |
 | Demo deixa de autenticar | initializer chama runner/seed sem accounts/resources/signing keys compatíveis | `dotnet run` parece funcional, mas login/authorize falha | DF27, modo Demo do runner + seed de contas e fluxo OIDC completo a partir de memória vazia | Aberto |
-| Entry point do Demo colide com `Tests.Host.Program` | Demo expõe outro `public Program` no namespace global | `Tests.Integration` falha com `CS0433` ao referenciar os dois hosts | usar `RoyalIdentity.Demo.DemoProgram` público/não estático com `Main` estático e `WebApplicationFactory<DemoProgram>` | Aberto |
+| Entry points web colidem com `Tests.Host.Program` | Server ou Demo expõe outro `Program` no namespace global | `Tests.Integration` falha com `CS0433` ou exige aliases contagiosos para consumir tipos dos hosts | substituir top-level statements por `RoyalIdentity.Server.ServerProgram` e usar `RoyalIdentity.Demo.DemoProgram`, ambos públicos/não estáticos com `Main` estático; somente `Tests.Host` mantém `Program` global | Aberto |
 | SQLite Demo desaparece após o runner | keep-alive é aberto depois das conexões transitórias do migration runner | schema/seed somem antes do startup | abrir os dois keep-alives nomeados antes de invocar o runner e mantê-los até o shutdown | Aberto |
 | Bootstrap Demo vaza para o Server | composição/extension compartilhada inclui migration ou seed | processo produtivo altera schema/dados | executáveis irmãos, guards bidirecionais e extension compartilhado limitado ao protocolo | Aberto |
 | Demo absorve ownership de `UserAccounts` | host manipula entidades/tabelas internas do módulo para semear contas | viola ADR-013/ADR-015 | Demo usa migrations do provider e casos de uso públicos do módulo | Aberto |
