@@ -247,8 +247,10 @@
   do Plano 3, implementação atual e resposta humana após Q13.
 - **DF11 — Proteção fail-closed:** Plain exige registro + seleção explícitos e warning; profile/protector ausente
   falha, sem fallback; segredos não entram em Configuration persistida. Fonte: Planos 2/3.
-- **DF12 — Signing keys são externas ao host:** provisionamento cria material utilizável; o Server valida e usa,
-  mas não cria nem rotaciona keys. Fonte: decisões 19/27/28 do Plano 2.
+- **DF12 — Signing keys do Server são externas:** o runner produtivo cria material utilizável; o Server valida e
+  usa, mas nunca cria nem rotaciona keys. `RoyalIdentity.Demo`, por começar com SQLite in-memory vazio, cria signing
+  keys efêmeras como parte do seed de cada execução; isso não introduz rotação runtime nem autoriza criação no
+  Server. Fonte: decisões 19/27/28 do Plano 2 e DF27.
 - **DF13 — Resources/scopes permanecem bridge:** o Plano 4 usa `IConfigurationResourceSource`/hook de composição e
   não adiciona persistência ou write facade pública. Fonte: decisão 22 do baseline e Plano 2.
 - **DF14 — Seeds separados por owner:** o seed de produto Configuration pertence ao runner PostgreSQL; o seed demo
@@ -326,6 +328,10 @@
   O extension exige que o caller já tenha instalado routing e não possui antiforgery/UI; cada host instala esses
   elementos na ordem documentada ao redor dele. Depois da Fase 4, `Tests.Host` é somente infraestrutura para
   `WebApplicationFactory`, não um executável standalone sem factory/storage.
+  Server e Demo possuem shell/scaffolding web mínimos próprios; alguma duplicação de arquivos estritamente de host
+  é consequência aceita dessa independência. Não duplicar protocolo ou UI de contas: esses permanecem em
+  `UseRoyalIdentityProtocol(...)` e `RoyalIdentity.Razor`. Não extrair bootstrap geral compartilhado apenas para
+  eliminar essa duplicação.
   Não criar `RoyalIdentity.Hosting`, bootstrap geral compartilhado nem referências de `Tests.Host`/Demo ao
   `RoyalIdentity.Server`. Fonte: respostas humanas a Q8/Q13.
 - **DF30 — Consumers atômicos sem indireção vazia:** depois de DF28,
@@ -702,6 +708,12 @@ dotnet test Tests.Architecture
 composition root SQLite integral e self-provisioned. Ambos registram snapshot, resource bridge,
 Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo aplica migrations/seeds no startup.
 
+**Sequência interna da fase:**
+
+1. **Fase 3A — Server PostgreSQL:** composição, validação sem I/O e retirada do fake.
+2. **Fase 3B — Demo SQLite:** projeto/shell web mínimo, composição fixa, migrations, seed e fluxo OIDC.
+3. **Fase 3C — execução local:** runbook Podman → runner → Server.
+
 **Tarefas:**
 
 - [ ] Referenciar no Server somente EF/PostgreSQL, `UserAccounts.Integration`/PostgreSQL, Razor e core; proibir
@@ -730,6 +742,8 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo aplica m
 - [ ] Implementar initializer do Demo que aplica migrations das três famílias em ordem e executa o seed demo de
   Configuration/resources/contas antes de liberar tráfego; contas usam os casos de uso públicos de `UserAccounts`,
   não um seed dentro do provider SQLite.
+- [ ] Garantir que o seed do Demo crie signing keys efêmeras utilizáveis para todos os realms habilitados e que o
+  runtime consiga desprotegê-las com o mesmo protector da execução, sem criar política de rotação.
 - [ ] Manter o seed demo dentro de `RoyalIdentity.Demo`; remover o modo Demo do runner sem mover esse seed para o
   provider SQLite nem duplicar o seed de produto.
 - [ ] Usar Data Protection efêmero/fixo da composição Demo, compatível entre seu initializer e runtime, e escolher
@@ -738,6 +752,8 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo aplica m
   files/antiforgery e detalhes de hosting em cada `Program`.
 - [ ] Adicionar um teste estreito em `Tests.Integration` que hospede o `RoyalIdentity.Demo` real por
   `WebApplicationFactory`, sem passar por `Tests.Host`, e execute o fluxo OIDC demo.
+- [ ] Tornar o entry point do Demo acessível ao teste com `public partial class Program`, seguindo o padrão já usado
+  por `Tests.Host`, em vez de depender do `Program` interno gerado por top-level statements.
 - [ ] Provar por guard que Demo não referencia Server/Migrations/PostgreSQL e que Server não referencia
   Demo/SQLite/Migrations.
 - [ ] Remover `AddInMemoryStorage()` e a referência `RoyalIdentity.Storage.InMemory` do Server.
@@ -752,13 +768,18 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo aplica m
   do Server; manter três chaves de conexão explícitas, ainda que apontem para o mesmo banco, e não versionar senha.
 - [ ] Cobrir startup do Demo a partir de memória vazia e um fluxo OIDC completo com conta real.
 
-**Critérios de aceite:** o Server inicia sobre PostgreSQL previamente provisionado e resolve exatamente um
+**Critérios de aceite — 3A/Server:** inicia sobre PostgreSQL previamente provisionado e resolve exatamente um
 `IStorage` EF e um `IUserDirectory` de `UserAccounts`; configuração inválida falha antes de aceitar request; o
-projeto não referencia SQLite/Demo/InMemory/Migrations/Data e não executa migration/seed. `RoyalIdentity.Demo`
-inicia sem configuração de storage sobre SQLite in-memory vazio, aplica migrations/seeds próprios e conclui um
-fluxo OIDC com conta real; não referencia Server/PostgreSQL/Migrations. A composição PostgreSQL completa é
-construída por teste default com validação de scopes/build, sem I/O e sem serviços de bootstrap demo; resource
-bridge segue DF13; o runbook Podman permite executar localmente runner + Server.
+projeto não referencia SQLite/Demo/InMemory/Migrations/Data e não executa migration/seed. A composição PostgreSQL
+completa é construída por teste default com validação de scopes/build, sem I/O e sem serviços de bootstrap demo.
+
+**Critérios de aceite — 3B/Demo:** inicia sem configuração de storage sobre SQLite in-memory vazio, aplica
+migrations/seeds próprios, cria signing keys efêmeras desprotegíveis pelo runtime e conclui um fluxo OIDC com conta
+real. Seu `Program` é alcançável por `WebApplicationFactory`; o projeto não referencia Server/PostgreSQL/Migrations;
+o scaffolding duplicado limita-se ao shell de host, enquanto protocolo e UI de contas permanecem compartilhados.
+
+**Critérios de aceite — 3C/local:** resource bridge segue DF13 e o runbook Podman permite executar localmente
+runner + Server com três connection strings explícitas e sem secret versionada.
 
 **Testes:**
 
@@ -1133,8 +1154,8 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 9. Não há transação global nem promessa de rollback conjunto entre famílias.
 10. Cleanup possui exatamente um modo explícito.
 11. Plain nunca é default e proteção ausente/incompatível falha fechado.
-12. O host consegue desproteger as signing keys provisionadas usando o protector configurado; nunca cria nem
-    rotaciona esse material.
+12. O Server consegue desproteger as signing keys provisionadas externamente e nunca cria/rotaciona esse material;
+    o Demo cria signing keys efêmeras no seed de cada execução e também não implementa rotação runtime.
 13. Resources/scopes permanecem voláteis por DF13.
 14. Authorization codes são single-use sob concorrência real.
 15. Refresh transitions são condicionais e preservam a tolerância pós-consumo vigente.
