@@ -1,6 +1,6 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: RASCUNHO - inventário verificado em 2026-07-26; Q1-Q10 abertas; implementação não iniciada
+## Status: RASCUNHO - inventário verificado em 2026-07-26; Q1-Q12 abertas; implementação não iniciada
 
 ## Progresso
 
@@ -24,9 +24,12 @@
 > Antes de fechar uma fase, confirme que decisões, critérios de aceite, testes e invariantes relacionados foram
 > aplicados.
 
-> **Gate de planejamento:** nenhuma fase que dependa de Q1-Q10 pode ser iniciada enquanto a pergunta correspondente
+> **Gate de planejamento:** nenhuma fase que dependa de Q1-Q12 pode ser iniciada enquanto a pergunta correspondente
 > estiver aberta. Respostas humanas devem ser convertidas em novas decisões `DF<n>` e registradas em
 > `Histórico de decisões` antes do primeiro edit da fase.
+>
+> **Evidência numérica:** todo número medido durante a execução deve ser registrado com o comando exato que o
+> produziu, no mesmo item ou no `Resultado da Fase`; contagem sem comando não fecha critério de aceite.
 
 ---
 
@@ -53,6 +56,8 @@
   `UserAccounts` e o ciclo de segurança.
 - [ADR-018](../../adrs/ADR-018.md) — torna o fake transitório, proíbe ampliar sua paridade e determina sua remoção
   quando a migração ocorrer.
+- [ADR.md](../../ADR.md) — define que uma decisão aceita não é reescrita; consequências posteriores entram em
+  nova seção de revisão, e mantém o índice das ADRs.
 - [product.md](../foundation/product.md), [tech.md](../foundation/tech.md),
   [structure.md](../foundation/structure.md) e [architecture.md](../foundation/architecture.md) — objetivos,
   invariantes, dependências e fronteiras a preservar; parte do texto ainda descreve o default in-memory e deve ser
@@ -70,9 +75,10 @@
 - `Tests.Storage/Storage/Support/InMemoryStorageHarness.cs`,
   `Tests.UserAccounts/UserDirectoryContractTests.cs` e
   `Tests.Architecture/ModuleBoundaryTests.cs` — consumidores restantes do projeto fake fora da suíte HTTP.
-- `RoyalIdentity/Contracts/Defaults/DefaultAuthorizationCodeConsumer.cs`,
-  `DefaultRefreshTokenConsumer.cs`, `ISingleUseAuthorizationCodeStore.cs` e
-  `IVersionedRefreshTokenStore.cs` — capability detection e fallbacks transitórios.
+- `RoyalIdentity/Contracts/Defaults/DefaultAuthorizationCodeConsumer.cs` e
+  `DefaultRefreshTokenConsumer.cs` — capability detection e fallbacks transitórios.
+- `RoyalIdentity/Contracts/Storage/ISingleUseAuthorizationCodeStore.cs` e
+  `IVersionedRefreshTokenStore.cs` — interfaces das capabilities atômicas.
 
 ### Estado atual do código (verificado em 2026-07-26)
 
@@ -92,22 +98,45 @@
   operacional integrado ao runner do core.
 - **As factories opt-in são complementares, não cumulativas:** `EntityFrameworkStorageAppFactory` torna o core real
   e mantém contas fake; `UserAccountsAppFactory` torna contas reais e mantém o core fake.
-- **O default HTTP continua fake:** 29 classes usam `IClassFixture<AppFactory>`, e `AppFactory` herda
-  `AddInMemoryStorage()` de `Tests.Host`.
-- **A suíte HTTP conhece detalhes do fake:** `rg -o` encontrou 381 ocorrências de `MemoryStorage` em 36 arquivos,
-  64 ocorrências de getters de `RealmMemoryStore`, 265 usos de `MemoryStorage.DemoRealm` e 28 usos do subject
-  estático de Alice.
+- **O default HTTP continua fake:** 29 classes usam `IClassFixture<AppFactory>` — medição:
+  `(rg -l "IClassFixture<AppFactory>" Tests.Integration -g "*.cs" | Measure-Object -Line).Lines` —, e `AppFactory`
+  herda `AddInMemoryStorage()` de `Tests.Host`.
+- **A suíte HTTP conhece detalhes do fake:** `MemoryStorage` possui 381 ocorrências em 36 arquivos;
+  medições: `(rg -o "MemoryStorage" Tests.Integration -g "*.cs" | Measure-Object -Line).Lines` e
+  `(rg -l "MemoryStorage" Tests.Integration -g "*.cs" | Measure-Object -Line).Lines`.
+  `MemoryStorage.DemoRealm` possui 265 ocorrências — medição:
+  `(rg -o "MemoryStorage\.DemoRealm" Tests.Integration -g "*.cs" | Measure-Object -Line).Lines` —; e o subject
+  estático de Alice, 28 — medição:
+  `(rg -o "MemoryStorage\.AliceSubjectId" Tests.Integration -g "*.cs" | Measure-Object -Line).Lines`. A busca
+  `rg -o "GetRealmMemoryStore|GetDemoRealmStore|GetServerRealmStore" Tests.Integration -g "*.cs"` retorna
+  exatamente 64 ocorrências: 16 de `GetRealmMemoryStore`, 47 de `GetDemoRealmStore` e 1 de
+  `GetServerRealmStore`, incluindo as indireções definidas em `MemoryStorage.Storage.cs`.
+- **A referência ao fake tem quatro consumidores diretos:** o comando
+  `rg -l "RoyalIdentity.Storage.InMemory" -g "*.csproj"` retorna `RoyalIdentity.Server`, `Tests.Host`,
+  `Tests.Storage` e `Tests.UserAccounts`; `Tests.Integration` recebe a dependência transitivamente de `Tests.Host`.
+- **`Tests.Integration` já referencia o runner diretamente:** seu `.csproj` possui referência a
+  `RoyalIdentity.Migrations`; essa relação não precisa ser criada para a fixture persistente.
+- **O registro in-memory possui seis descriptors:** `AddInMemoryStorage()` registra `MemoryStorage`, `IStorage`,
+  `IStorageProvider`, `IConfigurationSnapshotSource`, `ConfigurationSnapshotRefreshOptions` e `IUserDirectory`;
+  não registra `IReplayCache` nem `IMessageStore`.
+- **A integração de contas já suporta substituição explícita:** `AddUserAccountsForRoyalIdentity()` usa
+  `Replace` e funciona sem um registro anterior do fake.
 - **Há mutações não portáveis nos testes:** `CharacterizationSeed` e testes de refresh/signing alteram live
   references de contas, varrem sessões por subject, limpam tokens diretamente e escrevem clients/resources nos
   dictionaries do fake.
 - **O seed compartilhado ainda importa o fake:** `Tests.UserAccounts/UserAccountsModuleSeed.cs` obtém os subjects
   determinísticos de Alice/Bob em `MemoryStorage`.
-- **`Tests.Storage` ainda executa contratos contra o fake:** existem 11 especializações `InMemory`; o contrato de
+- **`Tests.Storage` ainda executa contratos contra o fake:** existem 11 especializações `InMemory` — medição:
+  `(rg -n "public sealed class InMemory" Tests.Storage -g "*.cs" | Measure-Object -Line).Lines` —; o contrato de
   `IStorageSession` ainda não tem twin EF, e há composições parciais Configuration EF + Operational fake.
 - **`Tests.UserAccounts` ainda protege paridade com o fake:** `UserDirectoryContractTests` possui uma especialização
   `InMemory`, enquanto até a variante SQLite usa realms estáticos do fake.
 - **Atomicidade ainda é capability opcional:** os consumers fazem cast em runtime; na ausência da capability,
   authorization code usa get-then-remove e refresh token usa `UpdateAsync` não condicional.
+- **A bridge de scopes padrão é global aos realms vivos:** a composição atual fornece os identity scopes padrão a
+  todos os realms; o resource server demo continua sendo dado explícito da composição.
+- **Não há automação de CI no repositório:** não existem `.github/workflows` nem arquivo de pipeline na raiz; tornar
+  PostgreSQL obrigatório em CI inclui criar a primeira automação desse tipo.
 - **O worktree estava limpo no início do inventário:** nenhuma alteração de código ou teste foi executada para criar
   este rascunho.
 
@@ -160,7 +189,7 @@
    provider.
 4. Remover os caminhos não atômicos, as capabilities opcionais conforme a decisão Q9 e todo o projeto
    `RoyalIdentity.Storage.InMemory`.
-5. Preservar as semânticas fechadas na matriz, a paridade PostgreSQL exigida por Q10 e a suíte completa verde.
+5. Preservar as semânticas fechadas na matriz, a evidência PostgreSQL decidida em Q10 e a suíte completa verde.
 
 ## Fora de escopo
 
@@ -237,7 +266,11 @@
 - **Q6 — Experiência local/demo após retirar o fake:** o Server oficial deve manter um perfil demo funcional?
   - **Opções:**
     - **A)** Manter profile demo opt-in, provisionado externamente com Configuration demo, resource bridge e contas
-      demo próprias da composição, sem depender de `Tests.*`.
+      demo próprias da composição, sem depender de `Tests.*`. Ao escolher A, decidir também:
+      - se as identidades demo de produção são distintas das identidades Alice/Bob test-only (**recomendado**) ou
+        compartilham os mesmos identificadores;
+      - qual artefato é a fonte de verdade de cada conjunto;
+      - qual duplicação de seed é aceita entre produto e testes.
     - **B)** Remover o demo do Server oficial; exigir configuração/provisionamento do operador e conservar Alice/Bob
       somente nos testes.
   - **Impacto se não decidir:** bloqueia appsettings de development, seed de contas e documentação de `dotnet run`.
@@ -274,10 +307,37 @@
 - **Q10 — Gate PostgreSQL e CI:** qual evidência é obrigatória antes de excluir o fake?
   - **Opções:**
     - **A)** Exigir um fluxo OIDC completo opt-in sobre PostgreSQL 17 real no fechamento, sem torná-lo job default.
-    - **B)** Tornar o fluxo OIDC completo sobre PostgreSQL um job obrigatório de CI.
+    - **B)** Criar a primeira automação de CI do repositório e tornar nela obrigatório o fluxo OIDC completo sobre
+      PostgreSQL; a resposta aceita explicitamente esse escopo e seu custo operacional.
     - **C)** Manter os contratos/concorrência PostgreSQL já existentes e exigir apenas provisionamento + startup
       smoke do Server real.
   - **Impacto se não decidir:** bloqueia os critérios finais, o custo de CI e a definição de paridade do host.
+  - **Status:** Aberta.
+
+- **Q11 — Topologia e orçamento da fixture persistente:** como conter o custo das 29 factories sem compartilhar
+  estado mutável entre testes?
+  - **Opções; a resposta deve informar também o multiplicador máximo `N` em relação à suíte fake medida na mesma
+    máquina/execução:**
+    - **A)** Criar arquivo(s) SQLite e aplicar migrations desde zero para cada fixture.
+    - **B)** Produzir uma única vez um template SQLite migrado/semeado e copiar arquivo(s) por fixture
+      (**direção recomendada**).
+    - **C)** Compartilhar uma `ICollectionFixture` SQLite apenas entre classes comprovadamente read-only e manter
+      banco isolado para classes mutantes.
+  - **Impacto se não decidir:** não bloqueia as Fases 1-3, mas bloqueia o desenho e o aceite de desempenho da
+    Fase 4.
+  - **Status:** Aberta.
+
+- **Q12 — Coexistência das factories durante a migração:** como manter fake e composição persistente em Fases 4-6
+  sem a factory real herdar registros do fake?
+  - **Opções:**
+    - **A)** Extrair `AppFactoryBase` com Data Protection, logging, configuração comum e validação do container;
+      manter temporariamente `AppFactory : AppFactoryBase` registrando o fake e criar
+      `PersistentStorageAppFactory : AppFactoryBase` registrando EF + `UserAccounts`. As factories concretas são
+      irmãs (**direção recomendada**).
+    - **B)** Usar uma única base com seletor explícito e imutável por instância para a composição; é proibido
+      estado global/process-wide para escolher o backing.
+  - **Impacto se não decidir:** não bloqueia as Fases 1-3, mas bloqueia a composição transitória da Fase 4 e a
+    estratégia de corte da Fase 6.
   - **Status:** Aberta.
 
 ---
@@ -362,11 +422,21 @@
   provisionamento; o catálogo oficial depende de Q3.
 - Contrato atômico de authorization code/refresh token: torna o caminho seguro uma dependência de compilação,
   conforme Q9; nenhum consumer detecta capability opcional.
-- Fixture HTTP: expõe handles imutáveis de realm/client/resource/subject/session e operações test-only de setup,
-  nunca `MemoryStorage`, dictionaries ou live references.
+- `Tests.Host`: permanece agnóstico de storage; registros do fake, enquanto ainda existirem, pertencem apenas à
+  factory legada transitória. A factory persistente nunca herda de uma factory que registra o fake e nunca tenta
+  neutralizá-lo removendo descriptors seletivamente.
+- Fixture HTTP: expõe handles imutáveis compostos por ids primitivos, caminhos e outros valores neutros de
+  realm/client/resource/subject/session, além de operações test-only de setup; nunca expõe `Realm`,
+  `MemoryStorage`, dictionaries ou live references. Quando um teste precisa do objeto `Realm`, ele o obtém de
+  `IRealmStore`/snapshot após o seed, dentro da composição corrente.
 - `IConfigurationSnapshotRefresher`: é chamado pela fixture depois de writes de Configuration e antes do request
   que consome os dados.
 - `IConfigurationResourceSource`: continua sendo a rota volátil explícita de resources/scopes em host/fixtures.
+- Topologia da fixture: segue Q11; se usar template SQLite, o template é imutável depois de publicado, migrations e
+  seed executam uma única vez sob lock process-wide e cada fixture recebe sua própria cópia física.
+- Coexistência: segue Q12; classes migradas mudam uma única vez para a composição persistente, e a factory/ramo
+  legado é excluído assim que seu último consumer for migrado. A factory persistente restante é a composição
+  canônica, sem exigir renome cosmético.
 
 ### Modelo, dados e persistência
 
@@ -439,16 +509,36 @@ RoyalIdentity/
   casos de uso com mutação de entidades vivas.
 - O processo web não escreve schema nem seed, inclusive em development.
 
+### Triagem obrigatória de divergências
+
+Toda asserção que precise mudar durante as Fases 4-7 deve ser classificada e registrada no `Resultado da Fase`, com
+o teste afetado, o comportamento anterior, a evidência do backing real e a correção aplicada:
+
+- **artefato-do-fake:** o teste dependia de comportamento não normativo do fake; ajustar o teste à matriz/ADR.
+- **regressão-do-módulo:** `UserAccounts` viola a matriz ou ADR aplicável; corrigir o módulo e preservar a asserção
+  normativa.
+- **defeito-de-produto:** o backing real revela defeito do core mascarado pelo fake; corrigir o produto e registrar
+  o mecanismo que tornou o defeito observável.
+- **sem-decisão-normativa:** não existe fonte normativa suficiente; parar o cenário afetado e abrir pergunta ao
+  humano antes de mudar produto ou asserção.
+
+Nenhuma divergência pode ser automaticamente classificada como artefato do fake apenas porque surgiu após a troca
+do backing.
+
 ### Compatibilidade, migração e rollout
 
 - Primeiro entregar provisionamento e composição real do Server; depois criar a fixture conjunta e migrar os grupos
   de testes.
 - Manter o fake apenas como suporte temporário durante Fases 1-7, sem adicionar capabilities ou comportamento.
-- Trocar `AppFactory` para a composição real somente após todos os grupos HTTP estarem verdes nessa factory.
+- Deixar a factory persistente como composição canônica somente após todos os grupos HTTP estarem verdes nela.
+- Durante a coexistência, manter `Tests.Host` storage-agnóstico e factories concretas independentes conforme Q12;
+  não registrar o fake para depois remover seus seis descriptors.
 - Preparar `Tests.Storage`, `Tests.UserAccounts` e guards arquiteturais para viver sem o fake antes da quebra pública.
 - Aplicar Q9, remover fallbacks e excluir o projeto fake no mesmo corte compilável da Fase 8.
 - Não há dual-write, import/export de dictionaries nem compatibilidade de dados com processos in-memory anteriores.
 - Hosts com banco existente devem executar o(s) runner(s) antes do novo binário; o Server nunca corrige schema.
+- Medir o tempo da suíte fake antes da migração e o da suíte persistente na mesma execução de referência; o aceite
+  é uma razão `persistente <= N × fake`, com `N` decidido em Q11, não um limite absoluto dependente de hardware.
 - O fechamento PostgreSQL/CI segue Q10 e ocorre antes de marcar o plano como concluído.
 
 ---
@@ -459,9 +549,11 @@ RoyalIdentity/
    demais fases consomem.
 2. **Fase 2 (provisionamento externo)** — prepara os três schemas e seeds sem permitir migration no processo web.
 3. **Fase 3 (Server real)** — troca o host oficial somente depois de existir configuração e provisionamento.
-4. **Fase 4 (fixture SQLite unificada)** — reproduz a composição integral com lifetime e dados controlados.
+4. **Fase 4 (fixture SQLite unificada)** — fecha Q11/Q12 e reproduz a composição integral com lifetime, custo e
+   dados controlados.
 5. **Fase 5 (primeiros grupos HTTP)** — migra setup de conta/configuração e os fluxos login/authorize/token.
-6. **Fase 6 (fluxos restantes e default)** — elimina acessos diretos do HTTP ao fake e vira `AppFactory`.
+6. **Fase 6 (fluxos restantes e default)** — elimina acessos diretos do HTTP ao fake e torna a factory persistente
+   a única composição canônica.
 7. **Fase 7 (contratos de teste)** — retira os últimos consumidores do fake sem ainda alterar os contratos públicos.
 8. **Fase 8 (remoção da transição)** — aplica Q9, apaga fallbacks e exclui o fake num único corte compilável.
 9. **Fase 9 (paridade e fechamento)** — executa Q10, regressão completa e atualiza a documentação normativa.
@@ -534,6 +626,11 @@ produtivo se Q6=A.
 - [ ] Registrar Q4 respondida e convertê-la em decisão fechada.
 - [ ] Implementar a seleção explícita da família `UserAccounts` no runner escolhido sem acoplá-la ao gateway
   `IStorage`.
+- [ ] Se Q4=A, reescrever `MigrationsRunner_ProjectGraph_References_Providers_Only` como allowlist dos providers EF
+  do core e dos providers `UserAccounts`, continuando a proibir referências diretas a
+  `RoyalIdentity/RoyalIdentity.csproj` e `Tests.*`.
+- [ ] Se Q4=A, registrar junto do guard a justificativa de ADR-013: o runner é composition root das duas famílias
+  independentes e não traduz tipos entre elas; portanto seu papel não é o adapter `.Integration`.
 - [ ] Aceitar provider e conexão por família conforme Q1/Q2, preferindo secrets por variáveis de ambiente.
 - [ ] Desacoplar a seleção de provider Configuration/Operational no runner atual e cobrir topologia mista somente se
   Q1=C.
@@ -615,40 +712,66 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostComposition|Fully
 
 ## Fase 4 - fixture SQLite unificada, handles e seeds
 
-**Depende de:** Q8, Fases 2-3, DF5, DF13, DF14 e DF16.
+**Depende de:** Q8, Q11, Q12, Fases 2-3, DF5, DF13, DF14 e DF16.
 
 **Escopo:** `Tests.Host`, `Tests.Integration/Prepare`, `Tests.UserAccounts/UserAccountsModuleSeed.cs`, helpers de
 Configuration/Operational e resource bridge test-only.
 
-**O que/como:** criar uma única factory integral SQLite com Configuration + Operational migrados e `UserAccounts`
-real. Expor dados por handles neutros e operações explícitas de setup; não substituir um acesso ao fake por outro
-static global.
+**O que/como:** decidir a topologia/custo e a coexistência; criar uma factory integral SQLite com Configuration +
+Operational migrados e `UserAccounts` real. Expor dados por handles neutros e operações explícitas de setup; não
+substituir um acesso ao fake por outro static global.
 
 **Tarefas:**
 
-- [ ] Implementar a fonte única de composição HTTP decidida em Q8.
-- [ ] Criar banco(s)/conexões SQLite isolados por lifetime de factory e aplicar migrations antes do host.
+- [ ] Registrar Q11/Q12 respondidas no histórico e convertê-las em decisões fechadas, incluindo o multiplicador
+  máximo `N`.
+- [ ] Medir e registrar, com comando e ambiente, o tempo da suíte `Tests.Integration` ainda fake e o startup
+  cold/warm da factory persistente; todos os comparativos posteriores usam a mesma execução/máquina.
+- [ ] Implementar a fonte única de composição HTTP decidida em Q8; remover de `Tests.Host`
+  `AddInMemoryStorage()` e sua referência ao projeto fake, deixando o projeto storage-agnóstico.
+- [ ] Implementar a coexistência decidida em Q12; a factory persistente nunca herda de uma factory que registra o
+  fake e não remove descriptors do fake seletivamente.
+- [ ] Durante a coexistência, fazer a composição legada — não `Tests.Host` — possuir explicitamente o registro e a
+  referência temporária ao fake; documentar essa referência para remoção na Fase 6.
+- [ ] Fazer a factory persistente construir o service provider com `ValidateScopes` e `ValidateOnBuild`.
+- [ ] Criar banco(s)/conexões SQLite isolados por lifetime de factory conforme Q11 e aplicar migrations antes do
+  host.
+- [ ] Se Q11=B, produzir o template exatamente uma vez sob lock/Lazy process-wide e nunca permitir que um teste
+  modifique o template publicado.
+- [ ] Se Q11=B, fechar conexões e executar `SqliteConnection.ClearAllPools()` antes de cada `File.Copy`; copiar
+  todos os arquivos físicos quando as famílias usarem bancos separados.
+- [ ] Se Q11=B, usar no seed do template o mesmo material/protector das fixtures que lerão signing keys e payloads
+  protegidos.
 - [ ] Registrar Configuration + Operational EF, `UserAccounts` SQLite e cleanup `External` na fixture.
 - [ ] Usar protectors determinísticos test-only sem variável de ambiente process-global compartilhada.
 - [ ] Semear Configuration demo/teste, Alice/Bob e property scopes por owner correto.
 - [ ] Mover `AliceSubjectId`/`BobSubjectId` para o seed test-only e remover seu import de InMemory.
-- [ ] Expor handles imutáveis para realms internos/demo, clients, resources e subjects.
+- [ ] Expor handles imutáveis para realms internos/demo, clients, resources e subjects usando somente ids
+  primitivos, paths e valores provider-neutral; nenhum handle pode conter `Realm`.
+- [ ] Obter qualquer objeto `Realm` usado pelo teste via `IRealmStore`/snapshot depois do seed e dentro da
+  composição corrente.
 - [ ] Criar helper de client que persiste pelo seam test-only e chama `IConfigurationSnapshotRefresher`.
 - [ ] Criar source/hook explícito para resources/scopes voláteis, sem nova tabela/contrato público.
 - [ ] Criar operações test-only de conta via features reais do módulo para seed, claims e activate/deactivate.
 - [ ] Criar setup Operational focado apenas onde a API pública não permite preparar o cenário.
 - [ ] Provar smoke de discovery, login, authorize, token e sessão na composição integral.
+- [ ] Provar que `ValidateScopes`/`ValidateOnBuild` faz captive dependency falhar no startup da factory, em vez de
+  produzir falha tardia/intermitente.
 - [ ] Garantir teardown de arquivos/conexões e ausência de contaminação entre duas factories paralelas.
 
 **Critérios de aceite:** uma factory inicia sem resolver `MemoryStorage`; os três backings reais estão presentes;
 Alice/Bob mantêm subjects determinísticos; writes de client são visíveis após refresh; resources usam a bridge;
-duas fixtures não compartilham DB, env var ou estado estático; um fluxo OIDC completo passa.
+duas fixtures não compartilham DB mutável, env var ou handle estático; nenhum handle contém `Realm`; captive
+dependencies falham durante a construção; um fluxo OIDC completo passa; baseline, startup cold/warm, topologia e
+orçamento `N` estão registrados. Se Q11=B, template é criado uma vez, copiado com pools limpos e as fixtures
+conseguem desproteger suas signing keys com o protector configurado. `Tests.Host` não registra nem referencia
+qualquer backing.
 
 **Testes:**
 
 ```powershell
 dotnet test Tests.UserAccounts --filter "FullyQualifiedName~UserAccountsModuleSeed"
-dotnet test Tests.Integration --filter "FullyQualifiedName~EntityFrameworkStorageOidcFlow|FullyQualifiedName~PersistentStorage"
+dotnet test Tests.Integration --filter "FullyQualifiedName~EntityFrameworkStorageOidcFlow|FullyQualifiedName~PersistentStorage|FullyQualifiedName~ServiceProviderValidation"
 ```
 
 ### Resultado da Fase 4
@@ -678,10 +801,16 @@ do módulo, getters de realm por handles e mutações de client/resource por hel
 - [ ] Semear contas cross-realm por `realmId`/`SubjectId`, sem copiar objetos do demo.
 - [ ] Remover dos arquivos migrados todos os getters de `RealmMemoryStore` e constantes `MemoryStorage`.
 - [ ] Preservar casos negativos, issuer/realm isolation, PKCE, signing algorithm e claims emitidas.
+- [ ] Antes de executar os filtros da fase, rodar
+  `dotnet test Tests.Integration --no-build --list-tests`, provar que cada filtro seleciona ao menos um teste e
+  registrar no resultado as contagens esperada e executada.
+- [ ] Classificar e registrar toda asserção alterada nos quatro buckets de triagem; corrigir produto/módulo quando
+  aplicável, sem adaptar silenciosamente a expectativa ao backing real.
 
 **Critérios de aceite:** todos os grupos listados executam somente sobre a factory integral; seus arquivos não
 referenciam namespace/tipos do fake; alterações de conta passam por `UserAccounts`; writes de Configuration ficam
-visíveis no snapshot; nenhuma asserção depende de live reference.
+visíveis no snapshot; nenhuma asserção depende de live reference; cada filtro seleciona ao menos um teste e possui
+contagens esperada/executada registradas; toda asserção alterada está classificada.
 
 **Testes:**
 
@@ -698,13 +827,13 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CodeAuthorize|FullyQu
 
 ## Fase 6 - migração dos fluxos restantes e troca do default
 
-**Depende de:** Fase 5, DF2, DF5, DF7, DF13 e DF14.
+**Depende de:** Q11, Q12, Fase 5, DF2, DF5, DF7, DF13 e DF14.
 
 **Escopo:** refresh/revocation, logout/session, UI/consent, realm isolation, demais caracterizações,
 `AppFactory` e factories opt-in parciais.
 
-**O que/como:** migrar os grupos restantes, eliminar preparações específicas do fake e somente então tornar a
-factory integral o `AppFactory` compartilhado pelas 29 classes.
+**O que/como:** migrar os grupos restantes, eliminar preparações específicas do fake e somente então deixar a
+factory integral como única composição canônica das 29 classes, conforme o mecanismo decidido em Q12.
 
 **Tarefas:**
 
@@ -714,14 +843,27 @@ factory integral o `AppFactory` compartilhado pelas 29 classes.
 - [ ] Capturar `sid` no próprio fluxo e consultar por id, sem scan de `UserSessions`.
 - [ ] Migrar UI login/consent, issuer URI, eventos e isolamento por realm.
 - [ ] Substituir `FakeSessionStorage` baseado em stores concretos por doubles locais de contratos ou gateway EF.
-- [ ] Tornar a composição integral a implementação de `AppFactory`.
-- [ ] Absorver/remover `EntityFrameworkStorageAppFactory` e `UserAccountsAppFactory` parciais.
+- [ ] Mudar cada classe uma única vez para a factory persistente segundo Q12 e remover a factory/ramo legado assim
+  que seu último consumer for migrado.
+- [ ] Manter a factory persistente como única composição canônica, sem exigir renome; absorver/remover
+  `EntityFrameworkStorageAppFactory` e `UserAccountsAppFactory` parciais.
 - [ ] Remover o global using e todas as referências a `MemoryStorage`/`RealmMemoryStore` de `Tests.Integration`.
+- [ ] Remover de `Tests.Integration` a referência temporária ao projeto fake criada para a coexistência da Fase 4.
+- [ ] Executar busca estática/guard arquitetural que rejeite handles contendo `Realm` e confirme que realms usados
+  nos testes são carregados da composição corrente.
+- [ ] Antes de executar os filtros da fase, rodar
+  `dotnet test Tests.Integration --no-build --list-tests`, provar que cada filtro seleciona ao menos um teste e
+  registrar no resultado as contagens esperada e executada.
+- [ ] Classificar e registrar toda asserção alterada nos quatro buckets de triagem.
 - [ ] Executar toda a suíte HTTP sobre o novo default antes de tocar nos contratos atômicos.
+- [ ] Medir, na mesma execução/ambiente do baseline da Fase 4, a duração da suíte persistente completa e provar
+  `tempo persistente <= N × tempo fake`, conforme Q11.
 
 **Critérios de aceite:** as 29 classes antes ligadas a `AppFactory` executam sobre EF + `UserAccounts`; não existem
 factories parciais; `Tests.Integration` não contém uso de `MemoryStorage`, getters do fake ou mutação de dictionary;
-todos os fluxos e caracterizações permanecem verdes; os fallbacks ainda não foram ampliados nem acionados pelo EF.
+todos os filtros executam ao menos um teste e têm suas contagens registradas; toda mudança de asserção está
+classificada; o orçamento relativo Q11 está cumprido; todos os fluxos e caracterizações permanecem verdes; os
+fallbacks ainda não foram ampliados nem acionados pelo EF; a referência temporária ao projeto fake foi removida.
 
 **Testes:**
 
@@ -742,8 +884,7 @@ dotnet test Tests.Integration
 
 **Depende de:** Fase 6, DF5-DF7 e DF16.
 
-**Escopo:** `Tests.Storage`, `Tests.UserAccounts`, `Tests.Architecture`, `Tests.Host` e referências de projeto
-restantes.
+**Escopo:** `Tests.Storage`, `Tests.UserAccounts`, `Tests.Architecture` e referências de projeto restantes.
 
 **O que/como:** retirar todos os consumidores que ainda obrigariam o projeto fake a compilar depois da quebra Q9.
 Preservar cobertura sem transformar doubles locais em outro backing geral.
@@ -754,19 +895,24 @@ Preservar cobertura sem transformar doubles locais em outro backing geral.
 - [ ] Substituir `CompositeStorageSessionTests` Configuration EF + Operational fake pelo gateway EF completo.
 - [ ] Remover fallbacks de stores fake do harness SQLite Configuration; usar gateway EF ou doubles locais focados.
 - [ ] Remover as 11 variantes `InMemory` e `InMemoryStorageHarness` de `Tests.Storage`.
+- [ ] Registrar antes da remoção a quantidade de testes concretos exposta pelas 11 variantes `InMemory` e, depois,
+  a quantidade/cobertura dos substitutos EF; anotar o comando ao lado de cada número.
 - [ ] Substituir em `OperationalContractsShapeTests` os casos que usam o fake por doubles locais de caracterização
   do contrato ainda transitório; registrar as asserções que serão removidas/reformuladas na Fase 8, sem antecipar
   Q9.
 - [ ] Remover a especialização `InMemory` de `UserDirectoryContractTests`.
 - [ ] Tornar os realms da variante `UserAccountsSqlite` independentes de `MemoryStorage`.
-- [ ] Remover referências ao fake de `Tests.Storage`, `Tests.UserAccounts` e `Tests.Host`.
+- [ ] Remover referências ao fake de `Tests.Storage` e `Tests.UserAccounts`; confirmar que Server, `Tests.Host` e
+  `Tests.Integration` já foram limpos nas Fases 3, 4 e 6.
 - [ ] Substituir o teste arquitetural do grafo do fake por allowlist genérica de dependências, sem conservar o nome
   literal do projeto removido.
 - [ ] Mapear cada teste concreto removido para cobertura EF/módulo equivalente e registrar qualquer perda real.
+- [ ] Classificar pelos quatro buckets toda divergência de asserção encontrada nesta fase.
 
 **Critérios de aceite:** somente o próprio projeto `RoyalIdentity.Storage.InMemory` e a entrada na solução permanecem;
 nenhum projeto de produção/teste o referencia; contratos de core e `UserDirectory` rodam sobre providers reais;
-`IStorageSession` possui cobertura EF; não houve perda de cenário sem substituição registrada.
+`IStorageSession` possui cobertura EF; contagens anterior/substituta e comandos estão registrados; não houve perda de
+cenário sem substituição registrada; mudanças de asserção foram triadas.
 
 **Testes:**
 
@@ -852,7 +998,9 @@ documentação ao estado real. Não marcar conclusão com teste obrigatório nã
 - [ ] Executar startup/fluxo OIDC PostgreSQL conforme Q10 e registrar comando, contagens e skips.
 - [ ] Executar novamente contratos, migrations, concorrência e gateway SQLite/PostgreSQL afetados.
 - [ ] Executar `dotnet build` e `dotnet test` da solução completa.
-- [ ] Atualizar ADR-018 com a conclusão da migração e a remoção efetiva do fake, sem adicionar design à ADR.
+- [ ] Atualizar ADR-018 adicionando uma seção `## 4. Revisão` que registre a conclusão da migração e a remoção
+  efetiva do fake, sem reescrever o corpo da decisão, conforme a regra de revisão de `ADR.md`.
+- [ ] Atualizar o índice de ADRs em `ADR.md`, que ainda lista somente ADR-001 a ADR-009.
 - [ ] Atualizar `product.md`, `tech.md`, `structure.md` e `architecture.md` onde ainda descrevem o default antigo.
 - [ ] Atualizar `plans-roadmap-02.md`, `plan-data-macro.md`, backlog e `AGENTS.md` com Plano 4 concluído e próximo
   item real.
@@ -874,7 +1022,8 @@ dotnet test RoyalIdentity.sln
 ```
 
 Executar também o script PostgreSQL definido/atualizado pela fase e registrar o comando exato em
-`Resultado da Fase 9`; não inserir aqui um nome de script que ainda dependa da resposta Q10.
+`Resultado da Fase 9`; não inserir aqui um nome de script que ainda dependa da resposta Q10. Se Q10=B, incluir
+também a configuração e a execução da primeira automação de CI decidida.
 
 ### Resultado da Fase 9
 
@@ -888,7 +1037,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 |---|---|---|---|---|
 | Objetivo 1 — Server integral sem fake | 1-3 | DF3, DF4, DF8-DF13, DF15; Q1-Q3/Q5-Q7 | exatamente um gateway EF e um `IUserDirectory` real; zero migration no web | `HostConfiguration`, `HostComposition`, `HostStartup`, `Tests.Architecture` |
 | Objetivo 2 — provisionamento/readiness | 1-3 | DF8, DF9, DF11, DF12, DF15; Q2-Q6 | três schemas externos, resultado por família, falha segura | testes de migration/runner e startup negativo |
-| Objetivo 3 — testes default reais | 4-6 | DF2, DF5, DF13, DF14, DF16; Q8 | 29 consumers sobre factory integral; zero uso do fake em `Tests.Integration` | grupos HTTP + `dotnet test Tests.Integration` |
+| Objetivo 3 — testes default reais | 4-6 | DF2, DF5, DF13, DF14, DF16; Q8, Q11, Q12 | 29 consumers sobre factory integral; zero uso do fake em `Tests.Integration`; custo relativo dentro de Q11 | grupos HTTP + `--list-tests` + `dotnet test Tests.Integration` |
 | Objetivo 4 — remover transição/fake | 7-8 | DF6, DF7; Q9 | atomicidade obrigatória; zero fallback/projeto/referência fake | `Tests.Identity`, `Tests.Storage`, concorrência e buscas `rg` |
 | Objetivo 5 — paridade e fechamento | 9 | DF1, DF2, DF16; Q10 | gate PostgreSQL cumprido, solução/doc normativa verde | script PostgreSQL decidido + `dotnet test RoyalIdentity.sln` |
 
@@ -907,26 +1056,34 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 9. Não há transação global nem promessa de rollback conjunto entre famílias.
 10. Cleanup possui exatamente um modo explícito.
 11. Plain nunca é default e proteção ausente/incompatível falha fechado.
-12. Signing keys persistidas permanecem desprotegíveis pelo host depois do provisionamento.
+12. O host consegue desproteger as signing keys provisionadas usando o protector configurado; nunca cria nem
+    rotaciona esse material.
 13. Resources/scopes permanecem voláteis por DF13.
 14. Authorization codes são single-use sob concorrência real.
 15. Refresh transitions são condicionais e preservam a tolerância pós-consumo vigente.
 16. Nenhuma nova paridade é adicionada ao fake durante sua janela restante.
 17. Setup de conta usa o módulo ou seam test-only; nunca live reference de entidade.
 18. Write de Configuration usado por teste é seguido de refresh explícito do snapshot.
-19. Fixtures não compartilham DB, secret, env var mutável ou handle estático.
+19. Fixtures não compartilham DB, secret store, env var mutável ou handle estático; se Q11=B, cópias isoladas
+    podem usar o mesmo material determinístico test-only necessário para ler o template.
 20. `UseRealmDiscovery` continua antes de `UseAuthentication`.
 21. Validators continuam sinalizando falhas esperadas por `context.Response`, sem lançar por erro de protocolo.
 22. A fase de exclusão não remove cobertura sem mapear seu provider/teste substituto.
+23. Handles de fixture não contêm `Realm`; objetos de realm usados por testes vêm do store/snapshot da composição
+    corrente.
+24. A factory persistente não herda registros do fake nem depende de remoção seletiva de descriptors.
+25. Toda mudança de asserção durante a migração possui classificação e evidência nos quatro buckets de triagem.
 
 ---
 
 ## Critérios globais de conclusão
 
-- Q1-Q10 foram respondidas, convertidas em DFs e removidas da seção de perguntas.
+- Q1-Q12 foram respondidas, convertidas em DFs e removidas da seção de perguntas.
 - `RoyalIdentity.Server` inicia sobre a composição persistente decidida e não oferece fallback in-memory.
 - As três famílias são provisionáveis fora do host e validadas conforme Q5.
 - `Tests.Integration` roda integralmente sobre EF/SQLite + `UserAccounts`.
+- A duração da suíte persistente cumpre o orçamento relativo decidido em Q11, medido contra o baseline fake na
+  mesma execução/ambiente.
 - Nenhum código de teste resolve `MemoryStorage`, `RealmMemoryStore` ou stores concretos do fake.
 - Nenhum consumer detecta capability atômica opcional ou executa fallback não atômico.
 - `RoyalIdentity.Storage.InMemory` não existe na solução nem no grafo de projetos.
@@ -948,11 +1105,17 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Histories colidem em banco compartilhado | terceira família usa nome/schema incompatível | migrations são ignoradas ou reaplicadas | teste same-database e history explícita por owner | Aberto |
 | Snapshot não reflete setup | helper grava client e não publica refresh | testes falham ou exercitam dados antigos | helper único + `IConfigurationSnapshotRefresher` obrigatório | Aberto |
 | Estado global contamina fixtures | env AES estática, arquivo ou connection compartilhada | flakiness/paralelismo inseguro | material/lifetime por fixture e teste com duas factories | Aberto |
+| Topologia persistente degrada a suíte | migrations/seed se repetem em 29 factories | regressão de dezenas de segundos ou pior e feedback mais lento | Q11, baseline na Fase 4 e razão `persistente <= N × fake` na Fase 6 | Aberto |
+| Template SQLite é copiado com estado inseguro | inicialização paralela, pool aberto ou protector divergente | lock no Windows, template corrompido ou signing keys ilegíveis | lock/Lazy único, `ClearAllPools`, cópia de todos os arquivos e material de proteção idêntico | Aberto |
+| Fake sobrevive por herança/remoção seletiva | factory persistente deriva da que registra `AddInMemoryStorage()` | coexistência frágil e descriptors residuais | Q12, `Tests.Host` agnóstico e factories irmãs/seletor imutável | Aberto |
 | Live references são reproduzidas em outro seam | setup altera entidade EF diretamente | teste deixa de representar comportamento real | features do módulo ou hook test-only explícito | Aberto |
+| Handle estático mascara options/realm atual | fixture carrega `Realm` no handle e o reutiliza entre composições | teste lê estado/options fora do snapshot corrente | handles primitivos, carga por store/snapshot e guard estático | Aberto |
 | Resource bridge é “resolvida” com persistência acidental | cenário precisa adicionar/remover resource | quebra DF13 e antecipa redesign | source volátil da fixture + guard de arquitetura | Aberto |
 | Limpeza direta de Operational vira API pública genérica | teste chama `Clear()` por conveniência | contrato de produto cresce por setup | remover handle conhecido ou hook test-only focado | Aberto |
 | Quebra atômica ocorre cedo demais | Q9 é aplicada com fake ainda referenciado | fake precisa ganhar paridade ou solução não compila | Fases 6-8 e corte coordenado DF7 | Aberto |
 | Testes concretos do fake somem sem equivalente | variante/harness é apagado sem mapa | perda silenciosa de regressão | inventário por cenário na Fase 7 | Aberto |
+| Divergência real é tratada como artefato do fake | asserção muda apenas para a suíte voltar a passar | regressão de módulo ou defeito do core fica mascarado | triagem obrigatória em quatro buckets e correção no owner | Aberto |
+| Filtro executa zero testes | nome/classe muda durante a migração | fase aparenta verde sem exercitar o grupo | `--list-tests`, contagem esperada/executada e registro por filtro | Aberto |
 | SQLite mascara diferença produtiva | fluxo só é executado no default SQLite | regressão de provider chega a produção | gate Q10 e contratos PostgreSQL reais | Aberto |
 | Cleanup Hosted disputa entre réplicas | várias instâncias escolhem Hosted | carga/locks apesar de batches idempotentes | configuração explícita, documentar External para cluster | Aberto |
 | Secrets aparecem em CLI/log | conexão/key é passada como argumento ou exception | exposição operacional | env/secret store, sanitização e testes negativos | Aberto |
@@ -988,6 +1151,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 - [ADR-015](../../adrs/ADR-015.md).
 - [ADR-017](../../adrs/ADR-017.md).
 - [ADR-018](../../adrs/ADR-018.md).
+- [ADR.md](../../ADR.md).
 - [architecture.md](../foundation/architecture.md).
 - `RoyalIdentity.Server/HostServices.cs`.
 - `RoyalIdentity.Storage.EntityFramework/Extensions/ServiceCollectionExtensions.cs`.
