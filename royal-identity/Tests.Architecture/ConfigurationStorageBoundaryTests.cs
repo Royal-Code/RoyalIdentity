@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Xml.Linq;
 using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Storage.EntityFramework;
 using RoyalIdentity.Storage.EntityFramework.PostgreSql;
@@ -155,6 +156,25 @@ public class ConfigurationStorageBoundaryTests
         Assert.DoesNotContain(testHostReferences, r => r.Contains("RoyalIdentity.Demo", StringComparison.Ordinal));
         Assert.DoesNotContain(migrationsReferences, r => r.Contains("RoyalIdentity.Server", StringComparison.Ordinal));
         Assert.DoesNotContain(migrationsReferences, r => r.Contains("RoyalIdentity.Demo", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void IntegrationTests_ReferenceServerThroughTheNamedAlias()
+    {
+        var projectPath = Path.Combine(
+            ProjectReferenceReader.FindRepositoryRoot(),
+            "Tests.Integration",
+            "Tests.Integration.csproj");
+        var document = XDocument.Load(projectPath);
+        var serverReference = document
+            .Descendants("ProjectReference")
+            .Single(reference => reference
+                .Attribute("Include")!
+                .Value
+                .Replace('\\', '/')
+                .EndsWith("RoyalIdentity.Server/RoyalIdentity.Server.csproj", StringComparison.Ordinal));
+
+        Assert.Equal("RoyalIdentityServer", serverReference.Element("Aliases")?.Value);
     }
 
     [Fact]

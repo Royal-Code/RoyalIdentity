@@ -629,8 +629,8 @@ dotnet test RoyalIdentity.sln
 
 **Depende de:** DF3, DF4, DF9-DF12, DF15, DF17-DF23 e DF29.
 
-**Escopo:** `RoyalIdentity/Extensions`, `RoyalIdentity.Server`, `Tests.Host`, options/validators de composição,
-`Tests.Architecture` e ADR da separação Server/Demo.
+**Escopo:** `RoyalIdentity/Extensions`, `RoyalIdentity.Server`, `Tests.Host`, `Tests.Integration`,
+options/validators de composição, `Tests.Architecture` e ADR da separação Server/Demo.
 
 **O que/como:** criar o entry point PostgreSQL do Server com configuração tipada por família/`DbContext`, validação
 antes do tráfego e grafo de dependências permitido. Não criar abstração de provider nem trocar o backing antes de a
@@ -694,8 +694,10 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration"
   mensagens de erro não incluem a connection string.
 - Vinculadas e validadas no startup as seções `RoyalIdentity:Snapshot`, `RoyalIdentity:Cleanup` e
   `RoyalIdentity:DataProtection`. Snapshot e cleanup reutilizam respectivamente
-  `ConfigurationSnapshotRefreshOptions` e `OperationalCleanupOptions`; Data Protection não expõe selector e rejeita
-  configuração de provider alternativo.
+  `ConfigurationSnapshotRefreshOptions` e `OperationalCleanupOptions` como contrato de configuração; enquanto o
+  backing do Server ainda é in-memory, os valores de snapshot/cleanup são validados, mas só passam a dirigir os
+  serviços runtime na composição EF da Fase 3. Data Protection não expõe selector e rejeita configuração de provider
+  alternativo.
 - Criado `ConfigurationUserAccountsRealmOptionsResolver` na `.Integration`, com defaults globais, overrides em
   `RoyalIdentity:UserAccounts:Options:Realms:{realmId}`, cópias independentes e validação antecipada de todos os
   realms configurados.
@@ -707,7 +709,8 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration"
   do Server.
 
 **Arquivos principais:** `RoyalIdentity.Server/Configuration/*`, `RoyalIdentity.Server/HostServices.cs`,
-`RoyalIdentity.Server/Program.cs`, `RoyalIdentity/Extensions/ApplicationBuilderExtensions.cs`,
+`RoyalIdentity.Server/Program.cs`, `RoyalIdentity.Server/README.md`,
+`RoyalIdentity/Extensions/ApplicationBuilderExtensions.cs`,
 `RoyalIdentity.UserAccounts.Integration/ConfigurationUserAccountsRealmOptionsResolver.cs`,
 `Tests.Integration/Configuration/HostConfigurationTests.cs`,
 `Tests.Architecture/ConfigurationStorageBoundaryTests.cs`, `adrs/ADR-019.md` e `ADR.md`.
@@ -715,15 +718,25 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration"
 **Verificação:**
 
 - `dotnet build RoyalIdentity.Server/RoyalIdentity.Server.csproj --no-restore` — verde, 0 erros.
-- `dotnet test Tests.Architecture --no-restore` — 50 aprovados, 0 falhas, 0 ignorados.
-- `dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration" --no-restore` — 11 aprovados,
+- `dotnet test Tests.Architecture --no-restore` — 51 aprovados, 0 falhas, 0 ignorados.
+- `dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration" --no-restore` — 13 aprovados,
   0 falhas, 0 ignorados.
-- `dotnet test Tests.Integration --no-restore` — 280 aprovados, 0 falhas, 0 ignorados.
+- `dotnet test Tests.Integration --no-restore` — 282 aprovados, 0 falhas, 0 ignorados.
 
-**Desvios e pendências:** nenhum desvio arquitetural. O alias `RoyalIdentityServer` na referência de teste evita
-expor o `Program` global do Server ao lado de `Tests.Host.Program`. `AddInMemoryStorage()` permanece deliberadamente
-no Server até a troca integral e testada da Fase 3; nenhuma migration, consulta de schema ou composição EF runtime
-foi antecipada.
+**Desvios e pendências:** nenhum desvio arquitetural. A referência
+`Tests.Integration -> RoyalIdentity.Server`, necessária para validar a superfície de configuração, usa o alias
+`RoyalIdentityServer`: sem ele, a compilação reproduziu `CS0433` entre `RoyalIdentity.Server.Program` e
+`Tests.Host.Program`. `AddInMemoryStorage()` permanece deliberadamente no Server até a troca integral e testada da
+Fase 3; nenhuma migration, consulta de schema ou composição EF runtime foi antecipada.
+
+Há um efeito transitório aceito: `appsettings.json` mantém as três connections vazias para não versionar destino ou
+secret, e `ValidateOnStart` faz `dotnet run --project RoyalIdentity.Server` falhar até que as três chaves sejam
+fornecidas por ambiente/secret store. Os nomes são
+`RoyalIdentity__Connections__Configuration__ConnectionString`,
+`RoyalIdentity__Connections__Operational__ConnectionString` e
+`RoyalIdentity__Connections__UserAccounts__ConnectionString`. Nesta fase esses valores, snapshot e cleanup formam
+uma superfície validada, mas o backing ainda é in-memory; a Fase 3 torna a configuração efetiva e entrega o runbook
+Podman.
 
 ---
 
@@ -816,7 +829,12 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo invoca o
   DF20 e a futura substituição por KMS.
 - [ ] Registrar contexts PostgreSQL de Configuration/Operational com histories corretas e as três connection
   strings explícitas definidas na Fase 1.
-- [ ] Registrar snapshot source/refresh interval e resource bridge no Server, sem profile ou branch Demo.
+- [ ] Registrar snapshot source e materializar o `ConfigurationSnapshotRefreshOptions` concreto a partir da
+  configuração já validada na Fase 1; remover o valor fixo do backing in-memory e manter o resource bridge sem
+  profile ou branch Demo.
+- [ ] Alimentar `AddEntityFrameworkOperationalCleanup(...)` a partir do mesmo
+  `OperationalCleanupOptions`/seção validada na Fase 1, garantindo que o modo usado para escolher o scheduler seja
+  idêntico ao modo efetivo resolvido por `IOptions`; não usar literal duplicado.
 - [ ] Registrar Operational storage, profiles e exatamente um modo de cleanup.
 - [ ] Registrar o gateway `AddEntityFrameworkStorage()` completo.
 - [ ] Registrar `UserAccounts.PostgreSql`, fonte configurável de options por realm conforme DF23 e

@@ -63,6 +63,21 @@ public class HostConfigurationTests
     }
 
     [Fact]
+    public void ConnectionWithInvalidTypedValue_IsRejectedAsOptionsValidation()
+    {
+        const string secret = "must-never-appear";
+        var values = ValidConfiguration();
+        values[$"{ServerConfigurationSections.ConfigurationConnection}:ConnectionString"] =
+            $"Host=localhost;Database=royal_identity;Port=abc;Password={secret}";
+        using var provider = BuildProvider(values);
+
+        var exception = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<ConfigurationPostgreSqlOptions>>().Value);
+
+        Assert.DoesNotContain(secret, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SnapshotWithoutPositiveInterval_IsRejected()
     {
         var values = ValidConfiguration();
@@ -148,6 +163,27 @@ public class HostConfigurationTests
 
         Assert.Throws<OptionsValidationException>(
             () => provider.GetRequiredService<IOptions<UserAccountsRealmOptionsConfiguration>>().Value);
+    }
+
+    [Fact]
+    public async Task InvalidConfiguration_FailsTheActualHostStart()
+    {
+        var values = ValidConfiguration();
+        values[$"{ServerConfigurationSections.ConfigurationConnection}:ConnectionString"] = null;
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
+            .Build();
+        using var host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
+            .ConfigureServices((context, services) =>
+                services.AddRoyalIdentityServerConfiguration(configuration, context.HostingEnvironment))
+            .Build();
+
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => host.StartAsync());
+        IReadOnlyCollection<Exception> failures = exception is AggregateException aggregate
+            ? aggregate.Flatten().InnerExceptions
+            : [exception];
+
+        Assert.Contains(failures, failure => failure is OptionsValidationException);
     }
 
     private static ServiceProvider BuildProvider(Dictionary<string, string?> values)
