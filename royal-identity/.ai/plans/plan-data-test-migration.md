@@ -1,14 +1,14 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: RASCUNHO - decisões de planejamento fechadas em 2026-07-27; implementação não iniciada
+## Status: EM ANDAMENTO - Fase 1 concluída em 2026-07-27; Fase 2 pendente
 
 ## Progresso
 
-`░░░░░░░░░` **0%** - 0 de 9 fases
+`█░░░░░░░░` **11%** - 1 de 9 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - contrato de configuração e composição | Pendente |
+| Fase 1 - contrato de configuração e composição | Concluida |
 | Fase 2 - provisionamento externo das três famílias | Pendente |
 | Fase 3 - composições reais e fail-fast do Server/Demo | Pendente |
 | Fase 4 - fixture SQLite unificada, handles e seeds | Pendente |
@@ -638,34 +638,34 @@ superfície estar testada.
 
 **Tarefas:**
 
-- [ ] Registrar em ADR nova a separação entre `RoyalIdentity.Server` PostgreSQL e `RoyalIdentity.Demo` SQLite
+- [x] Registrar em ADR nova a separação entre `RoyalIdentity.Server` PostgreSQL e `RoyalIdentity.Demo` SQLite
   self-provisioned, ambos composition roots independentes e sem seletor de provider; manter detalhes de
   implementação somente neste plano.
-- [ ] Criar options tipadas independentes para as connection strings PostgreSQL de Configuration, Operational e
+- [x] Criar options tipadas independentes para as connection strings PostgreSQL de Configuration, Operational e
   `UserAccounts`; não criar enum, selector, factory ou options de provider.
-- [ ] Permitir que as três connection strings apontem para o mesmo PostgreSQL/banco no ambiente local, mantendo
+- [x] Permitir que as três connection strings apontem para o mesmo PostgreSQL/banco no ambiente local, mantendo
   cada chave explícita e cada `DbContext`/history independente.
-- [ ] Criar options tipadas para snapshot, cleanup e Data Protection; não oferecer seletor oficial
+- [x] Criar options tipadas para snapshot, cleanup e Data Protection; não oferecer seletor oficial
   Plain/AES.
-- [ ] Validar presença e formato das conexões sem materializar secrets em mensagens; igualdade entre valores é
+- [x] Validar presença e formato das conexões sem materializar secrets em mensagens; igualdade entre valores é
   permitida e não os transforma em uma conexão default implícita.
-- [ ] Alterar `AddHostServices`/entry point escolhido para receber `IConfiguration` e ambiente explicitamente.
-- [ ] Criar `UseRoyalIdentityProtocol(...)` no core com o limite exato de DF29; manter UI, error handling,
+- [x] Alterar `AddHostServices`/entry point escolhido para receber `IConfiguration` e ambiente explicitamente.
+- [x] Criar `UseRoyalIdentityProtocol(...)` no core com o limite exato de DF29; manter UI, error handling,
   static files, antiforgery específico e endpoints test-only fora do extension.
-- [ ] Documentar no XML/API do extension e provar nos composition roots a precondição `UseRouting` antes da chamada, a
+- [x] Documentar no XML/API do extension e provar nos composition roots a precondição `UseRouting` antes da chamada, a
   ordem interna `UseRealmDiscovery` antes de authentication e a responsabilidade do caller por UI/antiforgery
   depois do pipeline protocolar.
-- [ ] Fazer `RoyalIdentity.Server.Program` e `Tests.Host.Program` chamarem o extension, preservando composition
+- [x] Fazer `RoyalIdentity.Server.Program` e `Tests.Host.Program` chamarem o extension, preservando composition
   roots e complementos próprios; o Demo será acrescentado na Fase 3.
-- [ ] Fixar e documentar a seção de `IConfiguration` para defaults globais e overrides de
+- [x] Fixar e documentar a seção de `IConfiguration` para defaults globais e overrides de
   `UserAccountsRealmOptions` por `realmId`; entregar o resolver na composição/adapter, preservar o módulo puro e
   validar options inválidas antes do tráfego.
-- [ ] Cobrir dois realms com overrides distintos, fallback de realm sem override para os defaults e rejeição de
+- [x] Cobrir dois realms com overrides distintos, fallback de realm sem override para os defaults e rejeição de
   configuração inválida, sem introduzir persistência/admin.
-- [ ] Não adicionar options, serviços ou validators que consultem estado de migrations.
-- [ ] Substituir guards que hoje proíbem qualquer referência EF no Server por guards que permitam adapters/providers
+- [x] Não adicionar options, serviços ou validators que consultem estado de migrations.
+- [x] Substituir guards que hoje proíbem qualquer referência EF no Server por guards que permitam adapters/providers
   PostgreSQL exigidos e continuem proibindo SQLite, Demo, `Data.*`, `Migrations` e dependências inversas.
-- [ ] Cobrir conexões ausentes/inválidas, três chaves iguais válidas, cleanup ausente e protection incompatível.
+- [x] Cobrir conexões ausentes/inválidas, três chaves iguais válidas, cleanup ausente e protection incompatível.
 
 **Critérios de aceite:** cada `DbContext` do Server possui connection string PostgreSQL explícita; não existe
 selector/options de provider; as três strings podem apontar para o mesmo banco local; cleanup ou Data Protection
@@ -685,7 +685,45 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration"
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Entregáveis:**
+
+- Criada a [ADR-019](../../adrs/ADR-019.md), que fixa Server PostgreSQL, Demo SQLite in-memory e composition roots
+  independentes sem seletor de provider; o índice `ADR.md` foi atualizado.
+- Criada a superfície `RoyalIdentity:Connections:{Configuration|Operational|UserAccounts}` com três options
+  PostgreSQL independentes e validação real via `NpgsqlConnectionStringBuilder`. Valores iguais são aceitos e
+  mensagens de erro não incluem a connection string.
+- Vinculadas e validadas no startup as seções `RoyalIdentity:Snapshot`, `RoyalIdentity:Cleanup` e
+  `RoyalIdentity:DataProtection`. Snapshot e cleanup reutilizam respectivamente
+  `ConfigurationSnapshotRefreshOptions` e `OperationalCleanupOptions`; Data Protection não expõe selector e rejeita
+  configuração de provider alternativo.
+- Criado `ConfigurationUserAccountsRealmOptionsResolver` na `.Integration`, com defaults globais, overrides em
+  `RoyalIdentity:UserAccounts:Options:Realms:{realmId}`, cópias independentes e validação antecipada de todos os
+  realms configurados.
+- Criado `UseRoyalIdentityProtocol(...)` no core. Server e `Tests.Host` agora instalam explicitamente routing antes
+  do extension e antiforgery/UI depois dele, sem compartilhar seus entry points.
+- Atualizados os guards do grafo: Server admite somente core/Razor, adapters/providers PostgreSQL,
+  `UserAccounts.Integration`/PostgreSQL e o fake transitório; SQLite, Demo, `Data.*`, Migrations, `Tests.*` e
+  dependências inversas continuam proibidos. Um guard adicional impede inspeção/aplicação de migrations no source
+  do Server.
+
+**Arquivos principais:** `RoyalIdentity.Server/Configuration/*`, `RoyalIdentity.Server/HostServices.cs`,
+`RoyalIdentity.Server/Program.cs`, `RoyalIdentity/Extensions/ApplicationBuilderExtensions.cs`,
+`RoyalIdentity.UserAccounts.Integration/ConfigurationUserAccountsRealmOptionsResolver.cs`,
+`Tests.Integration/Configuration/HostConfigurationTests.cs`,
+`Tests.Architecture/ConfigurationStorageBoundaryTests.cs`, `adrs/ADR-019.md` e `ADR.md`.
+
+**Verificação:**
+
+- `dotnet build RoyalIdentity.Server/RoyalIdentity.Server.csproj --no-restore` — verde, 0 erros.
+- `dotnet test Tests.Architecture --no-restore` — 50 aprovados, 0 falhas, 0 ignorados.
+- `dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration" --no-restore` — 11 aprovados,
+  0 falhas, 0 ignorados.
+- `dotnet test Tests.Integration --no-restore` — 280 aprovados, 0 falhas, 0 ignorados.
+
+**Desvios e pendências:** nenhum desvio arquitetural. O alias `RoyalIdentityServer` na referência de teste evita
+expor o `Program` global do Server ao lado de `Tests.Host.Program`. `AddInMemoryStorage()` permanece deliberadamente
+no Server até a troca integral e testada da Fase 3; nenhuma migration, consulta de schema ou composição EF runtime
+foi antecipada.
 
 ---
 

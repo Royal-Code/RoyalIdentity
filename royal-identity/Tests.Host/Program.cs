@@ -1,10 +1,9 @@
-using RoyalIdentity.Authentication;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.Components.Layout;
 using Tests.Host;
 using Tests.Host.Components;
 
-#pragma warning disable S1118 // public Program 
+#pragma warning disable S1118 // public Program
 #pragma warning disable S6966 // RunAsync() is not required
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,14 +16,11 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseExceptionHandler("/Exception", createScopeForErrors: true);
 
-app.UseRealmDiscovery();
-app.UseRealmCors();
+app.UseRouting();
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseRoyalIdentityProtocol();
+
 app.UseAntiforgery();
-
-app.MapOpenIdConnectProviderEndpoints();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

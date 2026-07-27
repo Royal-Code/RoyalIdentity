@@ -1,4 +1,3 @@
-using RoyalIdentity.Authentication;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Razor.Components.Layout;
 using RoyalIdentity.Server;
@@ -12,7 +11,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddHostServices();
+builder.Services.AddHostServices(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -26,13 +25,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.UseRealmDiscovery();
-app.UseRealmCors();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapOpenIdConnectProviderEndpoints();
+app.UseRoyalIdentityProtocol();
 
 app.UseAntiforgery();
 

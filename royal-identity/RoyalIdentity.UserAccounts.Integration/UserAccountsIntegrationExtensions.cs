@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Infrastructure.Audit;
@@ -14,6 +16,33 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class UserAccountsIntegrationExtensions
 {
+    /// <summary>
+    /// Registers a configuration-backed realm options resolver. The supplied section must contain
+    /// <c>Defaults</c> and optional <c>Realms:{realmId}</c> overrides. Every configured effective option set is
+    /// validated at host startup.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="section">The UserAccounts options section.</param>
+    /// <returns>The same collection for chaining.</returns>
+    public static IServiceCollection AddConfiguredUserAccountsRealmOptions(
+        this IServiceCollection services,
+        IConfigurationSection section)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(section);
+
+        var resolver = new ConfigurationUserAccountsRealmOptionsResolver(section);
+
+        services.Replace(ServiceDescriptor.Singleton<IUserAccountsRealmOptionsResolver>(resolver));
+        services.AddOptions<UserAccountsRealmOptionsConfiguration>()
+            .Validate(
+                _ => resolver.ValidateConfiguration().Count is 0,
+                "The configured UserAccounts realm options are invalid.")
+            .ValidateOnStart();
+
+        return services;
+    }
+
     /// <summary>
     /// Registers the integration adapter: the realm-boundary translation, the password hashing bridge and the
     /// module-backed <see cref="IUserDirectory"/> (replacing the in-memory fake).

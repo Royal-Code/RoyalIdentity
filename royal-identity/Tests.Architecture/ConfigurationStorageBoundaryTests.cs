@@ -10,7 +10,8 @@ namespace Tests.Architecture;
 /// Enforces the boundaries of the core Configuration storage family (ADR-013 §2.1/§2.3,
 /// plan-data-configuration-storage DF1 e Fase 1): the pure Data project references neither the IdP core,
 /// nor the adapter, nor ASP.NET; only the adapter knows core and Data; providers sit on adapter/Data; the
-/// runner sits on providers; and neither the host nor the core gains a reference to the new family.
+/// runner sits on providers; the Server may compose only the production adapters/providers; and the core remains
+/// provider-neutral.
 /// Assembly-level checks catch accidental <c>using</c>s; csproj-graph checks pin the intended references
 /// even before later phases bind them in code.
 /// </summary>
@@ -115,16 +116,116 @@ public class ConfigurationStorageBoundaryTests
     }
 
     [Fact]
-    public void Host_DoesNotReference_TheEntityFrameworkFamily()
+    public void Server_ProjectGraph_AllowsOnly_ProductionComposition_Dependencies()
     {
-        // DF11/DF20: no database, runner or EF storage becomes a prerequisite of the default host.
         var projectReferences = ProjectReferenceReader.ReadProjectReferences(
             "RoyalIdentity.Server/RoyalIdentity.Server.csproj");
 
-        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Storage.EntityFramework", StringComparison.Ordinal));
-        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Configuration", StringComparison.Ordinal));
-        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.Operational", StringComparison.Ordinal));
+        string[] allowedProjects =
+        [
+            "RoyalIdentity/RoyalIdentity.csproj",
+            "RoyalIdentity.Razor/RoyalIdentity.Razor.csproj",
+            "RoyalIdentity.Storage.InMemory/RoyalIdentity.Storage.InMemory.csproj", // transitional until Plan 4 Fase 3
+            "RoyalIdentity.Storage.EntityFramework/RoyalIdentity.Storage.EntityFramework.csproj",
+            "RoyalIdentity.Storage.EntityFramework.PostgreSql/RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj",
+            "RoyalIdentity.UserAccounts.Integration/RoyalIdentity.UserAccounts.Integration.csproj",
+            "RoyalIdentity.UserAccounts.PostgreSql/RoyalIdentity.UserAccounts.PostgreSql.csproj",
+        ];
+
+        Assert.All(
+            projectReferences,
+            reference => Assert.Contains(
+                allowedProjects,
+                allowed => reference.EndsWith(allowed, StringComparison.Ordinal)));
+        Assert.DoesNotContain(projectReferences, r => r.Contains(".Sqlite/", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Demo", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Data.", StringComparison.Ordinal));
         Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Migrations", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("Tests.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Hosts_And_Migrations_DoNotAcquire_InverseEntryPointReferences()
+    {
+        var testHostReferences = ProjectReferenceReader.ReadProjectReferences("Tests.Host/Tests.Host.csproj");
+        var migrationsReferences = ProjectReferenceReader.ReadProjectReferences(
+            "RoyalIdentity.Migrations/RoyalIdentity.Migrations.csproj");
+
+        Assert.DoesNotContain(testHostReferences, r => r.Contains("RoyalIdentity.Server", StringComparison.Ordinal));
+        Assert.DoesNotContain(testHostReferences, r => r.Contains("RoyalIdentity.Demo", StringComparison.Ordinal));
+        Assert.DoesNotContain(migrationsReferences, r => r.Contains("RoyalIdentity.Server", StringComparison.Ordinal));
+        Assert.DoesNotContain(migrationsReferences, r => r.Contains("RoyalIdentity.Demo", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ProtocolExtension_LivesInCore_WithoutHostUiOrProviderDependencies()
+    {
+        var method = typeof(RoyalIdentity.Extensions.ApplicationBuilderExtensions)
+            .GetMethod(nameof(RoyalIdentity.Extensions.ApplicationBuilderExtensions.UseRoyalIdentityProtocol));
+        var coreReferences = typeof(RoyalIdentity.Extensions.ApplicationBuilderExtensions).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name!)
+            .ToArray();
+
+        Assert.NotNull(method);
+        Assert.DoesNotContain(coreReferences, name => name == "RoyalIdentity.Razor");
+        Assert.DoesNotContain(coreReferences, name => name == "RoyalIdentity.Server");
+        Assert.DoesNotContain(coreReferences, name => name.StartsWith(AdapterName, StringComparison.Ordinal));
+        Assert.DoesNotContain(coreReferences, name => name.StartsWith("RoyalIdentity.UserAccounts", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Server_Source_DoesNotInspectOrApplyMigrations()
+    {
+        var serverDirectory = Path.Combine(ProjectReferenceReader.FindRepositoryRoot(), "RoyalIdentity.Server");
+        string[] forbiddenCalls =
+        [
+            ".EnsureCreated(",
+            ".EnsureCreatedAsync(",
+            ".Migrate(",
+            ".MigrateAsync(",
+            "GetPendingMigrations",
+        ];
+
+        var sourceFiles = Directory
+            .EnumerateFiles(serverDirectory, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"));
+
+        foreach (var sourceFile in sourceFiles)
+        {
+            var source = File.ReadAllText(sourceFile);
+            Assert.DoesNotContain(
+                forbiddenCalls,
+                call => source.Contains(call, StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void ServerAndTestHost_UseTheSharedProtocolExtension_WithoutSharingPrograms()
+    {
+        var root = ProjectReferenceReader.FindRepositoryRoot();
+        var serverProgram = File.ReadAllText(Path.Combine(root, "RoyalIdentity.Server", "Program.cs"));
+        var testHostProgram = File.ReadAllText(Path.Combine(root, "Tests.Host", "Program.cs"));
+
+        Assert.Contains("app.UseRouting();", serverProgram, StringComparison.Ordinal);
+        Assert.Contains("app.UseRouting();", testHostProgram, StringComparison.Ordinal);
+        Assert.Contains("app.UseRoyalIdentityProtocol();", serverProgram, StringComparison.Ordinal);
+        Assert.Contains("app.UseRoyalIdentityProtocol();", testHostProgram, StringComparison.Ordinal);
+        Assert.DoesNotContain("app.UseRealmDiscovery();", serverProgram, StringComparison.Ordinal);
+        Assert.DoesNotContain("app.UseRealmDiscovery();", testHostProgram, StringComparison.Ordinal);
+        Assert.True(
+            serverProgram.IndexOf("app.UseRouting();", StringComparison.Ordinal) <
+            serverProgram.IndexOf("app.UseRoyalIdentityProtocol();", StringComparison.Ordinal));
+        Assert.True(
+            testHostProgram.IndexOf("app.UseRouting();", StringComparison.Ordinal) <
+            testHostProgram.IndexOf("app.UseRoyalIdentityProtocol();", StringComparison.Ordinal));
+        Assert.True(
+            serverProgram.IndexOf("app.UseRoyalIdentityProtocol();", StringComparison.Ordinal) <
+            serverProgram.IndexOf("app.UseAntiforgery();", StringComparison.Ordinal));
+        Assert.True(
+            testHostProgram.IndexOf("app.UseRoyalIdentityProtocol();", StringComparison.Ordinal) <
+            testHostProgram.IndexOf("app.UseAntiforgery();", StringComparison.Ordinal));
     }
 
     [Fact]
