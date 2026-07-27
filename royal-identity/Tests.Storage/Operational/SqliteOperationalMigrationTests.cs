@@ -93,7 +93,7 @@ public class SqliteOperationalMigrationTests
         Assert.All(ExpectedOperationalTables, table => Assert.Contains(table, tables));
     }
 
-    // The bootstrap must run before EF consults the new history; the four states it can meet are pinned here.
+    // The bootstrap must run before EF consults the new history; its observable states are pinned here.
     [Fact]
     public async Task Bootstrap_OnAnEmptyDatabase_DoesNothing()
     {
@@ -103,6 +103,44 @@ public class SqliteOperationalMigrationTests
         var outcome = await new SqliteMigrationsHistoryBootstrap().RunAsync(connection);
 
         Assert.Equal(MigrationsHistoryBootstrapOutcome.NoHistory, outcome);
+    }
+
+    [Fact]
+    public async Task Bootstrap_WithOnlyForeignLegacyHistory_LeavesItForItsOwner()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        await CreateHistoryAsync(connection, "__EFMigrationsHistory", "20260721010154_InitialCreate");
+
+        var outcome = await new SqliteMigrationsHistoryBootstrap().RunAsync(connection);
+
+        Assert.Equal(MigrationsHistoryBootstrapOutcome.ForeignHistory, outcome);
+        Assert.Equal(
+            ["20260721010154_InitialCreate"],
+            await MigrationIdsAsync(connection, "__EFMigrationsHistory"));
+        Assert.DoesNotContain("__ConfigurationMigrationsHistory", await HistoryTableNamesAsync(connection));
+    }
+
+    [Fact]
+    public async Task Bootstrap_WithConfigurationAndForeignLegacyHistories_LeavesBothUntouched()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        await CreateHistoryAsync(connection, "__EFMigrationsHistory", "20260721010154_InitialCreate");
+        await CreateHistoryAsync(
+            connection,
+            "__ConfigurationMigrationsHistory",
+            "20260722164339_InitialConfiguration");
+
+        var outcome = await new SqliteMigrationsHistoryBootstrap().RunAsync(connection);
+
+        Assert.Equal(MigrationsHistoryBootstrapOutcome.AlreadyRelocated, outcome);
+        Assert.Equal(
+            ["20260721010154_InitialCreate"],
+            await MigrationIdsAsync(connection, "__EFMigrationsHistory"));
+        Assert.Equal(
+            ["20260722164339_InitialConfiguration"],
+            await MigrationIdsAsync(connection, "__ConfigurationMigrationsHistory"));
     }
 
     [Fact]
@@ -152,6 +190,23 @@ public class SqliteOperationalMigrationTests
             ["20260722164339_InitialConfiguration"],
             await MigrationIdsAsync(connection, "__EFMigrationsHistory"));
         Assert.Equal(["20260101000000_Other"], await MigrationIdsAsync(connection, "__ConfigurationMigrationsHistory"));
+    }
+
+    [Fact]
+    public async Task Bootstrap_WithMixedLegacyHistory_FailsClosedWithoutTouchingIt()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        await CreateHistoryAsync(connection, "__EFMigrationsHistory", "20260722164339_InitialConfiguration");
+        await AddHistoryIdAsync(connection, "__EFMigrationsHistory", "20260721010154_InitialCreate");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await new SqliteMigrationsHistoryBootstrap().RunAsync(connection));
+
+        Assert.Equal(
+            ["20260721010154_InitialCreate", "20260722164339_InitialConfiguration"],
+            await MigrationIdsAsync(connection, "__EFMigrationsHistory"));
+        Assert.DoesNotContain("__ConfigurationMigrationsHistory", await HistoryTableNamesAsync(connection));
     }
 
     [Fact]
@@ -224,6 +279,15 @@ public class SqliteOperationalMigrationTests
         command.CommandText =
             $"CREATE TABLE \"{table}\" (\"MigrationId\" TEXT NOT NULL CONSTRAINT \"PK_{table}\" PRIMARY KEY, " +
             "\"ProductVersion\" TEXT NOT NULL); " +
+            $"INSERT INTO \"{table}\" (\"MigrationId\", \"ProductVersion\") VALUES ($id, '10.0.10');";
+        command.Parameters.AddWithValue("$id", migrationId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task AddHistoryIdAsync(SqliteConnection connection, string table, string migrationId)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
             $"INSERT INTO \"{table}\" (\"MigrationId\", \"ProductVersion\") VALUES ($id, '10.0.10');";
         command.Parameters.AddWithValue("$id", migrationId);
         await command.ExecuteNonQueryAsync();

@@ -800,18 +800,25 @@ dotnet test Tests.Architecture
 - `RoyalIdentity.Migrations` agora seleciona e reporta Configuration, Operational e `UserAccounts` explicitamente,
   na ordem Configuration → Operational → UserAccounts e sem transação distribuída. A falha de uma família em
   topologia separada não invalida nem impede as demais; em banco declarado `Shared`, a falha interrompe as
-  seguintes sem alegar rollback.
+  seguintes sem alegar rollback. Esse fail-stop considera qualquer seleção com mais de uma família, inclusive
+  `Configuration | Operational`, e não apenas o valor agregado `All`.
 - O CLI ganhou `--provider` uniforme, `--user-accounts-connection[-env]` e seleção parcial por lista em
   `--families`. Cada família selecionada exige sua própria connection string, mesmo quando os três valores apontam
   para o mesmo banco. `--configuration-provider` permanece somente como alias compatível de `--provider`;
-  seletores de provider por família não existem, tornando mixed-provider irrepresentável.
+  seletores de provider por família não existem, tornando mixed-provider irrepresentável. O valor público
+  `StorageFamilySelection.All` agora inclui `UserAccounts`; chamadores anteriores precisam fornecer a terceira
+  connection ou selecionar explicitamente `Configuration | Operational`, como faz a fixture EF transitória.
 - O seed continua sendo a única implementação `ConfigurationSeed`, com `None|Product|Demo|All`, independente do
   provider e aplicável somente quando Configuration foi selecionada. O runner não cria seed ou write model de
   `UserAccounts`; o Demo fará isso pelos casos de uso públicos na Fase 3B.
 - `UserAccounts` recebeu a history própria `__UserAccountsMigrationsHistory` em SQLite/PostgreSQL, inclusive nas
-  extensions de DI e factories de design. Isso evita colisão com a history default reservada pelo bootstrap legado
-  de Configuration em banco compartilhado. O runner reloca uma history antiga de `UserAccounts` apenas quando todos
-  os migration ids pertencem ao módulo; history mista/ambígua falha fechado.
+  extensions de DI e factories de design. Como Configuration e UserAccounts já usaram a history default, os
+  bootstraps SQLite/PostgreSQL agora atribuem a tabela legada pelos migration ids antes de qualquer relocação:
+  Configuration deixa uma history integralmente UserAccounts intacta para o bootstrap do módulo, que então a move.
+  O outcome distingue ausência real (`NoHistory`) de uma history pertencente a outra família (`ForeignHistory`);
+  history mista/ambígua falha fechado. A relocação de compatibilidade de UserAccounts permanece responsabilidade
+  explícita do runner: uma composição futura que migre o módulo por fora deverá tratar a history legada antes de
+  chamar `MigrateAsync`.
 - O grafo de `RoyalIdentity.Migrations` referencia diretamente somente os quatro providers
   EF/`UserAccounts` SQLite/PostgreSQL. O guard registra a justificativa de ADR-013: o runner é composition root das
   famílias independentes, não adapter de tradução entre core e módulo.
@@ -830,17 +837,22 @@ providers SQLite/PostgreSQL de `UserAccounts`,
 
 **Verificação:**
 
-- `dotnet build RoyalIdentity.sln --no-restore` — verde, 0 erros; 5 warnings preexistentes de SDK/pacotes.
+- `dotnet build RoyalIdentity.sln --no-restore` — verde, 0 erros; 7 warnings preexistentes nesta execução
+  incremental de SDK/pacotes/código.
 - `dotnet test Tests.Storage --filter "FullyQualifiedName~MigrationRunner|FullyQualifiedName~Migration"` —
-  56 aprovados, 0 falhas, 15 PostgreSQL ignorados sem opt-in.
+  60 aprovados, 0 falhas, 19 PostgreSQL ignorados sem opt-in.
 - `dotnet test Tests.UserAccounts --filter "FullyQualifiedName~Migration"` — 4 aprovados, 0 falhas,
   1 PostgreSQL ignorado sem opt-in.
 - `dotnet test Tests.Architecture --no-restore` — 51 aprovados, 0 falhas.
 - `scripts/Test-OperationalPostgreSql.ps1 -Filter "FullyQualifiedName~PostgreSqlStorageMigrationRunnerTests"` —
-  2 aprovados contra PostgreSQL 17 real em Podman, cobrindo banco compartilhado e três bancos separados.
+  3 aprovados contra PostgreSQL 17 real em Podman, cobrindo banco compartilhado, history legada de UserAccounts
+  no banco compartilhado e três bancos separados.
+- `scripts/Test-OperationalPostgreSql.ps1 -Filter "FullyQualifiedName~PostgreSqlOperationalMigrationTests"` —
+  14 aprovados contra PostgreSQL 17 real em Podman, incluindo history estrangeira, coexistência válida e history
+  mista com falha fechada.
 - `scripts/Test-UserAccountsPostgreSql.ps1` — 1 migration acceptance aprovado contra PostgreSQL 17 real,
   cobrindo a extension de DI e a history dedicada do módulo.
-- Suítes completas: `Tests.Storage` 582 aprovados/39 opt-in ignorados; `Tests.UserAccounts`
+- Suítes completas: `Tests.Storage` 586 aprovados/43 opt-in ignorados; `Tests.UserAccounts`
   194 aprovados/1 opt-in ignorado; `Tests.Integration` 282 aprovados, sem falhas.
 
 **Desvios e pendências:** nenhum desvio arquitetural. `RoyalIdentity.Server` continua sem referência ou chamada ao

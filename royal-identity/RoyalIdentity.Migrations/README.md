@@ -30,9 +30,10 @@ dotnet run --project RoyalIdentity.Migrations -- `
 ```
 
 Configuration, Operational e UserAccounts mantêm histories distintas. A execução repetida é idempotente e não
-usa transação distribuída entre as famílias. Ao encontrar uma base UserAccounts anterior a esta composição, o
-runner reloca `__EFMigrationsHistory` para `__UserAccountsMigrationsHistory` somente quando todos os ids pertencem
-ao módulo; history mista ou ambígua falha fechado para resolução manual.
+usa transação distribuída entre as famílias. Configuration e UserAccounts já usaram a history default em versões
+anteriores; por isso o runner atribui `__EFMigrationsHistory` pelos migration ids antes de relocá-la. Uma history
+inteiramente UserAccounts é preservada até ser movida para `__UserAccountsMigrationsHistory`, mesmo quando
+Configuration executa primeiro. History mista ou ambígua falha fechado para resolução manual.
 
 ## PostgreSQL de produto
 

@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.Storage.EntityFramework.Migrations;
 
 namespace RoyalIdentity.Storage.EntityFramework.Sqlite;
@@ -12,10 +13,10 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite;
 ///     history and try to recreate every table.
 /// </para>
 /// <para>
-///     The move preserves the migration ids verbatim, is idempotent, and fails closed when both histories exist:
-///     that is ambiguity the tool cannot resolve, and merging or dropping either one silently could reapply or
-///     skip migrations. Operational never shipped under the default name, so a legacy history on SQLite always
-///     means Configuration.
+///     UserAccounts shipped under EF's default history before acquiring its own history table. Therefore this
+///     bootstrap inspects every legacy migration id: it moves the table only when all ids belong to Configuration,
+///     leaves a history owned entirely by another family untouched, and fails closed when ownership is mixed or
+///     when both Configuration histories exist.
 /// </para>
 /// </summary>
 public sealed class SqliteMigrationsHistoryBootstrap
@@ -36,15 +37,34 @@ public sealed class SqliteMigrationsHistoryBootstrap
         var legacyExists = await TableExistsAsync(connection, legacy, ct);
         var configurationExists = await TableExistsAsync(connection, configuration, ct);
 
-        if (legacyExists && configurationExists)
+        if (!legacyExists)
+        {
+            return configurationExists
+                ? MigrationsHistoryBootstrapOutcome.AlreadyRelocated
+                : MigrationsHistoryBootstrapOutcome.NoHistory;
+        }
+
+        var legacyIds = await MigrationIdsAsync(connection, legacy, ct);
+        var ownedCount = legacyIds.Count(ConfigurationMigrationIds.Contains);
+        if (ownedCount is 0)
+        {
+            return configurationExists
+                ? MigrationsHistoryBootstrapOutcome.AlreadyRelocated
+                : MigrationsHistoryBootstrapOutcome.ForeignHistory;
+        }
+        if (ownedCount != legacyIds.Count)
+        {
+            throw new InvalidOperationException(
+                $"The legacy '{legacy}' contains migration ids from Configuration and another family. The " +
+                "migrations history is ambiguous and will not be split automatically; resolve it manually " +
+                "before migrating.");
+        }
+        if (configurationExists)
         {
             throw new InvalidOperationException(
                 $"Both '{legacy}' and '{configuration}' exist in this database. The migrations history is " +
                 "ambiguous and will not be merged or dropped automatically; resolve it manually before migrating.");
         }
-
-        if (!legacyExists)
-            return configurationExists ? MigrationsHistoryBootstrapOutcome.AlreadyRelocated : MigrationsHistoryBootstrapOutcome.NoHistory;
 
         await using var command = connection.CreateCommand();
         // ALTER TABLE ... RENAME TO keeps every row, so the applied migration ids are preserved exactly.
@@ -74,5 +94,31 @@ public sealed class SqliteMigrationsHistoryBootstrap
         command.Parameters.AddWithValue("$name", tableName);
 
         return Convert.ToInt64(await command.ExecuteScalarAsync(ct)) > 0;
+    }
+
+    private static async Task<List<string>> MigrationIdsAsync(
+        SqliteConnection connection,
+        string table,
+        CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT \"MigrationId\" FROM \"{table}\";";
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        List<string> ids = [];
+        while (await reader.ReadAsync(ct))
+            ids.Add(reader.GetString(0));
+
+        return ids;
+    }
+
+    private static readonly IReadOnlySet<string> ConfigurationMigrationIds = GetConfigurationMigrationIds();
+
+    private static IReadOnlySet<string> GetConfigurationMigrationIds()
+    {
+        using var context = new ConfigurationSqliteDbContext(
+            new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
+                .UseSqlite("Data Source=:memory:")
+                .Options);
+        return context.Database.GetMigrations().ToHashSet(StringComparer.Ordinal);
     }
 }

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RoyalIdentity.Storage.EntityFramework.Migrations;
 
@@ -15,8 +16,10 @@ namespace RoyalIdentity.Storage.EntityFramework.PostgreSql;
 ///     Like its SQLite counterpart it is infrastructure of the runner, not a domain migration: it runs per
 ///     connection <b>before</b> any <c>MigrateAsync</c>, so EF never consults the new location while the old one
 ///     still holds the applied ids — which would look like an empty history and try to recreate every table.
-///     The move preserves the migration ids verbatim, is idempotent, and fails closed when both exist. The
-///     Operational family never shipped in <c>public</c>, so a legacy history there always means Configuration.
+///     UserAccounts shipped under <c>public.__EFMigrationsHistory</c> before acquiring its own history table.
+///     Therefore this bootstrap inspects every legacy migration id: it moves the table only when all ids belong
+///     to Configuration, leaves a history owned entirely by another family untouched, and fails closed when
+///     ownership is mixed or when both Configuration histories exist.
 /// </para>
 /// </summary>
 public sealed class PostgreSqlMigrationsHistoryBootstrap
@@ -41,19 +44,34 @@ public sealed class PostgreSqlMigrationsHistoryBootstrap
         var legacyExists = await TableExistsAsync(connection, LegacySchema, table, ct);
         var targetExists = await TableExistsAsync(connection, targetSchema, table, ct);
 
-        if (legacyExists && targetExists)
-        {
-            throw new InvalidOperationException(
-                $"Both '{LegacySchema}.{table}' and '{targetSchema}.{table}' exist in this database. The " +
-                "migrations history is ambiguous and will not be merged or dropped automatically; resolve it " +
-                "manually before migrating.");
-        }
-
         if (!legacyExists)
         {
             return targetExists
                 ? MigrationsHistoryBootstrapOutcome.AlreadyRelocated
                 : MigrationsHistoryBootstrapOutcome.NoHistory;
+        }
+
+        var legacyIds = await MigrationIdsAsync(connection, LegacySchema, table, ct);
+        var ownedCount = legacyIds.Count(ConfigurationMigrationIds.Contains);
+        if (ownedCount is 0)
+        {
+            return targetExists
+                ? MigrationsHistoryBootstrapOutcome.AlreadyRelocated
+                : MigrationsHistoryBootstrapOutcome.ForeignHistory;
+        }
+        if (ownedCount != legacyIds.Count)
+        {
+            throw new InvalidOperationException(
+                $"The legacy '{LegacySchema}.{table}' contains migration ids from Configuration and another " +
+                "family. The migrations history is ambiguous and will not be split automatically; resolve it " +
+                "manually before migrating.");
+        }
+        if (targetExists)
+        {
+            throw new InvalidOperationException(
+                $"Both '{LegacySchema}.{table}' and '{targetSchema}.{table}' exist in this database. The " +
+                "migrations history is ambiguous and will not be merged or dropped automatically; resolve it " +
+                "manually before migrating.");
         }
 
         await using (var createSchema = connection.CreateCommand())
@@ -96,5 +114,32 @@ public sealed class PostgreSqlMigrationsHistoryBootstrap
         command.Parameters.AddWithValue("table", table);
 
         return Convert.ToInt64(await command.ExecuteScalarAsync(ct)) > 0;
+    }
+
+    private static async Task<List<string>> MigrationIdsAsync(
+        NpgsqlConnection connection,
+        string schema,
+        string table,
+        CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT \"MigrationId\" FROM \"{schema}\".\"{table}\";";
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        List<string> ids = [];
+        while (await reader.ReadAsync(ct))
+            ids.Add(reader.GetString(0));
+
+        return ids;
+    }
+
+    private static readonly IReadOnlySet<string> ConfigurationMigrationIds = GetConfigurationMigrationIds();
+
+    private static IReadOnlySet<string> GetConfigurationMigrationIds()
+    {
+        using var context = new ConfigurationPostgreSqlDbContext(
+            new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
+                .UseNpgsql("Host=design-time;Database=design-time")
+                .Options);
+        return context.Database.GetMigrations().ToHashSet(StringComparer.Ordinal);
     }
 }

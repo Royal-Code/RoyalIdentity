@@ -9,6 +9,11 @@ namespace RoyalIdentity.Migrations;
 /// table. Rows are moved only when every legacy migration id belongs to UserAccounts; a mixed history is
 /// ambiguous and fails closed.
 /// </summary>
+/// <remarks>
+/// This compatibility step is owned by the migrations runner. Any future composition that migrates UserAccounts
+/// outside this runner must explicitly handle the legacy default history before calling <c>MigrateAsync</c>;
+/// registering a UserAccounts provider does not relocate it.
+/// </remarks>
 internal static class UserAccountsMigrationsHistoryBootstrap
 {
     private const string LegacyHistoryTable = "__EFMigrationsHistory";

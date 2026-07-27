@@ -1,6 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RoyalIdentity.Migrations;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
+using RoyalIdentity.UserAccounts.Infrastructure.Events;
+using RoyalIdentity.UserAccounts.PostgreSql;
 using Tests.Storage.Configuration;
 using Tests.Storage.Configuration.Support;
 
@@ -34,6 +37,42 @@ public class PostgreSqlStorageMigrationRunnerTests
         Assert.Contains("configuration.realms", tables);
         Assert.Contains("operation.protocol_artifacts", tables);
         Assert.Contains("public.UserAccounts", tables);
+        Assert.Contains("configuration.__EFMigrationsHistory", tables);
+        Assert.Contains("operation.__EFMigrationsHistory", tables);
+        Assert.Contains($"public.{UserAccountsDbContext.MigrationsHistoryTableName}", tables);
+        Assert.DoesNotContain("public.__EFMigrationsHistory", tables);
+    }
+
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public async Task AllFamilies_SharedDatabase_PreserveAndRelocateLegacyUserAccountsHistory()
+    {
+        await using var database = await PostgreSqlConfigurationDatabase.CreateEmptyAsync();
+        await using (var legacy = new UserAccountsPostgreSqlDbContext(
+            new DbContextOptionsBuilder<UserAccountsPostgreSqlDbContext>()
+                .UseNpgsql(database.ConnectionString)
+                .Options,
+            new DomainEventDispatcher([])))
+        {
+            await legacy.Database.MigrateAsync();
+        }
+
+        var options = new MigrationRunnerOptions
+        {
+            ConfigurationProvider = ConfigurationDatabaseProvider.PostgreSql,
+            ConfigurationConnection = database.ConnectionString,
+            OperationalConnection = database.ConnectionString,
+            UserAccountsConnection = database.ConnectionString,
+            Families = StorageFamilySelection.All,
+            DatabaseTopology = StorageDatabaseTopology.Shared,
+        };
+        var report = await StorageMigrationRunner.RunAsync(options);
+
+        Assert.True(report.Succeeded);
+        Assert.All(report.Families, family => Assert.Equal(StorageMigrationStatus.Applied, family.Status));
+        Assert.True((await StorageMigrationRunner.RunAsync(options)).Succeeded);
+
+        var tables = await TableNamesAsync(database.ConnectionString);
         Assert.Contains("configuration.__EFMigrationsHistory", tables);
         Assert.Contains("operation.__EFMigrationsHistory", tables);
         Assert.Contains($"public.{UserAccountsDbContext.MigrationsHistoryTableName}", tables);

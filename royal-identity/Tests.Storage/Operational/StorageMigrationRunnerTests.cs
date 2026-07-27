@@ -169,6 +169,36 @@ public class StorageMigrationRunnerTests : IDisposable
         Assert.DoesNotContain("__EFMigrationsHistory", tables);
     }
 
+    [Fact]
+    public async Task AllFamilies_SharedDatabase_PreserveAndRelocateLegacyUserAccountsHistory()
+    {
+        var connection = NewConnectionString();
+        await using (var legacy = new UserAccountsSqliteDbContext(
+            new DbContextOptionsBuilder<UserAccountsSqliteDbContext>()
+                .UseSqlite(connection)
+                .Options,
+            new DomainEventDispatcher([])))
+        {
+            await legacy.Database.MigrateAsync();
+        }
+
+        var options = Options(
+            connection,
+            StorageFamilySelection.All,
+            databaseTopology: StorageDatabaseTopology.Shared);
+        var report = await StorageMigrationRunner.RunAsync(options);
+
+        Assert.True(report.Succeeded);
+        Assert.All(report.Families, family => Assert.Equal(StorageMigrationStatus.Applied, family.Status));
+        Assert.True((await StorageMigrationRunner.RunAsync(options)).Succeeded);
+
+        var tables = await TableNamesAsync(connection);
+        Assert.Contains("__ConfigurationMigrationsHistory", tables);
+        Assert.Contains("__OperationalMigrationsHistory", tables);
+        Assert.Contains(UserAccountsDbContext.MigrationsHistoryTableName, tables);
+        Assert.DoesNotContain("__EFMigrationsHistory", tables);
+    }
+
     // One database for all families is the topology their independent histories must make safe.
     [Fact]
     public async Task AllFamilies_OverOneDatabase_KeepSeparateHistories()

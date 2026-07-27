@@ -98,6 +98,39 @@ public class PostgreSqlOperationalMigrationTests
 
     [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
+    public async Task Bootstrap_WithOnlyForeignLegacyHistory_LeavesItForItsOwner()
+    {
+        await using var database = await PostgreSqlOperationalDatabase.CreateEmptyAsync();
+        await using var connection = await OpenAsync(database);
+        await CreateHistoryAsync(connection, "public", "20260721010432_InitialCreate");
+
+        var outcome = await new PostgreSqlMigrationsHistoryBootstrap().RunAsync(connection);
+
+        Assert.Equal(MigrationsHistoryBootstrapOutcome.ForeignHistory, outcome);
+        Assert.Equal(["20260721010432_InitialCreate"], await MigrationIdsAsync(connection, "public"));
+        Assert.False(await TableExistsAsync(connection, "configuration", "__EFMigrationsHistory"));
+    }
+
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public async Task Bootstrap_WithConfigurationAndForeignLegacyHistories_LeavesBothUntouched()
+    {
+        await using var database = await PostgreSqlOperationalDatabase.CreateEmptyAsync();
+        await using var connection = await OpenAsync(database);
+        await CreateHistoryAsync(connection, "public", "20260721010432_InitialCreate");
+        await CreateHistoryAsync(connection, "configuration", "20260722233806_InitialConfiguration");
+
+        var outcome = await new PostgreSqlMigrationsHistoryBootstrap().RunAsync(connection);
+
+        Assert.Equal(MigrationsHistoryBootstrapOutcome.AlreadyRelocated, outcome);
+        Assert.Equal(["20260721010432_InitialCreate"], await MigrationIdsAsync(connection, "public"));
+        Assert.Equal(
+            ["20260722233806_InitialConfiguration"],
+            await MigrationIdsAsync(connection, "configuration"));
+    }
+
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
     public async Task Bootstrap_WithOnlyTheLegacyHistory_RelocatesItPreservingTheIds()
     {
         await using var database = await PostgreSqlOperationalDatabase.CreateEmptyAsync();
@@ -144,6 +177,24 @@ public class PostgreSqlOperationalMigrationTests
 
         Assert.Equal(["20260722233806_InitialConfiguration"], await MigrationIdsAsync(connection, "public"));
         Assert.Equal(["20260101000000_Other"], await MigrationIdsAsync(connection, "configuration"));
+    }
+
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public async Task Bootstrap_WithMixedLegacyHistory_FailsClosedWithoutTouchingIt()
+    {
+        await using var database = await PostgreSqlOperationalDatabase.CreateEmptyAsync();
+        await using var connection = await OpenAsync(database);
+        await CreateHistoryAsync(connection, "public", "20260722233806_InitialConfiguration");
+        await AddHistoryIdAsync(connection, "public", "20260721010432_InitialCreate");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await new PostgreSqlMigrationsHistoryBootstrap().RunAsync(connection));
+
+        Assert.Equal(
+            ["20260721010432_InitialCreate", "20260722233806_InitialConfiguration"],
+            await MigrationIdsAsync(connection, "public"));
+        Assert.False(await TableExistsAsync(connection, "configuration", "__EFMigrationsHistory"));
     }
 
     [StoragePostgreSqlFact]
@@ -320,6 +371,18 @@ public class PostgreSqlOperationalMigrationTests
             "\"MigrationId\" character varying(150) NOT NULL, " +
             "\"ProductVersion\" character varying(32) NOT NULL, " +
             $"CONSTRAINT \"PK___EFMigrationsHistory_{schema}\" PRIMARY KEY (\"MigrationId\")); " +
+            $"INSERT INTO \"{schema}\".\"__EFMigrationsHistory\" VALUES (@id, '10.0.10');",
+            connection);
+        command.Parameters.AddWithValue("id", migrationId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task AddHistoryIdAsync(
+        NpgsqlConnection connection,
+        string schema,
+        string migrationId)
+    {
+        await using var command = new NpgsqlCommand(
             $"INSERT INTO \"{schema}\".\"__EFMigrationsHistory\" VALUES (@id, '10.0.10');",
             connection);
         command.Parameters.AddWithValue("id", migrationId);

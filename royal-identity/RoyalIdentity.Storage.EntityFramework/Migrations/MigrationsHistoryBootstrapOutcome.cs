@@ -6,12 +6,21 @@ namespace RoyalIdentity.Storage.EntityFramework.Migrations;
 /// </summary>
 public enum MigrationsHistoryBootstrapOutcome
 {
-    /// <summary>Neither the legacy nor the Configuration history exists — a database that was never migrated.</summary>
+    /// <summary>Neither the Configuration history nor any legacy history exists.</summary>
     NoHistory,
 
     /// <summary>The legacy history existed and was moved, preserving every applied migration id.</summary>
     Relocated,
 
-    /// <summary>Only the Configuration history exists — the move already happened, so this run is a no-op.</summary>
+    /// <summary>
+    /// The Configuration history already exists, so no Configuration relocation is required. A legacy history
+    /// owned by another family may coexist and is left untouched.
+    /// </summary>
     AlreadyRelocated,
+
+    /// <summary>
+    /// A legacy history exists, but none of its migration ids belong to Configuration. It is left untouched for
+    /// its owning family.
+    /// </summary>
+    ForeignHistory,
 }
