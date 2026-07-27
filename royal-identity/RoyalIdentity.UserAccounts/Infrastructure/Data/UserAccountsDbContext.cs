@@ -17,6 +17,12 @@ namespace RoyalIdentity.UserAccounts.Infrastructure.Data;
 /// </summary>
 public class UserAccountsDbContext : DbContext
 {
+    /// <summary>
+    /// Dedicated EF migrations history. Configuration reserves the default history name for legacy bootstrap,
+    /// so this module must keep its own history when both families share a database.
+    /// </summary>
+    public const string MigrationsHistoryTableName = "__UserAccountsMigrationsHistory";
+
     private readonly IDomainEventDispatcher dispatcher;
 
     /// <summary>

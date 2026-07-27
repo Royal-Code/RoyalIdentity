@@ -21,8 +21,8 @@ internal static class MigrationRunnerProgram
 
             var report = await StorageMigrationRunner.RunAsync(parsedOptions, CancellationToken.None);
 
-            // Reported family by family, never as one outcome: the two may live in different databases, and even
-            // in one database they are applied as two independent sequences (plan DF23).
+            // Reported family by family, never as one outcome: the families may live in different databases, and
+            // even in one database they are applied as independent sequences (plan DF21/DF23).
             foreach (var family in report.Families)
             {
                 if (family.Status is StorageMigrationStatus.Skipped)

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
+using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.Options;
 using RoyalIdentity.UserAccounts.PostgreSql;
 
@@ -30,6 +31,7 @@ public class UserAccountsPostgreSqlMigrationTests
             var applied = await migration.Db.Database.GetAppliedMigrationsAsync();
             Assert.Contains(applied, name => name.EndsWith("_InitialCreate", StringComparison.Ordinal));
         }
+        await AssertDedicatedHistoryAsync(PostgreSqlTestEnvironment.ConnectionString);
 
         using (var seed = NewScope(provider))
         {
@@ -89,6 +91,30 @@ public class UserAccountsPostgreSqlMigrationTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddUserAccountsPostgreSql("UserAccountsPostgreSqlTests");
         return services.BuildServiceProvider();
+    }
+
+    private static async Task AssertDedicatedHistoryAsync(string connectionString)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name IN ('__EFMigrationsHistory', @userAccountsHistory);
+            """,
+            connection);
+        command.Parameters.AddWithValue(
+            "userAccountsHistory",
+            UserAccountsDbContext.MigrationsHistoryTableName);
+        await using var reader = await command.ExecuteReaderAsync();
+        List<string> histories = [];
+        while (await reader.ReadAsync())
+            histories.Add(reader.GetString(0));
+
+        Assert.Contains(UserAccountsDbContext.MigrationsHistoryTableName, histories);
+        Assert.DoesNotContain("__EFMigrationsHistory", histories);
     }
 
     private static Scope NewScope(ServiceProvider provider) => new(provider.CreateScope());

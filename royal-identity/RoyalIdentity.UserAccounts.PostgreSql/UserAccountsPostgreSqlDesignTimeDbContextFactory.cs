@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using RoyalCode.DomainEvents;
+using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.Infrastructure.Events;
 
 namespace RoyalIdentity.UserAccounts.PostgreSql;
@@ -17,7 +18,9 @@ public sealed class UserAccountsPostgreSqlDesignTimeDbContextFactory : IDesignTi
     public UserAccountsPostgreSqlDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<UserAccountsPostgreSqlDbContext>()
-            .UseNpgsql("Host=design-time;Database=design-time;Username=design-time;Password=design-time")
+            .UseNpgsql(
+                "Host=design-time;Database=design-time;Username=design-time;Password=design-time",
+                npgsql => npgsql.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
             .Options;
 
         return new UserAccountsPostgreSqlDbContext(options, NoopDomainEventDispatcher.Instance);

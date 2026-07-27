@@ -112,8 +112,27 @@ public class ConfigurationStorageBoundaryTests
         var projectReferences = ProjectReferenceReader.ReadProjectReferences(
             "RoyalIdentity.Migrations/RoyalIdentity.Migrations.csproj");
 
-        Assert.Equal(2, projectReferences.Count);
-        Assert.All(projectReferences, r => Assert.Contains("RoyalIdentity.Storage.EntityFramework.", r));
+        string[] allowedProviders =
+        [
+            "RoyalIdentity.Storage.EntityFramework.Sqlite/RoyalIdentity.Storage.EntityFramework.Sqlite.csproj",
+            "RoyalIdentity.Storage.EntityFramework.PostgreSql/RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj",
+            "RoyalIdentity.UserAccounts.Sqlite/RoyalIdentity.UserAccounts.Sqlite.csproj",
+            "RoyalIdentity.UserAccounts.PostgreSql/RoyalIdentity.UserAccounts.PostgreSql.csproj",
+        ];
+
+        // ADR-013: this executable is the composition root of two independent module families. Referencing both
+        // provider families applies their migrations; it does not translate core and UserAccounts types and
+        // therefore does not assume the role reserved for RoyalIdentity.UserAccounts.Integration.
+        Assert.Equal(allowedProviders.Length, projectReferences.Count);
+        Assert.All(
+            projectReferences,
+            reference => Assert.Contains(
+                allowedProviders,
+                allowed => reference.EndsWith(allowed, StringComparison.Ordinal)));
+        Assert.DoesNotContain(projectReferences, r => r.EndsWith(
+            "RoyalIdentity/RoyalIdentity.csproj", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.Demo", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, r => r.Contains("Tests.", StringComparison.Ordinal));
     }
 
     [Fact]

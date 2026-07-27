@@ -1,15 +1,15 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fase 1 concluída em 2026-07-27; Fase 2 pendente
+## Status: EM ANDAMENTO - Fases 1-2 concluídas em 2026-07-27; Fase 3 pendente
 
 ## Progresso
 
-`█░░░░░░░░` **11%** - 1 de 9 fases
+`██░░░░░░░` **22%** - 2 de 9 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contrato de configuração e composição | Concluida |
-| Fase 2 - provisionamento externo das três famílias | Pendente |
+| Fase 2 - provisionamento externo das três famílias | Concluida |
 | Fase 3 - composições reais e fail-fast do Server/Demo | Pendente |
 | Fase 4 - fixture SQLite unificada, handles e seeds | Pendente |
 | Fase 5 - migração de login, profile, authorize e token | Pendente |
@@ -756,28 +756,28 @@ combinações dos entry points oficiais, não limitações artificiais do runner
 
 **Tarefas:**
 
-- [ ] Implementar a seleção explícita da família `UserAccounts` no runner escolhido sem acoplá-la ao gateway
+- [x] Implementar a seleção explícita da família `UserAccounts` no runner escolhido sem acoplá-la ao gateway
   `IStorage`.
-- [ ] Estender `StorageFamilySelection`, `StorageMigrationReport` e o resultado/código de saída do runner para
+- [x] Estender `StorageFamilySelection`, `StorageMigrationReport` e o resultado/código de saída do runner para
   representar `UserAccounts` explicitamente, preservando os modos de seed `None|Product|Demo|All`.
-- [ ] Reescrever `MigrationsRunner_ProjectGraph_References_Providers_Only` como allowlist dos providers EF
+- [x] Reescrever `MigrationsRunner_ProjectGraph_References_Providers_Only` como allowlist dos providers EF
   SQLite/PostgreSQL do core e de `UserAccounts`, continuando a proibir Demo e referências diretas a
   `RoyalIdentity/RoyalIdentity.csproj` e `Tests.*`.
-- [ ] Registrar junto do guard a justificativa de ADR-013: o runner é composition root das duas famílias
+- [x] Registrar junto do guard a justificativa de ADR-013: o runner é composition root das duas famílias
   independentes e não traduz tipos entre elas; portanto seu papel não é o adapter `.Integration`.
-- [ ] Aceitar provider uniforme por execução e connection string independente por `DbContext`, conforme DF19,
+- [x] Aceitar provider uniforme por execução e connection string independente por `DbContext`, conforme DF19,
   preferindo secrets por variáveis de ambiente; permitir que as três apontem para o mesmo banco.
-- [ ] Preservar os modos SQLite/PostgreSQL e rejeitar qualquer topologia mixed-provider antes de I/O.
-- [ ] Cobrir no parsing/composição que provider e seed são seleções independentes: não inferir nem rejeitar um modo
+- [x] Preservar os modos SQLite/PostgreSQL e rejeitar qualquer topologia mixed-provider antes de I/O.
+- [x] Cobrir no parsing/composição que provider e seed são seleções independentes: não inferir nem rejeitar um modo
   apenas por ser SQLite/PostgreSQL, preservando as validações próprias dos dados exigidos por cada seed.
-- [ ] Aplicar migrations das famílias selecionadas em ordem documentada, sem transação distribuída.
-- [ ] Retornar status independente por família e preservar códigos de saída não zero em falha parcial.
-- [ ] Manter a única implementação `ConfigurationSeed` com modos `None|Product|Demo|All` idempotentes e separados de
+- [x] Aplicar migrations das famílias selecionadas em ordem documentada, sem transação distribuída.
+- [x] Retornar status independente por família e preservar códigos de saída não zero em falha parcial.
+- [x] Manter a única implementação `ConfigurationSeed` com modos `None|Product|Demo|All` idempotentes e separados de
   migration. Não acoplar modo de seed ao provider: os entry points oficiais selecionam PostgreSQL + Product e
   SQLite + Demo, enquanto o runner continua genérico.
-- [ ] Provar segunda execução idempotente, banco compartilhado e bancos separados em SQLite/PostgreSQL.
-- [ ] Provar que falha na terceira família não reporta rollback inexistente das anteriores.
-- [ ] Atualizar a documentação do(s) runner(s) com comandos que não exponham connection strings/chaves.
+- [x] Provar segunda execução idempotente, banco compartilhado e bancos separados em SQLite/PostgreSQL.
+- [x] Provar que falha na terceira família não reporta rollback inexistente das anteriores.
+- [x] Atualizar a documentação do(s) runner(s) com comandos que não exponham connection strings/chaves.
 
 **Critérios de aceite:** banco vazio pode receber os três schemas somente pelo(s) comando(s) externo(s); execução
 repetida é idempotente; cada família tem resultado identificável; banco compartilhado não colide histories/tabelas;
@@ -795,7 +795,57 @@ dotnet test Tests.Architecture
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Entregáveis:**
+
+- `RoyalIdentity.Migrations` agora seleciona e reporta Configuration, Operational e `UserAccounts` explicitamente,
+  na ordem Configuration → Operational → UserAccounts e sem transação distribuída. A falha de uma família em
+  topologia separada não invalida nem impede as demais; em banco declarado `Shared`, a falha interrompe as
+  seguintes sem alegar rollback.
+- O CLI ganhou `--provider` uniforme, `--user-accounts-connection[-env]` e seleção parcial por lista em
+  `--families`. Cada família selecionada exige sua própria connection string, mesmo quando os três valores apontam
+  para o mesmo banco. `--configuration-provider` permanece somente como alias compatível de `--provider`;
+  seletores de provider por família não existem, tornando mixed-provider irrepresentável.
+- O seed continua sendo a única implementação `ConfigurationSeed`, com `None|Product|Demo|All`, independente do
+  provider e aplicável somente quando Configuration foi selecionada. O runner não cria seed ou write model de
+  `UserAccounts`; o Demo fará isso pelos casos de uso públicos na Fase 3B.
+- `UserAccounts` recebeu a history própria `__UserAccountsMigrationsHistory` em SQLite/PostgreSQL, inclusive nas
+  extensions de DI e factories de design. Isso evita colisão com a history default reservada pelo bootstrap legado
+  de Configuration em banco compartilhado. O runner reloca uma history antiga de `UserAccounts` apenas quando todos
+  os migration ids pertencem ao módulo; history mista/ambígua falha fechado.
+- O grafo de `RoyalIdentity.Migrations` referencia diretamente somente os quatro providers
+  EF/`UserAccounts` SQLite/PostgreSQL. O guard registra a justificativa de ADR-013: o runner é composition root das
+  famílias independentes, não adapter de tradução entre core e módulo.
+- O README do runner documenta banco compartilhado, três bancos, seleção parcial, seeds/protectors e uso de
+  variáveis de ambiente sem secrets na linha de comando. O script PostgreSQL registra o aceite das três famílias.
+  A fixture EF transitória de `Tests.Integration` continua selecionando somente Configuration + Operational até a
+  migração integral da Fase 4.
+
+**Arquivos principais:** `RoyalIdentity.Migrations/MigrationRunnerOptions.cs`,
+`RoyalIdentity.Migrations/StorageMigrationRunner.cs`,
+`RoyalIdentity.Migrations/UserAccountsMigrationsHistoryBootstrap.cs`,
+`RoyalIdentity.Migrations/MigrationRunnerDiagnostics.cs`, `RoyalIdentity.Migrations/README.md`,
+providers SQLite/PostgreSQL de `UserAccounts`,
+`Tests.Storage/Operational/{StorageMigrationRunnerTests,PostgreSqlStorageMigrationRunnerTests}.cs`,
+`Tests.Architecture/ConfigurationStorageBoundaryTests.cs` e `scripts/Test-OperationalPostgreSql.ps1`.
+
+**Verificação:**
+
+- `dotnet build RoyalIdentity.sln --no-restore` — verde, 0 erros; 5 warnings preexistentes de SDK/pacotes.
+- `dotnet test Tests.Storage --filter "FullyQualifiedName~MigrationRunner|FullyQualifiedName~Migration"` —
+  56 aprovados, 0 falhas, 15 PostgreSQL ignorados sem opt-in.
+- `dotnet test Tests.UserAccounts --filter "FullyQualifiedName~Migration"` — 4 aprovados, 0 falhas,
+  1 PostgreSQL ignorado sem opt-in.
+- `dotnet test Tests.Architecture --no-restore` — 51 aprovados, 0 falhas.
+- `scripts/Test-OperationalPostgreSql.ps1 -Filter "FullyQualifiedName~PostgreSqlStorageMigrationRunnerTests"` —
+  2 aprovados contra PostgreSQL 17 real em Podman, cobrindo banco compartilhado e três bancos separados.
+- `scripts/Test-UserAccountsPostgreSql.ps1` — 1 migration acceptance aprovado contra PostgreSQL 17 real,
+  cobrindo a extension de DI e a history dedicada do módulo.
+- Suítes completas: `Tests.Storage` 582 aprovados/39 opt-in ignorados; `Tests.UserAccounts`
+  194 aprovados/1 opt-in ignorado; `Tests.Integration` 282 aprovados, sem falhas.
+
+**Desvios e pendências:** nenhum desvio arquitetural. `RoyalIdentity.Server` continua sem referência ou chamada ao
+runner. Os entry points oficiais PostgreSQL + Product e SQLite + Demo só serão materializados na Fase 3; a Fase 2
+mantém deliberadamente o runner genérico e não antecipa composição de host.
 
 ---
 

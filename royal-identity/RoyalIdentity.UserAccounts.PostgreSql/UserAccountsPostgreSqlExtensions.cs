@@ -22,6 +22,8 @@ public static class UserAccountsPostgreSqlExtensions
     {
         return services
             .AddPostgreWorkContext<UserAccountsPostgreSqlDbContext>(connectionStringName)
+            .ConfigureNpgsqlOptions(options =>
+                options.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
             .ConfigureUserAccounts();
     }
 }

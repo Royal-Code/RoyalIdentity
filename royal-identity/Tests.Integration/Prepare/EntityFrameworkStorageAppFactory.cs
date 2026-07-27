@@ -83,7 +83,9 @@ public sealed class EntityFrameworkStorageAppFactory : AppFactory
         {
             ConfigurationProvider = ConfigurationDatabaseProvider.Sqlite,
             ConfigurationConnection = ConnectionString,
-            Families = StorageFamilySelection.All,
+            Families = StorageFamilySelection.Configuration | StorageFamilySelection.Operational,
+            OperationalConnection = ConnectionString,
+            DatabaseTopology = StorageDatabaseTopology.Shared,
             Seed = ConfigurationSeedMode.Demo,
             KeyProtector = ConfigurationKeyProtector.Aes,
             AesKeyEnvironmentVariable = AesKeyVariable,

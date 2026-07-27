@@ -7,8 +7,9 @@ Verifies Podman, starts the selected machine when necessary, publishes PostgreSQ
 non-default host port, runs the opt-in Operational PostgreSQL suites, and removes the container in finally.
 The Podman machine is deliberately left running because it may be shared by other workloads.
 
-Both storage families share one PostgreSQL server here on purpose: that is the topology the two migrations
-histories of plan-data-operational-storage DF23 exist to keep apart.
+The PostgreSQL storage suites share one server. The Plan 4 runner acceptance creates isolated databases on that
+server and proves Configuration, Operational and UserAccounts both in one shared database and in three separate
+databases, with independent migrations histories.
 
 .EXAMPLE
 ./scripts/Test-OperationalPostgreSql.ps1

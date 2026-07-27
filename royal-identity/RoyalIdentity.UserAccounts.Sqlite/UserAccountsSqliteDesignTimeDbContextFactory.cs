@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using RoyalCode.DomainEvents;
+using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.Infrastructure.Events;
 
 namespace RoyalIdentity.UserAccounts.Sqlite;
@@ -17,7 +18,9 @@ public sealed class UserAccountsSqliteDesignTimeDbContextFactory : IDesignTimeDb
     public UserAccountsSqliteDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<UserAccountsSqliteDbContext>()
-            .UseSqlite("DataSource=design-time.db")
+            .UseSqlite(
+                "DataSource=design-time.db",
+                sqlite => sqlite.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
             .Options;
 
         return new UserAccountsSqliteDbContext(options, NoopDomainEventDispatcher.Instance);

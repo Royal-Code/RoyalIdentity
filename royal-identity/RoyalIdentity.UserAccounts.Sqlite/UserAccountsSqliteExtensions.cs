@@ -22,6 +22,8 @@ public static class UserAccountsSqliteExtensions
     {
         return services
             .AddSqliteWorkContext<UserAccountsSqliteDbContext>(connectionStringName)
+            .ConfigureSqliteOptions(options =>
+                options.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
             .ConfigureUserAccounts();
     }
 
@@ -36,6 +38,8 @@ public static class UserAccountsSqliteExtensions
     {
         return services
             .AddSqliteInMemoryWorkContext<UserAccountsSqliteDbContext>()
+            .ConfigureSqliteOptions(options =>
+                options.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
             .ConfigureUserAccounts()
             .EnsureDatabaseCreated();
     }

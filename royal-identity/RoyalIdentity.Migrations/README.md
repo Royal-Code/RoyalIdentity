@@ -1,51 +1,109 @@
 # RoyalIdentity.Migrations
 
-Runner separado para migrations e seed de Configuration. Ele nunca é chamado por `RoyalIdentity.Server` e
-não aplica nada sem provider e conexão explícitos. O namespace `configuration-*` da CLI deixa a futura conexão
-Operational independente, embora ambas possam apontar para o mesmo banco físico.
+Runner externo e genérico para as três famílias persistentes:
 
-Em ambientes automatizados, prefira fornecer a conexão por variável de ambiente para que ela não apareça na
-linha de comando:
+- Configuration;
+- Operational;
+- UserAccounts.
+
+`RoyalIdentity.Server` não referencia nem executa este projeto. O runner recebe um único provider por execução
+(`sqlite` ou `postgresql`) e uma connection string explícita para cada família selecionada. Não existe combinação
+SQLite + PostgreSQL no mesmo processo.
+
+## SQLite compartilhado
+
+As três chaves continuam explícitas mesmo quando apontam para o mesmo arquivo. `--database-topology shared`
+declara que uma falha deve interromper as famílias seguintes naquele mesmo banco.
 
 ```powershell
 $env:ROYALIDENTITY_CONFIGURATION_DB = 'Data Source=C:\data\royalidentity.db'
+$env:ROYALIDENTITY_OPERATIONAL_DB = 'Data Source=C:\data\royalidentity.db'
+$env:ROYALIDENTITY_USER_ACCOUNTS_DB = 'Data Source=C:\data\royalidentity.db'
+
 dotnet run --project RoyalIdentity.Migrations -- `
-  --configuration-provider sqlite `
-  --configuration-connection-env ROYALIDENTITY_CONFIGURATION_DB
+  --provider sqlite `
+  --families all `
+  --configuration-connection-env ROYALIDENTITY_CONFIGURATION_DB `
+  --operational-connection-env ROYALIDENTITY_OPERATIONAL_DB `
+  --user-accounts-connection-env ROYALIDENTITY_USER_ACCOUNTS_DB `
+  --database-topology shared
 ```
 
-O seed é opcional e separado entre produto e demo. Todo seed exige escolha explícita de protector; `Plain`
-nunca é default:
+Configuration, Operational e UserAccounts mantêm histories distintas. A execução repetida é idempotente e não
+usa transação distribuída entre as famílias. Ao encontrar uma base UserAccounts anterior a esta composição, o
+runner reloca `__EFMigrationsHistory` para `__UserAccountsMigrationsHistory` somente quando todos os ids pertencem
+ao módulo; history mista ou ambígua falha fechado para resolução manual.
+
+## PostgreSQL de produto
+
+O seed é uma seleção independente do provider e grava somente Configuration. `product` exige ao menos um redirect
+administrativo e um protector explícito:
 
 ```powershell
 $env:ROYALIDENTITY_CONFIGURATION_DB = '<connection supplied by deployment secret>'
-$env:ROYALIDENTITY_CONFIGURATION_AES_KEY = '<base64 AES key supplied by KMS or key vault>'
+$env:ROYALIDENTITY_OPERATIONAL_DB = '<connection supplied by deployment secret>'
+$env:ROYALIDENTITY_USER_ACCOUNTS_DB = '<connection supplied by deployment secret>'
+
 dotnet run --project RoyalIdentity.Migrations -- `
-  --configuration-provider postgresql `
+  --provider postgresql `
+  --families all `
   --configuration-connection-env ROYALIDENTITY_CONFIGURATION_DB `
+  --operational-connection-env ROYALIDENTITY_OPERATIONAL_DB `
+  --user-accounts-connection-env ROYALIDENTITY_USER_ACCOUNTS_DB `
+  --database-topology shared `
   --seed product `
   --server-admin-redirect-uri https://admin.example.com/signin-oidc `
   --server-admin-redirect-uri https://admin.example.com/callback `
-  --key-protector aes `
-  --aes-key-env ROYALIDENTITY_CONFIGURATION_AES_KEY
+  --key-protector data-protection `
+  --data-protection-key-ring C:\royalidentity\keys `
+  --data-protection-app-name RoyalIdentity.Configuration
 ```
 
-O seed `product` (e, por consequência, `all`) exige ao menos um
-`--server-admin-redirect-uri`. A opção é repetível, aceita qualquer URI absoluta suportada pelo cliente e não
-possui default implícito: redirects são dados do ambiente e precisam ser escolhidos pelo operador. URLs
-localhost permanecem somente no seed `demo` deste runner.
+No Server oficial, Data Protection é o protector transitório até a futura integração KMS. O key ring precisa ser
+persistente, compartilhado pelas instâncias e protegido em repouso.
 
-Também estão disponíveis `--key-protector plain` (opt-in inseguro, com warning) e
-`--key-protector data-protection`, que exige `--data-protection-key-ring` e aceita
-`--data-protection-app-name`. Em produção, o key ring precisa ser persistente, compartilhado pelas instâncias e
-protegido em repouso.
+## Bancos separados e seleção parcial
 
-`--seed demo` adiciona apenas o realm/clients demo; `--seed all` combina produto e demo. A segunda execução é
-idempotente. O runner retorna `64` para uso inválido, `1` para falha de migration/seed e `0` para sucesso.
+Sem `--database-topology shared`, múltiplas famílias são tratadas como bancos separados. É possível migrar apenas
+uma família ou um subconjunto:
 
-Os protectors são selecionáveis no provisionamento. Trocar o protector de uma base que já contém signing keys
-exige uma migração/reproteção própria; o runner não converte material persistido entre protectors. Essa rotação
-pertence ao futuro plano de KMS.
+```powershell
+$env:ROYALIDENTITY_OPERATIONAL_DB = '<operational connection>'
+$env:ROYALIDENTITY_USER_ACCOUNTS_DB = '<user accounts connection>'
 
-Para produção, os scripts revisáveis em `scripts/sql/configuration/` são o caminho preferido. O futuro Aspire
-executará este runner como workload/container separado dos hosts, conforme `.ai/backlogs/backlog-001.md`.
+dotnet run --project RoyalIdentity.Migrations -- `
+  --provider postgresql `
+  --families operational,user-accounts `
+  --operational-connection-env ROYALIDENTITY_OPERATIONAL_DB `
+  --user-accounts-connection-env ROYALIDENTITY_USER_ACCOUNTS_DB `
+  --database-topology separate
+```
+
+Valores aceitos em `--families`: `configuration`, `operational`, `user-accounts`, uma lista separada por vírgulas,
+ou `all`. A opção antiga `--configuration-provider` permanece aceita como alias de compatibilidade para
+`--provider`, mas não seleciona apenas Configuration.
+
+## Seeds e protectors
+
+Os modos são `none`, `product`, `demo` e `all`. Há uma única implementação de `ConfigurationSeed`; o runner não
+infere seed a partir do provider:
+
+- `--seed demo` adiciona somente o realm e clients do demo;
+- `--seed product` adiciona os realms de produto e exige `--server-admin-redirect-uri`;
+- `--seed all` combina os dois;
+- qualquer seed exige `--key-protector`.
+
+Também estão disponíveis `--key-protector aes` com `--aes-key-env` e `--key-protector plain`. Plain é inseguro,
+exige opt-in e emite warning. Trocar o protector de uma base que já contém signing keys requer
+migração/reproteção própria; o runner não converte material persistido.
+
+Prefira sempre as opções `*-connection-env`. Connections, senhas e chaves não devem aparecer na linha de comando
+nem ser versionadas.
+
+O processo retorna `64` para uso inválido, `1` quando qualquer família falha e `0` quando todas as famílias
+selecionadas concluem. O relatório identifica `Applied`, `Failed`, `Skipped` ou `NotAttempted` por família e nunca
+afirma rollback conjunto.
+
+Para produção, os scripts revisáveis em `scripts/sql/` continuam disponíveis para Configuration e Operational.
+O futuro Aspire executará este runner como workload/container separado dos hosts, conforme
+`.ai/backlogs/backlog-001.md`.

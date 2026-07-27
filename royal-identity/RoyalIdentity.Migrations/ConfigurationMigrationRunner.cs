@@ -55,11 +55,13 @@ public static class ConfigurationMigrationRunner
         switch (options.ConfigurationProvider)
         {
             case ConfigurationDatabaseProvider.Sqlite:
-                await new SqliteMigrationsHistoryBootstrap().RunAsync(options.ConfigurationConnection, ct);
+                await new SqliteMigrationsHistoryBootstrap().RunAsync(
+                    options.ResolvedConfigurationConnection, ct);
                 break;
 
             case ConfigurationDatabaseProvider.PostgreSql:
-                await new PostgreSqlMigrationsHistoryBootstrap().RunAsync(options.ConfigurationConnection, ct);
+                await new PostgreSqlMigrationsHistoryBootstrap().RunAsync(
+                    options.ResolvedConfigurationConnection, ct);
                 break;
 
             default:
@@ -73,13 +75,13 @@ public static class ConfigurationMigrationRunner
             ConfigurationDatabaseProvider.Sqlite => new ConfigurationSqliteDbContext(
                 new DbContextOptionsBuilder<ConfigurationSqliteDbContext>()
                     .UseSqlite(
-                        options.ConfigurationConnection,
+                        options.ResolvedConfigurationConnection,
                         sqlite => sqlite.UseConfigurationMigrationsHistory())
                     .Options),
             ConfigurationDatabaseProvider.PostgreSql => new ConfigurationPostgreSqlDbContext(
                 new DbContextOptionsBuilder<ConfigurationPostgreSqlDbContext>()
                     .UseNpgsql(
-                        options.ConfigurationConnection,
+                        options.ResolvedConfigurationConnection,
                         npgsql => npgsql.UseConfigurationMigrationsHistory())
                     .Options),
             _ => throw new InvalidOperationException("Unsupported Configuration provider."),

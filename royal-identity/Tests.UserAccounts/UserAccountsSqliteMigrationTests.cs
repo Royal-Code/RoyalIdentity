@@ -160,7 +160,11 @@ public class UserAccountsSqliteMigrationTests
     private static async Task<ServiceProvider> BuildMigratedProviderAsync()
     {
         var services = new ServiceCollection();
-        services.AddSqliteInMemoryWorkContext<UserAccountsSqliteDbContext>().ConfigureUserAccounts();
+        services
+            .AddSqliteInMemoryWorkContext<UserAccountsSqliteDbContext>()
+            .ConfigureSqliteOptions(options =>
+                options.MigrationsHistoryTable(UserAccountsDbContext.MigrationsHistoryTableName))
+            .ConfigureUserAccounts();
         var provider = services.BuildServiceProvider();
 
         using var scope = provider.CreateScope();

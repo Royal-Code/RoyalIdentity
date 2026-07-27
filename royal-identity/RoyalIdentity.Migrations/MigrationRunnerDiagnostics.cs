@@ -17,8 +17,7 @@ public static class MigrationRunnerDiagnostics
 
         var sanitized = message;
 
-        // Both connections are redacted: a run may carry two, and a message from the Operational family would
-        // otherwise leak the credentials of a database the Configuration redaction never looks at.
+        // Every selected connection is redacted: failures may originate from any independently owned family.
         foreach (var connection in Connections(options))
             sanitized = Redact(sanitized, connection, out var invalid) is var redacted && invalid
                 ? "A connection string given to the migration runner is invalid."
@@ -34,10 +33,16 @@ public static class MigrationRunnerDiagnostics
         return sanitized;
     }
 
-    /// <summary>The distinct connections this run may have touched — one when both families share a database.</summary>
+    /// <summary>The distinct connections this run may have touched.</summary>
     private static IEnumerable<string> Connections(MigrationRunnerOptions options)
-        => new[] { options.ConfigurationConnection, options.ResolvedOperationalConnection }
+        => new[]
+        {
+            options.ConfigurationConnection,
+            options.OperationalConnection,
+            options.UserAccountsConnection,
+        }
             .Where(connection => !string.IsNullOrWhiteSpace(connection))
+            .Select(connection => connection!)
             .Distinct(StringComparer.Ordinal);
 
     private static string Redact(string message, string connection, out bool invalidConnection)
