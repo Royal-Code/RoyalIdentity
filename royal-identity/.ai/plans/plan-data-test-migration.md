@@ -1,6 +1,6 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: RASCUNHO - decisões de planejamento fechadas em 2026-07-26; implementação não iniciada
+## Status: RASCUNHO - Q13 aberta; implementação não iniciada
 
 ## Progresso
 
@@ -26,6 +26,10 @@
 
 > **Evidência numérica:** todo número medido durante a execução deve ser registrado com o comando exato que o
 > produziu, no mesmo item ou no `Resultado da Fase`; contagem sem comando não fecha critério de aceite.
+
+> **Gate de planejamento:** as Fases 2 e 3 não podem iniciar enquanto Q13 estiver aberta. A resposta deve ser
+> convertida em decisão fechada e nas tarefas/grafo de projetos correspondentes antes da implementação dessas
+> fases.
 
 ---
 
@@ -203,6 +207,75 @@
 - Implementar Aspire/deployment orchestration além do contrato executável de provisionamento — destino:
   `.ai/backlogs/backlog-001.md`.
 - Migrar estado do fake para banco; o fake não é uma fonte durável.
+- Persistir ou administrar `UserAccountsRealmOptions`; este plano entrega apenas a fonte de configuração em runtime
+  definida por DF23.
+
+---
+
+## Perguntas ao humano
+
+### Q13 — Onde deve viver o seed reutilizável de Configuration consumido pelo runner e pelo demo SQLite?
+
+**Por que a decisão é necessária:** DF27 exige que
+`RoyalIdentity.Storage.EntityFramework.Sqlite` migre e semeie Configuration + Operational no demo, mas o seed
+existente está em `RoyalIdentity.Migrations/ConfigurationSeed.cs`. O runner referencia `.Sqlite`; fazer `.Sqlite`
+referenciar o runner criaria ciclo e violaria a fronteira que impede o Server de depender do executável de
+migrations. As fases 2 e 3 não podem fixar a estrutura do seed antes desta resposta.
+
+**Restrições que todas as opções devem preservar:**
+
+- `RoyalIdentity.Server` não referencia nem executa `RoyalIdentity.Migrations`;
+- o processo produtivo não aplica migration/seed; apenas `Development + Demo` usa o initializer opt-in de DF27;
+- Configuration/Operational e `UserAccounts` continuam com owners independentes;
+- signing keys semeadas precisam usar material/protector compatível com o host;
+- produto e demo não podem divergir silenciosamente no conteúdo lógico do seed.
+
+**Opções:**
+
+- **A — Mover o seed para `RoyalIdentity.Storage.EntityFramework`:** colocar modelos, builders e execução
+  provider-neutral do seed em uma pasta de provisionamento do projeto EF base; runner e `.Sqlite` reutilizam a
+  mesma implementação. É a menor mudança sem duplicação, mas o Server passa a carregar transitivamente código de
+  seed pelo provider, embora só o gate `Development + Demo` o execute.
+- **B — Criar `RoyalIdentity.Storage.EntityFramework.Provisioning`:** extrair seed e serviços reutilizáveis para
+  uma biblioteca neutra, referenciada pelo runner e por `.Sqlite`. Dá a fronteira mais explícita e evita referenciar
+  o executável, ao custo de um projeto adicional; se o Server referencia `.Sqlite`, a biblioteca de provisioning
+  também entra transitivamente no binário demo-capable.
+- **C — Separar runner e biblioteca de migrations/provisioning:** manter `RoyalIdentity.Migrations` como executável
+  fino e criar `RoyalIdentity.Migrations.Core` (ou nome equivalente) com seed/orquestração reutilizável.
+  `.Sqlite` referencia apenas a biblioteca. Evita o ciclo e preserva um CLI fino, mas exige deixar inequívoco que a
+  biblioteca não autoriza migrations no startup produtivo.
+- **D — Extrair somente a definição do seed:** mover descritores/builders determinísticos para uma biblioteca
+  inferior e manter executores EF separados no runner e em `.Sqlite`. Compartilha o conteúdo lógico e reduz a
+  superfície transitiva, mas mantém dois caminhos de execução que precisam de testes de paridade.
+- **E — Criar uma biblioteca estreita `RoyalIdentity.DemoData`:** mover apenas o seed demo e seus descritores para
+  um projeto próprio; o seed `Product` permanece no runner. Limita a superfície do demo, mas divide a ownership dos
+  modos de seed e exige provar quais dados são comuns e quais são exclusivos de cada modo.
+- **F — Injetar uma estratégia/delegate de seed na extensão SQLite:** `.Sqlite` provisiona schema/conexões e recebe
+  da composition root uma implementação de seed definida em uma biblioteca demo separada. Mantém o provider
+  independente do conteúdo, mas transforma o bootstrap em protocolo extensível, adiciona uma assembly de
+  composição e deixa de ser literalmente “tudo configurado por `.Sqlite`” sem uma extensão agregadora.
+- **G — Duplicar um seed demo em `.Sqlite`:** manter o seed operacional no runner e criar uma implementação
+  provider-owned reduzida para o demo. É a mudança mais localizada, mas aceita drift; só é admissível com uma
+  especificação compartilhada e testes de paridade obrigatórios.
+- **H — Embutir scripts SQL SQLite para o demo:** `.Sqlite` aplica migrations e scripts versionados próprios.
+  Evita dependência C# no seed do runner, porém duplica materialização/mappings, é sensível a mudanças de schema e
+  complica signing keys protegidas; não serve como implementação compartilhada com PostgreSQL.
+- **I — Distribuir uma imagem SQLite demo pré-provisionada:** gerar/versionar um banco conhecido e copiá-lo ou
+  carregá-lo em memória no startup demo. Torna o startup rápido e sem executor de seed no processo, mas cria um
+  artefato derivado que precisa ser regenerado a cada migration/seed e validado contra drift e material protegido.
+- **J — Criar um host `RoyalIdentity.Demo` separado:** o novo executável referencia o provisioning e hospeda a
+  aplicação em modo demo; o Server produtivo fica estruturalmente sem seed. É a separação binária mais forte, mas
+  adiciona outro host e altera DF27, que hoje prevê o profile demo no host oficial.
+- **K — Compartilhar o arquivo por MSBuild (`Compile Include`/linked source):** compilar o mesmo
+  `ConfigurationSeed.cs` no runner e em `.Sqlite`, sem referência entre projetos. Evita duplicação textual e novo
+  projeto, mas cria acoplamento frágil de build, namespace e dependências; é uma opção de compromisso, não a
+  preferência arquitetural.
+- **L — Gerar código/dados a partir de uma especificação declarativa:** uma source generator ou etapa de build
+  produz os artefatos de seed para runner e demo. Mantém uma única fonte lógica e assemblies independentes, porém
+  introduz tooling e complexidade desproporcionais ao problema atual.
+
+**Impacto da resposta:** substituir esta pergunta por uma decisão fechada, ajustar DF21/DF27 e fixar o grafo de
+projetos e as tarefas das Fases 2-3. Até lá, essas duas fases permanecem bloqueadas.
 
 ---
 
@@ -270,8 +343,11 @@
   `GetPendingMigrations*`, `EnsureCreated*` ou `Migrate*` e não possui readiness específica de schema. Validações
   funcionais já existentes, como snapshot e signing keys utilizáveis, permanecem e podem falhar naturalmente se o
   banco não tiver sido provisionado. Fonte: resposta humana a Q5 e regra histórica do projeto.
-- **DF23 — Options de `UserAccounts` configuráveis por realm:** este plano entrega uma fonte configurável por realm
-  através da composição/adapter, sem criar dependência do módulo puro no core. Fonte: resposta humana a Q7.
+- **DF23 — Options de `UserAccounts` configuráveis por realm:** este plano entrega uma fonte runtime baseada em
+  `IConfiguration`, com defaults globais e overrides indexados pelo `realmId` estável, através da
+  composição/adapter e sem criar dependência do módulo puro no core. A Fase 1 fixa e documenta o shape da seção,
+  fallback e validação; persistência e administração dessas options permanecem diferidas. Fonte: resposta humana a
+  Q7.
 - **DF24 — PostgreSQL sem CI neste plano:** não se cria pipeline de CI. PostgreSQL, por ser o provider produtivo,
   recebe evidência executável local/opt-in de provisionamento, startup e fluxo OIDC; SQLite permanece o provider
   dos testes default. Fonte: resposta humana a Q10.
@@ -280,8 +356,10 @@
   migração de consumidores/composição já determinada por ADR-018, não uma decisão humana adicional sobre
   coexistência de factories. Fonte: resposta humana à antiga Q12, ADR-013 e ADR-018.
 - **DF26 — Desempenho da fixture não é gate humano:** a duração da suíte deve ser medida durante a implementação,
-  mas otimizações de topologia não são decisões de arquitetura deste plano. Começar pela composição SQLite isolada
-  mais simples e otimizar somente se a medição demonstrar regressão material. Fonte: resposta humana à antiga Q11.
+  mas otimizações de topologia não são decisões de arquitetura deste plano. A Fase 4 registra protocolo, baseline e
+  um limiar numérico de regressão material antes da migração em massa; a Fase 6 repete o mesmo protocolo e compara o
+  resultado ao limiar. Começar pela composição SQLite isolada mais simples e otimizar somente quando a medição
+  ultrapassar esse limite. Fonte: resposta humana à antiga Q11.
 - **DF27 — Demo SQLite self-provisioned:** `RoyalIdentity.Storage.EntityFramework.Sqlite` expõe um extension method
   opt-in que registra e provisiona tudo que pertence a Configuration + Operational para um demo SQLite in-memory,
   incluindo conexões keep-alive, migrations e seed, antes do tráfego. Esta é uma exceção explícita a DF8/DF22,
@@ -301,8 +379,17 @@
   `RoyalIdentity/Extensions/ApplicationBuilderExtensions.cs` um `UseRoyalIdentityProtocol(...)` provider-neutral,
   limitado a realm discovery, realm CORS, authentication, authorization e mapeamento dos endpoints OIDC. Error
   handling, UI/Razor, static files, antiforgery específico e endpoints `/test/*` permanecem em cada `Program`.
+  O extension exige que o caller já tenha instalado routing e não possui antiforgery/UI; cada host instala esses
+  elementos na ordem documentada ao redor dele. Depois da Fase 4, `Tests.Host` é somente infraestrutura para
+  `WebApplicationFactory`, não um executável standalone sem factory/storage.
   Não criar `RoyalIdentity.Hosting`, bootstrap geral compartilhado nem referência de `Tests.Host` ao
   `RoyalIdentity.Server`. Fonte: resposta humana a Q8.
+- **DF30 — Consumers atômicos sem indireção vazia:** depois de DF28,
+  `IAuthorizationCodeConsumer`/`DefaultAuthorizationCodeConsumer` e
+  `IRefreshTokenConsumer`/`DefaultRefreshTokenConsumer` seriam apenas delegações sem política própria; por isso são
+  removidos. `LoadCode` chama diretamente o `IAuthorizationCodeStore` realm-bound, e `RefreshTokenHandler` chama
+  diretamente o `IRefreshTokenStore` realm-bound. A tolerância pós-consumo de refresh permanece no handler, onde já
+  está implementada; esta remoção não altera sua semântica. Fonte: revisão do uso atual após DF28.
 
 ---
 
@@ -324,6 +411,14 @@
 - Q9 foi fechada por DF28 com contratos base fortes.
 - Q8 foi fechada por DF29 com A: `Tests.Host` independente e somente o pipeline protocolar provider-neutral
   extraído no core. B foi descartada; C não cria uma abstração de hosting própria.
+
+**2026-07-26 (revisão do plano):**
+
+- Q13 foi aberta porque o seed atual está no runner, que já referencia `.Sqlite`; a extensão demo não pode
+  reutilizá-lo por referência inversa sem criar ciclo. A questão enumera as famílias de solução e bloqueia somente
+  as Fases 2-3.
+- Os demais achados válidos foram incorporados em DF23/DF26/DF29/DF30 e nas tarefas, critérios, invariantes e riscos
+  correspondentes.
 
 **Pré-plano (direção do fake):**
 
@@ -369,8 +464,10 @@
 - `IConfigurationSnapshotRefresher`: é chamado pela fixture depois de writes de Configuration e antes do request
   que consome os dados.
 - `IConfigurationResourceSource`: continua sendo a rota volátil explícita de resources/scopes em host/fixtures.
-- Topologia da fixture: começa com SQLite in-memory isolado por factory e conexão keep-alive própria por
-  `DbContext`; seu custo é medido, não convertido em gate arquitetural antecipado.
+- Topologia da fixture: começa com SQLite in-memory isolado por factory. Configuration e Operational usam o mesmo
+  banco nomeado/keep-alive para preservar a cobertura HTTP da topologia compartilhada, embora cada `DbContext`
+  mantenha registro e connection string explícitos; `UserAccounts` usa banco/keep-alive separado, conforme sua
+  ownership. As três histories continuam independentes. O custo é medido conforme DF26.
 - Composição dos testes: cada composition root registra exatamente uma implementação dos contratos do IdP. A
   composição legada existe apenas enquanto seus consumidores ainda não migraram e é excluída com eles, conforme
   DF25.
@@ -454,6 +551,9 @@ RoyalIdentity/
   casos de uso com mutação de entidades vivas.
 - O processo web produtivo não escreve schema nem seed; somente o profile `Development + Demo` executa os
   initializers provider-owned de DF27 antes do tráfego.
+- `UseRoyalIdentityProtocol(...)` é chamado somente depois de `UseRouting`; instala realm discovery antes de
+  authentication e não instala UI/antiforgery. Cada host adiciona seu antiforgery/UI depois do pipeline protocolar
+  na ordem documentada.
 
 ### Triagem obrigatória de divergências
 
@@ -484,8 +584,8 @@ do backing.
 - Não há dual-write, import/export de dictionaries nem compatibilidade de dados com processos in-memory anteriores.
 - Hosts produtivos devem executar o runner antes do novo binário; o Server nunca corrige schema produtivo. O
   bootstrap in-memory de DF27 é exclusivo do profile demo.
-- Medir o tempo da suíte antes/depois da migração e registrar os comandos; otimização de fixture só entra se os
-  números demonstrarem regressão material.
+- Medir o tempo da suíte antes/depois da migração com o mesmo protocolo; baseline, limiar numérico e comandos são
+  registrados na Fase 4, e otimização de fixture só entra quando a Fase 6 ultrapassar esse limiar.
 - O fechamento PostgreSQL é local/opt-in conforme DF24; CI não faz parte deste plano.
 
 ---
@@ -537,9 +637,16 @@ estar testada.
 - [ ] Alterar `AddHostServices`/entry point escolhido para receber `IConfiguration` e ambiente explicitamente.
 - [ ] Criar `UseRoyalIdentityProtocol(...)` no core com o limite exato de DF29; manter UI, error handling,
   static files, antiforgery específico e endpoints test-only fora do extension.
+- [ ] Documentar no XML/API do extension e provar nos dois hosts a precondição `UseRouting` antes da chamada, a
+  ordem interna `UseRealmDiscovery` antes de authentication e a responsabilidade do caller por UI/antiforgery
+  depois do pipeline protocolar.
 - [ ] Fazer `RoyalIdentity.Server.Program` e `Tests.Host.Program` chamarem o extension, preservando os dois
   composition roots e seus complementos próprios.
-- [ ] Entregar a fonte configurável por realm de `UserAccounts` na composição/adapter, preservando o módulo puro.
+- [ ] Fixar e documentar a seção de `IConfiguration` para defaults globais e overrides de
+  `UserAccountsRealmOptions` por `realmId`; entregar o resolver na composição/adapter, preservar o módulo puro e
+  validar options inválidas antes do tráfego.
+- [ ] Cobrir dois realms com overrides distintos, fallback de realm sem override para os defaults e rejeição de
+  configuração inválida, sem introduzir persistência/admin.
 - [ ] Não adicionar options, serviços ou validators que consultem estado de migrations.
 - [ ] Substituir guards que hoje proíbem qualquer referência EF no Server por guards que permitam adapters/providers
   e continuem proibindo `Data.*`, `Migrations` e dependências inversas.
@@ -550,7 +657,8 @@ estar testada.
 profile produtivo; cleanup ou Data Protection ausentes/ambíguos falham antes de servir requests; nenhum erro contém
 secret; options de `UserAccounts` variam por realm sem acoplar o módulo ao core; não existe inspeção de migrations;
 Server e `Tests.Host` usam `UseRoyalIdentityProtocol(...)` sem compartilhar seus `Program`; `Tests.Host` não
-referencia `RoyalIdentity.Server`; os guards arquiteturais refletem DF3/DF15/DF21/DF22/DF29.
+referencia `RoyalIdentity.Server`; routing, realm discovery, authentication e antiforgery respeitam as
+precondições documentadas; os guards arquiteturais refletem DF3/DF15/DF21/DF22/DF29.
 
 **Testes:**
 
@@ -568,7 +676,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostConfiguration"
 
 ## Fase 2 - provisionamento externo das três famílias
 
-**Depende de:** Fase 1, DF8, DF9, DF12, DF14, DF15, DF17-DF21.
+**Depende de:** Fase 1, DF8, DF9, DF12, DF14, DF15, DF17-DF21 e resposta de Q13.
 
 **Escopo:** `RoyalIdentity.Migrations` e/ou runner da família `UserAccounts`, providers de `UserAccounts`, seeds,
 scripts/README e testes de migration.
@@ -579,6 +687,8 @@ do demo SQLite pertence a DF27 e não altera o runner produtivo.
 
 **Tarefas:**
 
+- [ ] Aplicar a decisão de Q13 ao grafo de projetos antes de mover ou duplicar qualquer seed; registrar os testes de
+  paridade exigidos pela opção escolhida.
 - [ ] Implementar a seleção explícita da família `UserAccounts` no runner escolhido sem acoplá-la ao gateway
   `IStorage`.
 - [ ] Reescrever `MigrationsRunner_ProjectGraph_References_Providers_Only` como allowlist dos providers EF
@@ -618,10 +728,10 @@ dotnet test Tests.Architecture
 
 ## Fase 3 - composição real e fail-fast do Server
 
-**Depende de:** Fases 1-2, DF3, DF4, DF8-DF13, DF15 e DF17-DF23, DF27.
+**Depende de:** Fases 1-2, DF3, DF4, DF8-DF13, DF15, DF17-DF23, DF27 e resposta de Q13.
 
 **Escopo:** `RoyalIdentity.Server`, providers EF, `.Integration`/providers de `UserAccounts`, startup validators,
-appsettings de exemplo e testes de host.
+appsettings de exemplo, `Tests.Architecture` e testes de host.
 
 **O que/como:** trocar `AddInMemoryStorage()` pela composição integral. Registrar Data Protection, contexts
 Configuration/Operational, snapshot, resource bridge, Operational/profiles, cleanup, protector de signing keys,
@@ -631,6 +741,12 @@ conforme DF22.
 **Tarefas:**
 
 - [ ] Referenciar no Server apenas adapters/providers permitidos por DF17/DF18.
+- [ ] Adicionar em `Tests.Architecture` um teste default e sem I/O que monte a composição real do Server com
+  Configuration, Operational e `UserAccounts` PostgreSQL e construa o provider com `ValidateOnBuild = true` e
+  `ValidateScopes = true`, sem iniciar hosted services nem abrir conexão.
+- [ ] No teste do grafo produtivo, provar resolução única de `IStorage`/`IUserDirectory` e ausência de initializer
+  SQLite demo, runner ou serviço que execute migration/seed; permitir referência de teste ao Server somente para
+  exercitar essa composition root.
 - [ ] Configurar ASP.NET Data Protection e o protector de signing keys compatível com o provisionamento, preservando
   DF20 e a futura substituição por KMS.
 - [ ] Registrar contexts Configuration/Operational com histories corretas para o(s) provider(s) selecionado(s).
@@ -659,13 +775,14 @@ conforme DF22.
 EF e um `IUserDirectory` de `UserAccounts`; configuração inválida falha antes de aceitar request; o projeto não
 referencia InMemory/Migrations/Data; não há migration/seed no processo produtivo; a única exceção é o initializer
 provider-owned do profile SQLite demo definido em DF27; o demo inicia de banco vazio e conclui um fluxo OIDC com
-conta real; resource bridge segue DF13.
+conta real; resource bridge segue DF13; a composição PostgreSQL completa é construída por teste default com
+validação de scopes/build, sem I/O, e não contém serviços de bootstrap demo.
 
 **Testes:**
 
 ```powershell
 dotnet build RoyalIdentity.Server/RoyalIdentity.Server.csproj
-dotnet test Tests.Architecture
+dotnet test Tests.Architecture --filter "FullyQualifiedName~ServerPostgreSqlComposition|FullyQualifiedName~ModuleBoundary"
 dotnet test Tests.Integration --filter "FullyQualifiedName~HostComposition|FullyQualifiedName~HostStartup|FullyQualifiedName~SqliteDemo"
 ```
 
@@ -683,20 +800,30 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~HostComposition|Fully
 Configuration/Operational e resource bridge test-only.
 
 **O que/como:** criar uma factory integral SQLite in-memory com Configuration + Operational migrados e
-`UserAccounts` real. Cada `DbContext` recebe connection string/keep-alive isolados. Expor dados por handles neutros
-e operações explícitas de setup; não substituir um acesso ao fake por outro static global.
+`UserAccounts` real. Configuration e Operational compartilham o mesmo banco SQLite nomeado da factory, com
+connection strings/registrations explícitos e histories distintas; `UserAccounts` usa banco/keep-alive separado.
+Expor dados por handles neutros e operações explícitas de setup; não substituir um acesso ao fake por outro static
+global.
 
 **Tarefas:**
 
 - [ ] Medir e registrar, com comando e ambiente, o tempo da suíte `Tests.Integration` ainda fake e o startup
-  cold/warm da factory persistente; a medição informa otimizações posteriores, sem bloquear o desenho.
+  cold/warm da factory persistente. Usar warm-up e três execuções `--no-build`, registrar cada valor e a mediana.
+- [ ] Fixar no `Resultado da Fase 4`, antes da migração em massa, um limiar numérico de regressão material e sua
+  justificativa; a comparação da Fase 6 usa exatamente o mesmo protocolo e ambiente comparável.
 - [ ] Manter `Tests.Host.Program` como composition root independente conforme DF29; remover
   `AddInMemoryStorage()` e sua referência ao projeto fake, deixando o projeto storage-agnóstico.
+- [ ] Remover ou substituir os launch profiles de `Tests.Host` que o apresentam como executável standalone e
+  atualizar qualquer script/documentação equivalente; depois desta fase o projeto só inicia por uma
+  `WebApplicationFactory` que registra o backing antes do startup.
 - [ ] Fazer cada factory registrar diretamente uma única implementação dos contratos do IdP. Enquanto houver
   consumers legados, sua factory registra explicitamente o fake; a persistente registra EF + `UserAccounts`.
 - [ ] Fazer a factory persistente construir o service provider com `ValidateScopes` e `ValidateOnBuild`.
-- [ ] Criar uma conexão SQLite in-memory nomeada e keep-alive própria para cada `DbContext`/factory, aplicar as
-  migrations pelo runner de teste antes do host e manter as conexões abertas até o teardown.
+- [ ] Criar por factory um banco SQLite in-memory nomeado/keep-alive compartilhado por Configuration e Operational;
+  registrar connection string própria em cada `DbContext`, aplicar suas migrations/histories distintas antes do
+  host e manter a conexão aberta até o teardown.
+- [ ] Criar outro banco SQLite in-memory/keep-alive para `UserAccounts`, preservando sua ownership e migrations
+  próprias.
 - [ ] Registrar Configuration + Operational EF, `UserAccounts` SQLite e cleanup `External` na fixture.
 - [ ] Usar protectors determinísticos test-only sem variável de ambiente process-global compartilhada.
 - [ ] Semear Configuration demo/teste, Alice/Bob e property scopes por owner correto.
@@ -718,7 +845,9 @@ e operações explícitas de setup; não substituir um acesso ao fake por outro 
 Alice/Bob mantêm subjects determinísticos; writes de client são visíveis após refresh; resources usam a bridge;
 duas fixtures não compartilham DB mutável, env var ou handle estático; nenhum handle contém `Realm`; captive
 dependencies falham durante a construção; um fluxo OIDC completo passa; baseline e startup cold/warm estão
-registrados. `Tests.Host` não registra nem referencia qualquer backing.
+registrados com protocolo, mediana e limiar numérico. `Tests.Host` não registra nem referencia qualquer backing e
+não oferece launch profile standalone; a suíte HTTP cobre Configuration + Operational no mesmo banco com histories
+distintas e `UserAccounts` em banco separado.
 
 **Testes:**
 
@@ -809,14 +938,17 @@ factory integral como única composição canônica das 29 classes.
   registrar no resultado as contagens esperada e executada.
 - [ ] Classificar e registrar toda asserção alterada nos quatro buckets de triagem.
 - [ ] Executar toda a suíte HTTP sobre o novo default antes de tocar nos contratos atômicos.
-- [ ] Medir, no mesmo ambiente/protocolo do baseline da Fase 4, a duração da suíte persistente completa, registrar
-  a diferença e otimizar somente se houver regressão material demonstrada.
+- [ ] Medir, no mesmo ambiente/protocolo da Fase 4, warm-up e três execuções `--no-build` da suíte persistente
+  completa; registrar cada valor, mediana, razão contra o baseline e comparação com o limiar numérico fixado.
+- [ ] Se a mediana ultrapassar o limiar, tratar ou aceitar explicitamente a regressão com causa/evidência antes de
+  fechar a fase; abaixo do limiar, não criar otimização especulativa.
 
 **Critérios de aceite:** as 29 classes antes ligadas a `AppFactory` executam sobre EF + `UserAccounts`; não existem
 factories parciais; `Tests.Integration` não contém uso de `MemoryStorage`, getters do fake ou mutação de dictionary;
 todos os filtros executam ao menos um teste e têm suas contagens registradas; toda mudança de asserção está
 classificada; a comparação de duração está registrada; todos os fluxos e caracterizações permanecem verdes; os
-fallbacks ainda não foram ampliados nem acionados pelo EF; a referência temporária ao projeto fake foi removida.
+fallbacks ainda não foram ampliados nem acionados pelo EF; a referência temporária ao projeto fake foi removida; a
+mediana observada está dentro do limiar numérico da Fase 4 ou possui tratamento/aceite explícito registrado.
 
 **Testes:**
 
@@ -884,9 +1016,9 @@ dotnet test Tests.Architecture
 
 ## Fase 8 - remoção da transição e exclusão do fake
 
-**Depende de:** Fase 7, DF6, DF7 e DF28.
+**Depende de:** Fase 7, DF6, DF7, DF28 e DF30.
 
-**Escopo:** contratos/consumers do core, adapter EF Operational, shape tests, solução e
+**Escopo:** contratos/stores/handlers do core, adapter EF Operational, shape tests, solução e
 `RoyalIdentity.Storage.InMemory`.
 
 **O que/como:** aplicar a quebra pública definida em DF28 e excluir o fake no mesmo corte. O código intermediário não
@@ -897,11 +1029,16 @@ fase.
 
 - [ ] Tornar consumo de authorization code single-use uma dependência obrigatória de compilação.
 - [ ] Tornar transição de refresh token versionada/condicional uma dependência obrigatória de compilação.
-- [ ] Remover casts, capability detection, logging de fallback e get-then-remove do
-  `DefaultAuthorizationCodeConsumer`.
-- [ ] Remover casts, fallback não condicional e `IRefreshTokenStore.UpdateAsync`.
+- [ ] Fazer `LoadCode` consumir diretamente o `IAuthorizationCodeStore` realm-bound e remover
+  `IAuthorizationCodeConsumer`, `DefaultAuthorizationCodeConsumer`, seus registros, casts, logging de fallback e
+  get-then-remove.
+- [ ] Fazer `RefreshTokenHandler` consumir diretamente o `IRefreshTokenStore` realm-bound e remover
+  `IRefreshTokenConsumer`, `DefaultRefreshTokenConsumer`, seus registros, casts, fallback não condicional e
+  `IRefreshTokenStore.UpdateAsync`.
 - [ ] Remover `ISingleUseAuthorizationCodeStore`, `IVersionedRefreshTokenStore` e composites redundantes conforme
   DF28.
+- [ ] Preservar no `RefreshTokenHandler` a tolerância pós-consumo existente e provar que a retirada da indireção não
+  altera sua janela/política.
 - [ ] Atualizar adapter EF, mocks/doubles locais e testes de shape para o contrato final.
 - [ ] Preservar testes concorrentes de code single-use e refresh transition/tolerance.
 - [ ] Remover `AddInMemoryStorage`, extensões, facades e todos os arquivos de
@@ -909,8 +1046,9 @@ fase.
 - [ ] Remover o projeto da solução, props/referências e guards históricos restantes.
 - [ ] Executar busca estática em código/projetos/solução para provar ausência do fake e dos fallbacks.
 
-**Critérios de aceite:** nenhum consumer possui ramo não atômico; `IRefreshTokenStore.UpdateAsync` não existe; a
-composição EF satisfaz os contratos em compile time; nenhuma referência, símbolo ou projeto InMemory permanece em
+**Critérios de aceite:** nenhum handler possui ramo não atômico; as duas interfaces/classes consumer e
+`IRefreshTokenStore.UpdateAsync` não existem; handlers dependem dos stores base realm-bound; a composição EF
+satisfaz os contratos em compile time; nenhuma referência, símbolo ou projeto InMemory permanece em
 código/csproj/solução; concorrência e tolerância mantêm as semânticas fechadas.
 
 **Testes:**
@@ -923,7 +1061,7 @@ dotnet test Tests.Integration
 dotnet test Tests.UserAccounts
 dotnet test Tests.Architecture
 rg -n "RoyalIdentity\.Storage\.InMemory|AddInMemoryStorage|MemoryStorage|RealmMemoryStore" . -g "*.cs" -g "*.csproj" -g "*.sln" -g "!old-is4/**"
-rg -n "ISingleUseAuthorizationCodeStore|IVersionedRefreshTokenStore|fallback|UpdateAsync" RoyalIdentity/Contracts RoyalIdentity.Storage.EntityFramework Tests.Storage
+rg -n "ISingleUseAuthorizationCodeStore|IVersionedRefreshTokenStore|IAuthorizationCodeConsumer|IRefreshTokenConsumer|DefaultAuthorizationCodeConsumer|DefaultRefreshTokenConsumer|fallback|UpdateAsync" RoyalIdentity/Contracts RoyalIdentity.Storage.EntityFramework Tests.Storage
 ```
 
 Para as duas buscas `rg`, o resultado esperado deve ser documentado na fase: zero para símbolos removidos; menções
@@ -937,7 +1075,7 @@ legítimas a `UpdateAsync` não relacionadas a refresh ou a texto histórico dev
 
 ## Fase 9 - PostgreSQL, regressão final e fechamento documental
 
-**Depende de:** Fase 8, DF1-DF29.
+**Depende de:** Fase 8, DF1-DF30 e Q13 já convertida em decisão fechada.
 
 **Escopo:** aceites PostgreSQL, suíte completa, `ADR-018`, foundations, roadmap/macro, backlog, README de migrations,
 `AGENTS.md` e este plano.
@@ -959,13 +1097,18 @@ toda documentação ao estado real. Não criar CI nem marcar conclusão com test
   item real.
 - [ ] Atualizar README/scripts do provisionamento com provider, três famílias, protection, cleanup e experiência
   demo decididos.
+- [ ] Explicitar no README do demo que o SQLite in-memory é efêmero: cada restart perde usuários, consents, tokens
+  e sessões, portanto esse profile não serve para avaliação persistente.
 - [ ] Confirmar que documentação histórica não é apresentada como instrução vigente.
 - [ ] Preencher `Resultado da Fase` de todas as fases, riscos, desvios e pendências.
+- [ ] Remover a seção `Perguntas ao humano` depois que Q13 estiver refletida em decisão fechada, histórico, tarefas e
+  grafo de projetos.
 - [ ] Marcar o plano `CONCLUIDO` e atualizar a barra somente após todas as decisões e gates de aceite.
 
 **Critérios de aceite:** evidência PostgreSQL cumpre DF24; solução completa verde; nenhuma instrução vigente indica
 InMemory como default; ADR-018 registra a consequência já realizada; documentação operacional permite provisionar e
-iniciar o host sem secret em linha de comando; todas as decisões fechadas foram aplicadas.
+iniciar o host sem secret em linha de comando; o README não sugere durabilidade no demo in-memory; Q13 foi
+convertida em decisão e não restam perguntas abertas; todas as decisões fechadas foram aplicadas.
 
 **Testes:**
 
@@ -990,7 +1133,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Objetivo 1 — Server integral sem fake | 1-3 | DF3, DF4, DF8-DF13, DF15, DF17-DF23, DF27 | exatamente um gateway EF e um `IUserDirectory` real; demo SQLite isolado da composição produtiva | `HostConfiguration`, `HostComposition`, `HostStartup`, `Tests.Architecture` |
 | Objetivo 2 — provisionamento externo | 1-3 | DF8, DF9, DF11, DF12, DF15, DF17-DF22, DF27 | três schemas externos; exceção SQLite demo provider-owned e environment-gated | testes de migration/runner e startup |
 | Objetivo 3 — testes default reais | 4-6 | DF2, DF5, DF13, DF14, DF16, DF25, DF26, DF29 | 29 consumers sobre factory integral; zero uso do fake em `Tests.Integration`; `Tests.Host` permanece independente | grupos HTTP + `--list-tests` + `dotnet test Tests.Integration` |
-| Objetivo 4 — remover transição/fake | 7-8 | DF6, DF7, DF28 | atomicidade obrigatória nos contratos base; zero fallback/projeto/referência fake | `Tests.Identity`, `Tests.Storage`, concorrência e buscas `rg` |
+| Objetivo 4 — remover transição/fake | 7-8 | DF6, DF7, DF28, DF30 | atomicidade obrigatória nos contratos base; handlers chamam stores realm-bound; zero consumer vazio/fallback/projeto/referência fake | `Tests.Identity`, `Tests.Storage`, concorrência e buscas `rg` |
 | Objetivo 5 — paridade e fechamento | 9 | DF1, DF2, DF16, DF24 | aceite PostgreSQL local cumprido, solução/doc normativa verde | script PostgreSQL + `dotnet test RoyalIdentity.sln` |
 
 ---
@@ -1027,19 +1170,26 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 25. Toda mudança de asserção durante a migração possui classificação e evidência nos quatro buckets de triagem.
 26. `Tests.Host` não referencia nem executa `RoyalIdentity.Server`; ambos compartilham somente extensions
     provider-neutral e contracts/providers explicitamente selecionados.
+27. Depois da Fase 4, `Tests.Host` só inicia por factory que fornece storage; nenhum launch profile o anuncia como
+    host standalone.
+28. Configuration e Operational compartilham o banco SQLite da fixture HTTP, com histories distintas;
+    `UserAccounts` conserva banco/ownership próprios.
 
 ---
 
 ## Critérios globais de conclusão
 
-- DF17-DF29 foram aplicadas e eventuais desvios estão registrados nos resultados das fases.
+- DF17-DF30 foram aplicadas, Q13 foi convertida em decisão fechada e eventuais desvios estão registrados nos
+  resultados das fases.
 - `RoyalIdentity.Server` inicia sobre a composição persistente decidida e não oferece fallback in-memory.
 - As três famílias são provisionáveis externamente em produção; o host produtivo não contém inspeção ou execução
   de migrations, e somente o demo in-memory possui a exceção DF27.
 - `Tests.Integration` roda integralmente sobre EF/SQLite + `UserAccounts`.
-- A duração antes/depois da suíte está registrada com comandos e não sofreu regressão material sem tratamento.
+- A duração antes/depois da suíte está registrada com protocolo, comandos, medianas e limiar numérico; o resultado
+  final está dentro desse limiar ou possui tratamento/aceite explícito.
 - Nenhum código de teste resolve `MemoryStorage`, `RealmMemoryStore` ou stores concretos do fake.
-- Nenhum consumer detecta capability atômica opcional ou executa fallback não atômico.
+- Nenhum handler detecta capability atômica opcional ou executa fallback não atômico; as indireções consumer vazias
+  de code/refresh foram removidas.
 - `RoyalIdentity.Storage.InMemory` não existe na solução nem no grafo de projetos.
 - Resources/scopes continuam pela bridge e nenhuma semântica fechada na matriz foi reaberta.
 - O aceite PostgreSQL local/opt-in definido em DF24 está verde e registrado; nenhuma CI foi criada por este plano.
@@ -1058,12 +1208,15 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Demo deixa de autenticar | initializer core roda sem accounts/resources do módulo | `dotnet run` parece funcional, mas login/authorize falha | DF27, composição das duas extensões provider-owned e fluxo OIDC completo | Aberto |
 | Exceção demo vaza para produção | profile/ambiente não é validado antes do initializer | processo produtivo altera schema/seed | exigir simultaneamente `Development` + `Demo`, teste negativo em PostgreSQL e ausência do initializer fora desse gate | Aberto |
 | Provider SQLite do core absorve `UserAccounts` | extension demo tenta possuir migrations/seed de contas | viola ADR-013/ADR-015 e acopla famílias independentes | extensão core provisiona somente Configuration/Operational; composição chama a extensão própria de `UserAccounts.Sqlite` | Aberto |
+| Seed do demo cria ciclo ou drift | Q13 é implementada sem fechar o owner/grafo | Server passa a depender do runner ou demo diverge do seed operacional | bloquear Fases 2-3 até Q13, aplicar a opção escolhida e seus testes de paridade | Aberto |
 | Histories colidem em banco compartilhado | terceira família usa nome/schema incompatível | migrations são ignoradas ou reaplicadas | teste same-database e history explícita por owner | Aberto |
 | Snapshot não reflete setup | helper grava client e não publica refresh | testes falham ou exercitam dados antigos | helper único + `IConfigurationSnapshotRefresher` obrigatório | Aberto |
 | Estado global contamina fixtures | env AES estática, arquivo ou connection compartilhada | flakiness/paralelismo inseguro | material/lifetime por fixture e teste com duas factories | Aberto |
-| Topologia persistente degrada a suíte | migrations/seed se repetem nas factories | feedback local fica mais lento | medir nas Fases 4/6 e otimizar somente com evidência, conforme DF26 | Aberto |
+| Topologia persistente degrada a suíte | migrations/seed se repetem nas factories | feedback local fica mais lento | baseline, três medições, mediana e limiar numérico nas Fases 4/6 conforme DF26 | Aberto |
 | Composição resolve backing incorreto | duas implementações dos mesmos contratos são registradas | teste passa pelo storage errado | `Tests.Host` agnóstico, registro explícito por factory e validação de resolução | Aberto |
 | Extension protocolar vira bootstrap geral | `UseRoyalIdentityProtocol` passa a registrar storage, UI ou endpoints test-only | hosts deixam de ser composition roots independentes | limite de DF29 + guard contra referências a Server/providers/Razor no extension | Aberto |
+| Ordem de middleware é usada incorretamente | host chama o extension antes de routing ou mistura antiforgery/UI dentro dele | realm discovery/authentication ou endpoints falham | precondições XML, ordem explícita nos dois Programs e testes de composição | Aberto |
+| `Tests.Host` parece executável mas não possui storage | launch profile antigo inicia o projeto fora de uma factory | snapshot hosted service falha no startup | remover/substituir profiles e documentar uso exclusivo por `WebApplicationFactory` | Aberto |
 | Live references são reproduzidas em outro seam | setup altera entidade EF diretamente | teste deixa de representar comportamento real | features do módulo ou hook test-only explícito | Aberto |
 | Handle estático mascara options/realm atual | fixture carrega `Realm` no handle e o reutiliza entre composições | teste lê estado/options fora do snapshot corrente | handles primitivos, carga por store/snapshot e guard estático | Aberto |
 | Resource bridge é “resolvida” com persistência acidental | cenário precisa adicionar/remover resource | quebra DF13 e antecipa redesign | source volátil da fixture + guard de arquitetura | Aberto |
@@ -1090,6 +1243,8 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 - Orquestração Aspire e deployment workloads — destino: `.ai/backlogs/backlog-001.md`.
 - Lock distribuído para cleanup Hosted — destino: backlog operacional, se métricas demonstrarem necessidade.
 - API/UI administrativa e gerenciamento de realms/clients/users — destino: roadmap administrativo.
+- Persistência e administração de `UserAccountsRealmOptions` — este plano entrega somente configuração runtime por
+  defaults + overrides de realm; armazenamento durável e UI/API ficam para o roadmap administrativo.
 
 ---
 
