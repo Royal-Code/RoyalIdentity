@@ -328,9 +328,12 @@
   transitivo e podem acompanhar o artefato publicado do Demo. Essa consequência da reutilização do runner é aceita:
   o projeto Demo não possui `ProjectReference` direto, uso em source, configuração nem registro de DI para
   PostgreSQL ou `Data.*`, e nunca seleciona/executa PostgreSQL. Providers SQLite não passam a possuir seed nem outra
-  família. Esta é uma exceção explícita a DF8/DF22 porque ocorre em outro produto executável, nunca no host
-  produtivo. Fonte: respostas humanas a Q6/Q13, escolha da opção 1, decisão de aceitar a dependência transitiva e
-  caminho já exercitado por `Tests.Integration`.
+  família. O modo Demo cria deliberadamente somente `demo_realm`, seus clients, resources, contas e signing keys;
+  não cria os realms internos `server`, `account` e `admin` do modo Product. Não usar `All`: além de misturar
+  finalidades, ele exigiria `serverAdminRedirectUris` e quebraria a experiência sem configuração. Esta é uma exceção
+  explícita a DF8/DF22 porque ocorre em outro produto executável, nunca no host produtivo. Fonte: respostas humanas
+  a Q6/Q13, escolha da opção 1, decisão de aceitar a dependência transitiva e caminho já exercitado por
+  `Tests.Integration`.
 - **DF28 — Contratos atômicos incorporados aos contratos base:** `ConsumeAuthorizationCodeAsync` entra em
   `IAuthorizationCodeStore`; `TryConsumeAsync`/`TryUpdateAsync` entram em `IRefreshTokenStore`;
   `ISingleUseAuthorizationCodeStore`, `IVersionedRefreshTokenStore` e `IRefreshTokenStore.UpdateAsync` são
@@ -401,6 +404,8 @@
   mas o Demo não possui referência direta, uso, configuração, registro ou execução desses providers.
 - O runner permanece genérico: provider uniforme e modo de seed são seleções independentes; apenas os entry points
   oficiais fixam PostgreSQL + Product e SQLite + Demo.
+- O Demo seleciona somente `ConfigurationSeedMode.Demo` e expõe deliberadamente apenas `demo_realm`; os realms
+  internos do produto não fazem parte da experiência demo e `All` não é usado.
 - O reset destrutivo de dados foi distinguido do cleanup Operational e diferido para a futura composição
   administrativa cross-family.
 
@@ -428,7 +433,8 @@
   `Data.*`.
 - `RoyalIdentity.Demo`: composition root web separada, fixa em SQLite in-memory e dona de invocar a orquestração
   `StorageMigrationRunner`/seed Demo já existente; nunca executa/adapta o `Program` do Server nem usa/configura
-  PostgreSQL. A referência ao runner traz PostgreSQL/Data somente como dependências transitivas aceitas.
+  PostgreSQL. A referência ao runner traz PostgreSQL/Data somente como dependências transitivas aceitas. Sua
+  superfície funcional contém apenas `demo_realm`; os realms internos Product não são semeados.
 - `IStorage`/`IStorageProvider`: são fornecidos exclusivamente pelo gateway EF completo; exatamente uma composição
   fica resolvível.
 - `IUserDirectory` e portas realm-bound de conta: são fornecidos por
@@ -513,12 +519,14 @@ RoyalIdentity.Migrations/
 
 RoyalIdentity.Demo/
   composição web fixa, sem options de provider/conexão
+  -> entry point público nomeado RoyalIdentity.Demo.DemoProgram
   -> RoyalIdentity.Migrations (StorageMigrationRunner + seed Demo)
      -> providers PostgreSql/Data.* apenas transitivamente; Demo não os usa, configura ou registra
   -> Configuration + Operational Sqlite no mesmo banco in-memory/keep-alive
   -> UserAccounts Sqlite em banco in-memory/keep-alive próprio
-  -> migrations + seed demo antes do tráfego
+  -> migrations + seed somente de demo_realm antes do tráfego
   -X-> RoyalIdentity.Server
+  -X-> Program público no namespace global
   -X-> ProjectReference/uso/configuração/registro direto de providers PostgreSql ou Data.*
 
 Tests.Host + Tests.Integration/
@@ -786,6 +794,9 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo invoca o
 - [ ] Abrir as conexões keep-alive nomeadas antes do provisionamento e implementar initializer do Demo que invoca
   `StorageMigrationRunner` com SQLite, as três famílias e `ConfigurationSeedMode.Demo` antes de liberar tráfego;
   resources usam a bridge e contas usam os casos de uso públicos de `UserAccounts`.
+- [ ] Manter o conjunto de realms do Demo deliberadamente mínimo: semear somente `demo_realm`, seus clients,
+  resources, contas e signing keys; não usar `ConfigurationSeedMode.All` nem criar os realms internos `server`,
+  `account` e `admin`.
 - [ ] Garantir que o seed do Demo crie signing keys efêmeras utilizáveis para todos os realms habilitados e que o
   runtime consiga desprotegê-las com o mesmo protector da execução, sem criar política de rotação.
 - [ ] Reutilizar a implementação `ConfigurationSeed` existente no runner; o Demo apenas seleciona o modo Demo e não
@@ -796,15 +807,21 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo invoca o
   diretório temporário somente no teardown. Não expor option obrigatória ao usuário do Demo.
 - [ ] Escolher um modo de cleanup Operational fixo para o Demo, sem options obrigatórias para quem o executa.
 - [ ] Fazer Demo, Server e `Tests.Host` usarem `UseRoyalIdentityProtocol(...)`, mantendo UI/static
-  files/antiforgery e detalhes de hosting em cada `Program`.
+  files/antiforgery e detalhes de hosting em cada entry point.
 - [ ] Adicionar um teste estreito em `Tests.Integration` que hospede o `RoyalIdentity.Demo` real por
-  `WebApplicationFactory`, sem passar por `Tests.Host`, e execute o fluxo OIDC demo.
-- [ ] Tornar o entry point do Demo acessível ao teste com `public partial class Program`, seguindo o padrão já usado
-  por `Tests.Host`, em vez de depender do `Program` interno gerado por top-level statements.
+  `WebApplicationFactory<RoyalIdentity.Demo.DemoProgram>`, sem passar por `Tests.Host`, e execute o fluxo OIDC demo.
+- [ ] Implementar o entry point real como tipo público nomeado
+  `RoyalIdentity.Demo.DemoProgram`, não estático e com `Main` estático, em vez de top-level statements +
+  `public partial class Program` global. Isso permite usá-lo como argumento genérico da `WebApplicationFactory` e
+  evita colisão `CS0433` com o `Program` global já exposto por `Tests.Host`; seguir o princípio do entry point
+  nomeado `MigrationRunnerProgram`.
 - [ ] Provar por guard que Demo não referencia Server e não possui referência direta/uso em source/registro de
   PostgreSQL ou `Data.*`; aceitar explicitamente o caminho transitivo Demo → Migrations → providers/Data, sem
   seleção nem execução de PostgreSQL pelo Demo. Provar também que Server não referencia Demo/SQLite/Migrations e
-  que não existe caminho inverso Migrations → Demo.
+  que não existe caminho inverso Migrations → Demo. Reutilizar a técnica de
+  `ConfigurationStorageBoundaryTests.Core_DoesNotReference_DataOrAdapter`: combinar leitura dos
+  `ProjectReference` diretos com `Assembly.GetReferencedAssemblies()` para detectar uso compilado real após a poda
+  do compilador, sem rejeitar a dependência transitiva aceita.
 - [ ] Remover `AddInMemoryStorage()` e a referência `RoyalIdentity.Storage.InMemory` do Server.
 - [ ] Preservar as validações funcionais de snapshot/signing keys, sem implementar readiness de schema e sem
   `GetPendingMigrations*`, `EnsureCreated*`, `Migrate*` ou seed.
@@ -815,7 +832,8 @@ Operational/profiles, cleanup, gateway e `UserAccounts`; somente o Demo invoca o
   policy; não criar teste de migrations pendentes no host.
 - [ ] Documentar e fornecer comando/script local para PostgreSQL 17 via Podman, execução prévia do runner e startup
   do Server; manter três chaves de conexão explícitas, ainda que apontem para o mesmo banco, e não versionar senha.
-- [ ] Cobrir startup do Demo a partir de memória vazia e um fluxo OIDC completo com conta real.
+- [ ] Cobrir startup do Demo a partir de memória vazia, provar que somente `demo_realm` foi semeado e executar um
+  fluxo OIDC completo com conta real nesse realm.
 - [ ] No teste do Demo, comprovar que as signing keys criadas pelo initializer são desprotegidas pelo runtime e que
   o diretório temporário do key ring é removido somente depois do encerramento da factory.
 
@@ -826,8 +844,10 @@ completa é construída por teste default com validação de scopes/build, sem I
 
 **Critérios de aceite — 3B/Demo:** inicia sem configuração de storage sobre SQLite in-memory vazio, invoca o runner
 com migrations + seed Demo, cria signing keys efêmeras desprotegíveis pelo runtime com key ring temporário por
-processo e conclui um fluxo OIDC com conta real. Seu `Program` é alcançável por `WebApplicationFactory`; o projeto
-referencia o runner reutilizável e aceita PostgreSQL/Data somente no grafo transitivo, sem referência direta, uso,
+processo e conclui um fluxo OIDC com conta real somente em `demo_realm`; `server`, `account` e `admin` não são
+semeados. Seu `DemoProgram` público e nomeado é alcançável por
+`WebApplicationFactory<RoyalIdentity.Demo.DemoProgram>` sem colidir com `Tests.Host.Program`. O projeto referencia
+o runner reutilizável e aceita PostgreSQL/Data somente no grafo transitivo, sem referência direta, uso,
 configuração, registro ou execução; não referencia o Server. O scaffolding duplicado limita-se ao shell de host,
 enquanto protocolo e UI de contas permanecem compartilhados.
 
@@ -1189,7 +1209,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
 | Objetivo 1 — Server integral sem fake | 1-3 | DF3, DF4, DF8-DF13, DF15, DF17-DF23 | Server exclusivamente PostgreSQL; exatamente um gateway EF e um `IUserDirectory` real; zero SQLite/Demo/Migrations no grafo | `HostConfiguration`, `ServerPostgreSqlComposition`, `HostStartup`, `Tests.Architecture` |
-| Objetivo 2 — provisionamento e Demo | 1-3 | DF8, DF9, DF11, DF12, DF14, DF17-DF22, DF27 | runner genérico SQLite/PostgreSQL para três famílias; Demo separado reutiliza runner + seed Demo sobre SQLite in-memory, aceita PG/Data somente transitivos e compartilha key ring efêmero entre initializer/runtime | testes de migration/runner, `DemoSqliteComposition` e fluxo OIDC demo |
+| Objetivo 2 — provisionamento e Demo | 1-3 | DF8, DF9, DF11, DF12, DF14, DF17-DF22, DF27 | runner genérico SQLite/PostgreSQL para três famílias; Demo com entry point nomeado reutiliza runner + seed exclusivo de `demo_realm`, aceita PG/Data somente transitivos e compartilha key ring efêmero entre initializer/runtime | testes de migration/runner, `DemoSqliteComposition` e fluxo OIDC demo |
 | Objetivo 3 — testes default reais | 4-6 | DF2, DF5, DF13, DF14, DF16, DF25, DF26, DF29 | 29 consumers sobre factory integral; zero uso do fake em `Tests.Integration`; `Tests.Host` permanece independente | grupos HTTP + `--list-tests` + `dotnet test Tests.Integration` |
 | Objetivo 4 — remover transição/fake | 7-8 | DF6, DF7, DF28, DF30 | atomicidade obrigatória nos contratos base; handlers chamam stores realm-bound; zero consumer vazio/fallback/projeto/referência fake | `Tests.Identity`, `Tests.Storage`, concorrência e buscas `rg` |
 | Objetivo 5 — paridade e fechamento | 9 | DF1, DF2, DF16, DF24 | aceite PostgreSQL local cumprido, solução/doc normativa verde | script PostgreSQL + `dotnet test RoyalIdentity.sln` |
@@ -1242,6 +1262,10 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
     possui referência direta, uso em source, configuração, registro de DI nem execução desses providers.
 32. O key ring Data Protection do Demo é temporário e exclusivo por processo, mas application name e purposes são
     fixos e compartilhados entre initializer e runtime durante toda a execução.
+33. O entry point público do Demo é `RoyalIdentity.Demo.DemoProgram`; o projeto Demo não declara um `Program`
+    público no namespace global que possa colidir com `Tests.Host.Program`.
+34. O seed do Demo cria somente `demo_realm` e seus dados funcionais; os realms internos Product não são copiados
+    para a experiência demo.
 
 ---
 
@@ -1250,7 +1274,8 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 - DF17-DF30 foram aplicadas e eventuais desvios estão registrados nos resultados das fases.
 - `RoyalIdentity.Server` inicia exclusivamente sobre PostgreSQL e não oferece selector/fallback SQLite/in-memory.
 - `RoyalIdentity.Demo` inicia sem configuração de storage sobre SQLite in-memory, invoca o runner compartilhado com
-  o modo Demo, usa o mesmo key ring temporário no initializer/runtime e conclui o fluxo OIDC demo. Dependências
+  o modo Demo, usa o mesmo key ring temporário no initializer/runtime e conclui o fluxo OIDC em `demo_realm`, único
+  realm semeado. `RoyalIdentity.Demo.DemoProgram` é hospedável sem colisão com `Tests.Host.Program`. Dependências
   PostgreSQL/`Data.*` são apenas transitivas pelo runner, sem uso/configuração/registro/execução pelo Demo.
 - As três famílias PostgreSQL são provisionáveis externamente; o host produtivo não contém inspeção ou execução de
   migrations, e somente o executável Demo possui a exceção DF27.
@@ -1277,10 +1302,11 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Initializer e runtime do Demo usam key rings diferentes | diretório temporário é criado tarde, recriado ou removido antes do shutdown | signing keys do seed ficam ilegíveis ainda na mesma execução | criar key ring por processo antes do runner, compartilhar application name/purposes e remover somente no teardown | Aberto |
 | Banco não foi provisionado antes do host | operador inicia Server sem executar o runner | falha funcional no primeiro bootstrap/acesso | runbook externo, erro sanitizado e nenhuma tentativa automática de migration | Aberto |
 | Demo deixa de autenticar | initializer chama runner/seed sem accounts/resources/signing keys compatíveis | `dotnet run` parece funcional, mas login/authorize falha | DF27, modo Demo do runner + seed de contas e fluxo OIDC completo a partir de memória vazia | Aberto |
+| Entry point do Demo colide com `Tests.Host.Program` | Demo expõe outro `public Program` no namespace global | `Tests.Integration` falha com `CS0433` ao referenciar os dois hosts | usar `RoyalIdentity.Demo.DemoProgram` público/não estático com `Main` estático e `WebApplicationFactory<DemoProgram>` | Aberto |
 | SQLite Demo desaparece após o runner | keep-alive é aberto depois das conexões transitórias do migration runner | schema/seed somem antes do startup | abrir os dois keep-alives nomeados antes de invocar o runner e mantê-los até o shutdown | Aberto |
 | Bootstrap Demo vaza para o Server | composição/extension compartilhada inclui migration ou seed | processo produtivo altera schema/dados | executáveis irmãos, guards bidirecionais e extension compartilhado limitado ao protocolo | Aberto |
 | Demo absorve ownership de `UserAccounts` | host manipula entidades/tabelas internas do módulo para semear contas | viola ADR-013/ADR-015 | Demo usa migrations do provider e casos de uso públicos do módulo | Aberto |
-| Modos Product/Demo são confundidos | entry point seleciona o modo errado da implementação compartilhada | dados administrativos entram no Demo ou dados demo em produção | Server nunca chama runner; CLI produtivo seleciona Product; Demo seleciona Demo; testes negativos dos dois entry points | Aberto |
+| Modos Product/Demo são confundidos | entry point seleciona o modo errado da implementação compartilhada | dados administrativos entram no Demo ou dados demo em produção | Server nunca chama runner; CLI produtivo seleciona Product; Demo seleciona Demo e prova somente `demo_realm`; testes negativos dos dois entry points | Aberto |
 | Server local parece simples mas não foi provisionado | PostgreSQL Podman sobe vazio e o Server é iniciado diretamente | bootstrap funcional falha | runbook único Podman → runner → Server, erro sanitizado e nenhuma migration automática | Aberto |
 | Histories colidem em banco compartilhado | terceira família usa nome/schema incompatível | migrations são ignoradas ou reaplicadas | teste same-database e history explícita por owner | Aberto |
 | Snapshot não reflete setup | helper grava client e não publica refresh | testes falham ou exercitam dados antigos | helper único + `IConfigurationSnapshotRefresher` obrigatório | Aberto |
@@ -1288,7 +1314,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Topologia persistente degrada a suíte | migrations/seed se repetem nas factories | feedback local fica mais lento | baseline, três medições, mediana e limiar numérico nas Fases 4/6 conforme DF26 | Aberto |
 | Composição resolve backing incorreto | duas implementações dos mesmos contratos são registradas | teste passa pelo storage errado | `Tests.Host` agnóstico, registro explícito por factory e validação de resolução | Aberto |
 | Extension protocolar vira bootstrap geral | `UseRoyalIdentityProtocol` passa a registrar storage, UI ou endpoints test-only | hosts deixam de ser composition roots independentes | limite de DF29 + guard contra referências a Server/providers/Razor no extension | Aberto |
-| Ordem de middleware é usada incorretamente | host chama o extension antes de routing ou mistura antiforgery/UI dentro dele | realm discovery/authentication ou endpoints falham | precondições XML, ordem explícita nos três Programs e testes de composição | Aberto |
+| Ordem de middleware é usada incorretamente | host chama o extension antes de routing ou mistura antiforgery/UI dentro dele | realm discovery/authentication ou endpoints falham | precondições XML, ordem explícita nos três entry points e testes de composição | Aberto |
 | `Tests.Host` parece executável mas não possui storage | launch profile antigo inicia o projeto fora de uma factory | snapshot hosted service falha no startup | remover/substituir profiles e documentar uso exclusivo por `WebApplicationFactory` | Aberto |
 | Live references são reproduzidas em outro seam | setup altera entidade EF diretamente | teste deixa de representar comportamento real | features do módulo ou hook test-only explícito | Aberto |
 | Handle estático mascara options/realm atual | fixture carrega `Realm` no handle e o reutiliza entre composições | teste lê estado/options fora do snapshot corrente | handles primitivos, carga por store/snapshot e guard estático | Aberto |
