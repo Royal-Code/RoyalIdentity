@@ -316,7 +316,9 @@
   mas otimizações de topologia não são decisões de arquitetura deste plano. A Fase 4 registra protocolo, baseline e
   um limiar numérico de regressão material antes da migração em massa; a Fase 6 repete o mesmo protocolo e compara o
   resultado ao limiar. Começar pela composição SQLite isolada mais simples e otimizar somente quando a medição
-  ultrapassar esse limite. Fonte: resposta humana à antiga Q11.
+  ultrapassar esse limite. O tempo absoluto observado continua baixo e não justifica repetir medições por
+  macrogrupo nem antecipar engenharia de performance; conservar apenas a comparação final da Fase 6 como registro.
+  Fonte: resposta humana à antiga Q11 e orientação posterior à revisão da Fase 5.
 - **DF27 — Host Demo SQLite fixo e self-provisioned:** criar `RoyalIdentity.Demo`, executável web irmão e
   independente de `RoyalIdentity.Server`. O Demo referencia os providers SQLite e `.Integration`, usa bancos
   SQLite in-memory com conexões keep-alive e invoca `StorageMigrationRunner` com SQLite +
@@ -568,14 +570,15 @@ RoyalIdentity/
 
 ### Triagem obrigatória de divergências
 
-Toda asserção que precise mudar durante as Fases 4-7 deve ser classificada e registrada no `Resultado da Fase`, com
-o teste afetado, o comportamento anterior, a evidência do backing real e a correção aplicada:
+Toda asserção que precise mudar ou todo defeito de produto/módulo revelado durante as Fases 4-7 deve ser
+classificado e registrado no `Resultado da Fase`, com o teste/cenário afetado, o comportamento anterior, a
+evidência do backing real e a correção aplicada:
 
 - **artefato-do-fake:** o teste dependia de comportamento não normativo do fake; ajustar o teste à matriz/ADR.
 - **regressão-do-módulo:** `UserAccounts` viola a matriz ou ADR aplicável; corrigir o módulo e preservar a asserção
   normativa.
-- **defeito-de-produto:** o backing real revela defeito do core mascarado pelo fake; corrigir o produto e registrar
-  o mecanismo que tornou o defeito observável.
+- **defeito-de-produto:** o backing real revela defeito do core ou de uma composition root oficial mascarado pelo
+  fake/caminho anterior; corrigir o produto e registrar o mecanismo que tornou o defeito observável.
 - **sem-decisão-normativa:** não existe fonte normativa suficiente; parar o cenário afetado e abrir pergunta ao
   humano antes de mudar produto ou asserção.
 
@@ -1184,13 +1187,13 @@ do módulo, getters de realm por handles e mutações de client/resource por hel
 - [x] Antes de executar os filtros da fase, rodar
   `dotnet test Tests.Integration --no-build --list-tests`, provar que cada filtro seleciona ao menos um teste e
   registrar no resultado as contagens esperada e executada.
-- [x] Classificar e registrar toda asserção alterada nos quatro buckets de triagem; corrigir produto/módulo quando
-  aplicável, sem adaptar silenciosamente a expectativa ao backing real.
+- [x] Classificar e registrar toda asserção alterada ou defeito revelado nos quatro buckets de triagem; corrigir
+  produto/módulo quando aplicável, sem adaptar silenciosamente a expectativa ao backing real.
 
 **Critérios de aceite:** todos os grupos listados executam somente sobre a factory integral; seus arquivos não
 referenciam namespace/tipos do fake; alterações de conta passam por `UserAccounts`; writes de Configuration ficam
 visíveis no snapshot; nenhuma asserção depende de live reference; cada filtro seleciona ao menos um teste e possui
-contagens esperada/executada registradas; toda asserção alterada está classificada.
+contagens esperada/executada registradas; toda asserção alterada ou defeito revelado está classificado.
 
 **Testes:**
 
@@ -1248,11 +1251,22 @@ $tests.Count
   executou 82/82. Esse filtro distingue o escopo real da fase das sobreposições nominais dos filtros amplos com
   fluxos ainda pertencentes à Fase 6.
 
-Triagem: **nenhuma asserção normativa foi alterada**, portanto há zero ocorrências nos quatro buckets
-(`artefato-do-fake`, `regressão-do-módulo`, `defeito-de-produto`, `sem-decisão-normativa`). Houve somente
-adaptações de setup/observação ao backing real: o isolamento cross-realm usa uma conta exclusiva do realm de
-origem, e testes de sessão/conta reconsultam o estado persistido em vez de observar objetos mutáveis do fake. Os
-status HTTP, erros, claims, issuers, PKCE, recursos e algoritmos esperados permaneceram iguais.
+Triagem: **nenhuma asserção normativa foi alterada**. Há zero ocorrências de `artefato-do-fake`,
+`regressão-do-módulo` e `sem-decisão-normativa`, e **duas ocorrências de `defeito-de-produto` reveladas pelo
+stress do backing real**:
+
+1. `ConfigurationSnapshotHostedService`: `StopAsync` e `Dispose` disputavam o mesmo
+   `CancellationTokenSource`; o `.trx` tornou a corrida observável como teardown intermitente. A correção transfere
+   atomicamente o estado de shutdown, mantém o source vivo até o loop em voo terminar e observa sua conclusão no
+   caminho síncrono de `Dispose`.
+2. `RoyalIdentity.Demo`: `DemoStorageInitializer.StopAsync` descartava `DemoStorageLifetime` antes do restante dos
+   hosted services/Data Protection. O container voltou a ser o único owner do lifetime e o descarta na ordem do
+   provider.
+
+As demais mudanças foram somente adaptações de setup/observação ao backing real: o isolamento cross-realm usa uma
+conta exclusiva do realm de origem, e testes de sessão/conta reconsultam o estado persistido em vez de observar
+objetos mutáveis do fake. Os status HTTP, erros, claims, issuers, PKCE, recursos e algoritmos esperados
+permaneceram iguais.
 
 Verificação final: busca estática nos quatorze arquivos migrados nesta fase por
 `MemoryStorage|RoyalIdentity.Storage.InMemory|GetDemoRealmStore|GetRealmMemoryStore|RealmMemoryStore|MemoryUser`
@@ -1274,7 +1288,9 @@ O `.trx` da falha localizou a corrida em `ConfigurationSnapshotHostedService.Sto
 podiam disputar o mesmo `CancellationTokenSource`, e um deles o descartava enquanto o outro ainda tentava
 cancelá-lo. O hosted service passou a transferir atomicamente a propriedade do estado de shutdown com
 `Interlocked.Exchange`; somente o caminho que obtém o estado cancela/descarta, e chamadas posteriores são no-op.
-`StopAsync_AndDispose_AreIdempotentInEitherOrder` prende as duas ordens de teardown.
+No caminho síncrono `Dispose`-first, uma continuação observa o `PeriodicLoop` e só então descarta o source.
+`StopAsync_AndDispose_AreIdempotentInEitherOrder` prende as duas ordens de teardown, e
+`Dispose_DuringPeriodicRefresh_KeepsCancellationSourceAliveUntilTheLoopFinishes` cobre um tick realmente em voo.
 
 O stress também revelou uma segunda corrida independente no teste do Demo: a remoção do key ring é eventual
 durante o fechamento completo do host/provider. `DemoStorageInitializer.StopAsync` deixou de descartar
@@ -1292,10 +1308,11 @@ abaixo foi executado sequencialmente: 20/20 execuções completas, todas 290/290
 }
 ```
 
-Validação complementar: `dotnet test Tests.Storage/Tests.Storage.csproj --no-build` (590 aprovados, 44
-PostgreSQL opt-in ignorados), incluindo 5/5 no filtro de `ConfigurationSnapshotHostedServiceTests`;
+Validação complementar: `dotnet test Tests.Storage/Tests.Storage.csproj --no-build` (591 aprovados, 44
+PostgreSQL opt-in ignorados), incluindo 6/6 no filtro de `ConfigurationSnapshotHostedServiceTests`;
 `dotnet test Tests.Architecture/Tests.Architecture.csproj --no-build` (57/57); e novo
-`dotnet build RoyalIdentity.sln --no-restore` (0 erros).
+`dotnet build RoyalIdentity.sln --no-restore` (0 erros). Após fechar a aresta do loop em voo,
+`dotnet test Tests.Integration/Tests.Integration.csproj --no-build` permaneceu 290/290.
 
 Medição intermediária posterior, no mesmo ambiente e com o projeto compilado, após um warm-up descartado:
 
@@ -1313,8 +1330,9 @@ Medição intermediária posterior, no mesmo ambiente e com o projeto compilado,
 As execuções foram `19,838 s`, `18,077 s` e `19,120 s`; mediana `19,120 s`, razão `1,638×` contra o baseline
 fake de `11,673 s`. Isso consome 81,9% do limite de `23,346 s`, mas ainda não aciona DF26. Extrapolar linearmente
 o custo das classes restantes não é evidência suficiente para escolher template ou collection fixture, pois o
-paralelismo pode saturar em qualquer direção. A Fase 6 ganhou um checkpoint intermediário obrigatório para medir
-o primeiro macrogrupo restante e decidir mitigação somente sobre tempo observado.
+paralelismo pode saturar em qualquer direção. O owner considera baixo e irrelevante o tempo absoluto atual:
+performance não recebe nova rodada por macrogrupo nem otimização nesta etapa; a Fase 6 conserva somente a medição
+final já prevista para registro comparável.
 
 ---
 
@@ -1348,11 +1366,8 @@ factory integral como única composição canônica das 29 classes.
 - [ ] Antes de executar os filtros da fase, rodar
   `dotnet test Tests.Integration --no-build --list-tests`, provar que cada filtro seleciona ao menos um teste e
   registrar no resultado as contagens esperada e executada.
-- [ ] Classificar e registrar toda asserção alterada nos quatro buckets de triagem.
+- [ ] Classificar e registrar toda asserção alterada ou defeito revelado nos quatro buckets de triagem.
 - [ ] Executar toda a suíte HTTP sobre o novo default antes de tocar nos contratos atômicos.
-- [ ] Depois de migrar o primeiro macrogrupo restante, repetir warm-up e três execuções `--no-build`, registrar a
-  mediana e compará-la com `23,346 s`; se o valor observado ultrapassar o limite, parar antes do macrogrupo
-  seguinte e decidir explicitamente a mitigação de topologia, sem extrapolação linear como substituto da medição.
 - [ ] Medir, no mesmo ambiente/protocolo da Fase 4, warm-up e três execuções `--no-build` da suíte persistente
   completa; registrar cada valor, mediana, razão contra o baseline e comparação com o limiar numérico fixado.
 - [ ] Se a mediana ultrapassar o limiar, tratar ou aceitar explicitamente a regressão com causa/evidência antes de
@@ -1360,8 +1375,8 @@ factory integral como única composição canônica das 29 classes.
 
 **Critérios de aceite:** as 29 classes antes ligadas a `AppFactory` executam sobre EF + `UserAccounts`; não existem
 factories parciais; `Tests.Integration` não contém uso de `MemoryStorage`, getters do fake ou mutação de dictionary;
-todos os filtros executam ao menos um teste e têm suas contagens registradas; toda mudança de asserção está
-classificada; a comparação de duração está registrada; todos os fluxos e caracterizações permanecem verdes; os
+todos os filtros executam ao menos um teste e têm suas contagens registradas; toda mudança de asserção ou defeito
+revelado está classificado; a comparação de duração está registrada; todos os fluxos e caracterizações permanecem verdes; os
 fallbacks ainda não foram ampliados nem acionados pelo EF; a referência temporária ao projeto fake foi removida; a
 mediana observada está dentro do limiar numérico da Fase 4 ou possui tratamento/aceite explícito registrado.
 
@@ -1408,12 +1423,12 @@ Preservar cobertura sem transformar doubles locais em outro backing geral.
 - [ ] Substituir o teste arquitetural do grafo do fake por allowlist genérica de dependências, sem conservar o nome
   literal do projeto removido.
 - [ ] Mapear cada teste concreto removido para cobertura EF/módulo equivalente e registrar qualquer perda real.
-- [ ] Classificar pelos quatro buckets toda divergência de asserção encontrada nesta fase.
+- [ ] Classificar pelos quatro buckets toda divergência de asserção ou defeito revelado nesta fase.
 
 **Critérios de aceite:** somente o próprio projeto `RoyalIdentity.Storage.InMemory` e a entrada na solução permanecem;
 nenhum projeto de produção/teste o referencia; contratos de core e `UserDirectory` rodam sobre providers reais;
 `IStorageSession` possui cobertura EF; contagens anterior/substituta e comandos estão registrados; não houve perda de
-cenário sem substituição registrada; mudanças de asserção foram triadas.
+cenário sem substituição registrada; mudanças de asserção e defeitos revelados foram triados.
 
 **Testes:**
 
@@ -1582,7 +1597,8 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 23. Handles de fixture não contêm `Realm`; objetos de realm usados por testes vêm do store/snapshot da composição
     corrente.
 24. Cada composition root resolve exatamente uma implementação dos contratos de storage que pretende exercitar.
-25. Toda mudança de asserção durante a migração possui classificação e evidência nos quatro buckets de triagem.
+25. Toda mudança de asserção ou defeito revelado durante a migração possui classificação e evidência nos quatro
+    buckets de triagem.
 26. `Tests.Host` e `RoyalIdentity.Demo` não referenciam nem executam `RoyalIdentity.Server`; os três hosts
     compartilham somente extensions provider-neutral e contratos/UI aplicáveis.
 27. Depois da Fase 4, `Tests.Host` só inicia por factory que fornece storage; nenhum launch profile o anuncia como
@@ -1662,7 +1678,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 | Reset administrativo é confundido com cleanup | option EF apaga dados válidos como se fossem expirados | perda cross-family sem coordenação/auditoria | manter fora do runtime; futuro comando/admin explícito, autorizado e orquestrado | Aberto |
 | Quebra atômica ocorre cedo demais | DF28 é aplicada com fake ainda referenciado | fake precisa ganhar paridade ou solução não compila | Fases 6-8 e corte coordenado DF7 | Aberto |
 | Testes concretos do fake somem sem equivalente | variante/harness é apagado sem mapa | perda silenciosa de regressão | inventário por cenário na Fase 7 | Aberto |
-| Divergência real é tratada como artefato do fake | asserção muda apenas para a suíte voltar a passar | regressão de módulo ou defeito do core fica mascarado | triagem obrigatória em quatro buckets e correção no owner | Aberto |
+| Divergência real é tratada como artefato do fake | asserção muda apenas para a suíte voltar a passar ou defeito de lifecycle fica fora da triagem | regressão de módulo ou defeito do core fica mascarado | triagem obrigatória em quatro buckets para asserções e defeitos revelados, com correção no owner | Aberto |
 | Filtro executa zero testes | nome/classe muda durante a migração | fase aparenta verde sem exercitar o grupo | `--list-tests`, contagem esperada/executada e registro por filtro | Aberto |
 | SQLite mascara diferença produtiva | fluxo só é executado no default SQLite | regressão de provider chega a produção | aceite PostgreSQL real local/opt-in de DF24 | Aberto |
 | Cleanup Hosted disputa entre réplicas | várias instâncias escolhem Hosted | carga/locks apesar de batches idempotentes | configuração explícita, documentar External para cluster | Aberto |

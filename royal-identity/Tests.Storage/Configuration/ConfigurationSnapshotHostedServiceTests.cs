@@ -104,4 +104,37 @@ public class ConfigurationSnapshotHostedServiceTests
         ((IDisposable)stopFirstService).Dispose();
         await stopFirstService.StopAsync(CancellationToken.None);
     }
+
+    [Fact]
+    public async Task Dispose_DuringPeriodicRefresh_KeepsCancellationSourceAliveUntilTheLoopFinishes()
+    {
+        using var harness = new SnapshotTestHarness(refreshInterval: TimeSpan.FromMilliseconds(20));
+        harness.Source.Data = SnapshotTestHarness.BuildData(new ServerOptions(), "server");
+        var service = harness.HostedService;
+        await service.StartAsync(CancellationToken.None);
+
+        var periodicEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registrationAfterCancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Source.Loader = async ct =>
+        {
+            periodicEntered.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                using var registration = ct.Register(static () => { });
+                registrationAfterCancellation.TrySetResult();
+            }
+
+            return harness.Source.Data!;
+        };
+
+        await periodicEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        ((IDisposable)service).Dispose();
+
+        await registrationAfterCancellation.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await service.StopAsync(CancellationToken.None);
+    }
 }

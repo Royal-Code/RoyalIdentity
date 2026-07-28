@@ -52,8 +52,25 @@ internal sealed class ConfigurationSnapshotHostedService(
         if (state is null)
             return;
 
-        state.StoppingSource.Cancel();
-        state.StoppingSource.Dispose();
+        try
+        {
+            state.StoppingSource.Cancel();
+        }
+        finally
+        {
+            // Dispose cannot await the loop. Keep the source alive until it finishes and observe any exceptional
+            // completion so a direct Dispose-first path cannot leave an unobserved task behind.
+            _ = state.PeriodicLoop.ContinueWith(
+                static (loop, source) =>
+                {
+                    _ = loop.Exception;
+                    ((CancellationTokenSource)source!).Dispose();
+                },
+                state.StoppingSource,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
     }
 
     private async Task RunPeriodicAsync(CancellationToken ct)
