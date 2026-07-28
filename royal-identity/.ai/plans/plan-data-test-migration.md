@@ -1,10 +1,10 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fases 1-5 concluídas em 2026-07-28; Fase 6 pendente
+## Status: EM ANDAMENTO - Fases 1-6 concluídas em 2026-07-28; Fase 7 pendente
 
 ## Progresso
 
-`█████░░░░` **56%** - 5 de 9 fases
+`██████░░░` **67%** - 6 de 9 fases
 
 | Fase | Estado |
 |---|---|
@@ -13,7 +13,7 @@
 | Fase 3 - composições reais e fail-fast do Server/Demo | Concluida |
 | Fase 4 - fixture SQLite unificada, handles e seeds | Concluida |
 | Fase 5 - migração de login, profile, authorize e token | Concluida |
-| Fase 6 - migração dos fluxos restantes e troca do default | Pendente |
+| Fase 6 - migração dos fluxos restantes e troca do default | Concluida |
 | Fase 7 - desacoplamento dos contratos de teste do fake | Pendente |
 | Fase 8 - remoção da transição e exclusão do fake | Pendente |
 | Fase 9 - PostgreSQL, regressão final e fechamento documental | Pendente |
@@ -1348,29 +1348,29 @@ factory integral como única composição canônica das 29 classes.
 
 **Tarefas:**
 
-- [ ] Migrar refresh token, claims mode e revocation sem `UpdateAsync` manual de cenário.
-- [ ] Substituir limpeza global de access tokens pela remoção do JTI conhecido ou hook Operational test-only.
-- [ ] Migrar end session, lifecycle de sessão, logout e revogação por subject.
-- [ ] Capturar `sid` no próprio fluxo e consultar por id, sem scan de `UserSessions`.
-- [ ] Migrar UI login/consent, issuer URI, eventos e isolamento por realm.
-- [ ] Substituir `FakeSessionStorage` baseado em stores concretos por doubles locais de contratos ou gateway EF.
-- [ ] Mudar cada classe uma única vez para a factory persistente e remover a factory/ramo legado assim que seu
+- [x] Migrar refresh token, claims mode e revocation sem `UpdateAsync` manual de cenário.
+- [x] Substituir limpeza global de access tokens pela remoção do JTI conhecido ou hook Operational test-only.
+- [x] Migrar end session, lifecycle de sessão, logout e revogação por subject.
+- [x] Capturar `sid` no próprio fluxo e consultar por id, sem scan de `UserSessions`.
+- [x] Migrar UI login/consent, issuer URI, eventos e isolamento por realm.
+- [x] Substituir `FakeSessionStorage` baseado em stores concretos por doubles locais de contratos ou gateway EF.
+- [x] Mudar cada classe uma única vez para a factory persistente e remover a factory/ramo legado assim que seu
   último consumer for migrado.
-- [ ] Manter a factory persistente como única composição canônica, sem exigir renome; as parciais
+- [x] Manter a factory persistente como única composição canônica, sem exigir renome; as parciais
   `EntityFrameworkStorageAppFactory` e `UserAccountsAppFactory` já foram absorvidas/removidas nas Fases 4 e 5,
   respectivamente.
-- [ ] Remover o global using e todas as referências a `MemoryStorage`/`RealmMemoryStore` de `Tests.Integration`.
-- [ ] Remover de `Tests.Integration` a referência temporária ao projeto fake criada para a coexistência da Fase 4.
-- [ ] Executar busca estática/guard arquitetural que rejeite handles contendo `Realm` e confirme que realms usados
+- [x] Remover o global using e todas as referências a `MemoryStorage`/`RealmMemoryStore` de `Tests.Integration`.
+- [x] Remover de `Tests.Integration` a referência temporária ao projeto fake criada para a coexistência da Fase 4.
+- [x] Executar busca estática/guard arquitetural que rejeite handles contendo `Realm` e confirme que realms usados
   nos testes são carregados da composição corrente.
-- [ ] Antes de executar os filtros da fase, rodar
+- [x] Antes de executar os filtros da fase, rodar
   `dotnet test Tests.Integration --no-build --list-tests`, provar que cada filtro seleciona ao menos um teste e
   registrar no resultado as contagens esperada e executada.
-- [ ] Classificar e registrar toda asserção alterada ou defeito revelado nos quatro buckets de triagem.
-- [ ] Executar toda a suíte HTTP sobre o novo default antes de tocar nos contratos atômicos.
-- [ ] Medir, no mesmo ambiente/protocolo da Fase 4, warm-up e três execuções `--no-build` da suíte persistente
+- [x] Classificar e registrar toda asserção alterada ou defeito revelado nos quatro buckets de triagem.
+- [x] Executar toda a suíte HTTP sobre o novo default antes de tocar nos contratos atômicos.
+- [x] Medir, no mesmo ambiente/protocolo da Fase 4, warm-up e três execuções `--no-build` da suíte persistente
   completa; registrar cada valor, mediana, razão contra o baseline e comparação com o limiar numérico fixado.
-- [ ] Se a mediana ultrapassar o limiar, tratar ou aceitar explicitamente a regressão com causa/evidência antes de
+- [x] Se a mediana ultrapassar o limiar, tratar ou aceitar explicitamente a regressão com causa/evidência antes de
   fechar a fase; abaixo do limiar, não criar otimização especulativa.
 
 **Critérios de aceite:** as 29 classes antes ligadas a `AppFactory` executam sobre EF + `UserAccounts`; não existem
@@ -1391,7 +1391,88 @@ dotnet test Tests.Integration
 
 ### Resultado da Fase 6
 
-*a preencher*
+Concluída em 2026-07-28. A composição persistente passou a ser o único default de `Tests.Integration`: as 29
+classes originalmente ligadas ao `AppFactory` fake, as factories especializadas de captura/tempo e os testes
+adicionais de storage executam agora sobre `PersistentStorageAppFactory` (Configuration + Operational em SQLite
+in-memory compartilhado, UserAccounts em SQLite in-memory próprio). O ramo `AppFactory` legado, seu seed auxiliar,
+o global using e a referência de projeto para `RoyalIdentity.Storage.InMemory` foram removidos. Os consumers
+atômicos/fallbacks de authorization code e refresh token não foram alterados nesta fase.
+
+O setup persistente ganhou apenas seams estreitos de teste: escrita de client/realm com refresh do snapshot,
+definição/valor de claim pelo módulo, ajuste controlado do timestamp consumido de refresh token e execução de
+operações de storage dentro de scope válido. `SessionStorageDouble` implementa localmente somente
+`IUserSessionStore` e `IRefreshTokenStore`; não reutiliza stores concretos nem tenta substituir um backing geral.
+Os 14 casos de `ResourceStoreTests` foram preservados e agora atravessam o gateway EF. Os 9 testes unitários de
+`MemoryLocalUserAuthenticator` foram removidos por testarem exclusivamente a implementação aposentada; a cobertura
+equivalente permanece em `Tests.UserAccounts` (`UserDirectoryContractTests`, `UserAccountsIntegrationTests`,
+`UserAccountUseCasesTests` e `UserAccountDomainTests`), validada nesta fase com 195 aprovados.
+
+O inventário foi reproduzido antes dos filtros com:
+
+```powershell
+$filters = @(
+  'FullyQualifiedName~RefreshToken|FullyQualifiedName~Revocation',
+  'FullyQualifiedName~EndSession|FullyQualifiedName~UserSession|FullyQualifiedName~SessionLifecycle|FullyQualifiedName~DefaultUserSession',
+  'FullyQualifiedName~Realm|FullyQualifiedName~IssuerUri|FullyQualifiedName~LoginConsent'
+)
+foreach ($filter in $filters) {
+    $lines = dotnet test Tests.Integration/Tests.Integration.csproj --no-build --list-tests --filter $filter --verbosity quiet 2>&1
+    ($lines | Where-Object { $_ -match '^\s+Tests\.Integration\.' }).Count
+}
+```
+
+As contagens esperadas foram, na ordem, 39, 29 e 81; as execuções reais dos mesmos três filtros fecharam,
+respectivamente, 39/39, 29/29 e 81/81. A listagem completa pelo mesmo protocolo, sem `--filter`, encontrou 281
+testes. `dotnet test Tests.Integration/Tests.Integration.csproj --no-build` aprovou 281/281; as três execuções
+cronometradas posteriores também terminaram com exit code zero.
+
+A busca estática:
+
+```powershell
+rg -n "RoyalIdentity\.Storage\.InMemory|MemoryStorage|RealmMemoryStore|AddInMemoryStorage|IClassFixture<AppFactory>|class AppFactory\s*:" Tests.Integration -g "*.cs" -g "*.csproj"
+```
+
+retornou zero ocorrências. `IntegrationCompositionBoundaryTests` fixa por allowlist as referências de projeto de
+`Tests.Integration` e prova que somente `PersistentStorageAppFactory` deriva de `AppFactoryBase`; o guard de handles
+continua rejeitando propriedades do tipo `Realm`, e os helpers carregam realms pela composição corrente.
+
+Triagem das divergências observadas:
+
+- **artefato-do-fake (2):** o caso de `invalid_target` deixou de exigir um resource URI que o endpoint auxiliar
+  nunca solicitou; o teste continua provando consumo CAS antes da falha. O teste de exclusão de realm deixou de
+  exigir o sinal específico do fake (accessor lançar após hard delete) e passou a provar somente o tombstone
+  Configuration; purge Operational coordenado continua coberto em `Tests.Storage` e pertence ao seam
+  administrativo já diferido;
+- **regressão-do-módulo (0):** nenhuma asserção precisou ser afrouxada por comportamento de UserAccounts;
+- **regressão-do-provider (0):** scopes scoped, `JwtAccessTokenPersistence=None` e schema explícito de claims foram
+  tratados no setup sem mudar a semântica esperada. Os testes de JWT persistido selecionam `Metadata`
+  explicitamente;
+- **defeito-de-produto (0):** nenhum defeito novo do core foi revelado nesta fase.
+
+Validação complementar:
+
+- `dotnet build RoyalIdentity.sln --no-restore --verbosity quiet`: 0 erros (somente warnings preexistentes de
+  framework/package);
+- `dotnet test Tests.Architecture/Tests.Architecture.csproj`: 59/59;
+- `dotnet test Tests.Storage/Tests.Storage.csproj --no-build`: 591 aprovados, 44 PostgreSQL opt-in ignorados;
+- `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-build`: 195 aprovados, 1 PostgreSQL opt-in
+  ignorado.
+
+Para DF26, a execução completa verde anterior serviu de warm-up. O protocolo final foi repetido três vezes:
+
+```powershell
+$exitCode = 0
+$elapsed = Measure-Command {
+    dotnet test Tests.Integration/Tests.Integration.csproj --no-build --logger "console;verbosity=minimal" *> $null
+    $exitCode = $LASTEXITCODE
+}
+"seconds=$([Math]::Round($elapsed.TotalSeconds,3)) exit=$exitCode"
+```
+
+Os tempos foram 28,186 s, 30,400 s e 26,401 s; mediana 28,186 s, razão 2,415× contra o baseline fake de
+11,673 s e 120,7% do limite de 23,346 s. O owner aceitou explicitamente essa ultrapassagem: o tempo absoluto local
+permanece baixo, não há CI neste repositório e desempenho da suíte não justifica template/fixture compartilhada
+nem novas rodadas de otimização. O número fica registrado como evidência comparável, não como trabalho pendente.
 
 ---
 

@@ -21,7 +21,7 @@ public static class SubjectFactory
     /// <summary>
     /// Builds a principal AND seeds a matching ACTIVE session in the realm store, so the unified "active"
     /// rule (account active + valid session, ADR-014 §2.7) holds for synthetic token-endpoint tests. Pass a
-    /// real seed SubjectId (e.g. <c>MemoryStorage.AliceSubjectId</c>) so the account lookup resolves.
+    /// deterministic SubjectId exposed by the active fixture so the account lookup resolves.
     /// </summary>
     public static ClaimsPrincipal CreateWithSession(
         IStorage storage, RoyalIdentity.Models.Realm realm, string subjectId, string name, string role)

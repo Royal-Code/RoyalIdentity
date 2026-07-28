@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Options;
-using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using RoyalIdentity.Users.Defaults;
@@ -237,11 +237,11 @@ public class SessionLifecycleTests
 
     // ---- harness ----
 
-    private (DefaultUserSessionService service, ControlledTimeProvider clock, FakeSessionStorage storage) Build(
+    private (DefaultUserSessionService service, ControlledTimeProvider clock, SessionStorageDouble storage) Build(
         RealmModel realm, IUserSecurityStateProvider? securityStateProvider = null)
     {
         var clock = new ControlledTimeProvider(T0);
-        var storage = new FakeSessionStorage(clock);
+        var storage = new SessionStorageDouble(clock);
         var accessor = new FakeRealmAccessor(realm);
         var directory = new StubUserDirectory(securityStateProvider);
         return (new DefaultUserSessionService(storage, accessor, directory, clock), clock, storage);
@@ -257,7 +257,7 @@ public class SessionLifecycleTests
     private static ClaimsPrincipal Principal(string sid)
         => new(new ClaimsIdentity(new[] { new Claim(JwtRegisteredClaimNames.Sid, sid) }, "test"));
 
-    private static void SeedSession(FakeSessionStorage storage, string sid, string subjectId)
+    private static void SeedSession(SessionStorageDouble storage, string sid, string subjectId)
     {
         storage.Sessions[sid] = new UserSession
         {
@@ -270,7 +270,7 @@ public class SessionLifecycleTests
         };
     }
 
-    private static void SeedRefreshToken(FakeSessionStorage storage, string token, string subjectId)
+    private static void SeedRefreshToken(SessionStorageDouble storage, string token, string subjectId)
     {
         // DF41: no identifier of a previous access token — the refresh token never depended on that row.
         storage.RefreshTokens[token] = new RoyalIdentity.Models.Tokens.RefreshToken(
@@ -281,7 +281,7 @@ public class SessionLifecycleTests
     {
         public RealmModel GetCurrentRealm() => realm;
 
-        public bool TryGetCurrentRealm(out RealmModel? r)
+        public bool TryGetCurrentRealm([NotNullWhen(true)] out RealmModel? r)
         {
             r = realm;
             return true;
@@ -305,36 +305,4 @@ public class SessionLifecycleTests
             => Task.FromResult(state);
     }
 
-    /// <summary>
-    /// Minimal <see cref="IStorage"/> backing only the session and refresh-token stores (the only ports the session
-    /// and revocation services touch), so a test can use a freshly built realm with custom <c>Session</c> options.
-    /// </summary>
-    private sealed class FakeSessionStorage(TimeProvider clock) : IStorage
-    {
-        public ConcurrentDictionary<string, UserSession> Sessions { get; } = new();
-
-        public ConcurrentDictionary<string, RoyalIdentity.Models.Tokens.RefreshToken> RefreshTokens { get; } = new();
-
-        public IUserSessionStore GetUserSessionStore(RealmModel realm) => new UserSessionStore(Sessions, clock);
-
-        public IRefreshTokenStore GetRefreshTokenStore(RealmModel realm) => new RefreshTokenStore(RefreshTokens);
-
-        public ServerOptions ServerOptions => throw new NotSupportedException();
-
-        public IRealmStore Realms => throw new NotSupportedException();
-
-        public IAuthorizeParametersStore GetAuthorizeParametersStore(RealmModel realm) => throw new NotSupportedException();
-
-        public IAccessTokenStore GetAccessTokenStore(RealmModel realm) => throw new NotSupportedException();
-
-        public IAuthorizationCodeStore GetAuthorizationCodeStore(RealmModel realm) => throw new NotSupportedException();
-
-        public IUserConsentStore GetUserConsentStore(RealmModel realm) => throw new NotSupportedException();
-
-        public IKeyStore GetKeyStore(RealmModel realm) => throw new NotSupportedException();
-
-        public IClientStore GetClientStore(RealmModel realm) => throw new NotSupportedException();
-
-        public IResourceStore GetResourceStore(RealmModel realm) => throw new NotSupportedException();
-    }
 }

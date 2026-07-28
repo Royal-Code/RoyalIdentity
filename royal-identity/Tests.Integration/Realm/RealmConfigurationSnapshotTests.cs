@@ -10,11 +10,11 @@ namespace Tests.Integration.Realm;
 /// loaded before traffic, a realm created at runtime becomes visible immediately (legacy write requests a
 /// reload), and reads hand out defensive copies.
 /// </summary>
-public class RealmConfigurationSnapshotTests : IClassFixture<AppFactory>
+public class RealmConfigurationSnapshotTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public RealmConfigurationSnapshotTests(AppFactory factory)
+    public RealmConfigurationSnapshotTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
         // Force the host (and its hosted services) to start.

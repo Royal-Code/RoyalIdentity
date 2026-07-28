@@ -7,11 +7,11 @@ using System.Collections.Concurrent;
 namespace Tests.Integration.Prepare;
 
 /// <summary>
-/// <see cref="AppFactory"/> variant that replaces <see cref="IBackChannelLogoutNotifier"/> with a
+/// <see cref="PersistentStorageAppFactory"/> variant that replaces <see cref="IBackChannelLogoutNotifier"/> with a
 /// capturing fake, so tests can assert which clients were notified on logout (and with which subject/sid).
 /// Last DI registration wins, so the capturing notifier is the one injected into the sign-out manager.
 /// </summary>
-public class BackChannelCapturingAppFactory : AppFactory
+public class BackChannelCapturingAppFactory : PersistentStorageAppFactory
 {
     public ConcurrentBag<LogoutBackChannelRequest> BackChannelCapture { get; } = [];
 

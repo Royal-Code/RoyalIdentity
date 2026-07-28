@@ -43,6 +43,9 @@ public class PersistentStorageAppFactory : AppFactoryBase
 
     public TestConfigurationResourceSource Resources => resourceSource;
 
+    public PersistentStorageScope CreateStorageScope()
+        => new(Services.CreateScope());
+
     internal string IdpConnectionString => lifetime.IdpConnectionString;
 
     internal string UserAccountsConnectionString => lifetime.UserAccountsConnectionString;
@@ -93,6 +96,7 @@ public class PersistentStorageAppFactory : AppFactoryBase
 
             services.AddScoped<PersistentClientSetup>();
             services.AddScoped<PersistentAccountSetup>();
+            services.AddScoped<PersistentOperationalSetup>();
             services.AddScoped<PersistentOperationalProbe>();
             InsertInitializerBeforeProtocolHostedServices(services);
             services.AddOperationalPayloadProfileStartupValidation();
@@ -126,6 +130,66 @@ public class PersistentStorageAppFactory : AppFactoryBase
     public async Task RefreshConfigurationAsync(CancellationToken ct = default)
     {
         using var scope = Services.CreateScope();
+        await scope.ServiceProvider
+            .GetRequiredService<IConfigurationSnapshotRefresher>()
+            .RefreshAsync(ct);
+    }
+
+    public async Task<TResult> WithStorageAsync<TResult>(
+        Func<IStorage, Task<TResult>> operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        using var scope = Services.CreateScope();
+        return await operation(scope.ServiceProvider.GetRequiredService<IStorage>());
+    }
+
+    public async Task<TResult> WithStorageValueAsync<TResult>(
+        Func<IStorage, ValueTask<TResult>> operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        using var scope = Services.CreateScope();
+        return await operation(scope.ServiceProvider.GetRequiredService<IStorage>());
+    }
+
+    public async Task WithStorageAsync(Func<IStorage, Task> operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        using var scope = Services.CreateScope();
+        await operation(scope.ServiceProvider.GetRequiredService<IStorage>());
+    }
+
+    public async Task WithStorageValueAsync(Func<IStorage, ValueTask> operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        using var scope = Services.CreateScope();
+        await operation(scope.ServiceProvider.GetRequiredService<IStorage>());
+    }
+
+    public async Task UpdateRealmAsync(
+        TestRealmHandle realmHandle,
+        Action<RealmOptions> update,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(realmHandle);
+        ArgumentNullException.ThrowIfNull(update);
+        using var scope = Services.CreateScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
+        var realm = await storage.Realms.GetByIdAsync(realmHandle.Id, ct)
+            ?? throw new InvalidOperationException($"Realm '{realmHandle.Id}' was not found.");
+        update(realm.Options);
+        await storage.Realms.SaveAsync(realm, ct);
+        await scope.ServiceProvider
+            .GetRequiredService<IConfigurationSnapshotRefresher>()
+            .RefreshAsync(ct);
+    }
+
+    public async Task SaveRealmAsync(
+        RoyalIdentity.Models.Realm realm,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IStorage>().Realms.SaveAsync(realm, ct);
         await scope.ServiceProvider
             .GetRequiredService<IConfigurationSnapshotRefresher>()
             .RefreshAsync(ct);
@@ -199,6 +263,32 @@ public class PersistentStorageAppFactory : AppFactoryBase
         await scope.ServiceProvider
             .GetRequiredService<PersistentAccountSetup>()
             .SetClaimAsync(realm.Id, subject.SubjectId, scopeName, claimType, values, ct);
+    }
+
+    public async Task EnsureAccountClaimDefinitionAsync(
+        TestRealmHandle realm,
+        string scopeName,
+        string claimType,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider
+            .GetRequiredService<PersistentAccountSetup>()
+            .EnsureClaimDefinitionAsync(realm.Id, scopeName, claimType, ct);
+    }
+
+    public async Task SetRefreshTokenConsumedTimeAsync(
+        TestRealmHandle realm,
+        string refreshToken,
+        DateTime consumedAtUtc,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider
+            .GetRequiredService<PersistentOperationalSetup>()
+            .SetRefreshTokenConsumedTimeAsync(realm.Id, refreshToken, consumedAtUtc, ct);
     }
 
     private void Provision()
@@ -325,4 +415,11 @@ public class PersistentStorageAppFactory : AppFactoryBase
             "demo_realm",
         ];
     }
+}
+
+public sealed class PersistentStorageScope(IServiceScope scope) : IDisposable
+{
+    public IStorage Storage { get; } = scope.ServiceProvider.GetRequiredService<IStorage>();
+
+    public void Dispose() => scope.Dispose();
 }

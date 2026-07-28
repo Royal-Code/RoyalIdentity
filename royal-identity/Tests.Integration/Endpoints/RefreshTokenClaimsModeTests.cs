@@ -11,7 +11,6 @@ using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Options;
 using RoyalIdentity.Responses.HttpResults;
 using Tests.Integration.Prepare;
-using RealmModel = RoyalIdentity.Models.Realm;
 
 namespace Tests.Integration.Endpoints;
 
@@ -22,45 +21,42 @@ namespace Tests.Integration.Endpoints;
 /// returned in the same response.
 /// </summary>
 [Collection(RefreshTokenClaimsModeCollection.Name)]
-public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
+public class RefreshTokenClaimsModeTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public RefreshTokenClaimsModeTests(AppFactory factory) => this.factory = factory;
+    public RefreshTokenClaimsModeTests(PersistentStorageAppFactory factory) => this.factory = factory;
 
-    private string RegisterClient(
+    private async Task<string> RegisterClientAsync(
         string clientId,
-        RealmModel? realm = null,
-        Action<Client>? configure = null)
+        TestRealmHandle? realm = null,
+        Action<TestClientBuilder>? configure = null)
     {
-        realm ??= MemoryStorage.DemoRealm;
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var client = new Client
+        realm ??= factory.Handles.Demo;
+        await factory.SaveClientAsync(realm, clientId, client =>
         {
-            Realm = realm,
-            Id = clientId,
-            Name = "Refresh Client",
-            RequireClientSecret = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = ["code", "refresh_token"],
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-        };
-        configure?.Invoke(client);
-        storage.GetRealmMemoryStore(realm).Clients.TryAdd(clientId, client);
+            client.Name = "Refresh Client";
+            client.RequireClientSecret = false;
+            client.AllowOfflineAccess = true;
+                client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+                client.AllowedScopes.Add("api");
+                client.AllowedResponseTypes.Add("code");
+            client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
+            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            configure?.Invoke(client);
+        });
 
         return clientId;
     }
 
-    private static Task<HttpResponseMessage> RefreshResponseAsync(
+    private Task<HttpResponseMessage> RefreshResponseAsync(
         HttpClient client,
         string refreshToken,
         string clientId,
-        RealmModel? realm = null,
+        TestRealmHandle? realm = null,
         string? resource = null)
     {
-        realm ??= MemoryStorage.DemoRealm;
+        realm ??= factory.Handles.Demo;
         var parameters = new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
@@ -75,8 +71,8 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
             new FormUrlEncodedContent(parameters));
     }
 
-    private static async Task<Dictionary<string, object>> RefreshAsync(
-        HttpClient client, string refreshToken, string clientId, RealmModel? realm = null)
+    private async Task<Dictionary<string, object>> RefreshAsync(
+        HttpClient client, string refreshToken, string clientId, TestRealmHandle? realm = null)
     {
         var response = await RefreshResponseAsync(client, refreshToken, clientId, realm);
         Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
@@ -125,7 +121,7 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Refresh_IdentityToken_HashesTheNewAccessToken()
     {
-        var clientId = RegisterClient("refresh_at_hash_client");
+        var clientId = await RegisterClientAsync("refresh_at_hash_client");
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(clientId: clientId);
@@ -147,13 +143,16 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Refresh_StillWorks_AfterThePreviousAccessTokenIsGone()
     {
-        var clientId = RegisterClient("refresh_no_access_token_client");
+        var clientId = await RegisterClientAsync("refresh_no_access_token_client");
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(clientId: clientId);
 
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        storage.GetDemoRealmStore().AccessTokens.Clear();
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var previousJti = ReadJwtPayload(issued.AccessToken!).GetProperty("jti").GetString();
+        Assert.NotNull(previousJti);
+        await factory.WithStorageAsync(
+            storage => storage.GetAccessTokenStore(realm).RemoveAsync(previousJti, default));
 
         var refreshed = await RefreshAsync(client, issued.RefreshToken!, clientId);
 
@@ -165,81 +164,70 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task IssuedRefreshToken_CarriesNoAccessTokenIdentifier()
     {
-        var clientId = RegisterClient("refresh_no_jti_client");
+        var clientId = await RegisterClientAsync("refresh_no_jti_client");
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(clientId: clientId);
 
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var stored = await storage.GetRefreshTokenStore(MemoryStorage.DemoRealm)
-            .GetAsync(issued.RefreshToken!, default);
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var stored = await factory.WithStorageAsync(
+            storage => storage.GetRefreshTokenStore(realm).GetAsync(issued.RefreshToken!, default));
 
         Assert.NotNull(stored);
         Assert.DoesNotContain(stored.Claims, claim => claim.Type == "jti");
     }
 
     /// <summary>Changes Alice's profile between the grant and the renewal, which is what tells the modes apart.</summary>
-    private IDisposable AddUserClaim(string type, string value, RealmModel? realm = null)
+    private async Task<IAsyncDisposable> AddUserClaimAsync(
+        string type,
+        string value,
+        TestRealmHandle? realm = null)
     {
-        realm ??= MemoryStorage.DemoRealm;
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var alice = storage.GetRealmMemoryStore(realm).UserAccounts.Values
-            .Single(user => user.SubjectId == MemoryStorage.AliceSubjectId);
-        var claim = new Claim(type, value);
-        alice.Claims.Add(claim);
+        realm ??= factory.Handles.Demo;
+        await factory.EnsureAccountClaimDefinitionAsync(realm, "profile", type);
+        await factory.SetAccountClaimAsync(
+            realm,
+            factory.Handles.Alice,
+            "profile",
+            type,
+            [value]);
 
-        return new Revert(() => alice.Claims.Remove(claim));
+        return new AsyncRevert(() => factory.SetAccountClaimAsync(
+            realm,
+            factory.Handles.Alice,
+            "profile",
+            type,
+            []));
     }
 
-    private IDisposable SetAliceActive(bool active, RealmModel? realm = null)
+    private async Task<IAsyncDisposable> SetAliceActiveAsync(
+        bool active,
+        TestRealmHandle? realm = null)
     {
-        realm ??= MemoryStorage.DemoRealm;
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var alice = storage.GetRealmMemoryStore(realm).UserAccounts.Values
-            .Single(user => user.SubjectId == MemoryStorage.AliceSubjectId);
-        var previous = alice.IsActive;
-        alice.IsActive = active;
-
-        return new Revert(() => alice.IsActive = previous);
+        realm ??= factory.Handles.Demo;
+        await factory.SetAccountActiveAsync(realm, factory.Handles.Alice, active);
+        return new AsyncRevert(
+            () => factory.SetAccountActiveAsync(realm, factory.Handles.Alice, !active));
     }
 
-    private IDisposable SeedAliceInServerRealm()
+    private sealed class AsyncRevert(Func<Task> revert) : IAsyncDisposable
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var demoAlice = storage.GetDemoRealmStore().UserAccounts["alice"];
-        var serverUsers = storage.GetServerRealmStore().UserAccounts;
-        serverUsers.TryGetValue("alice", out var previous);
-        serverUsers["alice"] = new MemoryUserAccount
-        {
-            SubjectId = demoAlice.SubjectId,
-            Username = demoAlice.Username,
-            PasswordHash = demoAlice.PasswordHash,
-            DisplayName = demoAlice.DisplayName,
-            IsActive = demoAlice.IsActive,
-            Claims = [.. demoAlice.Claims.Select(claim => new Claim(claim.Type, claim.Value, claim.ValueType))],
-        };
-
-        return new Revert(() =>
-        {
-            if (previous is null)
-                serverUsers.TryRemove("alice", out _);
-            else
-                serverUsers["alice"] = previous;
-        });
+        public ValueTask DisposeAsync() => new(revert());
     }
 
-    private sealed class Revert(Action revert) : IDisposable
+    private async Task<IAsyncDisposable> UseClaimsModeAsync(
+        RefreshTokenClaimsMode mode,
+        TestRealmHandle? realm = null)
     {
-        public void Dispose() => revert();
-    }
-
-    private IDisposable UseClaimsMode(RefreshTokenClaimsMode mode, RealmModel? realm = null)
-    {
-        realm ??= MemoryStorage.DemoRealm;
-        var previous = realm.Options.RefreshTokens.ClaimsMode;
-        realm.Options.RefreshTokens.ClaimsMode = mode;
-
-        return new Revert(() => realm.Options.RefreshTokens.ClaimsMode = previous);
+        realm ??= factory.Handles.Demo;
+        var materialized = await factory.LoadRealmAsync(realm);
+        var previous = materialized.Options.RefreshTokens.ClaimsMode;
+        await factory.UpdateRealmAsync(
+            realm,
+            options => options.RefreshTokens.ClaimsMode = mode);
+        return new AsyncRevert(() => factory.UpdateRealmAsync(
+            realm,
+            options => options.RefreshTokens.ClaimsMode = previous));
     }
 
     // DF32: Current re-runs issuance against the claims the provider gives now, so a claim added after the grant
@@ -247,15 +235,15 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task CurrentMode_ReflectsAClaimAddedAfterTheGrant()
     {
-        var clientId = RegisterClient("refresh_current_mode_client");
-        using var mode = UseClaimsMode(RefreshTokenClaimsMode.Current);
+        var clientId = await RegisterClientAsync("refresh_current_mode_client");
+        await using var mode = await UseClaimsModeAsync(RefreshTokenClaimsMode.Current);
 
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(clientId: clientId);
         Assert.False(ReadJwtPayload(issued.AccessToken!).TryGetProperty("website", out _));
 
-        using var claim = AddUserClaim("website", "https://alice.example");
+        await using var claim = await AddUserClaimAsync("website", "https://alice.example");
         var refreshed = await RefreshAsync(client, issued.RefreshToken!, clientId);
         var accessToken = ReadJwtPayload(refreshed["access_token"].ToString()!);
         var identityToken = ReadJwtPayload(refreshed["id_token"].ToString()!);
@@ -271,14 +259,14 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task CurrentMode_ReflectsAClaimRemovedAfterTheGrant_InBothTokens()
     {
-        var clientId = RegisterClient("refresh_current_removed_claim_client");
-        using var mode = UseClaimsMode(RefreshTokenClaimsMode.Current);
+        var clientId = await RegisterClientAsync("refresh_current_removed_claim_client");
+        await using var mode = await UseClaimsModeAsync(RefreshTokenClaimsMode.Current);
 
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
 
         TokenEndpointParameters issued;
-        using (AddUserClaim("website", "https://removed-before-refresh.example"))
+        await using (await AddUserClaimAsync("website", "https://removed-before-refresh.example"))
         {
             issued = await client.GetTokensAsync(clientId: clientId);
             Assert.Equal(
@@ -300,14 +288,14 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task SnapshotMode_IgnoresAClaimAddedAfterTheGrant_InBothTokens()
     {
-        var clientId = RegisterClient("refresh_snapshot_mode_client");
-        using var mode = UseClaimsMode(RefreshTokenClaimsMode.Snapshot);
+        var clientId = await RegisterClientAsync("refresh_snapshot_mode_client");
+        await using var mode = await UseClaimsModeAsync(RefreshTokenClaimsMode.Snapshot);
 
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(clientId: clientId);
 
-        using var claim = AddUserClaim("website", "https://added-after.example");
+        await using var claim = await AddUserClaimAsync("website", "https://added-after.example");
         var refreshed = await RefreshAsync(client, issued.RefreshToken!, clientId);
 
         var accessToken = ReadJwtPayload(refreshed["access_token"].ToString()!);
@@ -324,20 +312,20 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task SnapshotMode_PreservesTheOriginalClaims_WithoutCopyingAccessOnlyClaimsIntoTheIdentityToken()
     {
-        var clientId = RegisterClient(
+        var clientId = await RegisterClientAsync(
             "refresh_snapshot_distinct_claim_sets_client",
             configure: client =>
             {
                 client.ClientClaimsPrefix = string.Empty;
                 client.Claims.Add(new Claim("access_only", "client-value"));
             });
-        using var mode = UseClaimsMode(RefreshTokenClaimsMode.Snapshot);
+        await using var mode = await UseClaimsModeAsync(RefreshTokenClaimsMode.Snapshot);
 
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
 
         TokenEndpointParameters issued;
-        using (AddUserClaim("website", "https://snapshot.example"))
+        await using (await AddUserClaimAsync("website", "https://snapshot.example"))
             issued = await client.GetTokensAsync(clientId: clientId);
 
         var refreshed = await RefreshAsync(client, issued.RefreshToken!, clientId);
@@ -357,30 +345,40 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task TwoRealms_WithDifferentModes_DoNotShareClaimsPolicy()
     {
-        using var serverAlice = SeedAliceInServerRealm();
-        using var currentMode = UseClaimsMode(RefreshTokenClaimsMode.Current, MemoryStorage.DemoRealm);
-        using var snapshotMode = UseClaimsMode(RefreshTokenClaimsMode.Snapshot, MemoryStorage.ServerRealm);
-        var currentClientId = RegisterClient("refresh_two_realms_current", MemoryStorage.DemoRealm);
-        var snapshotClientId = RegisterClient("refresh_two_realms_snapshot", MemoryStorage.ServerRealm);
+        await using var currentMode = await UseClaimsModeAsync(
+            RefreshTokenClaimsMode.Current,
+            factory.Handles.Demo);
+        await using var snapshotMode = await UseClaimsModeAsync(
+            RefreshTokenClaimsMode.Snapshot,
+            factory.Handles.Server);
+        var currentClientId = await RegisterClientAsync(
+            "refresh_two_realms_current",
+            factory.Handles.Demo);
+        var snapshotClientId = await RegisterClientAsync(
+            "refresh_two_realms_snapshot",
+            factory.Handles.Server);
 
         var currentClient = factory.CreateClient();
         await currentClient.LoginAliceAsync();
         var currentIssued = await currentClient.GetTokensAsync(clientId: currentClientId);
 
         var snapshotClient = factory.CreateClient();
-        await snapshotClient.LoginAsync("alice", "alice", MemoryStorage.ServerRealm.Path);
+        await snapshotClient.LoginAsync(
+            factory.Handles.Alice.Username,
+            factory.Handles.Alice.Password,
+            factory.Handles.Server.Path);
         var snapshotIssued = await snapshotClient.GetTokensAsync(
-            snapshotClientId, "openid profile offline_access", MemoryStorage.ServerRealm.Path);
+            snapshotClientId, "openid profile offline_access", factory.Handles.Server.Path);
 
-        using var demoClaim = AddUserClaim(
-            "website", "https://current-realm.example", MemoryStorage.DemoRealm);
-        using var serverClaim = AddUserClaim(
-            "website", "https://snapshot-realm.example", MemoryStorage.ServerRealm);
+        await using var demoClaim = await AddUserClaimAsync(
+            "website", "https://current-realm.example", factory.Handles.Demo);
+        await using var serverClaim = await AddUserClaimAsync(
+            "website", "https://snapshot-realm.example", factory.Handles.Server);
 
         var currentRefreshed = await RefreshAsync(
-            currentClient, currentIssued.RefreshToken!, currentClientId, MemoryStorage.DemoRealm);
+            currentClient, currentIssued.RefreshToken!, currentClientId, factory.Handles.Demo);
         var snapshotRefreshed = await RefreshAsync(
-            snapshotClient, snapshotIssued.RefreshToken!, snapshotClientId, MemoryStorage.ServerRealm);
+            snapshotClient, snapshotIssued.RefreshToken!, snapshotClientId, factory.Handles.Server);
 
         Assert.Equal(
             "https://current-realm.example",
@@ -393,7 +391,7 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task ConsumedToken_WithZeroTolerance_IsRejected()
     {
-        var clientId = RegisterClient(
+        var clientId = await RegisterClientAsync(
             "refresh_zero_tolerance_client",
             configure: client => client.RefreshTokenPostConsumedTimeTolerance = TimeSpan.Zero);
         var client = factory.CreateClient();
@@ -407,7 +405,7 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task ConsumedToken_WithinFiniteTolerance_IsAccepted()
     {
-        var clientId = RegisterClient(
+        var clientId = await RegisterClientAsync(
             "refresh_finite_tolerance_client",
             configure: client => client.RefreshTokenPostConsumedTimeTolerance = TimeSpan.FromMinutes(5));
         var client = factory.CreateClient();
@@ -423,7 +421,7 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task ConsumedToken_OutsideFiniteTolerance_IsRejectedUsingThePersistedTimestamp()
     {
-        var clientId = RegisterClient(
+        var clientId = await RegisterClientAsync(
             "refresh_expired_finite_tolerance_client",
             configure: client => client.RefreshTokenPostConsumedTimeTolerance = TimeSpan.FromMinutes(5));
         var client = factory.CreateClient();
@@ -431,13 +429,15 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
         var issued = await client.GetTokensAsync(clientId: clientId);
         await RefreshAsync(client, issued.RefreshToken!, clientId);
 
-        var store = factory.Services.GetRequiredService<IStorage>()
-            .GetRefreshTokenStore(MemoryStorage.DemoRealm);
-        var consumed = await store.GetAsync(issued.RefreshToken!, default);
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var consumed = await factory.WithStorageAsync(
+            storage => storage.GetRefreshTokenStore(realm).GetAsync(issued.RefreshToken!, default));
         Assert.NotNull(consumed);
         Assert.NotNull(consumed!.ConsumedTime);
-        consumed.ConsumedTime = consumed.ConsumedTime.Value.AddMinutes(-6);
-        await store.UpdateAsync(consumed, default);
+        await factory.SetRefreshTokenConsumedTimeAsync(
+            factory.Handles.Demo,
+            issued.RefreshToken!,
+            consumed.ConsumedTime.Value.AddMinutes(-6));
 
         await AssertInvalidGrantAsync(await RefreshResponseAsync(client, issued.RefreshToken!, clientId));
     }
@@ -445,7 +445,7 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task ConsumedToken_WithInfiniteTolerance_IsAccepted()
     {
-        var clientId = RegisterClient(
+        var clientId = await RegisterClientAsync(
             "refresh_infinite_tolerance_client",
             configure: client =>
             {
@@ -467,13 +467,14 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [InlineData(RefreshTokenClaimsMode.Snapshot)]
     public async Task BothClaimsModes_RejectAnInactiveSubject(RefreshTokenClaimsMode claimsMode)
     {
-        var clientId = RegisterClient($"refresh_inactive_{claimsMode.ToString().ToLowerInvariant()}");
-        using var mode = UseClaimsMode(claimsMode);
+        var clientId = await RegisterClientAsync(
+            $"refresh_inactive_{claimsMode.ToString().ToLowerInvariant()}");
+        await using var mode = await UseClaimsModeAsync(claimsMode);
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(clientId: clientId);
 
-        using var inactive = SetAliceActive(false);
+        await using var inactive = await SetAliceActiveAsync(false);
         await AssertInvalidGrantAsync(await RefreshResponseAsync(client, issued.RefreshToken!, clientId));
     }
 
@@ -482,18 +483,19 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [InlineData(RefreshTokenClaimsMode.Snapshot)]
     public async Task BothClaimsModes_RejectAnEndedSession(RefreshTokenClaimsMode claimsMode)
     {
-        var clientId = RegisterClient($"refresh_ended_session_{claimsMode.ToString().ToLowerInvariant()}");
-        using var mode = UseClaimsMode(claimsMode);
+        var clientId = await RegisterClientAsync(
+            $"refresh_ended_session_{claimsMode.ToString().ToLowerInvariant()}");
+        await using var mode = await UseClaimsModeAsync(claimsMode);
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(clientId: clientId);
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var refreshToken = await storage.GetRefreshTokenStore(MemoryStorage.DemoRealm)
-            .GetAsync(issued.RefreshToken!, default);
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var refreshToken = await factory.WithStorageAsync(
+            storage => storage.GetRefreshTokenStore(realm).GetAsync(issued.RefreshToken!, default));
         Assert.NotNull(refreshToken);
         Assert.NotNull(refreshToken!.SessionId);
-        await storage.GetUserSessionStore(MemoryStorage.DemoRealm)
-            .EndAsync(refreshToken.SessionId!, default);
+        await factory.WithStorageAsync(
+            storage => storage.GetUserSessionStore(realm).EndAsync(refreshToken.SessionId!, default));
 
         await AssertInvalidGrantAsync(await RefreshResponseAsync(client, issued.RefreshToken!, clientId));
     }
@@ -501,7 +503,7 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task InvalidTargetAfterTheCas_LeavesTheRefreshTokenConsumed()
     {
-        var clientId = RegisterClient(
+        var clientId = await RegisterClientAsync(
             "refresh_invalid_target_after_cas_client",
             configure: client =>
             {
@@ -512,24 +514,25 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var issued = await client.GetTokensAsync(
             clientId, "openid profile offline_access api");
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var original = await storage.GetRefreshTokenStore(MemoryStorage.DemoRealm)
-            .GetAsync(issued.RefreshToken!, default);
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var original = await factory.WithStorageAsync(
+            storage => storage.GetRefreshTokenStore(realm).GetAsync(issued.RefreshToken!, default));
         Assert.NotNull(original);
-        original!.ResourceUris.Add("https://api.demo.local/apiserver");
-        await storage.GetRefreshTokenStore(MemoryStorage.DemoRealm).UpdateAsync(original, default);
         var resourceServerName = $"refresh-unauthorized-{Guid.NewGuid():N}";
         var unauthorizedResource = $"https://unauthorized.example/{Guid.NewGuid():N}";
-        storage.GetDemoRealmStore().ResourceServers[resourceServerName] = new ResourceServer(
+        factory.Resources.SetResourceServer(factory.Handles.Demo.Id, new ResourceServer(
             ScopeVisibility.Public,
             resourceServerName,
             "Unauthorized resource",
             "Known by the realm but outside the original grant")
         {
             ProtectedResources = [new ProtectedResource(unauthorizedResource)],
-        };
-        using var resource = new Revert(
-            () => storage.GetDemoRealmStore().ResourceServers.TryRemove(resourceServerName, out _));
+        });
+        await using var resource = new AsyncRevert(() =>
+        {
+            factory.Resources.RemoveResourceServer(factory.Handles.Demo.Id, resourceServerName);
+            return Task.CompletedTask;
+        });
 
         var invalidTarget = await RefreshResponseAsync(
             client,
@@ -538,9 +541,8 @@ public class RefreshTokenClaimsModeTests : IClassFixture<AppFactory>
             resource: unauthorizedResource);
         await AssertProtocolErrorAsync(invalidTarget, "invalid_target");
 
-        var persisted = await factory.Services.GetRequiredService<IStorage>()
-            .GetRefreshTokenStore(MemoryStorage.DemoRealm)
-            .GetAsync(issued.RefreshToken!, default);
+        var persisted = await factory.WithStorageAsync(
+            storage => storage.GetRefreshTokenStore(realm).GetAsync(issued.RefreshToken!, default));
         Assert.NotNull(persisted?.ConsumedTime);
 
         await AssertInvalidGrantAsync(await RefreshResponseAsync(client, issued.RefreshToken!, clientId));

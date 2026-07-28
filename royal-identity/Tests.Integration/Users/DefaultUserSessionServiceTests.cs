@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Diagnostics.CodeAnalysis;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
@@ -19,7 +20,7 @@ public class DefaultUserSessionServiceTests
     {
         public RoyalIdentity.Models.Realm GetCurrentRealm() => realm;
 
-        public bool TryGetCurrentRealm(out RoyalIdentity.Models.Realm? r)
+        public bool TryGetCurrentRealm([NotNullWhen(true)] out RoyalIdentity.Models.Realm? r)
         {
             r = realm;
             return true;
@@ -44,8 +45,15 @@ public class DefaultUserSessionServiceTests
     private static (DefaultUserSessionService service, ControlledTimeProvider clock) Build()
     {
         var clock = new ControlledTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
-        var storage = new MemoryStorage(clock);
-        var accessor = new FakeRealmAccessor(MemoryStorage.DemoRealm);
+        var storage = new SessionStorageDouble(clock);
+        var realm = new RoyalIdentity.Models.Realm(
+            "session-tests",
+            "session-tests.example",
+            "session-tests",
+            "Session Tests",
+            false,
+            new RoyalIdentity.Options.RealmOptions(new RoyalIdentity.Options.ServerOptions()));
+        var accessor = new FakeRealmAccessor(realm);
         return (new DefaultUserSessionService(storage, accessor, new StubUserDirectory(), clock), clock);
     }
 

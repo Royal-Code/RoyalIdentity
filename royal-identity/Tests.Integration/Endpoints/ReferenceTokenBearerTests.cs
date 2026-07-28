@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models.Tokens;
+using RoyalIdentity.Options;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
@@ -18,20 +19,33 @@ namespace Tests.Integration.Endpoints;
 /// EF provider under <c>Metadata</c>/<c>Full</c> (plan DF31) — must never turn it into an opaque credential.
 /// </para>
 /// </summary>
-public class ReferenceTokenBearerTests : IClassFixture<AppFactory>
+public class ReferenceTokenBearerTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public ReferenceTokenBearerTests(AppFactory factory) => this.factory = factory;
+    public ReferenceTokenBearerTests(PersistentStorageAppFactory factory) => this.factory = factory;
 
-    private static string UserInfoUrl => Oidc.Routes.BuildUserInfoUrl(MemoryStorage.DemoRealm.Path);
+    private string UserInfoUrl => Oidc.Routes.BuildUserInfoUrl(factory.Handles.Demo.Path);
 
-    private static async Task<HttpResponseMessage> GetUserInfoAsync(HttpClient client, string bearer)
+    private async Task<HttpResponseMessage> GetUserInfoAsync(HttpClient client, string bearer)
     {
         var message = new HttpRequestMessage(HttpMethod.Get, UserInfoUrl);
         message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearer);
 
         return await client.SendAsync(message);
+    }
+
+    private async Task<IAsyncDisposable> UseJwtPersistenceAsync()
+    {
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var previous = realm.Options.OperationalStorage.JwtAccessTokenPersistence;
+        await factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options => options.OperationalStorage.JwtAccessTokenPersistence =
+                JwtAccessTokenPersistenceMode.Metadata);
+        return new AsyncRevert(() => factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options => options.OperationalStorage.JwtAccessTokenPersistence = previous));
     }
 
     /// <summary>Reads a claim straight from the JWT payload — exactly what a token holder can do.</summary>
@@ -51,6 +65,7 @@ public class ReferenceTokenBearerTests : IClassFixture<AppFactory>
     [Fact]
     public async Task JwtAccessToken_JtiPresentedAsAnOpaqueBearer_IsRejectedLikeAnUnknownHandle()
     {
+        await using var persistence = await UseJwtPersistenceAsync();
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var accessToken = (await client.GetTokensAsync()).AccessToken!;
@@ -87,13 +102,14 @@ public class ReferenceTokenBearerTests : IClassFixture<AppFactory>
     [Fact]
     public async Task ReferenceAccessToken_IsAccepted()
     {
+        await using var persistence = await UseJwtPersistenceAsync();
         var client = factory.CreateClient();
         await client.LoginAliceAsync();
         var jwt = (await client.GetTokensAsync()).AccessToken!;
 
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var realm = MemoryStorage.DemoRealm;
-        var issued = await storage.GetAccessTokenStore(realm).GetAsync(ReadJwtClaim(jwt, "jti"), default);
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var issued = await factory.WithStorageAsync(
+            storage => storage.GetAccessTokenStore(realm).GetAsync(ReadJwtClaim(jwt, "jti"), default));
         Assert.NotNull(issued);
 
         // Same subject, client and claims as the JWT above, but issued as a reference token.
@@ -112,10 +128,16 @@ public class ReferenceTokenBearerTests : IClassFixture<AppFactory>
         foreach (var claim in issued.Claims.Where(claim => claim.Type != "jti"))
             reference.Claims.Add(claim);
 
-        await storage.GetAccessTokenStore(realm).StoreAsync(reference, default);
+        await factory.WithStorageAsync(
+            storage => storage.GetAccessTokenStore(realm).StoreAsync(reference, default));
 
         var response = await GetUserInfoAsync(client, bearer);
 
         Assert.True(response.IsSuccessStatusCode);
+    }
+
+    private sealed class AsyncRevert(Func<Task> revert) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() => new(revert());
     }
 }

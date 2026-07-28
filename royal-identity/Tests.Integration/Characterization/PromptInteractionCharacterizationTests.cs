@@ -17,7 +17,7 @@ namespace Tests.Integration.Characterization;
 public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTimeAppFactory>
 {
     private static readonly DateTimeOffset BaseTime =
-        new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        new(2026, 7, 29, 0, 0, 0, TimeSpan.Zero);
 
     private readonly ControlledTimeAppFactory factory;
 
@@ -26,12 +26,12 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
         this.factory = factory;
     }
 
-    private static string BuildAuthorizeUrl(params (string key, string value)[] extra)
+    private string BuildAuthorizeUrl(params (string key, string value)[] extra)
         => BuildAuthorizeUrlForClient("demo_client", extra);
 
-    private static string BuildAuthorizeUrlForClient(string clientId, params (string key, string value)[] extra)
+    private string BuildAuthorizeUrlForClient(string clientId, params (string key, string value)[] extra)
     {
-        var url = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var url = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", clientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -52,10 +52,10 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
         factory.Clock.SetUtcNow(BaseTime);
 
         // baseline: a fresh, authenticated session goes straight to the callback with a code
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
+        await CharacterizationSeed.PostLoginAsync(
+            client, subject.Username, subject.Password, factory.Handles.Demo.Path);
 
         var response = await client.GetAsync(BuildAuthorizeUrl());
 
@@ -70,10 +70,10 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
     {
         factory.Clock.SetUtcNow(BaseTime);
 
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
+        await CharacterizationSeed.PostLoginAsync(
+            client, subject.Username, subject.Password, factory.Handles.Demo.Path);
 
         var response = await client.GetAsync(BuildAuthorizeUrl(("prompt", "login")));
 
@@ -88,10 +88,10 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
     {
         factory.Clock.SetUtcNow(BaseTime);
 
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
+        await CharacterizationSeed.PostLoginAsync(
+            client, subject.Username, subject.Password, factory.Handles.Demo.Path);
 
         // max_age=0 means "authentication must be effectively now"; one second later is too old.
         factory.Clock.Advance(TimeSpan.FromSeconds(1));
@@ -108,26 +108,24 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
     {
         factory.Clock.SetUtcNow(BaseTime);
 
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
 
         var clientId = $"sso-client-{CryptoRandom.CreateUniqueId(6)}";
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, registered =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "User SSO Lifetime Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            UserSsoLifetime = 60,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid", "profile" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
+            registered.Name = "User SSO Lifetime Client";
+            registered.RequireClientSecret = false;
+            registered.RequirePkce = false;
+            registered.UserSsoLifetime = 60;
+            registered.AllowedGrantTypes.Add("authorization_code");
+            registered.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
+            registered.AllowedResponseTypes.Add("code");
+            registered.RedirectUris.Add("http://localhost:5000/**");
+        });
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
+        await CharacterizationSeed.PostLoginAsync(
+            client, subject.Username, subject.Password, factory.Handles.Demo.Path);
 
         var freshResponse = await client.GetAsync(BuildAuthorizeUrlForClient(clientId));
 

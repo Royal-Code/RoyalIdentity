@@ -5,13 +5,18 @@
     <UserSecretsId>3c952316-4b37-4038-9e98-176eee0257df</UserSecretsId>
   </PropertyGroup>
 
+  <!--
+    The AppHost is a composition root, like RoyalIdentity.Migrations: it may reference the web host and the
+    provisioning runner together because it never translates types between them, it only orchestrates their
+    lifetimes. RoyalIdentity.Server itself keeps no reference to the runner (plan DF15).
+  -->
   <ItemGroup>
-    <ProjectReference Include="..\Aspire.ApiService\Aspire.ApiService.csproj" />
-    <ProjectReference Include="..\Aspire.Web\Aspire.Web.csproj" />
+    <ProjectReference Include="..\..\RoyalIdentity.Migrations\RoyalIdentity.Migrations.csproj" />
+    <ProjectReference Include="..\..\RoyalIdentity.Server\RoyalIdentity.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
   </ItemGroup>
 
 </Project>

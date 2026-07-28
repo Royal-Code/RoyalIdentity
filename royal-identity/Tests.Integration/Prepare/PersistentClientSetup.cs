@@ -112,6 +112,12 @@ public sealed class TestClientBuilder
         set => client.AllowRememberConsent = value;
     }
 
+    public bool AllowLogoutWithoutUserConfirmation
+    {
+        get => client.AllowLogoutWithoutUserConfirmation;
+        set => client.AllowLogoutWithoutUserConfirmation = value;
+    }
+
     public bool AlwaysIncludeUserClaimsInIdToken
     {
         get => client.AlwaysIncludeUserClaimsInIdToken;
@@ -211,6 +217,10 @@ public sealed class TestClientBuilder
     public ISet<string> RedirectUris => client.RedirectUris;
 
     public ISet<string> PostLogoutRedirectUris => client.PostLogoutRedirectUris;
+
+    public ISet<string> FrontChannelLogoutUris => client.FrontChannelLogoutUri;
+
+    public ISet<string> BackChannelLogoutUris => client.BackChannelLogoutUri;
 
     public ISet<string> AllowedCorsOrigins => client.AllowedCorsOrigins;
 

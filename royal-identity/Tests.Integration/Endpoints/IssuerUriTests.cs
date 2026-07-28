@@ -20,11 +20,11 @@ namespace Tests.Integration.Endpoints;
 /// correctness depended on the backing handing out one shared options instance that an earlier request had
 /// populated.
 /// </summary>
-public class IssuerUriTests : IClassFixture<AppFactory>
+public class IssuerUriTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public IssuerUriTests(AppFactory factory) => this.factory = factory;
+    public IssuerUriTests(PersistentStorageAppFactory factory) => this.factory = factory;
 
     [Fact]
     public async Task Discovery_PublishesTheIssuerDerivedFromTheRequest()
@@ -32,11 +32,11 @@ public class IssuerUriTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
 
         var document = await client.GetFromJsonAsync<JsonElement>(
-            Oidc.Routes.BuildDiscoveryConfigurationUrl(MemoryStorage.DemoRealm.Path));
+            Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path));
 
         var issuer = document.GetProperty("issuer").GetString();
 
-        Assert.Equal($"{client.BaseAddress!.ToString().TrimEnd('/')}/{MemoryStorage.DemoRealm.Path}", issuer);
+        Assert.Equal($"{client.BaseAddress!.ToString().TrimEnd('/')}/{factory.Handles.Demo.Path}", issuer);
     }
 
     // The derivation itself: one origin, one realm segment, no repetition — and it does not depend on, nor
@@ -84,21 +84,21 @@ public class IssuerUriTests : IClassFixture<AppFactory>
     public async Task AnIssuedToken_CarriesTheDerivedIssuer_AndIsAcceptedByAProtectedEndpoint()
     {
         var client = factory.CreateClient();
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var realm = await storage.Realms.GetByPathAsync(MemoryStorage.DemoRealm.Path, default);
+        var realm = await factory.WithStorageValueAsync(
+            storage => storage.Realms.GetByPathAsync(factory.Handles.Demo.Path, default));
 
         Assert.NotNull(realm);
         // The realm derives its issuer; nothing has pinned it, and nothing below may pin it either.
         Assert.Null(realm.Options.IssuerUri);
 
-        var expectedIssuer = $"{client.BaseAddress!.ToString().TrimEnd('/')}/{MemoryStorage.DemoRealm.Path}";
+        var expectedIssuer = $"{client.BaseAddress!.ToString().TrimEnd('/')}/{factory.Handles.Demo.Path}";
         var accessToken = await IssueAccessTokenAsync(client);
 
         Assert.Equal(expectedIssuer, IssuerOf(accessToken));
 
         // Accepted by a protected endpoint, which validates the signature and the issuer.
         var request = new HttpRequestMessage(
-            HttpMethod.Get, Oidc.Routes.BuildUserInfoUrl(MemoryStorage.DemoRealm.Path));
+            HttpMethod.Get, Oidc.Routes.BuildUserInfoUrl(factory.Handles.Demo.Path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var userInfo = await client.SendAsync(request);
 
@@ -107,18 +107,19 @@ public class IssuerUriTests : IClassFixture<AppFactory>
             $"userinfo rejected the token: {userInfo.StatusCode} {await userInfo.Content.ReadAsStringAsync()}");
 
         // Issuing and validating never pinned the issuer onto the realm options.
-        var reloaded = await storage.Realms.GetByPathAsync(MemoryStorage.DemoRealm.Path, default);
+        var reloaded = await factory.WithStorageValueAsync(
+            storage => storage.Realms.GetByPathAsync(factory.Handles.Demo.Path, default));
         Assert.Null(reloaded!.Options.IssuerUri);
     }
 
     /// <summary>Runs the authorization-code flow far enough to hold a real access token.</summary>
-    private static async Task<string> IssueAccessTokenAsync(HttpClient client)
+    private async Task<string> IssueAccessTokenAsync(HttpClient client)
     {
         var codeVerifier = CryptoRandom.CreateUniqueId();
         var codeChallenge = Base64Url.Encode(Encoding.ASCII.GetBytes(codeVerifier).Sha256());
         var redirectUri = $"{client.BaseAddress}callback";
 
-        var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -140,7 +141,7 @@ public class IssuerUriTests : IClassFixture<AppFactory>
             await callback.Content.ReadAsStringAsync())!;
 
         var tokenResponse = await client.PostAsync(
-            Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path),
+            Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path),
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["grant_type"] = "authorization_code",

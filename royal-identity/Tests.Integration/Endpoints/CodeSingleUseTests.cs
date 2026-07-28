@@ -13,12 +13,11 @@ namespace Tests.Integration.Endpoints;
 /// the first exchange whatever happens afterwards, an unmatched client or redirect URI consumes nothing, and
 /// none of these outcomes is distinguishable from another.
 /// <para>
-/// These run over the default in-memory backing, which takes the transitional non-atomic path (DF39): the
-/// observable semantics asserted here are the same in both worlds, while the atomicity acceptance under real
-/// concurrency belongs to the EF provider and lives in <c>Tests.Storage</c>.
+/// These run over the canonical EF backing and therefore exercise the atomic consume path. The dedicated
+/// concurrency acceptance remains in <c>Tests.Storage</c>.
 /// </para>
 /// </summary>
-public class CodeSingleUseTests : IClassFixture<AppFactory>
+public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
 {
     private static readonly string[] ScopeNames = ["openid", "profile"];
 
@@ -29,35 +28,37 @@ public class CodeSingleUseTests : IClassFixture<AppFactory>
 
     private const string RedirectUri = "http://localhost:5000/callback";
 
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public CodeSingleUseTests(AppFactory factory) => this.factory = factory;
+    public CodeSingleUseTests(PersistentStorageAppFactory factory) => this.factory = factory;
 
     private async Task<AuthorizationCode> SeedCodeAsync(
         string? codeChallenge = null, string? codeChallengeMethod = null, DateTime? creationTime = null)
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm)
-            .FindResourcesByScopeAsync(ScopeNames, default);
-
-        var code = new AuthorizationCode(
-            ClientId,
-            SubjectFactory.CreateWithSession(
-                storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            creationTime ?? DateTime.UtcNow,
-            300,
-            resources,
-            RedirectUri)
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        return await factory.WithStorageAsync(async storage =>
         {
-            CodeChallenge = codeChallenge,
-            CodeChallengeMethod = codeChallengeMethod,
-        };
+            var resources = await storage.GetResourceStore(realm)
+                .FindResourcesByScopeAsync(ScopeNames, default);
 
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm)
-            .StoreAuthorizationCodeAsync(code, default);
+            var code = new AuthorizationCode(
+                ClientId,
+                SubjectFactory.CreateWithSession(
+                    storage, realm, factory.Handles.Alice.SubjectId, "Test Name", "admin"),
+                "session",
+                creationTime ?? DateTime.UtcNow,
+                300,
+                resources,
+                RedirectUri)
+            {
+                CodeChallenge = codeChallenge,
+                CodeChallengeMethod = codeChallengeMethod,
+            };
 
-        return code;
+            await storage.GetAuthorizationCodeStore(realm)
+                .StoreAuthorizationCodeAsync(code, default);
+            return code;
+        });
     }
 
     private async Task<HttpResponseMessage> ExchangeAsync(
@@ -78,7 +79,7 @@ public class CodeSingleUseTests : IClassFixture<AppFactory>
             form["code_verifier"] = codeVerifier;
 
         return await factory.CreateClient().PostAsync(
-            Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path), new FormUrlEncodedContent(form));
+            Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path), new FormUrlEncodedContent(form));
     }
 
     private static async Task<(string Error, string? Description)> ReadErrorAsync(HttpResponseMessage response)

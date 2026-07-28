@@ -12,14 +12,15 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Tests.Integration.Prepare;
 using RoyalIdentity.Contracts.Defaults;
+using RoyalIdentity.Options;
 
 namespace Tests.Integration.Realm;
 
-public class RealmIsolationTests : IClassFixture<AppFactory>
+public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public RealmIsolationTests(AppFactory factory)
+    public RealmIsolationTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -29,7 +30,49 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         using var scope = factory.Services.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IRealmManager>();
         var path = $"realm-b-{suffix}";
-        return await manager.CreateAsync(path, $"{path}.test", $"Test Realm {suffix}");
+        var realm = await manager.CreateAsync(path, $"{path}.test", $"Test Realm {suffix}");
+        factory.Resources.SetResourceServer(
+            realm.Id,
+            TestConfigurationResourceSource.CreateDemoResourceServer());
+        await factory.RefreshConfigurationAsync();
+        return realm;
+    }
+
+    private Task SaveClientAsync(
+        RoyalIdentity.Models.Realm realm,
+        string clientId,
+        string? secret = null,
+        Action<TestClientBuilder>? configure = null)
+        => factory.SaveClientAsync(new TestRealmHandle(realm.Id, realm.Path), clientId, client =>
+        {
+            client.Name = $"Realm isolation client {clientId}";
+            client.RequireClientSecret = secret is not null;
+            client.RequirePkce = false;
+            client.AllowedGrantTypes.Add("client_credentials");
+            client.AllowedScopes.Add("api");
+            client.AllowedResourceServers.Add("apiserver");
+            client.AllowedResponseTypes.Add("code");
+            if (secret is not null)
+                client.Secrets.Add(new ClientSecret(secret.Sha512()));
+            configure?.Invoke(client);
+        });
+
+    private async Task<IAsyncDisposable> UseJwtPersistenceAsync()
+    {
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var previous = realm.Options.OperationalStorage.JwtAccessTokenPersistence;
+        await factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options => options.OperationalStorage.JwtAccessTokenPersistence =
+                JwtAccessTokenPersistenceMode.Metadata);
+        return new AsyncRevert(() => factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options => options.OperationalStorage.JwtAccessTokenPersistence = previous));
+    }
+
+    private sealed class AsyncRevert(Func<Task> revert) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() => new(revert());
     }
 
     // ─── Phase 2: RealmDiscoveryMiddleware ────────────────────────────────────
@@ -56,7 +99,8 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task ClientIsolation_ClientInRealmA_NotFoundInRealmB()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         var clientB = await storage.GetClientStore(realmB).FindClientByIdAsync("demo_client", default);
 
@@ -67,18 +111,16 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task ClientIsolation_SameClientId_DifferentRealms_ReturnDifferentClients()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
-
-        memStorage.GetRealmMemoryStore(realmB).Clients["demo_client"] = new RoyalIdentity.Models.Client
+        await SaveClientAsync(realmB, "demo_client", configure: client =>
         {
-            Realm = realmB,
-            Id = "demo_client",
-            Name = "Demo Client in Realm B",
-            RedirectUris = { "http://realm-b.example.com/callback" }
-        };
+            client.Name = "Demo Client in Realm B";
+            client.RedirectUris.Add("http://realm-b.example.com/callback");
+        });
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
-        var clientA = await storage.GetClientStore(MemoryStorage.DemoRealm).FindClientByIdAsync("demo_client", default);
+        var clientA = await storage.GetClientStore(demoRealm).FindClientByIdAsync("demo_client", default);
         var clientB = await storage.GetClientStore(realmB).FindClientByIdAsync("demo_client", default);
 
         Assert.NotNull(clientA);
@@ -113,25 +155,15 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task TokenStoreIsolation_AccessTokenStoredOnlyInIssuingRealm()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        await using var persistence = await UseJwtPersistenceAsync();
         var clientId = $"cc-client-{CryptoRandom.CreateUniqueId(6)}";
         var secret = CryptoRandom.CreateUniqueId();
 
-        memStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Test CC Client",
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            AllowedScopes = { "api" },
-            AllowedResponseTypes = { "code" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secret.Sha512()) }
-        });
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        await SaveClientAsync(demoRealm, clientId, secret);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
         var response = await client.PostAsync(url, new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
@@ -145,12 +177,14 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         var jwt = content.GetProperty("access_token").GetString()!;
         var jti = new JwtSecurityTokenHandler().ReadJwtToken(jwt).Id;
 
-        var inRealmA = await storage.GetAccessTokenStore(MemoryStorage.DemoRealm).GetAsync(jti, default);
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
+        var inRealmA = await storage.GetAccessTokenStore(demoRealm).GetAsync(jti, default);
         var inRealmB = await storage.GetAccessTokenStore(realmB).GetAsync(jti, default);
 
         Assert.NotNull(inRealmA);
         Assert.Null(inRealmB);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, inRealmA.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, inRealmA.RealmId);
     }
 
     [Fact]
@@ -180,8 +214,10 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task AuthCodeIsolation_Code_StoredOnlyInIssuingRealmStore()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
+        var resourcesStore = storage.GetResourceStore(demoRealm);
         var resources = await resourcesStore.FindResourcesByScopeAsync(["openid", "profile"], default);
 
         var code = new AuthorizationCode(
@@ -193,11 +229,11 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
             resources,
             "http://localhost:5000/callback")
         {
-            RealmId = MemoryStorage.DemoRealm.Id
+            RealmId = factory.Handles.Demo.Id
         };
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+        await storage.GetAuthorizationCodeStore(demoRealm).StoreAuthorizationCodeAsync(code, default);
 
-        var inRealmA = await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).GetAuthorizationCodeAsync(code.Code, default);
+        var inRealmA = await storage.GetAuthorizationCodeStore(demoRealm).GetAuthorizationCodeAsync(code.Code, default);
         var inRealmB = await storage.GetAuthorizationCodeStore(realmB).GetAuthorizationCodeAsync(code.Code, default);
 
         Assert.NotNull(inRealmA);
@@ -208,37 +244,17 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task RevocationIsolation_AccessTokenFromRealmA_NotRevokedFromRealmB()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        await using var persistence = await UseJwtPersistenceAsync();
         var clientId = $"cc-revoke-{CryptoRandom.CreateUniqueId(6)}";
         var secret = CryptoRandom.CreateUniqueId();
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
         // Register same client in both realms — same client_id but realm B has no tokens
-        memStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Revocation Test Client",
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            AllowedScopes = { "api" },
-            AllowedResponseTypes = { "code" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secret.Sha512()) }
-        });
-        memStorage.GetRealmMemoryStore(realmB).Clients[clientId] = new RoyalIdentity.Models.Client
-        {
-            Realm = realmB,
-            Id = clientId,
-            Name = "Revocation Test Client (realm B)",
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            AllowedScopes = { "api" },
-            AllowedResponseTypes = { "code" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secret.Sha512()) }
-        };
+        await SaveClientAsync(demoRealm, clientId, secret);
+        await SaveClientAsync(realmB, clientId, secret);
 
         var client = factory.CreateClient();
-        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
         var tokenResponse = await client.PostAsync(tokenUrl, new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
@@ -262,21 +278,23 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         Assert.Equal(HttpStatusCode.OK, revokeResponse.StatusCode);
 
         // Token must still exist in realm A store — realm B revocation cannot touch realm A's store
-        var stillInRealmA = await storage.GetAccessTokenStore(MemoryStorage.DemoRealm).GetAsync(jti, default);
+        var stillInRealmA = await factory.WithStorageAsync(
+            storage => storage.GetAccessTokenStore(demoRealm).GetAsync(jti, default));
         Assert.NotNull(stillInRealmA);
     }
 
     [Fact]
     public async Task RefreshTokenRenewal_NewAccessToken_KeepsRealmId()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        await using var persistence = await UseJwtPersistenceAsync();
         var httpClient = factory.CreateClient();
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
         await httpClient.LoginAliceAsync();
         var tokens = await httpClient.GetTokensAsync("demo_client", "openid offline_access");
         Assert.NotNull(tokens.RefreshToken);
 
-        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
         var response = await httpClient.PostAsync(tokenUrl, new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
@@ -289,30 +307,27 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         var jwt = content.GetProperty("access_token").GetString()!;
         var jti = new JwtSecurityTokenHandler().ReadJwtToken(jwt).Id;
 
-        var newToken = await storage.GetAccessTokenStore(MemoryStorage.DemoRealm).GetAsync(jti, default);
+        var newToken = await factory.WithStorageAsync(
+            storage => storage.GetAccessTokenStore(demoRealm).GetAsync(jti, default));
         Assert.NotNull(newToken);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, newToken.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, newToken.RealmId);
     }
 
     [Fact]
     public async Task RevocationIsolation_RefreshTokenFromRealmA_NotRevokedFromRealmB()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
-
-        memStorage.GetRealmMemoryStore(realmB).Clients["demo_client"] = new RoyalIdentity.Models.Client
+        await SaveClientAsync(realmB, "demo_client", configure: client =>
         {
-            Realm = realmB,
-            Id = "demo_client",
-            Name = "Demo Client (realm B)",
-            RequireClientSecret = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid" },
-            AllowOfflineAccess = true,
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/callback" }
-        };
+            client.Name = "Demo Client (realm B)";
+            client.RequireClientSecret = false;
+            client.AllowedGrantTypes.Clear();
+            client.AllowedGrantTypes.Add("authorization_code");
+            client.AllowedIdentityScopes.Add("openid");
+            client.AllowOfflineAccess = true;
+            client.RedirectUris.Add("http://localhost:5000/callback");
+        });
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
         var httpClient = factory.CreateClient();
         await httpClient.LoginAliceAsync();
@@ -327,7 +342,8 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         }));
         Assert.Equal(HttpStatusCode.OK, revokeResponse.StatusCode);
 
-        var stillInRealmA = await storage.GetRefreshTokenStore(MemoryStorage.DemoRealm).GetAsync(tokens.RefreshToken, default);
+        var stillInRealmA = await factory.WithStorageAsync(
+            storage => storage.GetRefreshTokenStore(demoRealm).GetAsync(tokens.RefreshToken, default));
         Assert.NotNull(stillInRealmA);
     }
 
@@ -335,23 +351,20 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task AuthCodeIsolation_CodeFromRealmA_NotRedeemableInRealmB()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
-
-        memStorage.GetRealmMemoryStore(realmB).Clients["demo_client"] = new RoyalIdentity.Models.Client
+        await SaveClientAsync(realmB, "demo_client", configure: client =>
         {
-            Realm = realmB,
-            Id = "demo_client",
-            Name = "Demo Client (realm B)",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid", "profile" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/callback" }
-        };
+            client.Name = "Demo Client (realm B)";
+            client.RequireClientSecret = false;
+            client.AllowedGrantTypes.Clear();
+            client.AllowedGrantTypes.Add("authorization_code");
+            client.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
+            client.RedirectUris.Add("http://localhost:5000/callback");
+        });
 
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
+        var resourcesStore = storage.GetResourceStore(demoRealm);
         var resources = await resourcesStore.FindResourcesByScopeAsync(["openid", "profile"], default);
 
         var code = new AuthorizationCode(
@@ -363,9 +376,9 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
             resources,
             "http://localhost:5000/callback")
         {
-            RealmId = MemoryStorage.DemoRealm.Id
+            RealmId = factory.Handles.Demo.Id
         };
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+        await storage.GetAuthorizationCodeStore(demoRealm).StoreAuthorizationCodeAsync(code, default);
 
         var httpClient = factory.CreateClient();
         var tokenUrl = Oidc.Routes.BuildTokenUrl(realmB.Path);
@@ -384,25 +397,14 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task AccessTokenStoreIsolation_JtiFromRealmA_NotFoundInRealmB()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
         var clientId = $"ref-token-{CryptoRandom.CreateUniqueId(6)}";
         var secret = CryptoRandom.CreateUniqueId();
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
-        memStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Reference Token Test Client",
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            AllowedScopes = { "api" },
-            AllowedResponseTypes = { "code" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secret.Sha512()) }
-        });
+        await SaveClientAsync(demoRealm, clientId, secret);
 
         var httpClient = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
         var tokenResponse = await httpClient.PostAsync(url, new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
@@ -430,16 +432,18 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     public async Task ConsentIsolation_ConsentInRealmA_NotVisibleInRealmB()
     {
         var realmB = await CreateRealmAsync(CryptoRandom.CreateUniqueId(6));
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         var consent = new Consent
         {
             SubjectId = "alice",
             ClientId = "consent-app",
-            RealmId = MemoryStorage.DemoRealm.Id,
+            RealmId = factory.Handles.Demo.Id,
             CreationTime = DateTime.UtcNow
         };
-        await storage.GetUserConsentStore(MemoryStorage.DemoRealm).StoreUserConsentAsync(consent, default);
+        await storage.GetUserConsentStore(demoRealm).StoreUserConsentAsync(consent, default);
 
         var inRealmB = await storage.GetUserConsentStore(realmB).GetUserConsentAsync("alice", "consent-app", default);
 
@@ -449,11 +453,13 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     [Fact]
     public async Task DefaultConsentService_StoresConsent_WithRealmId()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
         using var scope = factory.Services.CreateScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
         var consentService = scope.ServiceProvider.GetRequiredService<IConsentService>();
+        var demoRealm = await storage.Realms.GetByIdAsync(factory.Handles.Demo.Id, default);
+        Assert.NotNull(demoRealm);
 
-        var client = await storage.GetClientStore(MemoryStorage.DemoRealm).FindClientByIdAsync("demo_consent_client", default);
+        var client = await storage.GetClientStore(demoRealm).FindClientByIdAsync("demo_consent_client", default);
         Assert.NotNull(client);
 
         var subject = SubjectFactory.Create("alice-consent-realm-test", "Alice", "user");
@@ -461,10 +467,10 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
 
         await consentService.UpdateConsentAsync(subject, client, scopes, default);
 
-        var consent = await storage.GetUserConsentStore(MemoryStorage.DemoRealm)
+        var consent = await storage.GetUserConsentStore(demoRealm)
             .GetUserConsentAsync("alice-consent-realm-test", "demo_consent_client", default);
         Assert.NotNull(consent);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, consent.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, consent.RealmId);
     }
 
     // ─── §8.5 RealmId in Tokens ───────────────────────────────────────────────
@@ -472,25 +478,15 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     [Fact]
     public async Task TokenCreation_AccessToken_HasCorrectRealmId()
     {
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        await using var persistence = await UseJwtPersistenceAsync();
         var clientId = $"realm-id-check-{CryptoRandom.CreateUniqueId(6)}";
         var secret = CryptoRandom.CreateUniqueId();
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
-        memStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "RealmId Check Client",
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            AllowedScopes = { "api" },
-            AllowedResponseTypes = { "code" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secret.Sha512()) }
-        });
+        await SaveClientAsync(demoRealm, clientId, secret);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
         var response = await client.PostAsync(url, new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
@@ -504,26 +500,28 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         var jwt = content.GetProperty("access_token").GetString()!;
         var jti = new JwtSecurityTokenHandler().ReadJwtToken(jwt).Id;
 
-        var token = await storage.GetAccessTokenStore(MemoryStorage.DemoRealm).GetAsync(jti, default);
+        var token = await factory.WithStorageAsync(
+            storage => storage.GetAccessTokenStore(demoRealm).GetAsync(jti, default));
 
         Assert.NotNull(token);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, token.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, token.RealmId);
     }
 
     [Fact]
     public async Task DefaultCodeFactory_CreatesCode_WithCorrectRealmId()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
         var httpClient = factory.CreateClient(new() { AllowAutoRedirect = false });
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
         await httpClient.LoginAliceAsync();
         var codeValue = await httpClient.GetAuthorizeAsync();
         Assert.NotNull(codeValue);
 
-        var code = await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm)
-            .GetAuthorizationCodeAsync(codeValue, default);
+        var code = await factory.WithStorageAsync(
+            storage => storage.GetAuthorizationCodeStore(demoRealm)
+                .GetAuthorizationCodeAsync(codeValue, default));
         Assert.NotNull(code);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, code.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, code.RealmId);
     }
 
     // ─── §8.6 IRealmManager ───────────────────────────────────────────────────
@@ -531,10 +529,11 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     [Fact]
     public async Task RealmManager_CreateAsync_CreatesRealmAndInitializesStores()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
         var suffix = CryptoRandom.CreateUniqueId(6);
 
         var realm = await CreateRealmAsync(suffix);
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         Assert.NotNull(realm);
         Assert.Equal($"realm-b-{suffix}", realm.Path);
@@ -562,8 +561,8 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
             "Normalized domain");
 
         Assert.Equal($"mixed-{suffix}.contract.test", realm.Domain);
-        var stored = await factory.Services.GetRequiredService<IStorage>().Realms
-            .GetByDomainAsync(realm.Domain);
+        var stored = await factory.WithStorageValueAsync(
+            storage => storage.Realms.GetByDomainAsync(realm.Domain));
         Assert.NotNull(stored);
         Assert.Equal(realm.Id, stored.Id);
     }
@@ -589,13 +588,14 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         var manager = scope.ServiceProvider.GetRequiredService<IRealmManager>();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => manager.DisableAsync(MemoryStorage.ServerRealm.Id, default).AsTask());
+            () => manager.DisableAsync(factory.Handles.Server.Id, default).AsTask());
     }
 
     [Fact]
     public async Task RealmManager_DeleteAsync_InternalRealm_ReturnsFalse()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         var deleted = await storage.Realms.DeleteAsync("server", default);
 
@@ -605,22 +605,12 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     }
 
     [Fact]
-    public async Task RealmStore_DeleteAsync_RemovesRealmAndDataStore()
+    public async Task RealmStore_DeleteAsync_TombstonesRealm()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
         var suffix = CryptoRandom.CreateUniqueId(6);
         var realm = await CreateRealmAsync(suffix);
-
-        // store something in the new realm
-        var code = new AuthorizationCode(
-            "any-client",
-            SubjectFactory.Create("alice", "Alice", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            null!,
-            "http://localhost/cb");
-        await storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         var deleted = await storage.Realms.DeleteAsync(realm.Id, default);
 
@@ -629,8 +619,6 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
         var notFound = await storage.Realms.GetByIdAsync(realm.Id, default);
         Assert.Null(notFound);
 
-        // Data store entry must also be removed — accessing any per-realm store must throw
-        Assert.Throws<ArgumentException>(() => storage.GetAuthorizationCodeStore(realm));
     }
 
     [Fact]
@@ -638,7 +626,7 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     {
         using var scope = factory.Services.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IRealmManager>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
         var suffix = CryptoRandom.CreateUniqueId(6);
 
         var realm = await manager.CreateAsync($"toggle-{suffix}", $"toggle-{suffix}.test", "Toggle Realm");
@@ -705,18 +693,21 @@ public class RealmIsolationTests : IClassFixture<AppFactory>
     [Fact]
     public async Task EventDispatcher_DispatchAsyncWithRealm_SetsRealmId()
     {
-        var dispatcher = factory.Services.GetRequiredService<IEventDispatcher>();
+        using var scope = factory.Services.CreateScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IEventDispatcher>();
         var evt = new TestEvent();
+        var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
-        await dispatcher.DispatchAsync(evt, MemoryStorage.DemoRealm);
+        await dispatcher.DispatchAsync(evt, demoRealm);
 
-        Assert.Equal(MemoryStorage.DemoRealm.Id, evt.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, evt.RealmId);
     }
 
     [Fact]
     public async Task EventDispatcher_DispatchAsyncWithoutRealm_KeepsRealmIdNull()
     {
-        var dispatcher = factory.Services.GetRequiredService<IEventDispatcher>();
+        using var scope = factory.Services.CreateScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IEventDispatcher>();
         var evt = new TestEvent();
 
         await dispatcher.DispatchAsync(evt);

@@ -11,11 +11,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.UI;
 
-public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
+public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public LoginConsentUIFlowTests(AppFactory factory)
+    public LoginConsentUIFlowTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -32,7 +32,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
         var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
 
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", "demo_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -80,7 +80,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
                     ["code_verifier"] = codeVerifier
                 });
 
-        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act 2
         var tokenResponse = await client.PostAsync(tokenUrl, tokenContent);
@@ -105,26 +105,24 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
     public async Task Login_WithPlainPkce_WhenClientAllowsPlain_MustGenerateToken()
     {
         var client = factory.CreateClient();
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"plain-pkce-client-{suffix}";
         var redirectUri = $"{client.BaseAddress}callback";
 
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, registered =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Plain PKCE Client",
-            RequireClientSecret = false,
-            RequirePkce = true,
-            AllowPlainTextPkce = true,
-            AllowedIdentityScopes = { "openid", "profile" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { redirectUri }
-        };
+            registered.Name = "Plain PKCE Client";
+            registered.RequireClientSecret = false;
+            registered.RequirePkce = true;
+            registered.AllowPlainTextPkce = true;
+            registered.AllowedGrantTypes.Add("authorization_code");
+            registered.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
+            registered.AllowedResponseTypes.Add("code");
+            registered.RedirectUris.Add(redirectUri);
+        });
 
         var codeVerifier = CryptoRandom.CreateUniqueId();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", clientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -161,7 +159,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
                 ["code_verifier"] = codeVerifier
             });
 
-        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
         var tokenResponse = await client.PostAsync(tokenUrl, tokenContent);
         var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
 
@@ -185,7 +183,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
         var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
 
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", "demo_consent_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -268,7 +266,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
                     ["code_verifier"] = codeVerifier
                 });
 
-        var tokenUrl = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var tokenUrl = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act 3
         var tokenResponse = await client.PostAsync(tokenUrl, tokenContent);
@@ -302,7 +300,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
         var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
 
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", "demo_consent_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
@@ -353,7 +351,7 @@ public class LoginConsentUIFlowTests : IClassFixture<AppFactory>
         var codeVerifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
         var codeChallenge = Base64Url.Encode(codeVerifierBytes.Sha256());
 
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", "demo_consent_client")
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")

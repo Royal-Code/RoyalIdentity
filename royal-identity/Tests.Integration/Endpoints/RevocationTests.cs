@@ -3,11 +3,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class RevocationTests : IClassFixture<AppFactory>
+public class RevocationTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public RevocationTests(AppFactory factory)
+    public RevocationTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -20,7 +20,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var access_token = tokens.AccessToken;
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -46,7 +46,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var refresh_token = tokens.RefreshToken!;
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -73,7 +73,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var access_token = tokens.AccessToken;
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -99,7 +99,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var refresh_token = tokens.RefreshToken!;
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -125,7 +125,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var access_token = tokens.AccessToken;
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -151,7 +151,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         await client.LoginAliceAsync();
         var tokens = await client.GetTokensAsync();
         var refresh_token = tokens.RefreshToken!;
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -175,7 +175,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         // Arrange
         var client = factory.CreateClient();
         var access_token = "AAA";
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -198,7 +198,7 @@ public class RevocationTests : IClassFixture<AppFactory>
         // Arrange
         var client = factory.CreateClient();
         var refresh_token = "AAA";
-        var url = Oidc.Routes.BuildRevocationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildRevocationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,

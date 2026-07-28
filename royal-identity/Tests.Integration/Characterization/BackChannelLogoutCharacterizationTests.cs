@@ -43,32 +43,31 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
     [Fact]
     public async Task Logout_NotifiesBackChannelClientsRecordedOnSession()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
 
         var clientId = $"bc-client-{CryptoRandom.CreateUniqueId(6)}";
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, registered =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Back-channel Logout Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid", "profile" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" },
-            BackChannelLogoutUri = { "https://client.example/backchannel-logout" }
-        };
+            registered.Name = "Back-channel Logout Client";
+            registered.RequireClientSecret = false;
+            registered.RequirePkce = false;
+            registered.AllowedGrantTypes.Add("authorization_code");
+            registered.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
+            registered.AllowedResponseTypes.Add("code");
+            registered.RedirectUris.Add("http://localhost:5000/**");
+            registered.BackChannelLogoutUris.Add("https://client.example/backchannel-logout");
+        });
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
+        await CharacterizationSeed.PostLoginAsync(
+            client, subject.Username, subject.Password, factory.Handles.Demo.Path);
 
         // issuing a code records the client on the session, so logout knows whom to notify
         var code = await client.GetAuthorizeAsync(clientId: clientId, scope: "openid profile");
         Assert.NotNull(code);
 
-        var session = LegacyCharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
+        var session = await CharacterizationSeed.FindSessionAsync(
+            factory, factory.Handles.Demo, subject);
         Assert.NotNull(session);
 
         await client.LogoutAsync();
@@ -82,33 +81,31 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
     [Fact]
     public async Task Logout_WritesFrontChannelCallbackForClientsRecordedOnSession()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var messageStore = factory.Services.GetRequiredService<IMessageStore>();
-        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
 
         var clientId = $"fc-client-{CryptoRandom.CreateUniqueId(6)}";
         const string frontChannelUri = "https://client.example/frontchannel-logout";
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, registered =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Front-channel Logout Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid", "profile" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" },
-            FrontChannelLogoutUri = { frontChannelUri }
-        };
+            registered.Name = "Front-channel Logout Client";
+            registered.RequireClientSecret = false;
+            registered.RequirePkce = false;
+            registered.AllowedGrantTypes.Add("authorization_code");
+            registered.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
+            registered.AllowedResponseTypes.Add("code");
+            registered.RedirectUris.Add("http://localhost:5000/**");
+            registered.FrontChannelLogoutUris.Add(frontChannelUri);
+        });
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
+        await CharacterizationSeed.PostLoginAsync(
+            client, subject.Username, subject.Password, factory.Handles.Demo.Path);
 
         var code = await client.GetAuthorizeAsync(clientId: clientId, scope: "openid profile");
         Assert.NotNull(code);
 
-        var session = LegacyCharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
+        var session = await CharacterizationSeed.FindSessionAsync(
+            factory, factory.Handles.Demo, subject);
         Assert.NotNull(session);
 
         var logoutResponse = await client.LogoutAsync();
@@ -118,13 +115,17 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
         Assert.NotNull(redirect);
 
         var logoutId = GetQueryValue(redirect, "logoutId");
+        using var scope = factory.Services.CreateScope();
+        var messageStore = scope.ServiceProvider.GetRequiredService<IMessageStore>();
         var callbackMessage = await messageStore.ReadAsync<LogoutCallbackMessage>(logoutId, default);
         Assert.NotNull(callbackMessage);
 
         var payload = callbackMessage.Data;
         Assert.NotNull(payload);
         Assert.Equal(session.Id, payload.SessionId);
-        Assert.Equal(Oidc.Routes.BuildEndSessionCallbackUrl(MemoryStorage.DemoRealm.Path), payload.SignOutIframeUrl);
+        Assert.Equal(
+            Oidc.Routes.BuildEndSessionCallbackUrl(factory.Handles.Demo.Path),
+            payload.SignOutIframeUrl);
 
         var frontChannelLogout = Assert.Single(payload.FrontChannelLogout!);
         var frontChannelLogoutUri = new Uri(frontChannelLogout);

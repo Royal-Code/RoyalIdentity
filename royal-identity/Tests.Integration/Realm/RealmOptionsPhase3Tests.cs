@@ -30,7 +30,8 @@ public class RealmOptionsPhase3Tests : IClassFixture<RealmOptionsPhase3Tests.Eve
     public async Task CspOptions_UsesRealmSpecificPolicy()
     {
         var realm = await CreateRealmAsync("csp");
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         realm.Options.Csp.Level = CspLevel.One;
         realm.Options.Csp.AddDeprecatedHeader = false;
@@ -60,7 +61,8 @@ public class RealmOptionsPhase3Tests : IClassFixture<RealmOptionsPhase3Tests.Eve
     {
         var disabledRealm = await CreateRealmAsync("evt-off");
         var enabledRealm = await CreateRealmAsync("evt-on");
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         disabledRealm.Options.DispatchEvents = false;
         enabledRealm.Options.DispatchEvents = true;
@@ -83,7 +85,8 @@ public class RealmOptionsPhase3Tests : IClassFixture<RealmOptionsPhase3Tests.Eve
     {
         var realmA = await CreateRealmAsync("phase3-a");
         var realmB = await CreateRealmAsync("phase3-b");
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         realmA.Options.Csp.AddDeprecatedHeader = false;
         realmA.Options.Logging.SensitiveValuesFilter.Add("realm-a-secret");
@@ -138,7 +141,8 @@ public class RealmOptionsPhase3Tests : IClassFixture<RealmOptionsPhase3Tests.Eve
         const string grantType = "client_credentials";
         var restrictiveRealm = await CreateRealmAsync("limit-low");
         var permissiveRealm = await CreateRealmAsync("limit-ok");
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         restrictiveRealm.Options.InputLengthRestrictions.GrantType = grantType.Length - 1;
         permissiveRealm.Options.InputLengthRestrictions.GrantType = grantType.Length;
@@ -192,7 +196,7 @@ public class RealmOptionsPhase3Tests : IClassFixture<RealmOptionsPhase3Tests.Eve
             => throw new NotSupportedException();
     }
 
-    public class EventObserverAppFactory : AppFactory
+    public class EventObserverAppFactory : PersistentStorageAppFactory
     {
         public ObservedEvents ObservedEvents { get; } = new();
 

@@ -11,7 +11,7 @@ namespace Tests.Integration.Prepare;
 /// CapturingEventDispatcher, allowing tests to assert on dispatched events.
 /// DispatchEvents does not need to be enabled — capture happens before the inner dispatcher.
 /// </summary>
-public class EventCapturingAppFactory : AppFactory
+public class EventCapturingAppFactory : PersistentStorageAppFactory
 {
     public TestEventCapture EventCapture { get; } = new();
 

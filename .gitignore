@@ -397,3 +397,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Local Data Protection key ring created by the Aspire AppHost (key material, never versioned).
+royal-identity/Aspire/Aspire.AppHost/.local/

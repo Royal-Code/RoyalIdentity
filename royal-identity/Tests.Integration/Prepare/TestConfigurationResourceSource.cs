@@ -43,6 +43,14 @@ public sealed class TestConfigurationResourceSource : IConfigurationResourceSour
     public bool RemoveResourceServer(string realmId, string name)
         => resourceServers.TryGetValue(realmId, out var values) && values.TryRemove(name, out _);
 
+    public void ReplaceResourceServers(string realmId, params ResourceServer[] servers)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(realmId);
+        resourceServers[realmId] = new ConcurrentDictionary<string, ResourceServer>(
+            servers.ToDictionary(server => server.Name, StringComparer.Ordinal),
+            StringComparer.Ordinal);
+    }
+
     public static ResourceServer CreateDemoResourceServer()
         => new(
             ScopeVisibility.Public,

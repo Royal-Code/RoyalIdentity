@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.UserAccounts.Features.Accounts.Commons;
+using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.UseCases;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.Integration;
@@ -97,6 +99,48 @@ internal sealed class PersistentAccountSetup(
             throw new InvalidOperationException(
                 $"Could not set claim '{claimType}' for subject '{subjectId}': {problems}");
         }
+    }
+
+    public async Task EnsureClaimDefinitionAsync(
+        string realmId,
+        string scopeName,
+        string claimType,
+        CancellationToken ct)
+    {
+        var propertyScope = await db.PropertyScopes
+            .Include("VersionItems.DefinitionVersionItems.PropertyDefinition")
+            .Include("DefinitionItems")
+            .SingleAsync(scope => scope.RealmId == realmId && scope.Name == scopeName, ct);
+
+        if (propertyScope.ActiveVersion?.DefinitionVersions.Any(
+            definition => definition.ClaimType == claimType) is true)
+        {
+            return;
+        }
+
+        var now = clock.GetUtcNow();
+        EnsureSucceeded(
+            propertyScope.CreateDraftVersion(scopeName, now),
+            $"create a draft of scope '{scopeName}'");
+        var draft = propertyScope.Versions.Single(
+            version => version.Status == PropertyScopeVersionStatus.Draft);
+        EnsureSucceeded(
+            propertyScope.AddDefinition(draft, claimType, new PropertyDefinitionSettings
+            {
+                ValueType = PropertyValueType.Text,
+                IsActive = true,
+            }),
+            $"define claim '{claimType}' in scope '{scopeName}'");
+        EnsureSucceeded(
+            propertyScope.ApproveVersion(draft, now),
+            $"approve scope '{scopeName}'");
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static void EnsureSucceeded(RoyalCode.SmartProblems.Result result, string operation)
+    {
+        if (result.HasProblems(out var problems))
+            throw new InvalidOperationException($"Could not {operation}: {problems}");
     }
 }
 

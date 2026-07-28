@@ -41,8 +41,6 @@ public class PersistentStorageCompositionTests
             storages.Single().GetType().FullName,
             StringComparison.Ordinal);
         Assert.IsType<UserAccountsUserDirectory>(directories.Single());
-        Assert.Null(scope.ServiceProvider.GetService<RoyalIdentity.Storage.InMemory.MemoryStorage>());
-
         var demo = await factory.LoadRealmAsync(factory.Handles.Demo);
         var alice = await scope.ServiceProvider
             .GetRequiredService<IUserDirectory>()

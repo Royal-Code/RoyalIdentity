@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Tests.Integration.Prepare;
 
-public class ControlledTimeAppFactory : AppFactory
+public class ControlledTimeAppFactory : PersistentStorageAppFactory
 {
     public ControlledTimeProvider Clock { get; } =
-        new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        new(new DateTimeOffset(2026, 7, 29, 0, 0, 0, TimeSpan.Zero));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

@@ -28,23 +28,21 @@ public class EventIsolationTests : IClassFixture<EventCapturingAppFactory>
     public async Task ClientCredentialsFlow_EventsContainRealmId()
     {
         // Arrange: register a CC client in DemoRealm
-        var memStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var clientId = $"evt-cc-{CryptoRandom.CreateUniqueId(6)}";
         var secret = CryptoRandom.CreateUniqueId();
-        memStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, registered =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Event Capture CC Client",
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            AllowedScopes = { "api" },
-            AllowedResponseTypes = { "code" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secret.Sha512()) }
+            registered.Name = "Event Capture CC Client";
+            registered.RequireClientSecret = true;
+            registered.AllowedGrantTypes.Add("client_credentials");
+            registered.AllowedScopes.Add("api");
+            registered.AllowedResourceServers.Add("apiserver");
+            registered.AllowedResponseTypes.Add("code");
+            registered.Secrets.Add(new RoyalIdentity.Models.ClientSecret(secret.Sha512()));
         });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url, new FormUrlEncodedContent(new Dictionary<string, string>
@@ -59,12 +57,12 @@ public class EventIsolationTests : IClassFixture<EventCapturingAppFactory>
         // Assert: at least one event was captured and all captured events carry the realm ID
         Assert.NotEmpty(factory.EventCapture.Events);
         Assert.All(factory.EventCapture.Events, evt =>
-            Assert.Equal(MemoryStorage.DemoRealm.Id, evt.RealmId));
+            Assert.Equal(factory.Handles.Demo.Id, evt.RealmId));
 
         // Specific: the access token event exists and has the correct realm
         var atEvent = factory.EventCapture.Events.OfType<AccessTokenIssuedEvent>().SingleOrDefault();
         Assert.NotNull(atEvent);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, atEvent.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, atEvent.RealmId);
     }
 
     // ─── §8.7 UnknownRealmEvent_HasNoRealmId ──────────────────────────────────

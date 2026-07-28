@@ -11,8 +11,8 @@ namespace Tests.Storage.Contracts;
 /// blocked for persistence by the redesign (DF11/DF22), but every `preservar` rule is locked provider-neutrally:
 /// the enabled filter (RS-02, ADR-010), realm isolation (DF6), the request-resolution semantics (RS-04,
 /// ADR-010/012) and the authorized-subset resolution (RS-05, ADR-012/RFC 8707). Construction-consistency rules
-/// of the in-memory index (duplicate scope/URI, malformed URI) remain in
-/// <c>Tests.Integration/Storage/ResourceStoreTests</c> as implementation coverage of the current backing.
+/// of the volatile resource bridge (duplicate scope/URI, malformed URI) remain in
+/// <c>Tests.Integration/Storage/ResourceStoreTests</c> and run through the canonical EF gateway.
 /// </summary>
 public abstract class ResourceStoreContractTests : StorageContractTests
 {

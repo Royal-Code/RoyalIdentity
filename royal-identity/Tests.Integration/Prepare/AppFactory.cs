@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RoyalIdentity.Storage.InMemory.Extensions;
 
 #pragma warning disable S1118 // Utility classes should not have public constructors
 
@@ -56,18 +55,5 @@ public class AppFactoryBase : WebApplicationFactory<Program>
         disposed = true;
         if (Directory.Exists(KeyRingPath))
             Directory.Delete(KeyRingPath, recursive: true);
-    }
-}
-
-/// <summary>
-/// Transitional legacy factory. Tests not migrated in Fases 5-6 select the in-memory fake here rather than
-/// obtaining it implicitly from <c>Tests.Host</c>.
-/// </summary>
-public class AppFactory : AppFactoryBase
-{
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        base.ConfigureWebHost(builder);
-        builder.ConfigureServices(services => services.AddInMemoryStorage());
     }
 }

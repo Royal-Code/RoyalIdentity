@@ -34,7 +34,7 @@ public class LoginEventCharacterizationTests : IClassFixture<EventCapturingAppFa
 
         var evt = Assert.Single(factory.EventCapture.Events.OfType<UserLoginFailureEvent>());
         Assert.Equal("alice", evt.Username);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, evt.RealmId);
+        Assert.Equal(factory.Handles.Demo.Id, evt.RealmId);
         Assert.Equal(AuthenticationFailureReason.InvalidCredentials, evt.Reason);
         Assert.Equal("Invalid username or password", evt.Message);
     }
@@ -55,7 +55,7 @@ public class LoginEventCharacterizationTests : IClassFixture<EventCapturingAppFa
 
         var evt = Assert.Single(factory.EventCapture.Events.OfType<UserLoginSuccessEvent>());
         Assert.Equal("alice", evt.Username);
-        Assert.Equal(MemoryStorage.AliceSubjectId, evt.SubjectId);
-        Assert.Equal(MemoryStorage.DemoRealm.Id, evt.RealmId);
+        Assert.Equal(factory.Handles.Alice.SubjectId, evt.SubjectId);
+        Assert.Equal(factory.Handles.Demo.Id, evt.RealmId);
     }
 }

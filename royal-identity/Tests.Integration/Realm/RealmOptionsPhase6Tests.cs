@@ -9,11 +9,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Realm;
 
-public class RealmOptionsPhase6Tests : IClassFixture<AppFactory>
+public class RealmOptionsPhase6Tests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public RealmOptionsPhase6Tests(AppFactory factory)
+    public RealmOptionsPhase6Tests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -23,7 +23,8 @@ public class RealmOptionsPhase6Tests : IClassFixture<AppFactory>
     {
         var realmA = await CreateRealmAsync("phase6-copy-a");
         var realmB = await CreateRealmAsync("phase6-copy-b");
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         realmA.Options.Authentication.CookieName = ".phase6";
         realmA.Options.Csp.AddDeprecatedHeader = false;

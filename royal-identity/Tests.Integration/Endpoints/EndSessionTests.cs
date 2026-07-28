@@ -8,11 +8,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class EndSessionTests : IClassFixture<AppFactory>
+public class EndSessionTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public EndSessionTests(AppFactory factory)
+    public EndSessionTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -32,7 +32,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();
 
         // Act
-        var path = Oidc.Routes.BuildEndSessionUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildEndSessionUrl(factory.Handles.Demo.Path)
             .AddQueryString("id_token_hint", idToken);
 
         var response = await client.GetAsync(path);
@@ -73,7 +73,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
 
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();
 
-        var url = Oidc.Routes.BuildEndSessionUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildEndSessionUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.GetAsync(url);
@@ -106,22 +106,19 @@ public class EndSessionTests : IClassFixture<AppFactory>
     public async Task Get_WhenClientAllowLogoutWithoutUserConfirmation_MustNotShowSignoutPrompt()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = "endsession_client_1";
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, client =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Client Allow Logout Without User Confirmation",
-            AllowLogoutWithoutUserConfirmation = true,
-            RequireClientSecret = true,
-            RequirePkce = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-            PostLogoutRedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
+            client.Name = "Client Allow Logout Without User Confirmation";
+            client.AllowLogoutWithoutUserConfirmation = true;
+            client.RequireClientSecret = true;
+            client.RequirePkce = false;
+            client.AllowOfflineAccess = true;
+            client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+            client.AllowedResponseTypes.Add("code");
+            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.PostLogoutRedirectUris.UnionWith(
+                ["http://localhost:5000/**", "https://localhost:5001/**"]);
         });
 
         var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions()
@@ -136,7 +133,7 @@ public class EndSessionTests : IClassFixture<AppFactory>
         var messageStorage = factory.Services.GetRequiredService<IMessageStore>();
 
         // Act
-        var path = Oidc.Routes.BuildEndSessionUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildEndSessionUrl(factory.Handles.Demo.Path)
             .AddQueryString("id_token_hint", idToken)
             .AddQueryString("client_id", clientId)
             .AddQueryString("post_logout_redirect_uri", "https://localhost:5001/signout-callback");

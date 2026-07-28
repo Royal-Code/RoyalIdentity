@@ -10,11 +10,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Realm;
 
-public class RealmOptionsRedesignTests : IClassFixture<AppFactory>
+public class RealmOptionsRedesignTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public RealmOptionsRedesignTests(AppFactory factory)
+    public RealmOptionsRedesignTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -24,7 +24,8 @@ public class RealmOptionsRedesignTests : IClassFixture<AppFactory>
     {
         var realmA = await CreateRealmAsync("auth-a");
         var realmB = await CreateRealmAsync("auth-b");
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         realmA.Options.Authentication.CookieName = ".realm-a";
         realmA.Options.Authentication.CookieLifetime = TimeSpan.FromMinutes(7);
@@ -67,7 +68,8 @@ public class RealmOptionsRedesignTests : IClassFixture<AppFactory>
     {
         var realmA = await CreateRealmAsync("copy-a");
         var realmB = await CreateRealmAsync("copy-b");
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var storageScope = factory.CreateStorageScope();
+        var storage = storageScope.Storage;
 
         realmA.Options.Authentication.CookieName = ".changed";
         await storage.Realms.SaveAsync(realmA);

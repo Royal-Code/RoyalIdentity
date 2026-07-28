@@ -5,11 +5,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.UI;
 
-public class LoginPageTests : IClassFixture<AppFactory>
+public class LoginPageTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public LoginPageTests(AppFactory factory)
+    public LoginPageTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }

@@ -20,11 +20,11 @@ namespace Tests.Integration.Endpoints;
 /// With it on, the authorize parameters live server-side and only a handle travels in the URL; with it off,
 /// nothing in the login/callback path may touch the store — not even when a handle is present in the query.
 /// </summary>
-public class AuthorizeParametersGateTests : IClassFixture<AppFactory>
+public class AuthorizeParametersGateTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public AuthorizeParametersGateTests(AppFactory factory) => this.factory = factory;
+    public AuthorizeParametersGateTests(PersistentStorageAppFactory factory) => this.factory = factory;
 
     // With the option on (the product default), the login redirect carries only the handle.
     [Fact]
@@ -43,9 +43,8 @@ public class AuthorizeParametersGateTests : IClassFixture<AppFactory>
         Assert.Null(parameters["redirect_uri"]);
 
         // The handle resolves to the parameters that were kept server-side.
-        var stored = await factory.Services.GetRequiredService<IStorage>()
-            .GetAuthorizeParametersStore(realm)
-            .ReadAsync(handle, default);
+        var stored = await factory.WithStorageAsync(
+            storage => storage.GetAuthorizeParametersStore(realm).ReadAsync(handle, default));
 
         Assert.NotNull(stored);
         Assert.Equal("gate_client", stored["client_id"]);
@@ -213,19 +212,20 @@ public class AuthorizeParametersGateTests : IClassFixture<AppFactory>
 
         realm.Options.StoreAuthorizationParameters = storeAuthorizationParameters;
         await scope.ServiceProvider.GetRequiredService<IStorage>().Realms.SaveAsync(realm);
+        await factory.RefreshConfigurationAsync();
 
-        var memory = factory.Services.GetRequiredService<MemoryStorage>();
-        memory.GetRealmMemoryStore(realm).Clients["gate_client"] = new Client
+        await factory.SaveClientAsync(
+            new TestRealmHandle(realm.Id, realm.Path),
+            "gate_client",
+            client =>
         {
-            Realm = realm,
-            Id = "gate_client",
-            Name = "AP Gate Client",
-            RequireClientSecret = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { RedirectUri },
-        };
+            client.Name = "AP Gate Client";
+            client.RequireClientSecret = false;
+            client.AllowedGrantTypes.Add("authorization_code");
+            client.AllowedIdentityScopes.Add("openid");
+            client.AllowedResponseTypes.Add("code");
+            client.RedirectUris.Add(RedirectUri);
+        });
 
         return realm;
     }

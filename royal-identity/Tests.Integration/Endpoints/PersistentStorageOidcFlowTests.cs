@@ -152,7 +152,6 @@ public class PersistentStorageOidcFlowTests : IClassFixture<PersistentStorageApp
             "RoyalIdentity.Storage.EntityFramework",
             storage.GetType().FullName,
             StringComparison.Ordinal);
-        Assert.Null(scope.ServiceProvider.GetService<RoyalIdentity.Storage.InMemory.MemoryStorage>());
     }
 
     // DF23: the host never migrates. The runner did, and both families recorded themselves separately.

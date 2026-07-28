@@ -1,23 +1,17 @@
-using System.Collections.Concurrent;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models.Scopes;
+using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Storage;
 
 /// <summary>
-/// Unit tests for <see cref="ResourceStore"/> covering the Fase 3 invariants:
-/// global scope-name uniqueness and disabled-scope handling.
+/// Resource catalog invariants exercised through the canonical EF configuration gateway.
 /// </summary>
-public class ResourceStoreTests
+public class ResourceStoreTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private static ConcurrentDictionary<string, ResourceServer> Servers(params ResourceServer[] servers)
-    {
-        var dict = new ConcurrentDictionary<string, ResourceServer>();
-        foreach (var s in servers)
-            dict[s.Name] = s;
-        return dict;
-    }
+    private readonly PersistentStorageAppFactory factory;
 
-    private static ConcurrentDictionary<string, IdentityScope> NoIdentityScopes() => new();
+    public ResourceStoreTests(PersistentStorageAppFactory factory) => this.factory = factory;
 
     private static ResourceServer Api(string name, params Scope[] scopes)
         => new(ScopeVisibility.Public, name, name, name) { Scopes = [.. scopes] };
@@ -25,20 +19,28 @@ public class ResourceStoreTests
     private static Scope Op(string name, bool enabled = true)
         => new(ScopeVisibility.Public, name, name, name) { Enabled = enabled };
 
-    private static ProtectedResource Resource(string uri)
-        => new(uri);
+    private static ProtectedResource Resource(string uri) => new(uri);
+
+    private async Task<TResult> WithStoreAsync<TResult>(
+        ResourceServer[] servers,
+        Func<IResourceStore, Task<TResult>> operation)
+    {
+        factory.Resources.ReplaceResourceServers(factory.Handles.Demo.Id, servers);
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        return await factory.WithStorageAsync(
+            storage => operation(storage.GetResourceStore(realm)));
+    }
 
     [Fact]
     public async Task FindResourcesByScope_DisabledScope_IsReportedAsInvalid()
     {
-        // Collapsed bucket (apontamento 3.1): a disabled scope is reported as invalid (MissingScopes).
         var server = Api("api1", Op("api1.read"), Op("api1.write", enabled: false));
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
+        var resources = await WithStoreAsync(
+            [server],
+            store => store.FindResourcesByScopeAsync(["api1.read", "api1.write"]));
 
-        var resources = await store.FindResourcesByScopeAsync(["api1.read", "api1.write"]);
-
-        Assert.Contains(resources.Scopes, s => s.Name == "api1.read");
-        Assert.DoesNotContain(resources.Scopes, s => s.Name == "api1.write");
+        Assert.Contains(resources.Scopes, scope => scope.Name == "api1.read");
+        Assert.DoesNotContain(resources.Scopes, scope => scope.Name == "api1.write");
         Assert.Contains("api1.write", resources.MissingScopes);
         Assert.False(resources.IsValid);
     }
@@ -46,13 +48,14 @@ public class ResourceStoreTests
     [Fact]
     public async Task FindResourcesByScope_OnlyEnabled_DisabledScope_IsReportedAsInvalid()
     {
-        // With onlyEnabled:true (the pipeline path) a disabled scope is also reported as invalid.
         var server = Api("api1", Op("api1.read"), Op("api1.write", enabled: false));
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
+        var resources = await WithStoreAsync(
+            [server],
+            store => store.FindResourcesByScopeAsync(
+                ["api1.read", "api1.write"],
+                onlyEnabled: true));
 
-        var resources = await store.FindResourcesByScopeAsync(["api1.read", "api1.write"], onlyEnabled: true);
-
-        Assert.Contains(resources.Scopes, s => s.Name == "api1.read");
+        Assert.Contains(resources.Scopes, scope => scope.Name == "api1.read");
         Assert.Contains("api1.write", resources.MissingScopes);
         Assert.False(resources.IsValid);
     }
@@ -61,12 +64,12 @@ public class ResourceStoreTests
     public async Task GetAllEnabledResources_ExcludesDisabledChildScopes()
     {
         var server = Api("api1", Op("api1.read"), Op("api1.write", enabled: false));
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
+        var all = await WithStoreAsync(
+            [server],
+            store => store.GetAllEnabledResourcesAsync());
 
-        var all = await store.GetAllEnabledResourcesAsync();
-
-        Assert.Contains(all.Scopes, s => s.Name == "api1.read");
-        Assert.DoesNotContain(all.Scopes, s => s.Name == "api1.write");
+        Assert.Contains(all.Scopes, scope => scope.Name == "api1.read");
+        Assert.DoesNotContain(all.Scopes, scope => scope.Name == "api1.write");
     }
 
     [Fact]
@@ -75,80 +78,64 @@ public class ResourceStoreTests
         var enabled = Api("api1", Op("api1.read"));
         var disabled = Api("api2", Op("api2.read"));
         disabled.Enabled = false;
-        var store = new ResourceStore(Servers(enabled, disabled), NoIdentityScopes());
+        var all = await WithStoreAsync(
+            [enabled, disabled],
+            store => store.GetAllEnabledResourcesAsync());
 
-        var all = await store.GetAllEnabledResourcesAsync();
-
-        Assert.Contains(all.ResourceServers, rs => rs.Name == "api1");
-        Assert.DoesNotContain(all.ResourceServers, rs => rs.Name == "api2");
+        Assert.Contains(all.ResourceServers, server => server.Name == "api1");
+        Assert.DoesNotContain(all.ResourceServers, server => server.Name == "api2");
     }
 
     [Fact]
-    public void Constructor_DuplicateScopeNameAcrossServers_Throws()
+    public async Task Catalog_DuplicateScopeNameAcrossServers_Throws()
     {
-        var a = Api("api1", Op("shared"));
-        var b = Api("api2", Op("shared"));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => WithStoreAsync(
+            [Api("api1", Op("shared")), Api("api2", Op("shared"))],
+            store => store.GetAllResourcesAsync()));
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => new ResourceStore(Servers(a, b), NoIdentityScopes()));
-
-        Assert.Contains("shared", ex.Message);
+        Assert.Contains("shared", exception.Message);
     }
 
     [Fact]
     public async Task FindResourcesByScope_ResourceServerName_IsNotRequestable()
     {
-        // ADR-010 / Fase 4 passo 5: a resource server is not requestable by name; only its scopes are.
-        var server = Api("api1", Op("api1.read"));
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
-
-        var resources = await store.FindResourcesByScopeAsync(["api1"]);
+        var resources = await WithStoreAsync(
+            [Api("api1", Op("api1.read"))],
+            store => store.FindResourcesByScopeAsync(["api1"]));
 
         Assert.Contains("api1", resources.MissingScopes);
-        Assert.DoesNotContain(resources.ResourceServers, rs => rs.Name == "api1");
+        Assert.DoesNotContain(resources.ResourceServers, server => server.Name == "api1");
         Assert.False(resources.IsValid);
     }
 
     [Fact]
-    public void Constructor_DuplicateProtectedResourceUriAcrossServers_Throws()
+    public async Task Catalog_DuplicateProtectedResourceUriAcrossServers_Throws()
     {
-        var a = WithResources(Api("api1"), "https://api.example.test/shared");
-        var b = WithResources(Api("api2"), "https://api.example.test/shared");
+        var first = Api("api1");
+        first.ProtectedResources = [Resource("https://api.example.test/shared")];
+        var second = Api("api2");
+        second.ProtectedResources = [Resource("https://api.example.test/shared")];
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => new ResourceStore(Servers(a, b), NoIdentityScopes()));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => WithStoreAsync(
+            [first, second],
+            store => store.GetAllResourcesAsync()));
 
-        Assert.Contains("Duplicate protected resource URI", ex.Message);
-
-        static ResourceServer WithResources(ResourceServer server, string uri)
-        {
-            server.ProtectedResources = [Resource(uri)];
-            return server;
-        }
+        Assert.Contains("Duplicate protected resource URI", exception.Message);
     }
 
-    [Fact]
-    public void Constructor_ProtectedResourceUriWithFragment_Throws()
+    [Theory]
+    [InlineData("https://api.example.test/resource#fragment")]
+    [InlineData("http://api.example.test/resource")]
+    public async Task Catalog_InvalidProtectedResourceUri_Throws(string uri)
     {
         var server = Api("api1");
-        server.ProtectedResources = [Resource("https://api.example.test/resource#fragment")];
+        server.ProtectedResources = [Resource(uri)];
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => new ResourceStore(Servers(server), NoIdentityScopes()));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => WithStoreAsync(
+            [server],
+            store => store.GetAllResourcesAsync()));
 
-        Assert.Contains("Invalid protected resource URI", ex.Message);
-    }
-
-    [Fact]
-    public void Constructor_NonHttpsProtectedResourceUri_Throws()
-    {
-        var server = Api("api1");
-        server.ProtectedResources = [Resource("http://api.example.test/resource")];
-
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => new ResourceStore(Servers(server), NoIdentityScopes()));
-
-        Assert.Contains("Invalid protected resource URI", ex.Message);
+        Assert.Contains("Invalid protected resource URI", exception.Message);
     }
 
     [Fact]
@@ -156,12 +143,17 @@ public class ResourceStoreTests
     {
         var server = Api("api1");
         server.ProtectedResources = [Resource("http://localhost:5000/resource")];
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
-
-        var resources = await store.FindRequestedResourcesAsync([], ["http://localhost:5000/resource"], onlyEnabled: true);
+        var resources = await WithStoreAsync(
+            [server],
+            store => store.FindRequestedResourcesAsync(
+                [],
+                ["http://localhost:5000/resource"],
+                onlyEnabled: true));
 
         Assert.False(resources.HasInvalidTargets);
-        Assert.Contains(resources.ProtectedResources, pr => pr.ResourceUri == "http://localhost:5000/resource");
+        Assert.Contains(
+            resources.ProtectedResources,
+            resource => resource.ResourceUri == "http://localhost:5000/resource");
     }
 
     [Fact]
@@ -169,9 +161,12 @@ public class ResourceStoreTests
     {
         var server = Api("api1");
         server.ProtectedResources = [Resource("https://api.example.test/resource")];
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
-
-        var resources = await store.FindRequestedResourcesAsync([], ["https://api.example.test/unknown"], onlyEnabled: true);
+        var resources = await WithStoreAsync(
+            [server],
+            store => store.FindRequestedResourcesAsync(
+                [],
+                ["https://api.example.test/unknown"],
+                onlyEnabled: true));
 
         Assert.True(resources.HasInvalidTargets);
         Assert.Contains("https://api.example.test/unknown", resources.InvalidTargets);
@@ -182,19 +177,21 @@ public class ResourceStoreTests
     {
         var server = Api("api1", Op("api1.read"));
         server.ProtectedResources = [Resource("https://api.example.test/resource")];
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
-
-        var resources = await store.FindRequestedResourcesAsync(
-            ["api1.read"],
-            ["https://api.example.test/resource"],
-            onlyEnabled: true);
+        var resources = await WithStoreAsync(
+            [server],
+            store => store.FindRequestedResourcesAsync(
+                ["api1.read"],
+                ["https://api.example.test/resource"],
+                onlyEnabled: true));
 
         Assert.True(resources.IsValid);
         Assert.False(resources.HasInvalidTargets);
         Assert.True(resources.IsScopeResourceCoherent());
         Assert.Contains(resources.Scopes, scope => scope.Name == "api1.read");
-        Assert.Contains(resources.ResourceServers, rs => rs.Name == "api1");
-        Assert.Contains(resources.ProtectedResources, resource => resource.ResourceUri == "https://api.example.test/resource");
+        Assert.Contains(resources.ResourceServers, resourceServer => resourceServer.Name == "api1");
+        Assert.Contains(
+            resources.ProtectedResources,
+            resource => resource.ResourceUri == "https://api.example.test/resource");
     }
 
     [Fact]
@@ -204,12 +201,12 @@ public class ResourceStoreTests
         first.ProtectedResources = [Resource("https://api1.example.test/resource")];
         var second = Api("api2", Op("api2.read"));
         second.ProtectedResources = [Resource("https://api2.example.test/resource")];
-        var store = new ResourceStore(Servers(first, second), NoIdentityScopes());
-
-        var resources = await store.FindRequestedResourcesAsync(
-            ["api1.read"],
-            ["https://api2.example.test/resource"],
-            onlyEnabled: true);
+        var resources = await WithStoreAsync(
+            [first, second],
+            store => store.FindRequestedResourcesAsync(
+                ["api1.read"],
+                ["https://api2.example.test/resource"],
+                onlyEnabled: true));
 
         Assert.False(resources.IsScopeResourceCoherent());
     }
@@ -219,11 +216,12 @@ public class ResourceStoreTests
     {
         var server = Api("api1", Op("api1.read"));
         server.ProtectedResources = [Resource("https://api.example.test/resource")];
-        var store = new ResourceStore(Servers(server), NoIdentityScopes());
-        var source = await store.FindRequestedResourcesAsync(
-            ["offline_access", "api1.read"],
-            ["https://api.example.test/resource"],
-            onlyEnabled: true);
+        var source = await WithStoreAsync(
+            [server],
+            store => store.FindRequestedResourcesAsync(
+                ["offline_access", "api1.read"],
+                ["https://api.example.test/resource"],
+                onlyEnabled: true));
         var target = new RequestedResources();
 
         source.CopyTo(target);
@@ -233,7 +231,9 @@ public class ResourceStoreTests
         Assert.Contains("api1.read", target.RequestedScopeNames);
         Assert.Contains("https://api.example.test/resource", target.RequestedResourceUris);
         Assert.Contains(target.Scopes, scope => scope.Name == "api1.read");
-        Assert.Contains(target.ResourceServers, rs => rs.Name == "api1");
-        Assert.Contains(target.ProtectedResources, resource => resource.ResourceUri == "https://api.example.test/resource");
+        Assert.Contains(target.ResourceServers, resourceServer => resourceServer.Name == "api1");
+        Assert.Contains(
+            target.ProtectedResources,
+            resource => resource.ResourceUri == "https://api.example.test/resource");
     }
 }

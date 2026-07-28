@@ -10,11 +10,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class RefreshTokenTests : IClassFixture<AppFactory>
+public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public RefreshTokenTests(AppFactory factory)
+    public RefreshTokenTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -23,20 +23,16 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidRefreshToken_ShouldReturnNewTokens()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = "refresh_grant_type_client_3";
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, client =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Demo Client",
-            RequireClientSecret = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = ["code", "refresh_token"],
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
+            client.Name = "Demo Client";
+            client.RequireClientSecret = false;
+            client.AllowOfflineAccess = true;
+            client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+            client.AllowedResponseTypes.Add("code");
+            client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
+            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
         });
 
         var client = factory.CreateClient();
@@ -44,7 +40,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -73,19 +69,16 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenDoNotHasRefreshTokenGrantTypeAllowed_ShouldReturnBadRequest()
     {
         // Arrange — dedicated client: offline_access allowed, but "refresh_token" grant type is not
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var clientId = "no_refresh_grant_type_client";
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, client =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "No Refresh Grant Client",
-            RequireClientSecret = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile" },
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = ["authorization_code"],
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" }
+            client.Name = "No Refresh Grant Client";
+            client.RequireClientSecret = false;
+            client.AllowOfflineAccess = true;
+            client.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
+            client.AllowedResponseTypes.Add("code");
+            client.AllowedGrantTypes.Add("authorization_code");
+            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
         });
 
         var client = factory.CreateClient();
@@ -93,7 +86,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync(clientId: clientId);
         var refreshToken = tokens.RefreshToken!;
 
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -119,24 +112,20 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenClientHasSecret_And_SecretNotInformed_ShouldReturnBadRequest()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = "refresh_grant_type_client_1";
         var clientSecret = CryptoRandom.CreateUniqueId();
         var secretHash = clientSecret.Sha512();
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, client =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Client with Secret",
-            RequireClientSecret = true,
-            RequirePkce = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = ["code", "refresh_token"],
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secretHash) }
+            client.Name = "Client with Secret";
+            client.RequireClientSecret = true;
+            client.RequirePkce = false;
+            client.AllowOfflineAccess = true;
+            client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+            client.AllowedResponseTypes.Add("code");
+            client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
+            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.Secrets.Add(new ClientSecret(secretHash));
         });
 
         var client = factory.CreateClient();
@@ -144,7 +133,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -167,24 +156,20 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidRefreshToken_And_ValidSecret_ShouldReturnNewTokens()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = "refresh_grant_type_client_2";
         var clientSecret = CryptoRandom.CreateUniqueId();
         var secretHash = clientSecret.Sha512();
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, client =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Client with Secret",
-            RequireClientSecret = true,
-            RequirePkce = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = [ "code", "refresh_token" ],
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secretHash) }
+            client.Name = "Client with Secret";
+            client.RequireClientSecret = true;
+            client.RequirePkce = false;
+            client.AllowOfflineAccess = true;
+            client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+            client.AllowedResponseTypes.Add("code");
+            client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
+            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.Secrets.Add(new ClientSecret(secretHash));
         });
 
         var client = factory.CreateClient();
@@ -192,7 +177,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         var tokens = await client.GetTokensAsync(clientId: clientId);
         var refresh_token = tokens.RefreshToken!;
 
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -225,7 +210,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
             ["https://api.demo.local/apiserver"]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -254,7 +239,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
             ["https://api.demo.local/apiserver", ordersResource]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -279,12 +264,11 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenRefreshTokenRequestsResourceSubsetWithApiScopes_ShouldDownscopeScopesAndAudience()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-refresh-with-scope-{suffix}";
         var ordersScope = $"orders:read:{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
-        storage.GetDemoRealmStore().ResourceServers[ordersServer] = new ResourceServer(
+        factory.Resources.SetResourceServer(factory.Handles.Demo.Id, new ResourceServer(
             ScopeVisibility.Public,
             ordersServer,
             "Orders API",
@@ -298,14 +282,14 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
             [
                 new ProtectedResource(ordersResource)
             ]
-        };
+        });
 
         var (clientId, refreshToken, _) = await CreateRefreshTokenWithResourcesAsync(
             ["https://api.demo.local/apiserver", ordersResource],
             ["openid", "offline_access", "api:read", ordersScope]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -341,7 +325,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
             ["https://api.demo.local/apiserver"]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -360,12 +344,11 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
 
     private string AddOrdersResourceServer()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
 
-        storage.GetDemoRealmStore().ResourceServers[ordersServer] = new ResourceServer(
+        factory.Resources.SetResourceServer(factory.Handles.Demo.Id, new ResourceServer(
             ScopeVisibility.Public,
             ordersServer,
             "Orders API",
@@ -375,7 +358,7 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
             [
                 new ProtectedResource(ordersResource)
             ]
-        };
+        });
 
         return ordersResource;
     }
@@ -384,51 +367,52 @@ public class RefreshTokenTests : IClassFixture<AppFactory>
         string[] resourceUris,
         string[]? scopeNames = null)
     {
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var store = memoryStorage.GetDemoRealmStore();
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"refresh-resource-client-{suffix}";
 
-        var allowedResourceServers = store.ResourceServers.Values
+        var allowedResourceServers = factory.Resources.GetResourceServers(factory.Handles.Demo.Id)
             .Where(server => server.ProtectedResources.Any(resource => resourceUris.Contains(resource.ResourceUri)))
             .Select(server => server.Name)
             .ToArray();
 
-        var resourceClient = new Client
+        await factory.SaveClientAsync(factory.Handles.Demo, clientId, client =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Refresh Resource Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowOfflineAccess = true,
-            AllowedGrantTypes = ["authorization_code", "refresh_token"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
-        resourceClient.AllowedResourceServers.AddRange(allowedResourceServers);
-        store.Clients[clientId] = resourceClient;
+            client.Name = "Refresh Resource Client";
+            client.RequireClientSecret = false;
+            client.RequirePkce = false;
+            client.AllowOfflineAccess = true;
+            client.AllowedGrantTypes.UnionWith(["authorization_code", "refresh_token"]);
+            client.AllowedIdentityScopes.Add("openid");
+            client.AllowedResponseTypes.Add("code");
+            client.RedirectUris.Add("http://localhost:5000/**");
+            client.AllowedResourceServers.UnionWith(allowedResourceServers);
+        });
 
-        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
-            scopeNames ?? ["openid", "offline_access"],
-            resourceUris,
-            onlyEnabled: true);
+        var code = await factory.WithStorageAsync(async storage =>
+        {
+            var resources = await storage.GetResourceStore(realm).FindRequestedResourcesAsync(
+                scopeNames ?? ["openid", "offline_access"],
+                resourceUris,
+                onlyEnabled: true);
 
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
+            var authorizationCode = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+                clientId,
+                SubjectFactory.CreateWithSession(
+                    storage, realm, factory.Handles.Alice.SubjectId, "Test Name", "admin"),
+                "session",
+                DateTime.UtcNow,
+                300,
+                resources,
+                "http://localhost:5000/callback");
 
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+            await storage.GetAuthorizationCodeStore(realm)
+                .StoreAuthorizationCodeAsync(authorizationCode, default);
+            return authorizationCode;
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
                 new Dictionary<string, string>
