@@ -1423,8 +1423,10 @@ foreach ($filter in $filters) {
 
 As contagens esperadas foram, na ordem, 39, 29 e 81; as execuções reais dos mesmos três filtros fecharam,
 respectivamente, 39/39, 29/29 e 81/81. A listagem completa pelo mesmo protocolo, sem `--filter`, encontrou 281
-testes. `dotnet test Tests.Integration/Tests.Integration.csproj --no-build` aprovou 281/281; as três execuções
-cronometradas posteriores também terminaram com exit code zero.
+testes. A redução de 290 para 281 corresponde exclusivamente aos 9 testes da implementação fake
+`MemoryLocalUserAuthenticator` removidos e mapeados para a cobertura do módulo no parágrafo anterior; não houve
+remoção silenciosa de cenários persistentes. `dotnet test Tests.Integration/Tests.Integration.csproj --no-build`
+aprovou 281/281; as três execuções cronometradas posteriores também terminaram com exit code zero.
 
 A busca estática:
 
@@ -1453,7 +1455,9 @@ Validação complementar:
 
 - `dotnet build RoyalIdentity.sln --no-restore --verbosity quiet`: 0 erros (somente warnings preexistentes de
   framework/package);
-- `dotnet test Tests.Architecture/Tests.Architecture.csproj`: 59/59;
+- `dotnet test Tests.Architecture/Tests.Architecture.csproj`: 59/59 após o guard detectar, em revisão posterior,
+  um `Tests.Host/Properties/launchSettings.json` recriado pelo Visual Studio (58/59). O artefato foi removido e
+  seu caminho entrou no `.gitignore`, preservando `Tests.Host` como composition root não executável;
 - `dotnet test Tests.Storage/Tests.Storage.csproj --no-build`: 591 aprovados, 44 PostgreSQL opt-in ignorados;
 - `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-build`: 195 aprovados, 1 PostgreSQL opt-in
   ignorado.

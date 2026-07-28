@@ -400,3 +400,6 @@ FodyWeavers.xsd
 
 # Local Data Protection key ring created by the Aspire AppHost (key material, never versioned).
 royal-identity/Aspire/Aspire.AppHost/.local/
+
+# Tests.Host is a composition root for integration tests, not a standalone executable.
+royal-identity/Tests.Host/Properties/launchSettings.json
