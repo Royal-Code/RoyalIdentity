@@ -93,6 +93,7 @@ public class PersistentStorageAppFactory : AppFactoryBase
 
             services.AddScoped<PersistentClientSetup>();
             services.AddScoped<PersistentAccountSetup>();
+            services.AddScoped<PersistentOperationalProbe>();
             InsertInitializerBeforeProtocolHostedServices(services);
             services.AddOperationalPayloadProfileStartupValidation();
         });
@@ -122,6 +123,14 @@ public class PersistentStorageAppFactory : AppFactoryBase
             .SaveAsync(realm, clientId, configure, ct);
     }
 
+    public async Task RefreshConfigurationAsync(CancellationToken ct = default)
+    {
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider
+            .GetRequiredService<IConfigurationSnapshotRefresher>()
+            .RefreshAsync(ct);
+    }
+
     public async Task SetAccountActiveAsync(
         TestRealmHandle realm,
         TestSubjectHandle subject,
@@ -134,6 +143,32 @@ public class PersistentStorageAppFactory : AppFactoryBase
         await scope.ServiceProvider
             .GetRequiredService<PersistentAccountSetup>()
             .SetActiveAsync(realm.Id, subject.SubjectId, active, ct);
+    }
+
+    public async Task<PersistentAccountState?> FindAccountStateAsync(
+        TestRealmHandle realm,
+        TestSubjectHandle subject,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        ArgumentNullException.ThrowIfNull(subject);
+        using var scope = Services.CreateScope();
+        return await scope.ServiceProvider
+            .GetRequiredService<PersistentAccountSetup>()
+            .FindStateAsync(realm.Id, subject.SubjectId, ct);
+    }
+
+    public async Task<IReadOnlyList<PersistentSessionState>> FindSessionsAsync(
+        TestRealmHandle realm,
+        TestSubjectHandle subject,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(realm);
+        ArgumentNullException.ThrowIfNull(subject);
+        using var scope = Services.CreateScope();
+        return await scope.ServiceProvider
+            .GetRequiredService<PersistentOperationalProbe>()
+            .FindSessionsAsync(realm.Id, subject.SubjectId, ct);
     }
 
     public async Task SeedAccountAsync(

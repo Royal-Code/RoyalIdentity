@@ -12,11 +12,11 @@ namespace Tests.Integration.Characterization;
 /// (Inactive accounts projecting no claims is covered by
 /// <see cref="ActiveRuleCharacterizationTests.UserInfo_WhenAccountInactive_ReturnsNoProfileClaims"/>.)
 /// </summary>
-public class ClaimsSeamCharacterizationTests : IClassFixture<AppFactory>
+public class ClaimsSeamCharacterizationTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public ClaimsSeamCharacterizationTests(AppFactory factory)
+    public ClaimsSeamCharacterizationTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -25,10 +25,15 @@ public class ClaimsSeamCharacterizationTests : IClassFixture<AppFactory>
     public async Task UserInfo_ProjectsClaimsByIdentityScope_AndFiltersUnrequested()
     {
         var client = factory.CreateClient();
-        await client.LoginAliceAsync();
-        var tokens = await client.GetTokensAsync("demo_client", "openid profile email");
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+        var tokens = await client.GetTokensAsync(
+            factory.Handles.Demo,
+            factory.Handles.DemoClient,
+            "openid profile email");
 
-        var message = new HttpRequestMessage(HttpMethod.Get, Oidc.Routes.BuildUserInfoUrl(MemoryStorage.DemoRealm.Path));
+        var message = new HttpRequestMessage(
+            HttpMethod.Get,
+            Oidc.Routes.BuildUserInfoUrl(factory.Handles.Demo.Path));
         message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokens.AccessToken);
         var response = await client.SendAsync(message);
         response.EnsureSuccessStatusCode();
@@ -50,8 +55,11 @@ public class ClaimsSeamCharacterizationTests : IClassFixture<AppFactory>
     public async Task IdToken_CarriesProfileClaimsBySeam_AndFiltersUnrequested()
     {
         var client = factory.CreateClient();
-        await client.LoginAliceAsync();
-        var tokens = await client.GetTokensAsync("demo_client", "openid profile email");
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+        var tokens = await client.GetTokensAsync(
+            factory.Handles.Demo,
+            factory.Handles.DemoClient,
+            "openid profile email");
         Assert.NotNull(tokens.IdentityToken);
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(tokens.IdentityToken);
@@ -69,8 +77,11 @@ public class ClaimsSeamCharacterizationTests : IClassFixture<AppFactory>
     public async Task AccessToken_ApiOnly_DoesNotLeakProfileClaims()
     {
         var client = factory.CreateClient();
-        await client.LoginAliceAsync();
-        var tokens = await client.GetTokensAsync("demo_consent_client", "api");
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+        var tokens = await client.GetTokensAsync(
+            factory.Handles.Demo,
+            factory.Handles.DemoConsentClient,
+            "api");
         Assert.NotNull(tokens.AccessToken);
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(tokens.AccessToken);

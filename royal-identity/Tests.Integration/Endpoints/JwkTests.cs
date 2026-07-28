@@ -3,11 +3,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class JwkTests : IClassFixture<AppFactory>
+public class JwkTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public JwkTests(AppFactory factory)
+    public JwkTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -17,7 +17,7 @@ public class JwkTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildDiscoveryWebKeysUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildDiscoveryWebKeysUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.GetAsync(url);

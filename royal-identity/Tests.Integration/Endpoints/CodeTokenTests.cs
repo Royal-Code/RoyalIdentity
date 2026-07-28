@@ -13,39 +13,80 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class CodeTokenTests : IClassFixture<AppFactory>
+public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
 {
     private static readonly string[] scopeNames = ["openid", "profile"];
 
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public CodeTokenTests(AppFactory factory)
+    public CodeTokenTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
+    }
+
+    private async Task<RoyalIdentity.Models.Tokens.AuthorizationCode> CreateCodeAsync(
+        string clientId,
+        IEnumerable<string> scopes,
+        IEnumerable<string>? resourceUris = null,
+        Action<RoyalIdentity.Models.Tokens.AuthorizationCode>? configure = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var resourceStore = storage.GetResourceStore(realm);
+        var resources = resourceUris is null
+            ? await resourceStore.FindResourcesByScopeAsync(scopes, default)
+            : await resourceStore.FindRequestedResourcesAsync(scopes, resourceUris, onlyEnabled: true);
+        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            clientId,
+            SubjectFactory.CreateWithSession(
+                storage,
+                realm,
+                factory.Handles.Alice.SubjectId,
+                "Test Name",
+                "admin"),
+            "session",
+            DateTime.UtcNow,
+            300,
+            resources,
+            "http://localhost:5000/callback");
+        configure?.Invoke(code);
+        await storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
+        return code;
+    }
+
+    private Task SaveAuthorizationClientAsync(
+        string clientId,
+        string? clientSecret = null,
+        Action<TestClientBuilder>? configure = null)
+    {
+        return factory.SaveClientAsync(
+            factory.Handles.Demo,
+            clientId,
+            configured =>
+            {
+                configured.RequireClientSecret = clientSecret is not null;
+                configured.RequirePkce = false;
+                configured.AllowOfflineAccess = true;
+                configured.AllowedGrantTypes.Add("authorization_code");
+                configured.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+                configured.AllowedResponseTypes.Add("code");
+                configured.RedirectUris.UnionWith(
+                    ["http://localhost:5000/**", "https://localhost:5001/**"]);
+                if (clientSecret is not null)
+                    configured.Secrets.Add(new ClientSecret(clientSecret.Sha512()));
+                configure?.Invoke(configured);
+            });
     }
 
     [Fact]
     public async Task Post_WhenValidCode_Must_GenerateToken()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
-
-        var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            "demo_client",
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await codeStore.StoreAuthorizationCodeAsync(code, default);
+        var code = await CreateCodeAsync(factory.Handles.DemoClient.ClientId, scopeNames);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url, 
@@ -54,7 +95,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
                 {
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
-                    ["client_id"] = "demo_client",
+                    ["client_id"] = factory.Handles.DemoClient.ClientId,
                     ["redirect_uri"] = "http://localhost:5000/callback"
                 }));
 
@@ -77,31 +118,19 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidCode_WithPkce_Must_GenerateToken()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
-
-        var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var codeVerifier = CryptoRandom.CreateUniqueId();
         var codeChallenge = PkceHelper.GenerateStoredS256CodeChallengeHash(codeVerifier);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            "demo_client",
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback")
+        var code = await CreateCodeAsync(
+            factory.Handles.DemoClient.ClientId,
+            scopeNames,
+            configure: configured =>
         {
-            CodeChallenge = codeChallenge,
-            CodeChallengeMethod = "S256"
-        };
-
-        await codeStore.StoreAuthorizationCodeAsync(code, default);
+            configured.CodeChallenge = codeChallenge;
+            configured.CodeChallengeMethod = "S256";
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -110,7 +139,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
                 {
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
-                    ["client_id"] = "demo_client",
+                    ["client_id"] = factory.Handles.DemoClient.ClientId,
                     ["redirect_uri"] = "http://localhost:5000/callback",
                     ["code_verifier"] = codeVerifier
                 }));
@@ -133,31 +162,19 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenNotValidCode_WithPkce_Must_BadRequest()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
-
-        var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
         var codeVerifier = CryptoRandom.CreateUniqueId();
         var codeChallenge = PkceHelper.GenerateStoredS256CodeChallengeHash(codeVerifier);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            "demo_client",
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback")
+        _ = await CreateCodeAsync(
+            factory.Handles.DemoClient.ClientId,
+            scopeNames,
+            configure: configured =>
         {
-            CodeChallenge = codeChallenge,
-            CodeChallengeMethod = "S256"
-        };
-
-        await codeStore.StoreAuthorizationCodeAsync(code, default);
+            configured.CodeChallenge = codeChallenge;
+            configured.CodeChallengeMethod = "S256";
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -166,7 +183,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
                 {
                     ["grant_type"] = "authorization_code",
                     ["code"] = CryptoRandom.CreateUniqueId(),
-                    ["client_id"] = "demo_client",
+                    ["client_id"] = factory.Handles.DemoClient.ClientId,
                     ["redirect_uri"] = "http://localhost:5000/callback",
                     ["code_verifier"] = codeVerifier
                 }));
@@ -179,25 +196,10 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenNotValidCode_Must_BadRequest()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
-
-        var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            "demo_client",
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await codeStore.StoreAuthorizationCodeAsync(code, default);
+        _ = await CreateCodeAsync(factory.Handles.DemoClient.ClientId, scopeNames);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -206,7 +208,7 @@ public class CodeTokenTests : IClassFixture<AppFactory>
                 {
                     ["grant_type"] = "authorization_code",
                     ["code"] = CryptoRandom.CreateUniqueId(),
-                    ["client_id"] = "demo_client",
+                    ["client_id"] = factory.Handles.DemoClient.ClientId,
                     ["redirect_uri"] = "http://localhost:5000/callback",
                 }));
 
@@ -218,42 +220,13 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidCode_WithClientSecret_Must_GenerateToken()
     {
         // Arrange
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
-
         var clientId = "code_grant_type_client_1";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        var secretHash = clientSecret.Sha512();
-        memoryStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Client with Secret",
-            RequireClientSecret = true,
-            RequirePkce = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secretHash) }
-        });
-
-        var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await codeStore.StoreAuthorizationCodeAsync(code, default);
+        await SaveAuthorizationClientAsync(clientId, clientSecret);
+        var code = await CreateCodeAsync(clientId, scopeNames);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -285,42 +258,13 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenValidCode_AndNoSecret_WithClientSecret_Must_BadRequest()
     {
         // Arrange
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var codeStore = storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm);
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
-
         var clientId = "code_grant_type_client_2";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        var secretHash = clientSecret.Sha512();
-        memoryStorage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Client with Secret",
-            RequireClientSecret = true,
-            RequirePkce = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secretHash) }
-        });
-
-        var resources = await resourcesStore.FindResourcesByScopeAsync(scopeNames, default);
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await codeStore.StoreAuthorizationCodeAsync(code, default);
+        await SaveAuthorizationClientAsync(clientId, clientSecret);
+        var code = await CreateCodeAsync(clientId, scopeNames);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -340,42 +284,18 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenCodeHasResourceIndicator_ShouldSetAudienceToResourceUri()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var clientId = $"code-resource-client-{CryptoRandom.CreateUniqueId(4, OutputFormat.Hex)}";
-        memoryStorage.GetDemoRealmStore().Clients[clientId] = new Client
+        await SaveAuthorizationClientAsync(clientId, configure: configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Code Resource Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResourceServers = { "apiserver" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
-
-        var resourcesStore = storage.GetResourceStore(MemoryStorage.DemoRealm);
-        var resources = await resourcesStore.FindRequestedResourcesAsync(
-            ["openid"],
-            ["https://api.demo.local/apiserver"],
-            onlyEnabled: true);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            configured.AllowedResourceServers.Add("apiserver");
+        });
+        var code = await CreateCodeAsync(
             clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+            ["openid"],
+            ["https://api.demo.local/apiserver"]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -400,13 +320,12 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenCodeTokenRequestUsesResourceSubset_ShouldSetSubsetAudience()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = memoryStorage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
-        store.ResourceServers[ordersServer] = new ResourceServer(
+        factory.Resources.SetResourceServer(
+            factory.Handles.Demo.Id,
+            new ResourceServer(
             ScopeVisibility.Public,
             ordersServer,
             "Orders API",
@@ -416,41 +335,21 @@ public class CodeTokenTests : IClassFixture<AppFactory>
             [
                 new ProtectedResource(ordersResource)
             ]
-        };
+            });
 
         var clientId = $"code-subset-client-{suffix}";
-        store.Clients[clientId] = new Client
+        await SaveAuthorizationClientAsync(clientId, configure: configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Code Subset Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResourceServers = { "apiserver", ordersServer },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
-
-        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
-            ["openid"],
-            ["https://api.demo.local/apiserver", ordersResource],
-            onlyEnabled: true);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            configured.Name = "Code Subset Client";
+            configured.AllowedResourceServers.UnionWith(["apiserver", ordersServer]);
+        });
+        var code = await CreateCodeAsync(
             clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+            ["openid"],
+            ["https://api.demo.local/apiserver", ordersResource]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -476,14 +375,13 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenCodeTokenRequestUsesResourceSubsetWithApiScopes_ShouldDownscopeScopesAndAudience()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = memoryStorage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-with-scope-{suffix}";
         var ordersScope = $"orders:read:{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
-        store.ResourceServers[ordersServer] = new ResourceServer(
+        factory.Resources.SetResourceServer(
+            factory.Handles.Demo.Id,
+            new ResourceServer(
             ScopeVisibility.Public,
             ordersServer,
             "Orders API",
@@ -497,41 +395,21 @@ public class CodeTokenTests : IClassFixture<AppFactory>
             [
                 new ProtectedResource(ordersResource)
             ]
-        };
+            });
 
         var clientId = $"code-subset-scopes-client-{suffix}";
-        store.Clients[clientId] = new Client
+        await SaveAuthorizationClientAsync(clientId, configure: configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Code Subset Scopes Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResourceServers = { "apiserver", ordersServer },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
-
-        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
-            ["openid", "api:read", ordersScope],
-            ["https://api.demo.local/apiserver", ordersResource],
-            onlyEnabled: true);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            configured.Name = "Code Subset Scopes Client";
+            configured.AllowedResourceServers.UnionWith(["apiserver", ordersServer]);
+        });
+        var code = await CreateCodeAsync(
             clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+            ["openid", "api:read", ordersScope],
+            ["https://api.demo.local/apiserver", ordersResource]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -564,64 +442,43 @@ public class CodeTokenTests : IClassFixture<AppFactory>
         // ADR-012 (subset): downscoping to a resource subset drops API scopes of resource-capable
         // resource servers left out of the subset, but keeps identity scopes and scopes of resource
         // servers that have no protected resources (they flow only through the scope axis).
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = memoryStorage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
 
         // resource-capable RS kept in the subset
         var ordersServer = $"orders-{suffix}";
         var ordersScope = $"orders:read:{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
-        store.ResourceServers[ordersServer] = new ResourceServer(
-            ScopeVisibility.Public, ordersServer, "Orders API", "Orders API")
-        {
-            Scopes = [new Scope(ScopeVisibility.Public, ordersScope, "Orders read", "Read orders")],
-            ProtectedResources = [new ProtectedResource(ordersResource)]
-        };
+        factory.Resources.SetResourceServer(
+            factory.Handles.Demo.Id,
+            new ResourceServer(ScopeVisibility.Public, ordersServer, "Orders API", "Orders API")
+            {
+                Scopes = [new Scope(ScopeVisibility.Public, ordersScope, "Orders read", "Read orders")],
+                ProtectedResources = [new ProtectedResource(ordersResource)]
+            });
 
         // RS without protected resources: its scope must survive the downscope (scope axis only)
         var plainServer = $"plain-{suffix}";
         var plainScope = $"plain:read:{suffix}";
-        store.ResourceServers[plainServer] = new ResourceServer(
-            ScopeVisibility.Public, plainServer, "Plain API", "Plain API")
-        {
-            Scopes = [new Scope(ScopeVisibility.Public, plainScope, "Plain read", "Read plain")]
-        };
+        factory.Resources.SetResourceServer(
+            factory.Handles.Demo.Id,
+            new ResourceServer(ScopeVisibility.Public, plainServer, "Plain API", "Plain API")
+            {
+                Scopes = [new Scope(ScopeVisibility.Public, plainScope, "Plain read", "Read plain")]
+            });
 
         var clientId = $"code-subset-mixed-client-{suffix}";
-        store.Clients[clientId] = new Client
+        await SaveAuthorizationClientAsync(clientId, configure: configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Code Subset Mixed Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResourceServers = { "apiserver", ordersServer, plainServer },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
-
-        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
-            ["openid", "api:read", ordersScope, plainScope],
-            ["https://api.demo.local/apiserver", ordersResource],
-            onlyEnabled: true);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            configured.Name = "Code Subset Mixed Client";
+            configured.AllowedResourceServers.UnionWith(["apiserver", ordersServer, plainServer]);
+        });
+        var code = await CreateCodeAsync(
             clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+            ["openid", "api:read", ordersScope, plainScope],
+            ["https://api.demo.local/apiserver", ordersResource]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // narrow to the orders resource only
         var response = await client.PostAsync(url,
@@ -657,42 +514,20 @@ public class CodeTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenCodeTokenRequestUsesUnauthorizedResourceSubset_ShouldReturnInvalidTarget()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var memoryStorage = factory.Services.GetRequiredService<MemoryStorage>();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"code-unauthorized-subset-client-{suffix}";
-        memoryStorage.GetDemoRealmStore().Clients[clientId] = new Client
+        await SaveAuthorizationClientAsync(clientId, configure: configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Code Unauthorized Subset Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResourceServers = { "apiserver" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
-
-        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm).FindRequestedResourcesAsync(
-            ["openid"],
-            ["https://api.demo.local/apiserver"],
-            onlyEnabled: true);
-
-        var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
+            configured.Name = "Code Unauthorized Subset Client";
+            configured.AllowedResourceServers.Add("apiserver");
+        });
+        var code = await CreateCodeAsync(
             clientId,
-            SubjectFactory.CreateWithSession(storage, MemoryStorage.DemoRealm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
-            "session",
-            DateTime.UtcNow,
-            300,
-            resources,
-            "http://localhost:5000/callback");
-
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+            ["openid"],
+            ["https://api.demo.local/apiserver"]);
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(

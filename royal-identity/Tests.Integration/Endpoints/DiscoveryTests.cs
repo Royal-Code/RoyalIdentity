@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Utils;
@@ -7,11 +6,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class DiscoveryTests : IClassFixture<AppFactory>
+public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public DiscoveryTests(AppFactory factory)
+    public DiscoveryTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -21,7 +20,7 @@ public class DiscoveryTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.GetAsync(url);
@@ -58,7 +57,7 @@ public class DiscoveryTests : IClassFixture<AppFactory>
     public async Task Get_ShouldPublishProtectedResources()
     {
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
 
         var response = await client.GetAsync(url);
         var content = await response.Content.ReadAsStringAsync();
@@ -75,21 +74,21 @@ public class DiscoveryTests : IClassFixture<AppFactory>
     {
         // ADR-012: scopes of resource servers with AllowScopeRequests = false are not requestable via the
         // scope parameter, so they must not be advertised in scopes_supported (reachable only via resource).
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"audience-only-discovery-{suffix}";
         var hiddenScope = $"{serverName}:read";
 
-        store.ResourceServers[serverName] = new ResourceServer(
+        factory.Resources.SetResourceServer(
+            factory.Handles.Demo.Id,
+            new ResourceServer(
             ScopeVisibility.Public, serverName, "Audience Only API", "Audience Only API")
-        {
-            AllowScopeRequests = false,
-            Scopes = [new Scope(ScopeVisibility.Public, hiddenScope, "read", "read")]
-        };
+            {
+                AllowScopeRequests = false,
+                Scopes = [new Scope(ScopeVisibility.Public, hiddenScope, "read", "read")]
+            });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
 
         var response = await client.GetAsync(url);
         var content = await response.Content.ReadAsStringAsync();
@@ -107,7 +106,7 @@ public class DiscoveryTests : IClassFixture<AppFactory>
     public async Task Get_ProtectedResourceMetadata_ShouldReturnRfc9728Document()
     {
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildProtectedResourceMetadataUrl(MemoryStorage.DemoRealm.Path)
+        var url = Oidc.Routes.BuildProtectedResourceMetadataUrl(factory.Handles.Demo.Path)
             .AddQueryString("resource", "https://api.demo.local/apiserver");
 
         var response = await client.GetAsync(url);
@@ -131,7 +130,7 @@ public class DiscoveryTests : IClassFixture<AppFactory>
     public async Task Get_ProtectedResourceMetadata_WithUnknownResource_ShouldReturnInvalidTarget()
     {
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildProtectedResourceMetadataUrl(MemoryStorage.DemoRealm.Path)
+        var url = Oidc.Routes.BuildProtectedResourceMetadataUrl(factory.Handles.Demo.Path)
             .AddQueryString("resource", "https://unknown.example.test/resource");
 
         var response = await client.GetAsync(url);

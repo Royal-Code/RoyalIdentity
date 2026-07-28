@@ -3,11 +3,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class UserInfoTests : IClassFixture<AppFactory>
+public class UserInfoTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public UserInfoTests(AppFactory factory)
+    public UserInfoTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -17,10 +17,12 @@ public class UserInfoTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        await client.LoginAliceAsync();
-        var tokens = await client.GetTokensAsync();
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+        var tokens = await client.GetTokensAsync(
+            factory.Handles.Demo,
+            factory.Handles.DemoClient);
         var access_token = tokens.AccessToken;
-        var url = Oidc.Routes.BuildUserInfoUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildUserInfoUrl(factory.Handles.Demo.Path);
 
         // Act
         var message = new HttpRequestMessage(HttpMethod.Get, url);

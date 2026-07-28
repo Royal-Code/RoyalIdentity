@@ -44,7 +44,7 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
     public async Task Logout_NotifiesBackChannelClientsRecordedOnSession()
     {
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
 
         var clientId = $"bc-client-{CryptoRandom.CreateUniqueId(6)}";
         storage.GetDemoRealmStore().Clients[clientId] = new Client
@@ -68,7 +68,7 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
         var code = await client.GetAuthorizeAsync(clientId: clientId, scope: "openid profile");
         Assert.NotNull(code);
 
-        var session = CharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
+        var session = LegacyCharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
         Assert.NotNull(session);
 
         await client.LogoutAsync();
@@ -84,7 +84,7 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
     {
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var messageStore = factory.Services.GetRequiredService<IMessageStore>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
 
         var clientId = $"fc-client-{CryptoRandom.CreateUniqueId(6)}";
         const string frontChannelUri = "https://client.example/frontchannel-logout";
@@ -108,7 +108,7 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
         var code = await client.GetAuthorizeAsync(clientId: clientId, scope: "openid profile");
         Assert.NotNull(code);
 
-        var session = CharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
+        var session = LegacyCharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
         Assert.NotNull(session);
 
         var logoutResponse = await client.LogoutAsync();

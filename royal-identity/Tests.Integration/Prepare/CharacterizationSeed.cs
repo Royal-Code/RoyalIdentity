@@ -1,52 +1,36 @@
-using RoyalIdentity.Models;
-using RoyalIdentity.Security.Passwords;
-using RoyalIdentity.Users;
-using System.Security.Claims;
-
 namespace Tests.Integration.Prepare;
 
 /// <summary>
-/// Helpers for the Fase 2 characterization tests (plan-users-edge-session.md).
-/// <para>
-/// The in-memory alice/bob accounts are shared mutable state across the whole <see cref="AppFactory"/>
-/// (singleton storage). Tests that mutate user state (failure counters, lockout, active flag) must NOT
-/// touch alice/bob or they would contaminate other test classes. These helpers seed a fresh, uniquely
-/// named user per call and let a test inspect the realm-scoped session store.
-/// </para>
+/// Provider-neutral setup helpers for characterization tests running over
+/// <see cref="PersistentStorageAppFactory"/>.
 /// </summary>
 internal static class CharacterizationSeed
 {
     public const string DefaultPassword = "char-pass";
 
-    /// <summary>Seeds a uniquely named user into the given realm's in-memory store.</summary>
-    public static (string username, string password) SeedUser(
-        MemoryStorage storage, RoyalIdentity.Models.Realm realm, bool active = true)
+    public static async Task<TestSubjectHandle> SeedUserAsync(
+        PersistentStorageAppFactory factory,
+        TestRealmHandle realm,
+        bool active = true,
+        CancellationToken ct = default)
     {
-        var username = $"char-{CryptoRandom.CreateUniqueId(8)}";
-        storage.GetRealmMemoryStore(realm).UserAccounts[username] = new MemoryUserAccount
-        {
-            SubjectId = $"sub-{CryptoRandom.CreateUniqueId(16)}", // stable id, intentionally != username
-            Username = username,
-            PasswordHash = PasswordHash.Create(DefaultPassword),
-            DisplayName = $"Char {username}",
-            IsActive = active,
-            Claims = [new Claim("email", $"{username}@example.com")]
-        };
-        return (username, DefaultPassword);
+        var suffix = CryptoRandom.CreateUniqueId(12);
+        var subject = new TestSubjectHandle(
+            $"sub-{suffix}",
+            $"char-{suffix}",
+            DefaultPassword);
+        await factory.SeedAccountAsync(realm, subject, active, ct);
+        return subject;
     }
 
-    /// <summary>Reads back the mutable account record (failure counters, active flag, ...).</summary>
-    public static MemoryUserAccount GetDetails(MemoryStorage storage, RoyalIdentity.Models.Realm realm, string username)
-        => storage.GetRealmMemoryStore(realm).UserAccounts[username];
-
-    /// <summary>Finds the (single) session created for the given user in the realm session store.</summary>
-    public static UserSession? FindSession(MemoryStorage storage, RoyalIdentity.Models.Realm realm, string username)
+    public static async Task<PersistentSessionState?> FindSessionAsync(
+        PersistentStorageAppFactory factory,
+        TestRealmHandle realm,
+        TestSubjectHandle subject,
+        CancellationToken ct = default)
     {
-        var store = storage.GetRealmMemoryStore(realm);
-        var details = store.UserAccounts.Values.FirstOrDefault(u => u.Username == username);
-        return details is null
-            ? null
-            : store.UserSessions.Values.FirstOrDefault(s => s.SubjectId == details.SubjectId);
+        var sessions = await factory.FindSessionsAsync(realm, subject, ct);
+        return sessions.LastOrDefault();
     }
 
     /// <summary>Posts the test-host login form and returns the raw response (does not throw on failure).</summary>

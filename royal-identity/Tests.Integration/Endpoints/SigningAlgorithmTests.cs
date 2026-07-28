@@ -10,16 +10,15 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Tests.Integration.Prepare;
-using PasswordHash = RoyalIdentity.Security.Passwords.PasswordHash;
 using RealmModel = RoyalIdentity.Models.Realm;
 
 namespace Tests.Integration.Endpoints;
 
-public class SigningAlgorithmTests : IClassFixture<AppFactory>
+public class SigningAlgorithmTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public SigningAlgorithmTests(AppFactory factory)
+    public SigningAlgorithmTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -29,7 +28,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
     {
         var realm = await CreateRealmAsync();
         var scope = AddResourceServer(realm, "api", []);
-        var clientId = AddClient(realm, [scope]);
+        var clientId = await AddClientAsync(realm, [scope]);
 
         var token = await RequestClientCredentialsAccessTokenAsync(realm, clientId, scope);
 
@@ -41,7 +40,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
     {
         var realm = await CreateRealmAsync();
         var scope = AddResourceServer(realm, "api", []);
-        var clientId = AddClient(realm, [scope], configureClient: client =>
+        var clientId = await AddClientAsync(realm, [scope], configureClient: client =>
         {
             client.AllowedAccessTokenSigningAlgorithms.Add(SecurityAlgorithms.RsaSha256);
         });
@@ -56,7 +55,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
     {
         var realm = await CreateRealmAsync();
         var scope = AddResourceServer(realm, "api", [SecurityAlgorithms.EcdsaSha256]);
-        var clientId = AddClient(realm, [scope], configureClient: client =>
+        var clientId = await AddClientAsync(realm, [scope], configureClient: client =>
         {
             client.AllowedAccessTokenSigningAlgorithms.Add(SecurityAlgorithms.RsaSha256);
         });
@@ -72,7 +71,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
         var realm = await CreateRealmAsync();
         var firstScope = AddResourceServer(realm, "first", [SecurityAlgorithms.RsaSha256, SecurityAlgorithms.EcdsaSha256]);
         var secondScope = AddResourceServer(realm, "second", [SecurityAlgorithms.EcdsaSha256]);
-        var clientId = AddClient(realm, [firstScope, secondScope]);
+        var clientId = await AddClientAsync(realm, [firstScope, secondScope]);
 
         var token = await RequestClientCredentialsAccessTokenAsync(realm, clientId, $"{firstScope} {secondScope}");
 
@@ -85,7 +84,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
         var realm = await CreateRealmAsync();
         var firstScope = AddResourceServer(realm, "first", [SecurityAlgorithms.RsaSha256]);
         var secondScope = AddResourceServer(realm, "second", [SecurityAlgorithms.EcdsaSha256]);
-        var clientId = AddClient(realm, [firstScope, secondScope]);
+        var clientId = await AddClientAsync(realm, [firstScope, secondScope]);
 
         var client = factory.CreateClient();
         var response = await client.PostAsync(
@@ -110,23 +109,33 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
     {
         var realm = await CreateRealmAsync();
         var scope = AddResourceServer(realm, "api", [SecurityAlgorithms.RsaSha256]);
-        var clientId = AddClient(realm, [scope], allowedIdentityScopes: ["openid"], configureClient: client =>
-        {
-            client.RequireClientSecret = false;
-            client.AllowedGrantTypes.Add("authorization_code");
-            client.AllowedResponseTypes.Add("code");
-            client.RedirectUris.Add("http://localhost:5000/**");
-            client.AllowedIdentityTokenSigningAlgorithms.Add(SecurityAlgorithms.EcdsaSha256);
-        });
-        SeedAlice(realm);
+        var clientId = await AddClientAsync(
+            realm,
+            [scope],
+            allowedIdentityScopes: ["openid"],
+            configureClient: client =>
+            {
+                client.RequireClientSecret = false;
+                client.AllowedGrantTypes.Add("authorization_code");
+                client.AllowedResponseTypes.Add("code");
+                client.RedirectUris.Add("http://localhost:5000/**");
+                client.AllowedIdentityTokenSigningAlgorithms.Add(SecurityAlgorithms.EcdsaSha256);
+            });
+        await SeedAliceAsync(realm);
 
-        var storage = factory.Services.GetRequiredService<IStorage>();
+        using var scopeServices = factory.Services.CreateScope();
+        var storage = scopeServices.ServiceProvider.GetRequiredService<IStorage>();
         var resources = await storage.GetResourceStore(realm).FindResourcesByScopeAsync(
             ["openid", scope],
             onlyEnabled: true);
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             clientId,
-            SubjectFactory.CreateWithSession(storage, realm, MemoryStorage.AliceSubjectId, "Test Name", "admin"),
+            SubjectFactory.CreateWithSession(
+                storage,
+                realm,
+                factory.Handles.Alice.SubjectId,
+                "Test Name",
+                "admin"),
             "session",
             DateTime.UtcNow,
             300,
@@ -174,6 +183,7 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
         var keyStore = storage.GetKeyStore(realm);
         await keyStore.AddKeyAsync(rsa, default);
         await keyStore.AddKeyAsync(ecdsa, default);
+        await factory.RefreshConfigurationAsync();
 
         return realm;
     }
@@ -192,49 +202,39 @@ public class SigningAlgorithmTests : IClassFixture<AppFactory>
             AllowedAccessTokenSigningAlgorithms = [.. signingAlgorithms],
         };
 
-        factory.Services.GetRequiredService<MemoryStorage>().GetRealmMemoryStore(realm).ResourceServers[serverName] = server;
+        factory.Resources.SetResourceServer(realm.Id, server);
 
         return scopeName;
     }
 
-    private void SeedAlice(RealmModel realm)
+    private Task SeedAliceAsync(RealmModel realm)
     {
-        factory.Services.GetRequiredService<MemoryStorage>().GetRealmMemoryStore(realm).UserAccounts["alice"] = new MemoryUserAccount
-        {
-            SubjectId = MemoryStorage.AliceSubjectId,
-            Username = "alice",
-            PasswordHash = PasswordHash.Create("alice"),
-            DisplayName = "Alice",
-            IsActive = true
-        };
+        return factory.SeedAccountAsync(
+            new TestRealmHandle(realm.Id, realm.Path),
+            factory.Handles.Alice);
     }
 
-    private string AddClient(
+    private async Task<string> AddClientAsync(
         RealmModel realm,
         IEnumerable<string> allowedScopes,
         IEnumerable<string>? allowedIdentityScopes = null,
-        Action<Client>? configureClient = null)
+        Action<TestClientBuilder>? configureClient = null)
     {
         var clientId = $"client-{CryptoRandom.CreateUniqueId(6, OutputFormat.Hex)}";
-        var client = new Client
-        {
-            Realm = realm,
-            Id = clientId,
-            Name = $"Client {clientId}",
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(Hashing.Sha512Base64($"{clientId}-secret")) },
-        };
-
-        foreach (var scope in allowedScopes)
-            client.AllowedScopes.Add(scope);
-
-        foreach (var identityScope in allowedIdentityScopes ?? [])
-            client.AllowedIdentityScopes.Add(identityScope);
-
-        configureClient?.Invoke(client);
-
-        factory.Services.GetRequiredService<MemoryStorage>().GetRealmMemoryStore(realm).Clients[clientId] = client;
+        await factory.SaveClientAsync(
+            new TestRealmHandle(realm.Id, realm.Path),
+            clientId,
+            client =>
+            {
+                client.Name = $"Client {clientId}";
+                client.RequireClientSecret = true;
+                client.AllowedGrantTypes.Clear();
+                client.AllowedGrantTypes.Add("client_credentials");
+                client.Secrets.Add(new ClientSecret(Hashing.Sha512Base64($"{clientId}-secret")));
+                client.AllowedScopes.UnionWith(allowedScopes);
+                client.AllowedIdentityScopes.UnionWith(allowedIdentityScopes ?? []);
+                configureClient?.Invoke(client);
+            });
 
         return clientId;
     }

@@ -1,10 +1,10 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fases 1-4 concluídas em 2026-07-28; Fase 5 pendente
+## Status: EM ANDAMENTO - Fases 1-5 concluídas em 2026-07-28; Fase 6 pendente
 
 ## Progresso
 
-`████░░░░░` **44%** - 4 de 9 fases
+`█████░░░░` **56%** - 5 de 9 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - provisionamento externo das três famílias | Concluida |
 | Fase 3 - composições reais e fail-fast do Server/Demo | Concluida |
 | Fase 4 - fixture SQLite unificada, handles e seeds | Concluida |
-| Fase 5 - migração de login, profile, authorize e token | Pendente |
+| Fase 5 - migração de login, profile, authorize e token | Concluida |
 | Fase 6 - migração dos fluxos restantes e troca do default | Pendente |
 | Fase 7 - desacoplamento dos contratos de teste do fake | Pendente |
 | Fase 8 - remoção da transição e exclusão do fake | Pendente |
@@ -1172,19 +1172,19 @@ do módulo, getters de realm por handles e mutações de client/resource por hel
 
 **Tarefas:**
 
-- [ ] Migrar login, user info, claims, active/lockout e caracterizações de conta.
-- [ ] Substituir seed/inspeção de `MemoryUserAccount` por seed e comportamento observável do módulo.
-- [ ] Substituir deactivate/claim mutation por operações reais/test-only de `UserAccounts`.
-- [ ] Migrar authorize, code token, client token, discovery, JWK e signing algorithm.
-- [ ] Substituir clients diretos por helper Configuration + refresh explícito.
-- [ ] Substituir resources diretos pelo source volátil da fixture.
-- [ ] Semear contas cross-realm por `realmId`/`SubjectId`, sem copiar objetos do demo.
-- [ ] Remover dos arquivos migrados todos os getters de `RealmMemoryStore` e constantes `MemoryStorage`.
-- [ ] Preservar casos negativos, issuer/realm isolation, PKCE, signing algorithm e claims emitidas.
-- [ ] Antes de executar os filtros da fase, rodar
+- [x] Migrar login, user info, claims, active/lockout e caracterizações de conta.
+- [x] Substituir seed/inspeção de `MemoryUserAccount` por seed e comportamento observável do módulo.
+- [x] Substituir deactivate/claim mutation por operações reais/test-only de `UserAccounts`.
+- [x] Migrar authorize, code token, client token, discovery, JWK e signing algorithm.
+- [x] Substituir clients diretos por helper Configuration + refresh explícito.
+- [x] Substituir resources diretos pelo source volátil da fixture.
+- [x] Semear contas cross-realm por `realmId`/`SubjectId`, sem copiar objetos do demo.
+- [x] Remover dos arquivos migrados todos os getters de `RealmMemoryStore` e constantes `MemoryStorage`.
+- [x] Preservar casos negativos, issuer/realm isolation, PKCE, signing algorithm e claims emitidas.
+- [x] Antes de executar os filtros da fase, rodar
   `dotnet test Tests.Integration --no-build --list-tests`, provar que cada filtro seleciona ao menos um teste e
   registrar no resultado as contagens esperada e executada.
-- [ ] Classificar e registrar toda asserção alterada nos quatro buckets de triagem; corrigir produto/módulo quando
+- [x] Classificar e registrar toda asserção alterada nos quatro buckets de triagem; corrigir produto/módulo quando
   aplicável, sem adaptar silenciosamente a expectativa ao backing real.
 
 **Critérios de aceite:** todos os grupos listados executam somente sobre a factory integral; seus arquivos não
@@ -1201,7 +1201,64 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CodeAuthorize|FullyQu
 
 ### Resultado da Fase 5
 
-*a preencher*
+Concluída em 2026-07-28. Quatorze classes HTTP/caracterizações, totalizando 82 testes, passaram a usar
+`PersistentStorageAppFactory`: login, user info, claims seam, active/lockout e sessões de conta, principal de
+sessão, estabilidade de `SubjectId`, regressão integral de `UserAccounts`, authorize, code token, client token,
+discovery, JWK e algoritmos de assinatura. `UserAccountsOptInRegressionTests` foi renomeada para
+`UserAccountsPersistentRegressionTests`, pois a composição integral deixou de ser opt-in parcial.
+
+Os cenários agora usam handles provider-neutral para realms, clients e subjects. Clients são persistidos pelo
+helper Configuration e publicados por refresh explícito do snapshot; resources/scopes usam o source volátil da
+fixture. Seed, claims e activate/deactivate de contas passam pelas features/agregado reais de `UserAccounts`.
+Inspeções de lockout e contador de falhas usam um estado imutável projetado pelo setup do módulo. Como os contratos
+públicos de Operational não oferecem consulta de sessões por subject, foi adicionado em `Prepare` um probe
+estritamente read-only sobre o contexto EF; mutações continuam passando pelo protocolo ou pelos stores públicos e
+o estado é sempre relido, sem live reference.
+
+`CharacterizationSeed` tornou-se exclusivamente provider-neutral. Os dois grupos ainda reservados à Fase 6
+(prompt interaction e back-channel logout) usam temporariamente `LegacyCharacterizationSeed`, cujo nome, doc e
+escopo explicitam a dívida. A factory parcial `UserAccountsAppFactory` perdeu o último consumer e foi removida.
+A conta do caso cross-realm é criada somente no realm de origem com novo `SubjectId`; nenhum objeto do demo é
+copiado para outro realm.
+
+Protocolo de contagem executado antes dos filtros:
+
+- O comando PowerShell abaixo listou 290 testes e mediu, sobre os nomes descobertos, 62 para o primeiro filtro,
+  56 para o segundo e 82 para as quatorze classes efetivamente migradas:
+
+```powershell
+$output = dotnet test Tests.Integration/Tests.Integration.csproj --no-build --list-tests --logger "console;verbosity=minimal"
+$tests = $output | Where-Object { $_ -match '^\s{4}\S' } | ForEach-Object { $_.Trim() }
+$tests.Count
+($tests | Where-Object { $_ -match 'Login|UserInfo|Claims|ActiveRule' }).Count
+($tests | Where-Object { $_ -match 'CodeAuthorize|CodeToken|ClientToken|Discovery|Jwk|SigningAlgorithm' }).Count
+($tests | Where-Object { $_ -match 'LoginTests|UserInfoTests|ClaimsSeamCharacterizationTests|ActiveRuleCharacterizationTests|UserSessionCharacterizationTests|UserAccountsPersistentRegressionTests|SessionPrincipalCharacterizationTests|SubjectIdCharacterizationTests|CodeAuthorizeTests|CodeTokenTests|ClientTokenTests|DiscoveryTests|JwkTests|SigningAlgorithmTests' }).Count
+```
+
+- `dotnet test Tests.Integration/Tests.Integration.csproj --no-build --filter
+  "FullyQualifiedName~Login|FullyQualifiedName~UserInfo|FullyQualifiedName~Claims|FullyQualifiedName~ActiveRule"`
+  executou 62/62.
+- `dotnet test Tests.Integration/Tests.Integration.csproj --no-build --filter
+  "FullyQualifiedName~CodeAuthorize|FullyQualifiedName~CodeToken|FullyQualifiedName~ClientToken|FullyQualifiedName~Discovery|FullyQualifiedName~Jwk|FullyQualifiedName~SigningAlgorithm"`
+  executou 56/56.
+- `dotnet test Tests.Integration/Tests.Integration.csproj --no-build --filter
+  "FullyQualifiedName~LoginTests|FullyQualifiedName~UserInfoTests|FullyQualifiedName~ClaimsSeamCharacterizationTests|FullyQualifiedName~ActiveRuleCharacterizationTests|FullyQualifiedName~UserSessionCharacterizationTests|FullyQualifiedName~UserAccountsPersistentRegressionTests|FullyQualifiedName~SessionPrincipalCharacterizationTests|FullyQualifiedName~SubjectIdCharacterizationTests|FullyQualifiedName~CodeAuthorizeTests|FullyQualifiedName~CodeTokenTests|FullyQualifiedName~ClientTokenTests|FullyQualifiedName~DiscoveryTests|FullyQualifiedName~JwkTests|FullyQualifiedName~SigningAlgorithmTests"`
+  executou 82/82. Esse filtro distingue o escopo real da fase das sobreposições nominais dos filtros amplos com
+  fluxos ainda pertencentes à Fase 6.
+
+Triagem: **nenhuma asserção normativa foi alterada**, portanto há zero ocorrências nos quatro buckets
+(`artefato-do-fake`, `regressão-do-módulo`, `defeito-de-produto`, `sem-decisão-normativa`). Houve somente
+adaptações de setup/observação ao backing real: o isolamento cross-realm usa uma conta exclusiva do realm de
+origem, e testes de sessão/conta reconsultam o estado persistido em vez de observar objetos mutáveis do fake. Os
+status HTTP, erros, claims, issuers, PKCE, recursos e algoritmos esperados permaneceram iguais.
+
+Verificação final: busca estática nos arquivos migrados por
+`MemoryStorage|RoyalIdentity.Storage.InMemory|GetDemoRealmStore|GetRealmMemoryStore|RealmMemoryStore|MemoryUser`
+sem ocorrências; `dotnet build RoyalIdentity.sln --no-restore` (sucesso, 0 erros);
+`dotnet test Tests.Integration/Tests.Integration.csproj --no-build` (290/290); e
+`dotnet test Tests.Architecture/Tests.Architecture.csproj --no-build` (57/57). Os avisos do build são os já
+existentes de SDK preview, referências ASP.NET implícitas/pacote legado e duas anotações de nulabilidade em
+doubles de testes.
 
 ---
 
@@ -1225,9 +1282,9 @@ factory integral como única composição canônica das 29 classes.
 - [ ] Substituir `FakeSessionStorage` baseado em stores concretos por doubles locais de contratos ou gateway EF.
 - [ ] Mudar cada classe uma única vez para a factory persistente e remover a factory/ramo legado assim que seu
   último consumer for migrado.
-- [ ] Manter a factory persistente como única composição canônica, sem exigir renome; a parcial
-  `EntityFrameworkStorageAppFactory` já foi absorvida/removida na Fase 4, e `UserAccountsAppFactory` deve ser
-  removida com seu último consumer.
+- [ ] Manter a factory persistente como única composição canônica, sem exigir renome; as parciais
+  `EntityFrameworkStorageAppFactory` e `UserAccountsAppFactory` já foram absorvidas/removidas nas Fases 4 e 5,
+  respectivamente.
 - [ ] Remover o global using e todas as referências a `MemoryStorage`/`RealmMemoryStore` de `Tests.Integration`.
 - [ ] Remover de `Tests.Integration` a referência temporária ao projeto fake criada para a coexistência da Fase 4.
 - [ ] Executar busca estática/guard arquitetural que rejeite handles contendo `Realm` e confirme que realms usados

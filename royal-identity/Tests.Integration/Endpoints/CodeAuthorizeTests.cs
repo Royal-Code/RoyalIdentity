@@ -1,7 +1,6 @@
 ﻿// Ignore Spelling: Pkce
 
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
@@ -13,11 +12,11 @@ using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class CodeAuthorizeTests : IClassFixture<AppFactory>
+public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public CodeAuthorizeTests(AppFactory factory)
+    public CodeAuthorizeTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -31,8 +30,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -57,10 +56,10 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        await client.LoginAliceAsync();
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
 
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -90,7 +89,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path);
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.GetAsync(path);
@@ -103,27 +102,30 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     public async Task Get_WithMinimumParameters_Must_RedirectToLoginPage()
     {
         // Arrange
-        var storage = factory.Services.GetService<MemoryStorage>()!;
-        storage.GetDemoRealmStore().Clients.TryAdd("client_with_secret", new RoyalIdentity.Models.Client()
-        {
-            Id = "client_with_secret",
-            Name = "Client with Secret",
-            RequireClientSecret = true,
-            RequirePkce = false,
-            AllowOfflineAccess = true,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret("secret") }
-        });
+        const string clientId = "client_with_secret";
+        await factory.SaveClientAsync(
+            factory.Handles.Demo,
+            clientId,
+            configured =>
+            {
+                configured.Name = "Client with Secret";
+                configured.RequireClientSecret = true;
+                configured.RequirePkce = false;
+                configured.AllowOfflineAccess = true;
+                configured.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+                configured.AllowedResponseTypes.Add("code");
+                configured.RedirectUris.UnionWith(
+                    ["http://localhost:5000/**", "https://localhost:5001/**"]);
+                configured.Secrets.Add(new ClientSecret("secret"));
+            });
 
         var options = new WebApplicationFactoryClientOptions()
         {
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "client_with_secret")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", clientId)
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
             .AddQueryString("response_type", "code")
             .AddQueryString("scope", "openid");
@@ -140,8 +142,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
             .AddQueryString("response_type", "code")
             .AddQueryString("scope", "openid");
@@ -158,8 +160,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
@@ -179,8 +181,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
@@ -200,8 +202,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -221,7 +223,7 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -242,8 +244,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -263,8 +265,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -284,8 +286,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // Arrange
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -309,8 +311,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("scope", "openid profile")
             .AddQueryString("redirect_uri", "http://localhost:5000/callback")
@@ -334,8 +336,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -359,8 +361,8 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -378,31 +380,33 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Get_WithImplicitResourceIndicatorAndNoApiScope_ShouldReturnAccessToken()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"implicit-resource-client-{suffix}";
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Implicit Resource Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["implicit"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResourceServers = { "apiserver" },
-            AllowedResponseTypes = { "token" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
+        await factory.SaveClientAsync(
+            factory.Handles.Demo,
+            clientId,
+            configured =>
+            {
+                configured.Name = "Implicit Resource Client";
+                configured.RequireClientSecret = false;
+                configured.RequirePkce = false;
+                configured.AllowedGrantTypes.Clear();
+                configured.AllowedGrantTypes.Add("implicit");
+                configured.AllowedIdentityScopes.Add("openid");
+                configured.AllowedResourceServers.Add("apiserver");
+                configured.AllowedResponseTypes.Clear();
+                configured.AllowedResponseTypes.Add("token");
+                configured.RedirectUris.Add("http://localhost:5000/**");
+            });
 
         var options = new WebApplicationFactoryClientOptions()
         {
             AllowAutoRedirect = false
         };
         var client = factory.CreateClient(options);
-        await client.LoginAliceAsync();
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
 
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", clientId)
             .AddQueryString("response_type", "token")
             .AddQueryString("response_mode", "form_post")
@@ -424,28 +428,30 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
     {
         // ADR-012 (l.91): id_token-only requests are restricted to identity scopes. A resource indicator
         // pulls in a resource server, which is not allowed for response_type=id_token only.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"id-token-resource-client-{suffix}";
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Id Token Resource Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["implicit"],
-            AllowedIdentityScopes = { "openid" },
-            AllowedResourceServers = { "apiserver" },
-            AllowedResponseTypes = { "id_token" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
+        await factory.SaveClientAsync(
+            factory.Handles.Demo,
+            clientId,
+            configured =>
+            {
+                configured.Name = "Id Token Resource Client";
+                configured.RequireClientSecret = false;
+                configured.RequirePkce = false;
+                configured.AllowedGrantTypes.Clear();
+                configured.AllowedGrantTypes.Add("implicit");
+                configured.AllowedIdentityScopes.Add("openid");
+                configured.AllowedResourceServers.Add("apiserver");
+                configured.AllowedResponseTypes.Clear();
+                configured.AllowedResponseTypes.Add("id_token");
+                configured.RedirectUris.Add("http://localhost:5000/**");
+            });
 
         var options = new WebApplicationFactoryClientOptions() { AllowAutoRedirect = false };
         var client = factory.CreateClient(options);
-        await client.LoginAliceAsync();
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
 
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", clientId)
             .AddQueryString("response_type", "id_token")
             .AddQueryString("response_mode", "form_post")
@@ -467,44 +473,45 @@ public class CodeAuthorizeTests : IClassFixture<AppFactory>
         // ADR-010/ADR-012: two requested resource servers with mutually incompatible signing-algorithm
         // filters cannot agree on an algorithm; the authorize request is rejected with invalid_request
         // (caught at ResourcesValidator, before login).
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
 
         var firstServer = $"signing-a-{suffix}";
         var firstScope = $"{firstServer}:read";
-        store.ResourceServers[firstServer] = new ResourceServer(
-            ScopeVisibility.Public, firstServer, "Signing A", "Signing A")
-        {
-            Scopes = [new Scope(ScopeVisibility.Public, firstScope, "read", "read")],
-            AllowedAccessTokenSigningAlgorithms = [SecurityAlgorithms.RsaSha256]
-        };
+        factory.Resources.SetResourceServer(
+            factory.Handles.Demo.Id,
+            new ResourceServer(ScopeVisibility.Public, firstServer, "Signing A", "Signing A")
+            {
+                Scopes = [new Scope(ScopeVisibility.Public, firstScope, "read", "read")],
+                AllowedAccessTokenSigningAlgorithms = [SecurityAlgorithms.RsaSha256]
+            });
 
         var secondServer = $"signing-b-{suffix}";
         var secondScope = $"{secondServer}:read";
-        store.ResourceServers[secondServer] = new ResourceServer(
-            ScopeVisibility.Public, secondServer, "Signing B", "Signing B")
-        {
-            Scopes = [new Scope(ScopeVisibility.Public, secondScope, "read", "read")],
-            AllowedAccessTokenSigningAlgorithms = [SecurityAlgorithms.EcdsaSha256]
-        };
+        factory.Resources.SetResourceServer(
+            factory.Handles.Demo.Id,
+            new ResourceServer(ScopeVisibility.Public, secondServer, "Signing B", "Signing B")
+            {
+                Scopes = [new Scope(ScopeVisibility.Public, secondScope, "read", "read")],
+                AllowedAccessTokenSigningAlgorithms = [SecurityAlgorithms.EcdsaSha256]
+            });
 
         var clientId = $"incompatible-signing-client-{suffix}";
-        store.Clients[clientId] = new Client
-        {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Incompatible Signing Client",
-            RequireClientSecret = false,
-            RequirePkce = false,
-            AllowedGrantTypes = ["authorization_code"],
-            AllowedResourceServers = { firstServer, secondServer },
-            AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost:5000/**" }
-        };
+        await factory.SaveClientAsync(
+            factory.Handles.Demo,
+            clientId,
+            configured =>
+            {
+                configured.Name = "Incompatible Signing Client";
+                configured.RequireClientSecret = false;
+                configured.RequirePkce = false;
+                configured.AllowedGrantTypes.Add("authorization_code");
+                configured.AllowedResourceServers.UnionWith([firstServer, secondServer]);
+                configured.AllowedResponseTypes.Add("code");
+                configured.RedirectUris.Add("http://localhost:5000/**");
+            });
 
         var client = factory.CreateClient();
-        var path = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", clientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")

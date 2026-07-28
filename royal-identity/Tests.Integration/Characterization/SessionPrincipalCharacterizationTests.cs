@@ -8,11 +8,11 @@ namespace Tests.Integration.Characterization;
 /// sign-in carries only the minimal protocol claims; roles and profile claims (e.g. email) are NOT in the
 /// cookie. They still reach tokens/userinfo via IProfileService (covered elsewhere).
 /// </summary>
-public class SessionPrincipalCharacterizationTests : IClassFixture<AppFactory>
+public class SessionPrincipalCharacterizationTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public SessionPrincipalCharacterizationTests(AppFactory factory)
+    public SessionPrincipalCharacterizationTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -24,9 +24,10 @@ public class SessionPrincipalCharacterizationTests : IClassFixture<AppFactory>
     {
         // alice is seeded with role=admin + email claims; none of those must end up in the cookie principal.
         var client = factory.CreateClient();
-        await client.LoginAliceAsync();
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
 
-        var response = await client.GetAsync("demo/test/account/principal");
+        var response = await client.GetAsync(
+            $"{factory.Handles.Demo.Path}/test/account/principal");
         response.EnsureSuccessStatusCode();
         var claims = await response.Content.ReadFromJsonAsync<ClaimDto[]>();
 
@@ -41,7 +42,9 @@ public class SessionPrincipalCharacterizationTests : IClassFixture<AppFactory>
         Assert.Contains(Jwt.ClaimTypes.IdentityProvider, types);
 
         // sub is the stable SubjectId, not the username
-        Assert.Equal(MemoryStorage.AliceSubjectId, claims.First(c => c.type == JwtRegisteredClaimNames.Sub).value);
+        Assert.Equal(
+            factory.Handles.Alice.SubjectId,
+            claims.First(c => c.type == JwtRegisteredClaimNames.Sub).value);
 
         // roles / profile claims do NOT leak into the cookie principal
         Assert.DoesNotContain(Jwt.ClaimTypes.Role, types);

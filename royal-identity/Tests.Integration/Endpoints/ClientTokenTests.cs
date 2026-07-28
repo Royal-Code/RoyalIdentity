@@ -1,50 +1,63 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Scopes;
-using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Endpoints;
 
-public class ClientTokenTests : IClassFixture<AppFactory>
+public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public ClientTokenTests(AppFactory factory)
+    public ClientTokenTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
+
+    private Task SaveClientAsync(
+        string clientId,
+        string clientSecret,
+        Action<TestClientBuilder>? configure = null)
+    {
+        return factory.SaveClientAsync(
+            factory.Handles.Demo,
+            clientId,
+            configured =>
+            {
+                configured.ClientType = ClientType.Confidential;
+                configured.RequireClientSecret = true;
+                configured.AllowedGrantTypes.Clear();
+                configured.AllowedGrantTypes.Add("client_credentials");
+                configured.Secrets.Add(new ClientSecret(clientSecret.Sha512()));
+                configure?.Invoke(configured);
+            });
+    }
+
+    private void SetResourceServer(ResourceServer server)
+        => factory.Resources.SetResourceServer(factory.Handles.Demo.Id, server);
 
     [Fact]
     public async Task Post_WhenValidClientCredentials_ShouldReturnNewTokens()
     {
         // Arrange
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = "client_credentials_client_1";
         var clientSecret = "client_credentials_client_1_secret";
-        var secretHash = clientSecret.Sha512();
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Demo Client",
-            RequireClientSecret = true,
-            AllowOfflineAccess = false,
-            AllowedIdentityScopes = { "openid", "profile", "email" },
-            AllowedScopes = { "api" },
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = ["client_credentials"],
-            RedirectUris = { "http://localhost:5000/**", "https://localhost:5001/**" },
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secretHash) }
+            configured.Name = "Demo Client";
+            configured.AllowOfflineAccess = false;
+            configured.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
+            configured.AllowedScopes.Add("api");
+            configured.AllowedResponseTypes.Add("code");
+            configured.RedirectUris.UnionWith(
+                ["http://localhost:5000/**", "https://localhost:5001/**"]);
         });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // Act
         var response = await client.PostAsync(url,
@@ -74,26 +87,17 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenAllowAllResourceServers_ShouldAuthorizeAnyScope()
     {
         // Full Scope Allowed (ADR-011): the client lists no scope/resource server, only AllowAllResourceServers.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = "full_scope_client";
         var clientSecret = "full_scope_client_secret";
-        var secretHash = clientSecret.Sha512();
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Full Scope Client",
-            ClientType = RoyalIdentity.Models.ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowAllResourceServers = true,
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secretHash) }
+            configured.Name = "Full Scope Client";
+            configured.AllowAllResourceServers = true;
+            configured.AllowedResponseTypes.Add("code");
         });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -119,25 +123,16 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     public async Task Post_WhenScopeNotAllowed_ShouldReturnInvalidScope()
     {
         // The client is allowed no API scope and has no Full Scope Allowed: requesting "api" is invalid_scope.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = "no_api_client";
         var clientSecret = "no_api_client_secret";
-        var secretHash = clientSecret.Sha512();
-        storage.GetDemoRealmStore().Clients.TryAdd(clientId, new RoyalIdentity.Models.Client()
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "No Api Client",
-            ClientType = RoyalIdentity.Models.ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResponseTypes = { "code" },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new RoyalIdentity.Models.ClientSecret(secretHash) }
+            configured.Name = "No Api Client";
+            configured.AllowedResponseTypes.Add("code");
         });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -157,25 +152,17 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenClientCredentialsRequestsOfflineAccess_ShouldReturnInvalidScope()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = $"offline-client-{CryptoRandom.CreateUniqueId(6)}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Offline Client Credentials Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowOfflineAccess = true,
-            AllowedScopes = { "api" },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Offline Client Credentials Client";
+            configured.AllowOfflineAccess = true;
+            configured.AllowedScopes.Add("api");
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -196,24 +183,16 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WhenClientCredentialsOmitsScope_ShouldReturnDefaultAllowedScopes()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = $"default-scope-client-{CryptoRandom.CreateUniqueId(6)}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Default Scope Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedScopes = { "api" },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Default Scope Client";
+            configured.AllowedScopes.Add("api");
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -236,24 +215,16 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     public async Task Post_WithResourceIndicator_ShouldSetAudienceToResourceUri()
     {
         // RFC 8707: requesting a resource indicator emits its URI as the aud and suppresses the legacy RS audience.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = $"resource-client-{CryptoRandom.CreateUniqueId(6)}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Resource Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { "apiserver" },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Resource Client";
+            configured.AllowedResourceServers.Add("apiserver");
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -279,24 +250,16 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WithUnknownResourceIndicator_ShouldReturnInvalidTarget()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = $"unknown-resource-client-{CryptoRandom.CreateUniqueId(6)}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Unknown Resource Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { "apiserver" },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Unknown Resource Client";
+            configured.AllowedResourceServers.Add("apiserver");
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -318,23 +281,15 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     public async Task Post_WithResourceNotAllowed_ShouldReturnInvalidTarget()
     {
         // Audience-only request for a resource whose resource server is not in AllowedResourceServers.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-
         var clientId = $"no-resource-client-{CryptoRandom.CreateUniqueId(6)}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        storage.GetDemoRealmStore().Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "No Resource Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "No Resource Client";
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -354,14 +309,12 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WithMultipleResourceIndicators_ShouldSetAllResourceAudiences()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersScope = $"orders:read:{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
 
-        store.ResourceServers[ordersServer] = new ResourceServer(
+        SetResourceServer(new ResourceServer(
             ScopeVisibility.Public,
             ordersServer,
             "Orders API",
@@ -375,24 +328,18 @@ public class ClientTokenTests : IClassFixture<AppFactory>
             [
                 new ProtectedResource(ordersResource)
             ]
-        };
+        });
 
         var clientId = $"multi-resource-client-{suffix}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        store.Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Multi Resource Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { "apiserver", ordersServer },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Multi Resource Client";
+            configured.AllowedResourceServers.UnionWith(["apiserver", ordersServer]);
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -419,13 +366,11 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Post_WithScopeAndResourceFromDifferentResourceCapableServer_ShouldReturnInvalidTarget()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var ordersServer = $"orders-{suffix}";
         var ordersResource = $"https://orders.demo.local/{suffix}";
 
-        store.ResourceServers[ordersServer] = new ResourceServer(
+        SetResourceServer(new ResourceServer(
             ScopeVisibility.Public,
             ordersServer,
             "Orders API",
@@ -435,24 +380,18 @@ public class ClientTokenTests : IClassFixture<AppFactory>
             [
                 new ProtectedResource(ordersResource)
             ]
-        };
+        });
 
         var clientId = $"mismatch-resource-client-{suffix}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        store.Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Mismatch Resource Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { "apiserver", ordersServer },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Mismatch Resource Client";
+            configured.AllowedResourceServers.UnionWith(["apiserver", ordersServer]);
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -475,35 +414,27 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     {
         // ADR-012: a resource server with AllowScopeRequests = false cannot have its scopes requested
         // via the scope parameter, even when the client is otherwise allowed the resource server.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"audience-only-{suffix}";
         var scopeName = $"{serverName}:read";
 
-        store.ResourceServers[serverName] = new ResourceServer(
+        SetResourceServer(new ResourceServer(
             ScopeVisibility.Public, serverName, "Audience Only API", "Audience Only API")
         {
             AllowScopeRequests = false,
             Scopes = [new Scope(ScopeVisibility.Public, scopeName, "read", "read")]
-        };
+        });
 
         var clientId = $"audience-only-scope-client-{suffix}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        store.Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Audience Only Scope Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { serverName },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Audience Only Scope Client";
+            configured.AllowedResourceServers.Add(serverName);
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -525,37 +456,29 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     {
         // ADR-012: an audience-only resource server (AllowScopeRequests = false) remains reachable via
         // the resource parameter — the resource axis is independent of the scope gate.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"audience-only-reachable-{suffix}";
         var scopeName = $"{serverName}:read";
         var resourceUri = $"https://audience-only-{suffix}.demo.local/api";
 
-        store.ResourceServers[serverName] = new ResourceServer(
+        SetResourceServer(new ResourceServer(
             ScopeVisibility.Public, serverName, "Audience Only API", "Audience Only API")
         {
             AllowScopeRequests = false,
             Scopes = [new Scope(ScopeVisibility.Public, scopeName, "read", "read")],
             ProtectedResources = [new ProtectedResource(resourceUri)]
-        };
+        });
 
         var clientId = $"audience-only-resource-client-{suffix}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        store.Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Audience Only Resource Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { serverName },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Audience Only Resource Client";
+            configured.AllowedResourceServers.Add(serverName);
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -580,35 +503,27 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     {
         // ADR-012: a ProtectedResource availability derives from the owning resource server's Enabled.
         // A disabled resource server makes its resources unavailable -> invalid_target.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var serverName = $"disabled-rs-{suffix}";
         var resourceUri = $"https://disabled-{suffix}.demo.local/api";
 
-        store.ResourceServers[serverName] = new ResourceServer(
+        SetResourceServer(new ResourceServer(
             ScopeVisibility.Public, serverName, "Disabled API", "Disabled API")
         {
             Enabled = false,
             ProtectedResources = [new ProtectedResource(resourceUri)]
-        };
+        });
 
         var clientId = $"disabled-rs-client-{suffix}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        store.Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Disabled RS Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { serverName },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Disabled RS Client";
+            configured.AllowedResourceServers.Add(serverName);
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         var response = await client.PostAsync(url,
             new FormUrlEncodedContent(
@@ -630,43 +545,35 @@ public class ClientTokenTests : IClassFixture<AppFactory>
     {
         // ADR-012: when client_credentials omits scope, the default scopes are the requestable scopes of
         // the client's allowed resource servers; audience-only servers (AllowScopeRequests = false) are excluded.
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var store = storage.GetDemoRealmStore();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
 
         var normalServer = $"normal-{suffix}";
         var normalScope = $"{normalServer}:read";
-        store.ResourceServers[normalServer] = new ResourceServer(
+        SetResourceServer(new ResourceServer(
             ScopeVisibility.Public, normalServer, "Normal API", "Normal API")
         {
             Scopes = [new Scope(ScopeVisibility.Public, normalScope, "read", "read")]
-        };
+        });
 
         var audienceOnlyServer = $"audience-only-default-{suffix}";
         var audienceOnlyScope = $"{audienceOnlyServer}:read";
-        store.ResourceServers[audienceOnlyServer] = new ResourceServer(
+        SetResourceServer(new ResourceServer(
             ScopeVisibility.Public, audienceOnlyServer, "Audience Only API", "Audience Only API")
         {
             AllowScopeRequests = false,
             Scopes = [new Scope(ScopeVisibility.Public, audienceOnlyScope, "read", "read")]
-        };
+        });
 
         var clientId = $"default-scopes-client-{suffix}";
         var clientSecret = CryptoRandom.CreateUniqueId();
-        store.Clients[clientId] = new Client
+        await SaveClientAsync(clientId, clientSecret, configured =>
         {
-            Realm = MemoryStorage.DemoRealm,
-            Id = clientId,
-            Name = "Default Scopes Client",
-            ClientType = ClientType.Confidential,
-            RequireClientSecret = true,
-            AllowedResourceServers = { normalServer, audienceOnlyServer },
-            AllowedGrantTypes = ["client_credentials"],
-            ClientSecrets = { new ClientSecret(clientSecret.Sha512()) }
-        };
+            configured.Name = "Default Scopes Client";
+            configured.AllowedResourceServers.UnionWith([normalServer, audienceOnlyServer]);
+        });
 
         var client = factory.CreateClient();
-        var url = Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path);
+        var url = Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path);
 
         // no scope parameter -> default scopes
         var response = await client.PostAsync(url,

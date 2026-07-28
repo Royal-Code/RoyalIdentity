@@ -55,8 +55,7 @@ internal sealed class PersistentClientSetup(
 
 /// <summary>
 /// Provider-neutral client setup model. It deliberately has no <see cref="RoyalIdentity.Models.Realm"/> property;
-/// the factory binds
-/// the realm loaded from its own composition only when persisting.
+/// the factory binds the realm loaded from its own composition only when persisting.
 /// </summary>
 public sealed class TestClientBuilder
 {
@@ -73,7 +72,11 @@ public sealed class TestClientBuilder
 
     public string Name { get => client.Name; set => client.Name = value; }
 
+    public string? Description { get => client.Description; set => client.Description = value; }
+
     public bool Enabled { get => client.Enabled; set => client.Enabled = value; }
+
+    public ClientType ClientType { get => client.ClientType; set => client.ClientType = value; }
 
     public bool RequirePkce { get => client.RequirePkce; set => client.RequirePkce = value; }
 
@@ -95,6 +98,12 @@ public sealed class TestClientBuilder
         set => client.AllowOfflineAccess = value;
     }
 
+    public bool AllowAllResourceServers
+    {
+        get => client.AllowAllResourceServers;
+        set => client.AllowAllResourceServers = value;
+    }
+
     public bool RequireConsent { get => client.RequireConsent; set => client.RequireConsent = value; }
 
     public bool AllowRememberConsent
@@ -107,6 +116,32 @@ public sealed class TestClientBuilder
     {
         get => client.AlwaysIncludeUserClaimsInIdToken;
         set => client.AlwaysIncludeUserClaimsInIdToken = value;
+    }
+
+    public bool IncludeJwtId { get => client.IncludeJwtId; set => client.IncludeJwtId = value; }
+
+    public bool AlwaysSendClientClaims
+    {
+        get => client.AlwaysSendClientClaims;
+        set => client.AlwaysSendClientClaims = value;
+    }
+
+    public string? ClientClaimsPrefix
+    {
+        get => client.ClientClaimsPrefix;
+        set => client.ClientClaimsPrefix = value;
+    }
+
+    public bool EnableLocalLogin
+    {
+        get => client.EnableLocalLogin;
+        set => client.EnableLocalLogin = value;
+    }
+
+    public int? UserSsoLifetime
+    {
+        get => client.UserSsoLifetime;
+        set => client.UserSsoLifetime = value;
     }
 
     public int AccessTokenLifetime
@@ -127,11 +162,47 @@ public sealed class TestClientBuilder
         set => client.AuthorizationCodeLifetime = value;
     }
 
+    public int AbsoluteRefreshTokenLifetime
+    {
+        get => client.AbsoluteRefreshTokenLifetime;
+        set => client.AbsoluteRefreshTokenLifetime = value;
+    }
+
+    public int SlidingRefreshTokenLifetime
+    {
+        get => client.SlidingRefreshTokenLifetime;
+        set => client.SlidingRefreshTokenLifetime = value;
+    }
+
+    public int? ConsentLifetime
+    {
+        get => client.ConsentLifetime;
+        set => client.ConsentLifetime = value;
+    }
+
+    public TokenExpiration RefreshTokenExpiration
+    {
+        get => client.RefreshTokenExpiration;
+        set => client.RefreshTokenExpiration = value;
+    }
+
+    public TimeSpan RefreshTokenPostConsumedTimeTolerance
+    {
+        get => client.RefreshTokenPostConsumedTimeTolerance;
+        set => client.RefreshTokenPostConsumedTimeTolerance = value;
+    }
+
     public ISet<string> AllowedGrantTypes => client.AllowedGrantTypes;
 
     public ISet<string> AllowedResponseTypes => client.AllowedResponseTypes;
 
     public ISet<string> AllowedIdentityScopes => client.AllowedIdentityScopes;
+
+    public ISet<string> AllowedIdentityTokenSigningAlgorithms =>
+        client.AllowedIdentityTokenSigningAlgorithms;
+
+    public ISet<string> AllowedAccessTokenSigningAlgorithms =>
+        client.AllowedAccessTokenSigningAlgorithms;
 
     public ISet<string> AllowedResourceServers => client.AllowedResourceServers;
 

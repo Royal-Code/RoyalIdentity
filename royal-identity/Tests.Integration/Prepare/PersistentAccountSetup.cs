@@ -18,6 +18,22 @@ internal sealed class PersistentAccountSetup(
     IUserAccountsRealmOptionsResolver optionsResolver,
     TimeProvider clock)
 {
+    public async Task<PersistentAccountState?> FindStateAsync(
+        string realmId,
+        string subjectId,
+        CancellationToken ct)
+    {
+        var account = await reader.FindBySubjectIdAsync(realmId, subjectId, ct);
+        return account is null
+            ? null
+            : new PersistentAccountState(
+                account.SubjectId,
+                account.Username,
+                account.IsActive,
+                account.LocalCredential.FailedPasswordAttempts,
+                account.LocalCredential.LockoutEndAt);
+    }
+
     public async Task SeedAsync(
         string realmId,
         TestSubjectHandle subject,
@@ -83,3 +99,10 @@ internal sealed class PersistentAccountSetup(
         }
     }
 }
+
+public sealed record PersistentAccountState(
+    string SubjectId,
+    string Username,
+    bool IsActive,
+    int FailedPasswordAttempts,
+    DateTimeOffset? LockoutEndAt);

@@ -14,11 +14,11 @@ namespace Tests.Integration.Characterization;
 /// authorize; and an inactive account yields no profile claims at userinfo. (The cookie path is covered by
 /// <see cref="UserSessionCharacterizationTests.Cookie_WhenSessionEnded_IsRejected"/>.)
 /// </summary>
-public class ActiveRuleCharacterizationTests : IClassFixture<AppFactory>
+public class ActiveRuleCharacterizationTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public ActiveRuleCharacterizationTests(AppFactory factory)
+    public ActiveRuleCharacterizationTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -26,29 +26,31 @@ public class ActiveRuleCharacterizationTests : IClassFixture<AppFactory>
     [Fact]
     public async Task TokenEndpoint_AuthCode_WhenSessionAbsent_IsRejected()
     {
-        var storage = factory.Services.GetRequiredService<IStorage>();
-        var resources = await storage.GetResourceStore(MemoryStorage.DemoRealm)
+        using var scope = factory.Services.CreateScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var resources = await storage.GetResourceStore(realm)
             .FindResourcesByScopeAsync(["openid", "profile"], default);
 
         // Principal for the active account 'alice' but with a sid that has NO backing session.
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
-            "demo_client",
-            SubjectFactory.Create(MemoryStorage.AliceSubjectId, "Alice", "admin"),
+            factory.Handles.DemoClient.ClientId,
+            SubjectFactory.Create(factory.Handles.Alice.SubjectId, "Alice", "admin"),
             "session",
             DateTime.UtcNow,
             300,
             resources,
             "http://localhost:5000/callback");
-        await storage.GetAuthorizationCodeStore(MemoryStorage.DemoRealm).StoreAuthorizationCodeAsync(code, default);
+        await storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
         var response = await client.PostAsync(
-            Oidc.Routes.BuildTokenUrl(MemoryStorage.DemoRealm.Path),
+            Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path),
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["grant_type"] = "authorization_code",
                 ["code"] = code.Code,
-                ["client_id"] = "demo_client",
+                ["client_id"] = factory.Handles.DemoClient.ClientId,
                 ["redirect_uri"] = "http://localhost:5000/callback",
             }));
 
@@ -59,18 +61,28 @@ public class ActiveRuleCharacterizationTests : IClassFixture<AppFactory>
     [Fact]
     public async Task Authorize_WhenSessionEnded_RePromptsLogin()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var sessionStorage = factory.Services.GetRequiredService<IStorage>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
-        var session = CharacterizationSeed.FindSession(storage, MemoryStorage.DemoRealm, username);
+        await CharacterizationSeed.PostLoginAsync(
+            client,
+            subject.Username,
+            subject.Password,
+            factory.Handles.Demo.Path);
+        var session = await CharacterizationSeed.FindSessionAsync(
+            factory,
+            factory.Handles.Demo,
+            subject);
         Assert.NotNull(session);
-        await sessionStorage.GetUserSessionStore(MemoryStorage.DemoRealm).EndAsync(session.Id, default);
+        using (var sessionScope = factory.Services.CreateScope())
+        {
+            var sessionStorage = sessionScope.ServiceProvider.GetRequiredService<IStorage>();
+            var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+            await sessionStorage.GetUserSessionStore(realm).EndAsync(session.Id, default);
+        }
 
-        var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl(MemoryStorage.DemoRealm.Path)
-            .AddQueryString("client_id", "demo_client")
+        var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
@@ -90,17 +102,25 @@ public class ActiveRuleCharacterizationTests : IClassFixture<AppFactory>
     [Fact]
     public async Task UserInfo_WhenAccountInactive_ReturnsNoProfileClaims()
     {
-        var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
         var client = factory.CreateClient();
 
-        await CharacterizationSeed.PostLoginAsync(client, username, password);
-        var tokens = await client.GetTokensAsync("demo_client", "openid profile");
+        await CharacterizationSeed.PostLoginAsync(
+            client,
+            subject.Username,
+            subject.Password,
+            factory.Handles.Demo.Path);
+        var tokens = await client.GetTokensAsync(
+            factory.Handles.Demo,
+            factory.Handles.DemoClient,
+            "openid profile");
 
         // deactivate the account after the token was issued
-        CharacterizationSeed.GetDetails(storage, MemoryStorage.DemoRealm, username).IsActive = false;
+        await factory.SetAccountActiveAsync(factory.Handles.Demo, subject, active: false);
 
-        var message = new HttpRequestMessage(HttpMethod.Get, Oidc.Routes.BuildUserInfoUrl(MemoryStorage.DemoRealm.Path));
+        var message = new HttpRequestMessage(
+            HttpMethod.Get,
+            Oidc.Routes.BuildUserInfoUrl(factory.Handles.Demo.Path));
         message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokens.AccessToken);
         var response = await client.SendAsync(message);
 

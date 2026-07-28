@@ -7,6 +7,12 @@ namespace Tests.Integration.Prepare;
 
 internal static class LoginExtensions
 {
+    public static Task LoginAsync(
+        this HttpClient client,
+        TestRealmHandle realm,
+        TestSubjectHandle subject)
+        => LoginAsync(client, subject.Username, subject.Password, realm.Path);
+
     public static async Task LoginAsync(this HttpClient client, string username, string password, string reaml = "demo")
     {
         var content = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -28,6 +34,11 @@ internal static class LoginExtensions
     {
         await LoginAsync(client, "bob", "bob");
     }
+
+    public static Task<HttpResponseMessage> LogoutAsync(
+        this HttpClient client,
+        TestRealmHandle realm)
+        => LogoutAsync(client, realm.Path);
 
     public static async Task<HttpResponseMessage> LogoutAsync(this HttpClient client, string reaml = "demo")
     {
@@ -52,6 +63,13 @@ internal static class LoginExtensions
         var json = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<TokenEndpointParameters>(json)!;
     }
+
+    public static Task<TokenEndpointParameters> GetTokensAsync(
+        this HttpClient client,
+        TestRealmHandle realm,
+        TestClientHandle clientHandle,
+        string scope = "openid profile offline_access")
+        => GetTokensAsync(client, clientHandle.ClientId, scope, realm.Path);
 
     public static async Task<string?> GetAuthorizeAsync(
         this HttpClient client,
@@ -79,4 +97,12 @@ internal static class LoginExtensions
         var parameters = HttpUtility.ParseQueryString(location.Query);
         return parameters["code"];
     }
+
+    public static Task<string?> GetAuthorizeAsync(
+        this HttpClient client,
+        TestRealmHandle realm,
+        TestClientHandle clientHandle,
+        string scope = "openid profile offline_access",
+        string redirectUri = "http://localhost:5000/callback")
+        => GetAuthorizeAsync(client, clientHandle.ClientId, scope, redirectUri, realm.Path);
 }

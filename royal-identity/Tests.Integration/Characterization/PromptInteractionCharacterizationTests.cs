@@ -53,7 +53,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
 
         // baseline: a fresh, authenticated session goes straight to the callback with a code
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await CharacterizationSeed.PostLoginAsync(client, username, password);
 
@@ -71,7 +71,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
         factory.Clock.SetUtcNow(BaseTime);
 
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await CharacterizationSeed.PostLoginAsync(client, username, password);
 
@@ -89,7 +89,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
         factory.Clock.SetUtcNow(BaseTime);
 
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await CharacterizationSeed.PostLoginAsync(client, username, password);
 
@@ -109,7 +109,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
         factory.Clock.SetUtcNow(BaseTime);
 
         var storage = factory.Services.GetRequiredService<MemoryStorage>();
-        var (username, password) = CharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
+        var (username, password) = LegacyCharacterizationSeed.SeedUser(storage, MemoryStorage.DemoRealm);
 
         var clientId = $"sso-client-{CryptoRandom.CreateUniqueId(6)}";
         storage.GetDemoRealmStore().Clients[clientId] = new Client

@@ -42,7 +42,7 @@ async snapshot; explicit Plain/Data Protection/AES key protectors; dedicated mig
 provider-neutral P2 contracts and acceptances validated against PostgreSQL 17 real). Treat each as the
 implemented target architecture before changing the area it covers.
 
-The active implementation plan is `.ai/plans/plan-data-test-migration.md` (Plan 4; Fases 1-4 complete).
+The active implementation plan is `.ai/plans/plan-data-test-migration.md` (Plan 4; Fases 1-5 complete).
 `.ai/plans/plan-data-operational-storage.md` (Plan 3) is COMPLETE
 (2026-07-26, 8/8): the Operational family is persisted over SQLite and PostgreSQL, authorization codes are
 single-use and refresh transitions conditional under real concurrency, authorize parameters are realm-bound with

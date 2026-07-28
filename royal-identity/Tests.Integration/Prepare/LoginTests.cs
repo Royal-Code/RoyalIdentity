@@ -2,11 +2,11 @@
 
 namespace Tests.Integration.Prepare;
 
-public class LoginTests : IClassFixture<AppFactory>
+public class LoginTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly AppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
     
-    public LoginTests(AppFactory factory)
+    public LoginTests(PersistentStorageAppFactory factory)
     {
         this.factory = factory;
     }
@@ -18,8 +18,8 @@ public class LoginTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
 
         // Act
-        await client.LoginAliceAsync();
-        var response = await client.GetAsync("demo/test/account/profile");
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+        var response = await client.GetAsync($"{factory.Handles.Demo.Path}/test/account/profile");
 
         // Assert
         Assert.NotNull(response);
@@ -34,7 +34,7 @@ public class LoginTests : IClassFixture<AppFactory>
 
         // The profile endpoint now returns the lean edge Subject (subjectId/displayName/isActive); the
         // username is no longer part of the borda. The sub is the stable SubjectId, not the username.
-        Assert.Equal(MemoryStorage.AliceSubjectId, subject["subjectId"].ToString());
+        Assert.Equal(factory.Handles.Alice.SubjectId, subject["subjectId"].ToString());
         Assert.Equal("Alice", subject["displayName"].ToString());
     }
 
@@ -45,8 +45,8 @@ public class LoginTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
 
         // Act
-        await LoginExtensions.LoginAliceAsync(client);
-        var response = await client.LogoutAsync();
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+        var response = await client.LogoutAsync(factory.Handles.Demo);
 
         // Assert
         Assert.NotNull(response);
@@ -60,8 +60,10 @@ public class LoginTests : IClassFixture<AppFactory>
         var client = factory.CreateClient();
         
         // Act
-        await client.LoginAliceAsync();
-        var token = await client.GetTokensAsync("demo_client", "openid profile offline_access");
+        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+        var token = await client.GetTokensAsync(
+            factory.Handles.Demo,
+            factory.Handles.DemoClient);
 
         // Assert
         Assert.NotNull(token);
