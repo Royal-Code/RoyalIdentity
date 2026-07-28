@@ -2,13 +2,15 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.PostgreSql;
+using RoyalIdentity.Users;
+using RoyalIdentity.Users.Contracts;
 
 namespace Tests.UserAccounts;
 
 public class UserAccountsPostgreSqlRegistrationTests
 {
     [Fact]
-    public void NamedConnectionRegistration_BuildsWithScopeValidation()
+    public void NamedConnectionAndIntegration_BuildCompleteGraphWithScopeValidation()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -21,7 +23,9 @@ public class UserAccountsPostgreSqlRegistrationTests
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSingleton<IUserAccountPasswordHasher, FakePasswordHasher>();
+        services.AddSingleton<ISessionRevocationService, NoopSessionRevocationService>();
         services.AddUserAccountsPostgreSql();
+        services.AddUserAccountsForRoyalIdentity();
 
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
@@ -31,6 +35,7 @@ public class UserAccountsPostgreSqlRegistrationTests
         using var scope = provider.CreateScope();
 
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<UserAccountsPostgreSqlDbContext>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<IUserDirectory>());
     }
 
     private sealed class FakePasswordHasher : IUserAccountPasswordHasher
@@ -38,5 +43,15 @@ public class UserAccountsPostgreSqlRegistrationTests
         public string Hash(string password) => password;
 
         public bool Verify(string password, string passwordHash) => password == passwordHash;
+    }
+
+    private sealed class NoopSessionRevocationService : ISessionRevocationService
+    {
+        public Task RevokeAsync(
+            string subjectId,
+            SessionRevocation revocation,
+            string? currentSessionId,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

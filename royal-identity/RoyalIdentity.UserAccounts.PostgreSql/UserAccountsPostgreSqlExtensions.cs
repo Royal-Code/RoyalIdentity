@@ -31,6 +31,8 @@ public static class UserAccountsPostgreSqlExtensions
     /// <summary>
     /// Registers the module with one explicit PostgreSQL connection string supplied by the composition root.
     /// This avoids introducing a second configuration key when the host already owns a typed connection option.
+    /// The context deliberately uses the scoped <c>AddDbContext</c> registration rather than pooling: its
+    /// constructor consumes the module's scoped domain-event dispatcher.
     /// </summary>
     public static IWorkContextBuilder<UserAccountsPostgreSqlDbContext> AddUserAccountsPostgreSqlConnection(
         this IServiceCollection services,

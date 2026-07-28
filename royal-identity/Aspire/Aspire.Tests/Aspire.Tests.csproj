@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<Import Project="../../tests.targets" />
+
+	<ItemGroup>
+		<PackageReference Include="Aspire.Hosting.Testing" Version="13.4.6" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Aspire.AppHost\Aspire.AppHost.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="System.Net" />
+		<Using Include="Microsoft.Extensions.DependencyInjection" />
+		<Using Include="Aspire.Hosting.ApplicationModel" />
+		<Using Include="Aspire.Hosting.Testing" />
+		<Using Include="Xunit" />
+	</ItemGroup>
+
+</Project>

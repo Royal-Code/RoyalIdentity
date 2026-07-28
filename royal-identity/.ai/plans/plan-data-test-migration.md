@@ -1008,7 +1008,8 @@ compatibilidade da signing key semeada com o runtime.
 
 O teste real `scripts/Test-ServerPostgreSql.ps1` executou PostgreSQL 17 via Podman, aplicou as três famílias pelo
 runner e iniciou o Server com sucesso. Essa validação revelou dois defeitos mascarados pelo SQLite/fake e ambos
-foram corrigidos: o pool de `UserAccountsDbContext` capturava um dispatcher scoped, e o
+foram corrigidos: uma versão intermediária da nova sobrecarga de conexão explícita de `UserAccounts` registrava o
+contexto em pool, incompatível com o `IDomainEventDispatcher` scoped consumido pelo seu construtor, e o
 `SigningKeyStartupValidator` consultava keys enquanto o reader de realms ainda estava aberto no mesmo contexto
 Npgsql. Também foi adicionado fail-fast para profiles Operational selecionados e indisponíveis.
 
@@ -1022,8 +1023,9 @@ Comandos finais: `dotnet build RoyalIdentity.sln --no-restore` (sucesso);
 Revisão posterior prendeu o segundo defeito com um aceite PostgreSQL opt-in: o
 `SigningKeyStartupValidator` percorre dois realms habilitados no gateway EF real sem sobrepor comandos Npgsql.
 O atalho público `AddUserAccountsPostgreSql` também ganhou uma guarda de composição com
-`ValidateOnBuild`/`ValidateScopes`; ela confirmou que o registro do WorkContext não reproduz o captive dependency
-do `DbContextPool` removido da composição do Server. Verificação posterior:
+`ValidateOnBuild`/`ValidateScopes`, incluindo o adapter `AddUserAccountsForRoyalIdentity`; ela confirmou que o
+registro do WorkContext e a integração completa não reproduzem o captive dependency do `DbContextPool` descartado
+na implementação intermediária da sobrecarga explícita. Verificação posterior:
 `./scripts/Test-ConfigurationPostgreSql.ps1` (44/44 PostgreSQL);
 `dotnet test Tests.Storage/Tests.Storage.csproj --no-restore` (589 aprovados, 44 opt-in ignorados); e
 `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-restore` (195 aprovados, 1 opt-in ignorado).
