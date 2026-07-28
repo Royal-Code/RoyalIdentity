@@ -12,8 +12,8 @@
 	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
 	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Sqlite\RoyalIdentity.UserAccounts.Sqlite.csproj" />
 	  <ProjectReference Include="..\Tests.Host\Tests.Host.csproj" />
-	  <!-- Opt-in EF-gateway host variant (plan-data-operational-storage Fase 8): the migration runner applies
-	       both families and the demo seed, exactly as production would. No default changes (ADR-018). -->
+	  <!-- Opt-in persistent composition support (plan-data-test-migration Fase 4): the shared runner applies
+	       all three storage families before Tests.Host starts. No default changes yet (ADR-018). -->
 	  <ProjectReference Include="..\RoyalIdentity.Migrations\RoyalIdentity.Migrations.csproj" />
 	</ItemGroup>
 

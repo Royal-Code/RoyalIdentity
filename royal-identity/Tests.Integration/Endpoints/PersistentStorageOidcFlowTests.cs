@@ -15,19 +15,20 @@ namespace Tests.Integration.Endpoints;
 /// <summary>
 /// One complete OIDC flow over the <b>EF gateway</b> — discovery, authorize, login, code exchange, userinfo
 /// and refresh —
-/// with Configuration and Operational persisted in one SQLite database migrated and seeded by the production
-/// runner (plan Fase 8). It is the end-to-end answer to "is this backing actually usable?", which no store
+/// with Configuration and Operational persisted in one SQLite database migrated and seeded by the shared
+/// migration runner (plan-data-test-migration Fase 4). It is the end-to-end answer to "is this backing actually
+/// usable?", which no store
 /// contract can give on its own.
 /// <para>
 /// Opt-in by construction: it uses <see cref="PersistentStorageAppFactory"/> while every other suite keeps
 /// the in-memory backing, so nothing here changes the default the host or the other tests run on (ADR-018).
 /// </para>
 /// </summary>
-public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStorageAppFactory>
+public class PersistentStorageOidcFlowTests : IClassFixture<PersistentStorageAppFactory>
 {
     private readonly PersistentStorageAppFactory factory;
 
-    public EntityFrameworkStorageOidcFlowTests(PersistentStorageAppFactory factory)
+    public PersistentStorageOidcFlowTests(PersistentStorageAppFactory factory)
         => this.factory = factory;
 
     [Fact]
@@ -38,17 +39,20 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
         var codeVerifier = CryptoRandom.CreateUniqueId();
         var codeChallenge = Base64Url.Encode(Encoding.ASCII.GetBytes(codeVerifier).Sha256());
         var redirectUri = $"{client.BaseAddress}callback";
+        var demo = factory.Handles.Demo;
+        var demoClient = factory.Handles.DemoClient;
+        var alice = factory.Handles.Alice;
 
         var discoveryResponse = await client.GetAsync(
-            Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path));
+            Oidc.Routes.BuildDiscoveryConfigurationUrl(demo.Path));
         Assert.Equal(HttpStatusCode.OK, discoveryResponse.StatusCode);
         using var discovery = JsonDocument.Parse(await discoveryResponse.Content.ReadAsStringAsync());
         Assert.Equal(
-            $"{client.BaseAddress!.ToString().TrimEnd('/')}/{factory.Handles.Demo.Path}",
+            $"{client.BaseAddress!.ToString().TrimEnd('/')}/{demo.Path}",
             discovery.RootElement.GetProperty("issuer").GetString());
 
-        var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl("demo")
-            .AddQueryString("client_id", "demo_client")
+        var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl(demo.Path)
+            .AddQueryString("client_id", demoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile email offline_access")
@@ -65,8 +69,8 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
         var document = new HtmlDocument();
         document.LoadHtml(await loginPage.Content.ReadAsStringAsync());
         var callback = await new FormAction(client, document.DocumentNode.SelectSingleNode("//form"))
-            .SetValue("Input.Username", "alice")
-            .SetValue("Input.Password", "alice")
+            .SetValue("Input.Username", alice.Username)
+            .SetValue("Input.Password", alice.Password)
             .SubmitAsync();
 
         // 2 — the login lands on the client callback carrying the authorization code.
@@ -86,7 +90,7 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
         {
             ["grant_type"] = "authorization_code",
             ["code"] = callbackData["code"],
-            ["client_id"] = "demo_client",
+            ["client_id"] = demoClient.ClientId,
             ["redirect_uri"] = redirectUri,
             ["code_verifier"] = codeVerifier,
         });
@@ -101,7 +105,7 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
 
         // 4 — the access token works against a protected endpoint.
         var userInfo = await GetUserInfoAsync(client, tokens.GetProperty("access_token").GetString()!);
-        Assert.Equal(factory.Handles.Alice.SubjectId, userInfo.GetProperty("sub").GetString());
+        Assert.Equal(alice.SubjectId, userInfo.GetProperty("sub").GetString());
 
         // 5 — MP-3 through the flow: the refresh renews the access token, and the conditional transition marked
         // the very same row as consumed instead of writing a second one.
@@ -109,7 +113,7 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
         {
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = refreshToken,
-            ["client_id"] = "demo_client",
+            ["client_id"] = demoClient.ClientId,
         });
 
         Assert.False(string.IsNullOrEmpty(refreshed.GetProperty("access_token").GetString()));
@@ -129,7 +133,7 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
         {
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = refreshToken,
-            ["client_id"] = "demo_client",
+            ["client_id"] = demoClient.ClientId,
         });
 
         Assert.Equal(3, await CountArtifactsAsync(ProtocolArtifactTypes.RefreshToken));
@@ -169,11 +173,13 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
             id => Assert.EndsWith("_InitialOperational", id, StringComparison.Ordinal));
     }
 
-    private static async Task<HttpResponseMessage> PostTokenAsync(
+    private async Task<HttpResponseMessage> PostTokenAsync(
         HttpClient client, Dictionary<string, string> form)
-        => await client.PostAsync(Oidc.Routes.BuildTokenUrl("demo"), new FormUrlEncodedContent(form));
+        => await client.PostAsync(
+            Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path),
+            new FormUrlEncodedContent(form));
 
-    private static async Task<JsonElement> ExchangeAsync(HttpClient client, Dictionary<string, string> form)
+    private async Task<JsonElement> ExchangeAsync(HttpClient client, Dictionary<string, string> form)
     {
         var response = await PostTokenAsync(client, form);
         var body = await response.Content.ReadAsStringAsync();
@@ -183,9 +189,11 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStora
         return JsonDocument.Parse(body).RootElement.Clone();
     }
 
-    private static async Task<JsonElement> GetUserInfoAsync(HttpClient client, string accessToken)
+    private async Task<JsonElement> GetUserInfoAsync(HttpClient client, string accessToken)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, Oidc.Routes.BuildUserInfoUrl("demo"));
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            Oidc.Routes.BuildUserInfoUrl(factory.Handles.Demo.Path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await client.SendAsync(request);

@@ -1097,7 +1097,7 @@ distintas e `UserAccounts` em banco separado.
 
 ```powershell
 dotnet test Tests.UserAccounts --filter "FullyQualifiedName~UserAccountsModuleSeed"
-dotnet test Tests.Integration --filter "FullyQualifiedName~EntityFrameworkStorageOidcFlow|FullyQualifiedName~PersistentStorage|FullyQualifiedName~ServiceProviderValidation"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PersistentStorage|FullyQualifiedName~ServiceProviderValidation"
 ```
 
 ### Resultado da Fase 4
@@ -1129,10 +1129,16 @@ aquecimento e três execuções independentes `--no-build`, medindo o tempo de p
 - Suíte ainda fake:
   `dotnet test Tests.Integration/Tests.Integration.csproj --no-build` — aquecimento `10,566 s`; execuções
   `10,922 s`, `12,345 s`, `11,673 s`; mediana `11,673 s`.
-- Startup da factory persistente:
+- Execução filtrada que contém o startup da factory persistente:
   `dotnet test Tests.Integration/Tests.Integration.csproj --no-build --filter
   "FullyQualifiedName~PersistentStorageCompositionTests.Host_UsesThreeRealBackings_AndDeterministicProviderNeutralHandles"`
-  — aquecimento `5,728 s`; execuções `5,756 s`, `6,143 s`, `5,711 s`; mediana `5,756 s`.
+  — aquecimento `5,728 s`; execuções `5,756 s`, `6,143 s`, `5,711 s`; mediana `5,756 s`. Estes são tempos de
+  parede do comando completo e incluem processo `dotnet test`, carga/descoberta do xUnit e execução das asserções;
+  servem para remedição do mesmo filtro, não como custo isolado da factory.
+- Startup isolado por `Stopwatch`, iniciado antes do construtor e encerrado imediatamente após `CreateClient()`,
+  no mesmo teste executado com `--no-build --logger "console;verbosity=detailed"` — passagem inicial
+  `3,787 s`; execuções aquecidas `3,689 s`, `3,897 s`, `3,649 s`; mediana `3,689 s`. A instrumentação é somente
+  observacional e não impõe asserção de tempo.
 
 Para DF26, regressão material fica fixada em **mais de 2,00× a mediana fake**, isto é, `23,346 s` neste ambiente.
 A razão, e não o valor absoluto, é o critério que a Fase 6 deve reproduzir no mesmo ambiente comparável: ela
@@ -1146,6 +1152,11 @@ filtro persistente da fase em `Tests.Integration` (10/10);
 `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-build` (195 aprovados, 1 PostgreSQL opt-in
 ignorado). Os avisos do build são os já existentes de SDK preview, referências ASP.NET implícitas/pacote legado e
 duas anotações de nulabilidade em doubles de testes.
+
+Revisão posterior distinguiu o tempo de parede do filtro do startup instrumentado acima e normalizou o smoke
+exemplar para consumir `Demo`, `DemoClient` e `Alice` exclusivamente pelos handles da factory. A classe/arquivo
+passou a se chamar `PersistentStorageOidcFlowTests`, e seu XML doc agora referencia a Fase 4 deste plano e o runner
+compartilhado, removendo a menção histórica ambígua à Fase 8 do plano anterior.
 
 ---
 

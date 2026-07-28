@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Configuration;
@@ -6,16 +7,27 @@ using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
 using RoyalIdentity.UserAccounts.Integration;
 using RoyalIdentity.Users.Contracts;
+using Xunit.Abstractions;
 
 namespace Tests.Integration.Prepare;
 
 public class PersistentStorageCompositionTests
 {
+    private readonly ITestOutputHelper output;
+
+    public PersistentStorageCompositionTests(ITestOutputHelper output)
+        => this.output = output;
+
     [Fact]
     public async Task Host_UsesThreeRealBackings_AndDeterministicProviderNeutralHandles()
     {
+        var startup = Stopwatch.StartNew();
         using var factory = new PersistentStorageAppFactory();
         _ = factory.CreateClient();
+        startup.Stop();
+        output.WriteLine(
+            "PersistentStorageAppFactory startup (constructor + CreateClient): {0:F3} s",
+            startup.Elapsed.TotalSeconds);
         using var scope = factory.Services.CreateScope();
 
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ConfigurationSqliteDbContext>());
