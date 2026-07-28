@@ -325,8 +325,11 @@ public class EntityFrameworkStorageGatewayTests
     /// The production composition under test: both EF families over one SQLite database, the snapshot bootstrapped
     /// like the host does, and the gateway added by its public opt-in.
     /// </summary>
-    private sealed class GatewayComposition : IAsyncDisposable
+    public sealed class GatewayComposition : IAsyncDisposable
     {
+        public const string RealmAId = "gateway-realm";
+        public const string RealmBId = "gateway-realm-b";
+
         private readonly SqliteOperationalDatabase database;
 
         private GatewayComposition(
@@ -339,7 +342,7 @@ public class EntityFrameworkStorageGatewayTests
 
         public ServiceProvider Services { get; }
 
-        public CommandCounter Commands { get; }
+        internal CommandCounter Commands { get; }
 
         public static async Task<GatewayComposition> CreateAsync(Action<OperationalCleanupOptions>? cleanup = null)
         {
@@ -399,9 +402,9 @@ public class EntityFrameworkStorageGatewayTests
         }
 
         /// <summary>Reads the seeded realm back through the gateway, which is how a caller would get it.</summary>
-        public async Task<Realm> LoadRealmAsync(IStorage storage)
-            => await storage.Realms.GetByIdAsync("gateway-realm", default)
-                ?? throw new InvalidOperationException("The gateway fixture realm is missing.");
+        public async Task<Realm> LoadRealmAsync(IStorage storage, string realmId = RealmAId)
+            => await storage.Realms.GetByIdAsync(realmId, default)
+                ?? throw new InvalidOperationException($"The gateway fixture realm '{realmId}' is missing.");
 
         private static async Task SeedAsync(IServiceProvider services, SqliteOperationalDatabase database)
         {
@@ -421,17 +424,28 @@ public class EntityFrameworkStorageGatewayTests
             });
             await context.SaveChangesAsync();
 
-            var realmOptions = new RealmOptions(serverOptions)
+            var realmAOptions = new RealmOptions(serverOptions)
             {
                 OperationalStorage =
                 {
                     JwtAccessTokenPersistence = JwtAccessTokenPersistenceMode.Full,
                 },
             };
-            var realm = new Realm(
-                "gateway-realm", "gateway.contract.test", "gateway", "Gateway Realm", false, realmOptions);
+            var realmBOptions = new RealmOptions(serverOptions)
+            {
+                OperationalStorage =
+                {
+                    JwtAccessTokenPersistence = JwtAccessTokenPersistenceMode.Full,
+                },
+            };
+            var realmA = new Realm(
+                RealmAId, "gateway.contract.test", "gateway", "Gateway Realm", false, realmAOptions);
+            var realmB = new Realm(
+                RealmBId, "gateway-b.contract.test", "gateway-b", "Gateway Realm B", false, realmBOptions);
 
-            await scope.ServiceProvider.GetRequiredService<IRealmStore>().SaveAsync(realm);
+            var realms = scope.ServiceProvider.GetRequiredService<IRealmStore>();
+            await realms.SaveAsync(realmA);
+            await realms.SaveAsync(realmB);
         }
 
         public async ValueTask DisposeAsync()

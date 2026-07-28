@@ -36,7 +36,6 @@ public class DemoBoundaryTests
         Assert.DoesNotContain(compiledReferences, name => name == "RoyalIdentity.Server");
         Assert.DoesNotContain(compiledReferences, name => name.Contains("PostgreSql", StringComparison.Ordinal));
         Assert.DoesNotContain(compiledReferences, name => name.StartsWith("RoyalIdentity.Data.", StringComparison.Ordinal));
-        Assert.DoesNotContain(compiledReferences, name => name == "RoyalIdentity.Storage.InMemory");
     }
 
     [Fact]
@@ -71,7 +70,6 @@ public class DemoBoundaryTests
         Assert.DoesNotContain(serverReferences, name => name == "RoyalIdentity.Demo");
         Assert.DoesNotContain(serverReferences, name => name.Contains("Sqlite", StringComparison.Ordinal));
         Assert.DoesNotContain(serverReferences, name => name == "RoyalIdentity.Migrations");
-        Assert.DoesNotContain(serverReferences, name => name == "RoyalIdentity.Storage.InMemory");
         Assert.DoesNotContain(migrationsReferences, name => name == "RoyalIdentity.Demo");
 
         var demoAssembly = typeof(RoyalIdentity.Demo.DemoProgram).Assembly;

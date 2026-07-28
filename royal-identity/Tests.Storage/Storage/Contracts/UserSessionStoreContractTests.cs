@@ -253,11 +253,6 @@ public abstract class UserSessionStoreContractTests : StorageContractTests
         Assert.Null(inB);
     }
 
-    public sealed class InMemory : UserSessionStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
-
     public sealed class SqliteOperational : UserSessionStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()

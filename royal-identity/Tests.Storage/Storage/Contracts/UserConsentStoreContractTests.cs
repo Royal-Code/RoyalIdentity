@@ -138,11 +138,6 @@ public abstract class UserConsentStoreContractTests : StorageContractTests
         Assert.Contains("profile", inB.GetValidScopes());
     }
 
-    public sealed class InMemory : UserConsentStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
-
     public sealed class SqliteOperational : UserConsentStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()

@@ -145,11 +145,6 @@ public abstract class RefreshTokenStoreContractTests : StorageContractTests
         Assert.Equal("subject-of-b", inB.SubjectId);
     }
 
-    public sealed class InMemory : RefreshTokenStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
-
     public sealed class SqliteOperational : RefreshTokenStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()

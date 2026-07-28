@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;

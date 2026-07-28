@@ -6,7 +6,6 @@ using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
-using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.Users.Contracts;
 using Tests.Storage.Operational.Support;
 
@@ -16,8 +15,7 @@ namespace Tests.Storage.Operational;
 /// Shape and behavior of the public contracts introduced by Fase 1 of plan-data-operational-storage: the
 /// atomic capabilities MP-2/MP-3 (DF11/DF12), their transitional detection and fallback (DF39), and the
 /// realm-bound authorize-parameters accessor (MP-5/DF16). The capabilities must never carry a non-atomic
-/// default implementation, the in-memory fake must never claim them (ADR-018/DF25), and only the core may
-/// take the legacy path — explicitly.
+/// default implementation, and only the core may take the legacy path — explicitly.
 /// </summary>
 public class OperationalContractsShapeTests
 {
@@ -51,13 +49,14 @@ public class OperationalContractsShapeTests
             method => method.Name.StartsWith("Try", StringComparison.Ordinal));
     }
 
-    // ADR-018/DF25: the fake stays transitional. It never gains the atomic capabilities, so the acceptances
-    // that prove atomicity can only run against the EF provider.
+    // Plan 4 Fase 7: the legacy shape is characterized by a focused local double, not by retaining a concrete
+    // storage implementation. This assertion and the fallback behavior tests below disappear in Fase 8 when
+    // the atomic operations move into the base contracts and the legacy path becomes unrepresentable.
     [Fact]
-    public void InMemoryStores_DoNotImplementTheCapabilities()
+    public void LegacyContractDoubles_DoNotImplementTheAtomicCapabilities()
     {
-        Assert.False(typeof(AuthorizationCodeStore).IsAssignableTo(typeof(ISingleUseAuthorizationCodeStore)));
-        Assert.False(typeof(RefreshTokenStore).IsAssignableTo(typeof(IVersionedRefreshTokenStore)));
+        Assert.False(typeof(LegacyAuthorizationCodeStore).IsAssignableTo(typeof(ISingleUseAuthorizationCodeStore)));
+        Assert.False(typeof(LegacyRefreshTokenStore).IsAssignableTo(typeof(IVersionedRefreshTokenStore)));
     }
 
     // DF39: the EF composition must be unable to produce a store without the capability. The factory's own
@@ -86,7 +85,7 @@ public class OperationalContractsShapeTests
         var refreshStore = new CapableRefreshTokenStore(OperationalTestData.NewRefreshToken());
         var storage = new SingleStoreStorage { AuthorizationCodes = codeStore, RefreshTokens = refreshStore };
 
-        // Both fakes satisfy the factory's return types, which is what the EF stores will have to satisfy too.
+        // Both doubles satisfy the factory's return types, which is what the EF stores satisfy too.
         Assert.True(codeStore is IOperationalAuthorizationCodeStore);
         Assert.True(refreshStore is IOperationalRefreshTokenStore);
 

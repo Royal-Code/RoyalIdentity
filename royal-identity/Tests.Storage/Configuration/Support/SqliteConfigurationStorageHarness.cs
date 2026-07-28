@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Collections.Specialized;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
@@ -7,7 +6,6 @@ using RoyalIdentity.Data.Configuration;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Scopes;
-using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
@@ -16,17 +14,14 @@ using RoyalIdentity.Storage.EntityFramework.Extensions;
 using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using RoyalIdentity.Storage.EntityFramework.Security.KeyMaterial;
 using RoyalIdentity.Storage.EntityFramework.Sqlite;
-using RoyalIdentity.Storage.InMemory;
-using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
 using Tests.Storage.Support;
 
 namespace Tests.Storage.Configuration.Support;
 
 /// <summary>
-/// Shared Configuration-EF fixture for the provider-neutral contracts. Only Configuration operations use EF;
-/// Operational members are isolated in test-local dictionaries so no partial production <see cref="IStorage"/>
-/// is registered (plan DF20).
+/// Shared Configuration-EF fixture. A Configuration-only specialization exposes no Operational fallback;
+/// cross-family contracts use the specialization that registers the real Operational EF factory.
 /// </summary>
 internal abstract class ConfigurationStorageHarness<TContext> : StorageContractHarness
     where TContext : ConfigurationDbContext
@@ -124,11 +119,8 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
             await context.SaveChangesAsync();
 
             var factory = scope.ServiceProvider.GetRequiredService<IConfigurationStoreFactory>();
-            // Present only when the fixture registered the Operational family; the Configuration-only fixture
-            // keeps every Operational member in memory.
             var operational = scope.ServiceProvider.GetService<IOperationalStoreFactory>();
-            var storage = new ConfigurationCompositeStorage(factory, serverOptions, clock, operational);
-            storage.EnsureRealm(internalRealm.Id);
+            var storage = new ConfigurationCompositeStorage(factory, serverOptions, operational);
 
             var harness = createHarness(new HarnessState(
                 database,
@@ -232,64 +224,43 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
     }
 
     /// <summary>
-    /// Composes the EF stores that already exist with test-local dictionaries for the ones that do not, so the
-    /// provider-neutral contracts run unchanged while the Operational family lands phase by phase. Passing no
-    /// <see cref="IOperationalStoreFactory"/> keeps every Operational member in memory (the Configuration-only
-    /// fixture of Plano 2); passing one routes the stores that phase delivered to EF.
+    /// Composes Configuration EF with Operational EF when the latter was registered. The Configuration-only
+    /// fixture fails explicitly on Operational access instead of supplying a second storage implementation.
     /// </summary>
     protected sealed class ConfigurationCompositeStorage : IStorage
     {
         private readonly IConfigurationStoreFactory configuration;
         private readonly IOperationalStoreFactory? operational;
-        private readonly ConcurrentDictionary<string, RealmOperationalData> realmData = new(StringComparer.Ordinal);
-        private readonly TimeProvider clock;
 
         public ConfigurationCompositeStorage(
             IConfigurationStoreFactory configuration,
             ServerOptions serverOptions,
-            TimeProvider clock,
             IOperationalStoreFactory? operational = null)
         {
             this.configuration = configuration;
             this.operational = operational;
-            this.clock = clock;
             ServerOptions = new ServerOptions(serverOptions);
-            Realms = new CoordinatedRealmStore(configuration.Realms, EnsureRealm, RemoveRealm);
-            authorizeParameters = new AuthorizeParametersStore(new ConcurrentDictionary<string, NameValueCollection>());
+            Realms = configuration.Realms;
         }
 
         public ServerOptions ServerOptions { get; }
 
         public IRealmStore Realms { get; }
 
-        private readonly IAuthorizeParametersStore authorizeParameters;
-
-        /// <summary>
-        /// The Configuration-only composite keeps the transitional in-memory authorize-parameters fake behind
-        /// the realm-bound accessor of MP-5, with no partitioning and no TTL: those are acceptances of the
-        /// Operational EF provider, not of this composite (plan-data-operational-storage DF25).
-        /// </summary>
         public IAuthorizeParametersStore GetAuthorizeParametersStore(Realm realm)
-            => operational is null
-                ? authorizeParameters
-                : operational.GetAuthorizeParametersStore(realm);
+            => Operational.GetAuthorizeParametersStore(realm);
 
-        // Fase 2 delivered these two over EF; the rest still come from the transitional dictionaries.
         public IAccessTokenStore GetAccessTokenStore(Realm realm)
-            => operational?.GetAccessTokenStore(realm) ?? new AccessTokenStore(GetData(realm).AccessTokens);
+            => Operational.GetAccessTokenStore(realm);
 
         public IRefreshTokenStore GetRefreshTokenStore(Realm realm)
-            => operational is null
-                ? new RefreshTokenStore(GetData(realm).RefreshTokens)
-                : operational.GetRefreshTokenStore(realm);
+            => Operational.GetRefreshTokenStore(realm);
 
         public IAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm)
-            => operational is null
-                ? new AuthorizationCodeStore(GetData(realm).AuthorizationCodes)
-                : operational.GetAuthorizationCodeStore(realm);
+            => Operational.GetAuthorizationCodeStore(realm);
 
         public IUserConsentStore GetUserConsentStore(Realm realm)
-            => operational?.GetUserConsentStore(realm) ?? new UserConsentStore(GetData(realm).Consents);
+            => Operational.GetUserConsentStore(realm);
 
         public IKeyStore GetKeyStore(Realm realm)
             => configuration.GetKeyStore(realm);
@@ -301,57 +272,11 @@ internal abstract class ConfigurationStorageHarness<TContext> : StorageContractH
             => configuration.GetResourceStore(realm);
 
         public IUserSessionStore GetUserSessionStore(Realm realm)
-            => operational?.GetUserSessionStore(realm) ?? new UserSessionStore(GetData(realm).Sessions, clock);
+            => Operational.GetUserSessionStore(realm);
 
-        public void EnsureRealm(string realmId) => realmData.TryAdd(realmId, new RealmOperationalData());
-
-        private void RemoveRealm(string realmId) => realmData.TryRemove(realmId, out _);
-
-        private RealmOperationalData GetData(Realm realm)
-        {
-            if (realmData.TryGetValue(realm.Id, out var data))
-                return data;
-
-            throw new ArgumentException($"The realm with id '{realm.Id}' is unavailable.", nameof(realm));
-        }
-    }
-
-    private sealed class CoordinatedRealmStore(
-        IRealmStore inner,
-        Action<string> realmSaved,
-        Action<string> realmDeleted) : IRealmStore
-    {
-        public ValueTask<Realm?> GetByPathAsync(string path, CancellationToken ct) => inner.GetByPathAsync(path, ct);
-
-        public ValueTask<Realm?> GetByIdAsync(string id, CancellationToken ct) => inner.GetByIdAsync(id, ct);
-
-        public ValueTask<Realm?> GetByDomainAsync(string domain, CancellationToken ct = default)
-            => inner.GetByDomainAsync(domain, ct);
-
-        public IAsyncEnumerable<Realm> GetAllAsync(CancellationToken ct) => inner.GetAllAsync(ct);
-
-        public async ValueTask SaveAsync(Realm realm, CancellationToken ct = default)
-        {
-            await inner.SaveAsync(realm, ct);
-            realmSaved(realm.Id);
-        }
-
-        public async ValueTask<bool> DeleteAsync(string realmId, CancellationToken ct = default)
-        {
-            var deleted = await inner.DeleteAsync(realmId, ct);
-            if (deleted)
-                realmDeleted(realmId);
-            return deleted;
-        }
-    }
-
-    private sealed class RealmOperationalData
-    {
-        public ConcurrentDictionary<string, AccessToken> AccessTokens { get; } = new(StringComparer.Ordinal);
-        public ConcurrentDictionary<string, RefreshToken> RefreshTokens { get; } = new(StringComparer.Ordinal);
-        public ConcurrentDictionary<string, AuthorizationCode> AuthorizationCodes { get; } = new(StringComparer.Ordinal);
-        public ConcurrentDictionary<string, Consent> Consents { get; } = new(StringComparer.Ordinal);
-        public ConcurrentDictionary<string, UserSession> Sessions { get; } = new(StringComparer.Ordinal);
+        private IOperationalStoreFactory Operational
+            => operational ?? throw new NotSupportedException(
+                "The Configuration-only test harness does not provide Operational storage.");
     }
 
     private sealed class TestStorageProvider(IStorage storage) : IStorageProvider

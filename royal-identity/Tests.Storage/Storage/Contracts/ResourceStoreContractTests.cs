@@ -288,11 +288,6 @@ public abstract class ResourceStoreContractTests : StorageContractTests
         Assert.Equal("https://contract-rs7a.api.test/resource", resource.ResourceUri);
     }
 
-    public sealed class InMemory : ResourceStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
-
     public sealed class Sqlite : ResourceStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()

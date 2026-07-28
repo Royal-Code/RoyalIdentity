@@ -194,9 +194,6 @@ public class ConfigurationStorageBoundaryTests
             reference => reference.Contains("RoyalIdentity.Storage.", StringComparison.Ordinal));
         Assert.DoesNotContain(
             source,
-            text => text.Contains("AddInMemoryStorage", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            source,
             text => text.Contains("AddEntityFrameworkStorage", StringComparison.Ordinal));
         Assert.False(File.Exists(Path.Combine(hostDirectory, "Properties", "launchSettings.json")));
     }

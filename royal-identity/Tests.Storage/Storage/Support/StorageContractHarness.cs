@@ -9,8 +9,8 @@ namespace Tests.Storage.Support;
 /// <para>
 ///     Provider-neutral harness for the storage contract suite (plan-data-storage-baseline Fase 3; DF2/DF13).
 ///     Scenarios only see <see cref="IStorage"/>/<see cref="IStorageProvider"/>, two isolated realms and the
-///     test-only seed hooks below — never the concrete backing type. A provider (in-memory today, EF later)
-///     plugs in by implementing this harness; the scenarios are reused as-is.
+///     test-only seed hooks below — never the concrete backing type. EF provider fixtures plug in by implementing
+///     this harness; the scenarios are reused as-is.
 /// </para>
 /// <para>
 ///     Lifecycle is isolated per test: each test creates (and disposes) its own harness, so no state leaks

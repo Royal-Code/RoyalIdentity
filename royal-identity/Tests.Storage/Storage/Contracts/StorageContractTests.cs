@@ -11,15 +11,15 @@ namespace Tests.Storage.Contracts;
 /// <summary>
 /// <para>
 ///     Base class of the provider-neutral storage contract suite (plan-data-storage-baseline Fase 3).
-///     Each scenario class is abstract and hosts one nested concrete class per provider fixture
-///     (<c>InMemory</c> today; the EF providers add their own without rewriting scenarios — DF2/DF13).
+///     Each scenario class is abstract and hosts nested concrete classes for EF provider fixtures without
+///     rewriting scenarios (DF2/DF13).
 /// </para>
 /// <para>
 ///     Scenarios lock only behaviors with a final `preservar` classification in the Fase 5 closure of
 ///     plan-data-storage-matrix.md ("Paridade final e ordem de migração"). Behaviors classified
 ///     `substituir` (atomic code consumption, refresh-token conditional transition, tombstone path/domain
 ///     reservation, create-only duplicate rejects, authorize-parameters realm binding/TTL) are acceptance
-///     requirements of Planos 2/3 and are NOT tested against the transitional fake (ADR-018).
+///     requirements covered by provider-specific EF acceptances.
 /// </para>
 /// </summary>
 public abstract class StorageContractTests

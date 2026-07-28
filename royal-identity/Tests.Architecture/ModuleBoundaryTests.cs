@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Xml.Linq;
 using RoyalIdentity.Security;
 using RoyalIdentity.UserAccounts;
 using RoyalIdentity.UserAccounts.Integration;
@@ -164,39 +163,34 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
-    public void InMemoryStorage_ProjectReference_Graph_DoesNotReference_UserAccounts()
+    public void StorageAdapter_ProjectReferences_StayWithinTheInfrastructureAllowlist()
     {
-        var projectReferences = ReadProjectReferences("RoyalIdentity.Storage.InMemory/RoyalIdentity.Storage.InMemory.csproj");
-
-        Assert.Contains(projectReferences, r => r.EndsWith("RoyalIdentity/RoyalIdentity.csproj", StringComparison.Ordinal));
-        Assert.DoesNotContain(projectReferences, r => r.Contains("RoyalIdentity.UserAccounts", StringComparison.Ordinal));
-    }
-
-    private static IReadOnlyList<string> ReadProjectReferences(string relativeProjectPath)
-    {
-        var projectPath = Path.Combine(FindRepositoryRoot(), relativeProjectPath);
-        var document = XDocument.Load(projectPath);
-
-        return document
-            .Descendants("ProjectReference")
-            .Select(e => e.Attribute("Include")?.Value)
-            .Where(v => !string.IsNullOrWhiteSpace(v))
-            .Select(v => v!.Replace('\\', '/'))
-            .ToArray();
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
+        var root = ProjectReferenceReader.FindRepositoryRoot();
+        var allowedDependencies = new HashSet<string>(StringComparer.Ordinal)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "RoyalIdentity.sln")))
-                return directory.FullName;
+            "RoyalIdentity",
+            "RoyalIdentity.Security",
+            "RoyalIdentity.Data.Configuration",
+            "RoyalIdentity.Data.Operational",
+            "RoyalIdentity.Storage.EntityFramework",
+        };
+        var storageProjects = Directory
+            .EnumerateDirectories(root, "RoyalIdentity.Storage.*", SearchOption.TopDirectoryOnly)
+            .SelectMany(directory => Directory.EnumerateFiles(directory, "*.csproj", SearchOption.TopDirectoryOnly))
+            .ToArray();
 
-            directory = directory.Parent;
+        Assert.NotEmpty(storageProjects);
+
+        foreach (var project in storageProjects)
+        {
+            var relativeProject = Path.GetRelativePath(root, project).Replace('\\', '/');
+            var references = ProjectReferenceReader
+                .ReadProjectReferences(relativeProject)
+                .Select(reference => Path.GetFileNameWithoutExtension(reference)!);
+
+            Assert.DoesNotContain(
+                references,
+                reference => !allowedDependencies.Contains(reference));
         }
-
-        throw new DirectoryNotFoundException("Could not locate repository root from test output directory.");
     }
 }

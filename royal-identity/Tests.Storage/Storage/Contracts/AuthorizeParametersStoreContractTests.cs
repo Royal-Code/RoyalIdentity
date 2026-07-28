@@ -110,11 +110,6 @@ public abstract class AuthorizeParametersStoreContractTests : StorageContractTes
         Assert.Equal("client-two", (await store.ReadAsync(handleTwo, default))!["client_id"]);
     }
 
-    public sealed class InMemory : AuthorizeParametersStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
-
     public sealed class SqliteOperational : AuthorizeParametersStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()

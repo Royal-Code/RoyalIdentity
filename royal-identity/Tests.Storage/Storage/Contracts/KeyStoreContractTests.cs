@@ -197,11 +197,6 @@ public abstract class KeyStoreContractTests : StorageContractTests
         Assert.DoesNotContain("contract-only-a-key", idsInB);
     }
 
-    public sealed class InMemory : KeyStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
-
     public sealed class Sqlite : KeyStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()

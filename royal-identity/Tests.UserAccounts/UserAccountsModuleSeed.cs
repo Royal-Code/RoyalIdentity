@@ -27,16 +27,16 @@ public static class UserAccountsModuleSeed
     /// <summary>Deterministic, opaque subject id for Bob.</summary>
     public const string BobSubjectId = "6f9619ff-8b86-d011-b42d-00cf4fc964ff";
 
-    /// <summary>Alice's username, matching the in-memory fake's seeded account.</summary>
+    /// <summary>Alice's deterministic username.</summary>
     public const string AliceUsername = "alice";
 
-    /// <summary>Alice's password, matching the in-memory fake's seeded account.</summary>
+    /// <summary>Alice's deterministic test password.</summary>
     public const string AlicePassword = "alice";
 
-    /// <summary>Bob's username, matching the in-memory fake's seeded account.</summary>
+    /// <summary>Bob's deterministic username.</summary>
     public const string BobUsername = "bob";
 
-    /// <summary>Bob's password, matching the in-memory fake's seeded account.</summary>
+    /// <summary>Bob's deterministic test password.</summary>
     public const string BobPassword = "bob";
 
     /// <summary>

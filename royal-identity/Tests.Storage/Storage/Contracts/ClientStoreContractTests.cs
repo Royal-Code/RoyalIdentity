@@ -109,11 +109,6 @@ public abstract class ClientStoreContractTests : StorageContractTests
         Assert.Equal("Client of realm B", inB.Name);
     }
 
-    public sealed class InMemory : ClientStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
-
     public sealed class Sqlite : ClientStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()

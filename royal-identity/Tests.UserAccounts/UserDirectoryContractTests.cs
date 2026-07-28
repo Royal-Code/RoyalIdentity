@@ -1,12 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Security.Passwords;
-using RoyalIdentity.Storage.InMemory;
-using RoyalIdentity.Storage.InMemory.Extensions;
-using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Infrastructure.Data;
 using RoyalIdentity.UserAccounts.Integration;
 using RoyalIdentity.UserAccounts.Options;
@@ -18,8 +14,7 @@ using RoyalIdentity.Users.Defaults;
 namespace Tests.UserAccounts;
 
 /// <summary>
-/// Fase 10 contract tests for the IdP user edge. The same behavioral contract runs against the
-/// in-memory fake and the real UserAccounts module adapter.
+/// Contract tests for the IdP user edge over the real UserAccounts module adapter with SQLite in-memory.
 /// </summary>
 public abstract class UserDirectoryContractTests
 {
@@ -33,15 +28,15 @@ public abstract class UserDirectoryContractTests
 
         var directory = scope.ServiceProvider.GetRequiredService<IUserDirectory>();
         var subject = await directory.GetSubjectStore(harness.PrimaryRealm)
-            .FindBySubjectIdAsync(MemoryStorage.AliceSubjectId);
+            .FindBySubjectIdAsync(UserAccountsModuleSeed.AliceSubjectId);
 
         Assert.NotNull(subject);
-        Assert.Equal(MemoryStorage.AliceSubjectId, subject!.SubjectId);
+        Assert.Equal(UserAccountsModuleSeed.AliceSubjectId, subject!.SubjectId);
         Assert.Equal("Alice", subject.DisplayName);
         Assert.True(subject.IsActive);
 
         var otherRealmSubject = await directory.GetSubjectStore(harness.OtherRealm)
-            .FindBySubjectIdAsync(MemoryStorage.AliceSubjectId);
+            .FindBySubjectIdAsync(UserAccountsModuleSeed.AliceSubjectId);
 
         Assert.Null(otherRealmSubject);
     }
@@ -60,11 +55,11 @@ public abstract class UserDirectoryContractTests
         var bob = await authenticator.AuthenticateLocalAsync("bob", "bob");
 
         Assert.True(alice.Success);
-        Assert.Equal(MemoryStorage.AliceSubjectId, alice.Subject!.SubjectId);
+        Assert.Equal(UserAccountsModuleSeed.AliceSubjectId, alice.Subject!.SubjectId);
         Assert.Equal("Alice", alice.Subject.DisplayName);
 
         Assert.True(bob.Success);
-        Assert.Equal(MemoryStorage.BobSubjectId, bob.Subject!.SubjectId);
+        Assert.Equal(UserAccountsModuleSeed.BobSubjectId, bob.Subject!.SubjectId);
         Assert.Equal("Bob", bob.Subject.DisplayName);
     }
 
@@ -158,8 +153,7 @@ public abstract class UserDirectoryContractTests
             .GetRequiredService<IUserDirectory>()
             .GetLocalAuthenticator(harness.PrimaryRealm);
 
-        // Both implementations default MaxFailedAccessAttempts to the same value; loop to that threshold instead of
-        // a magic number so the test tracks the configured policy (and surfaces any fake/module parity drift).
+        // Loop to the configured threshold instead of a magic number so the contract tracks the module policy.
         var maxFailedAttempts = new UserAccountsRealmOptions().PasswordOptions.MaxFailedAccessAttempts;
         for (var i = 0; i < maxFailedAttempts; i++)
         {
@@ -173,9 +167,8 @@ public abstract class UserDirectoryContractTests
         Assert.Equal(AuthenticationFailureReason.Blocked, locked.Reason);
     }
 
-    // The shared contract only asserts claim-TYPE filtering, not scope-intersection: the in-memory fake
-    // (MemoryUserClaimsProvider) ignores identityScopeNames and projects by claim type alone. Scope-intersection
-    // is a module-specific guarantee and is covered against the real module in UserAccountsIntegrationTests.
+    // The edge contract asserts the requested claim types. The module-specific scope-intersection matrix has
+    // additional coverage in UserAccountsIntegrationTests.
     [Fact]
     public async Task ClaimsProvider_ProjectsSeededProfileEmailAndRoles()
     {
@@ -186,7 +179,7 @@ public abstract class UserDirectoryContractTests
             .GetRequiredService<IUserDirectory>()
             .GetClaimsProvider(harness.PrimaryRealm)
             .GetClaimsAsync(
-                MemoryStorage.AliceSubjectId,
+                UserAccountsModuleSeed.AliceSubjectId,
                 ["profile", "email"],
                 [
                     Constants.Jwt.ClaimTypes.PreferredUserName,
@@ -268,39 +261,6 @@ public abstract class UserDirectoryContractTests
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
-    public sealed class InMemory : UserDirectoryContractTests
-    {
-        protected override Task<DirectoryContractHarness> CreateHarnessAsync()
-        {
-            var services = new ServiceCollection();
-            services.AddSingleton<TimeProvider>(new FakeClock(Start));
-            services.AddTransient<IPasswordProtector, DefaultPasswordProtector>();
-            services.AddInMemoryStorage();
-
-            var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-            return Task.FromResult(new DirectoryContractHarness(
-                provider,
-                MemoryStorage.DemoRealm,
-                MemoryStorage.AccountRealm));
-        }
-
-        protected override Task SeedAsync(DirectoryContractHarness harness, UserSeed seed)
-        {
-            var storage = harness.Provider.GetRequiredService<MemoryStorage>();
-            storage.GetRealmMemoryStore(seed.Realm).UserAccounts[seed.Username] = new MemoryUserAccount
-            {
-                SubjectId = seed.SubjectId,
-                Username = seed.Username,
-                PasswordHash = seed.Password is null ? null : PasswordHash.Create(seed.Password),
-                DisplayName = seed.DisplayName,
-                IsActive = seed.IsActive,
-                Roles = [.. seed.Roles],
-                Claims = [new Claim(JwtRegisteredClaimNames.Email, seed.Email)]
-            };
-            return Task.CompletedTask;
-        }
-    }
-
     public sealed class UserAccountsSqlite : UserDirectoryContractTests
     {
         protected override async Task<DirectoryContractHarness> CreateHarnessAsync()
@@ -315,7 +275,10 @@ public abstract class UserDirectoryContractTests
             services.AddUserAccountsForRoyalIdentity();
 
             var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-            var harness = new DirectoryContractHarness(provider, MemoryStorage.DemoRealm, MemoryStorage.AccountRealm);
+            var harness = new DirectoryContractHarness(
+                provider,
+                CreateRealm("primary"),
+                CreateRealm("other"));
 
             using (var scope = harness.Provider.CreateScope())
             {
@@ -339,5 +302,14 @@ public abstract class UserDirectoryContractTests
                 scope.ServiceProvider, seed.Realm.Id, options, seed.SubjectId, seed.Username, seed.DisplayName,
                 seed.Email, seed.Password, seed.IsActive, seed.Roles, Start);
         }
+
+        private static Realm CreateRealm(string suffix)
+            => new(
+                $"user-directory-{suffix}",
+                $"{suffix}.user-directory.test",
+                $"user-directory-{suffix}",
+                $"User Directory {suffix}",
+                false,
+                new RealmOptions(new ServerOptions()));
     }
 }

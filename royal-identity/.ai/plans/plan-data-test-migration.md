@@ -1,10 +1,10 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fases 1-6 concluídas em 2026-07-28; Fase 7 pendente
+## Status: EM ANDAMENTO - Fases 1-7 concluídas em 2026-07-28; Fase 8 pendente
 
 ## Progresso
 
-`██████░░░` **67%** - 6 de 9 fases
+`███████░░` **78%** - 7 de 9 fases
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - fixture SQLite unificada, handles e seeds | Concluida |
 | Fase 5 - migração de login, profile, authorize e token | Concluida |
 | Fase 6 - migração dos fluxos restantes e troca do default | Concluida |
-| Fase 7 - desacoplamento dos contratos de teste do fake | Pendente |
+| Fase 7 - desacoplamento dos contratos de teste do fake | Concluida |
 | Fase 8 - remoção da transição e exclusão do fake | Pendente |
 | Fase 9 - PostgreSQL, regressão final e fechamento documental | Pendente |
 
@@ -1492,23 +1492,23 @@ Preservar cobertura sem transformar doubles locais em outro backing geral.
 
 **Tarefas:**
 
-- [ ] Adicionar a variante EF completa de `StorageSessionContractTests`.
-- [ ] Substituir `CompositeStorageSessionTests` Configuration EF + Operational fake pelo gateway EF completo.
-- [ ] Remover fallbacks de stores fake do harness SQLite Configuration; usar gateway EF ou doubles locais focados.
-- [ ] Remover as 11 variantes `InMemory` e `InMemoryStorageHarness` de `Tests.Storage`.
-- [ ] Registrar antes da remoção a quantidade de testes concretos exposta pelas 11 variantes `InMemory` e, depois,
+- [x] Adicionar a variante EF completa de `StorageSessionContractTests`.
+- [x] Substituir `CompositeStorageSessionTests` Configuration EF + Operational fake pelo gateway EF completo.
+- [x] Remover fallbacks de stores fake do harness SQLite Configuration; usar gateway EF ou doubles locais focados.
+- [x] Remover as 11 variantes `InMemory` e `InMemoryStorageHarness` de `Tests.Storage`.
+- [x] Registrar antes da remoção a quantidade de testes concretos exposta pelas 11 variantes `InMemory` e, depois,
   a quantidade/cobertura dos substitutos EF; anotar o comando ao lado de cada número.
-- [ ] Substituir em `OperationalContractsShapeTests` os casos que usam o fake por doubles locais de caracterização
+- [x] Substituir em `OperationalContractsShapeTests` os casos que usam o fake por doubles locais de caracterização
   do contrato ainda transitório; registrar as asserções que serão removidas/reformuladas na Fase 8, sem antecipar
   DF28.
-- [ ] Remover a especialização `InMemory` de `UserDirectoryContractTests`.
-- [ ] Tornar os realms da variante `UserAccountsSqlite` independentes de `MemoryStorage`.
-- [ ] Remover referências ao fake de `Tests.Storage` e `Tests.UserAccounts`; confirmar que Server, `Tests.Host` e
+- [x] Remover a especialização `InMemory` de `UserDirectoryContractTests`.
+- [x] Tornar os realms da variante `UserAccountsSqlite` independentes de `MemoryStorage`.
+- [x] Remover referências ao fake de `Tests.Storage` e `Tests.UserAccounts`; confirmar que Server, `Tests.Host` e
   `Tests.Integration` já foram limpos nas Fases 3, 4 e 6.
-- [ ] Substituir o teste arquitetural do grafo do fake por allowlist genérica de dependências, sem conservar o nome
+- [x] Substituir o teste arquitetural do grafo do fake por allowlist genérica de dependências, sem conservar o nome
   literal do projeto removido.
-- [ ] Mapear cada teste concreto removido para cobertura EF/módulo equivalente e registrar qualquer perda real.
-- [ ] Classificar pelos quatro buckets toda divergência de asserção ou defeito revelado nesta fase.
+- [x] Mapear cada teste concreto removido para cobertura EF/módulo equivalente e registrar qualquer perda real.
+- [x] Classificar pelos quatro buckets toda divergência de asserção ou defeito revelado nesta fase.
 
 **Critérios de aceite:** somente o próprio projeto `RoyalIdentity.Storage.InMemory` e a entrada na solução permanecem;
 nenhum projeto de produção/teste o referencia; contratos de core e `UserDirectory` rodam sobre providers reais;
@@ -1525,7 +1525,99 @@ dotnet test Tests.Architecture
 
 ### Resultado da Fase 7
 
-*a preencher*
+Concluída em 2026-07-28. `Tests.Storage` e `Tests.UserAccounts` não referenciam mais
+`RoyalIdentity.Storage.InMemory`; Server, Demo, `Tests.Host` e `Tests.Integration` já estavam limpos. O próprio
+projeto fake e sua entrada em `RoyalIdentity.sln` permanecem deliberadamente até a quebra atômica da Fase 8.
+`InMemoryStorageHarness`, as 11 variantes concretas `InMemory` dos contratos de storage e a especialização
+`UserDirectoryContractTests.InMemory` foram removidos.
+
+O inventário anterior foi obtido com:
+
+```powershell
+$lines = dotnet test Tests.Storage/Tests.Storage.csproj --no-build --list-tests --verbosity quiet 2>&1
+$inMemory = $lines | Where-Object {
+    $_ -match 'Tests\.Storage\.Contracts\..+\+InMemory\.'
+}
+"storage_inmemory_concrete=$($inMemory.Count)"
+$inMemory | ForEach-Object {
+    if ($_ -match 'Contracts\.([^+]+)\+InMemory') { $matches[1] }
+} | Group-Object | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Count)" }
+
+$userLines = dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj `
+    --no-build --list-tests --verbosity quiet 2>&1
+"user_inmemory_concrete=$(($userLines | Where-Object {
+    $_ -match 'UserDirectoryContractTests\+InMemory\.'
+}).Count)"
+```
+
+O resultado foi 98 concretizações Storage: AccessToken 9, AuthorizationCode 8, AuthorizeParameters 6, Client 7,
+Key 11, Realm 10, RefreshToken 8, Resource 14, StorageSession 2, UserConsent 8 e UserSession 15. A especialização
+InMemory de `UserDirectoryContractTests` expunha 8 concretizações.
+
+Após a remoção, o comando equivalente:
+
+```powershell
+$lines = dotnet test Tests.Storage/Tests.Storage.csproj --no-build --list-tests --verbosity quiet 2>&1
+$sqlite = $lines | Where-Object {
+    $_ -match 'Tests\.Storage\.Contracts\..+\+(Sqlite|SqliteOperational|SqliteGateway)\.'
+}
+"storage_ef_contracts=$($sqlite.Count)"
+$sqlite | ForEach-Object {
+    if ($_ -match 'Contracts\.([^+]+)\+(Sqlite|SqliteOperational|SqliteGateway)') { $matches[1] }
+} | Group-Object | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Count)" }
+
+$userLines = dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj `
+    --no-build --list-tests --verbosity quiet 2>&1
+"user_sqlite_contracts=$(($userLines | Where-Object {
+    $_ -match 'UserDirectoryContractTests\+UserAccountsSqlite\.'
+}).Count)"
+```
+
+encontrou 98 concretizações EF nas mesmas onze famílias e com a mesma distribuição, incluindo os 2 casos novos
+`StorageSessionContractTests.SqliteGateway` sobre o `IStorageProvider` de produção. Encontrou também os mesmos 8
+casos de `UserDirectoryContractTests.UserAccountsSqlite`. Portanto, cada uma das 106 concretizações removidas tem
+substituto EF/módulo nominal; não houve queda não mapeada. Os dois testes do antigo composite foram preservados
+como `CompleteGatewayStorageSessionTests`, agora com Configuration e Operational EF reais.
+
+O harness Configuration-only não oferece mais stores Operational em dictionaries: seus acessores falham
+explicitamente, e todo contrato cross-family usa `SqliteOperationalStorageHarness`. A caracterização da transição
+em `OperationalContractsShapeTests` usa somente `LegacyAuthorizationCodeStore` e `LegacyRefreshTokenStore` locais.
+Na Fase 8 saem `Capabilities_DeclareNoDefaultImplementation`,
+`CrudContracts_DoNotDeclareTheAtomicOperations`, `LegacyContractDoubles_DoNotImplementTheAtomicCapabilities` e os
+dois casos `FallsBack...`; `RefreshTokenConsumer_OnTheLegacyPath_ReportsAnAlreadyConsumedToken` também perde o
+ramo legacy. Os casos de capability, binding, already-consumed e conflict serão reformulados contra os stores base
+atômicos/handler, sem conservar consumers ou interfaces transitórias.
+
+A busca:
+
+```powershell
+rg -n "ProjectReference.*RoyalIdentity.Storage.InMemory" . -g "*.csproj"
+```
+
+retornou zero. `PersistenceTestCompositionBoundaryTests` prende por allowlist exata os grafos de
+`Tests.Storage`/`Tests.UserAccounts`; `ModuleBoundaryTests` agora aplica uma allowlist genérica a todos os adapters
+`RoyalIdentity.Storage.*`, sem depender do nome do fake.
+
+Triagem das divergências observadas:
+
+- **artefato-do-fake (1):** `RealmStoreContractTests` atribuía a `IRealmStore.DeleteAsync` tanto o tombstone
+  Configuration quanto a remoção imediata de todos os dictionaries Operational do fake. O contrato foi
+  reformulado para a fronteira real: `DeleteAsync` prova o tombstone pelos lookups; o purge EF permanece coberto
+  por `OperationalPurgeRealmTests`. A orquestração Configuration + Operational + UserAccounts continua no seam
+  administrativo já diferido;
+- **regressão-do-módulo (0):** os 8 cenários `UserDirectory` mantiveram as asserções sobre o módulo SQLite;
+- **regressão-do-provider (0):** os 98 cenários EF permaneceram cobertos e o gateway completo satisfez
+  `IStorageSession`;
+- **defeito-de-produto (0):** nenhum defeito novo do core foi revelado.
+
+Validação:
+
+- filtro previsto de `Tests.Storage`: 133 aprovados, 15 PostgreSQL opt-in ignorados;
+- filtro previsto de `Tests.UserAccounts`: 9/9;
+- `dotnet test Tests.Storage/Tests.Storage.csproj --no-restore`: 495 aprovados, 44 PostgreSQL opt-in ignorados;
+- `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-restore`: 187 aprovados, 1 PostgreSQL opt-in
+  ignorado;
+- `dotnet test Tests.Architecture/Tests.Architecture.csproj --no-restore`: 61/61.
 
 ---
 

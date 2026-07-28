@@ -1,14 +1,14 @@
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
-using Tests.Storage.Configuration.Support;
+using Tests.Storage.Operational.Support;
 using Tests.Storage.Support;
 
 namespace Tests.Storage.Contracts;
 
 /// <summary>
 /// Contract of <c>IRealmStore</c> (matrix RL-01..RL-07): global configuration store for realms.
-/// Deletion is asserted only by its observable effects, common to the fake's hard delete and the EF
-/// tombstone target (DF20): the realm stops resolving and its operational data becomes inaccessible.
+/// Deletion is asserted at the Configuration boundary: the tombstoned realm stops resolving. Operational purge
+/// is a separate maintenance capability because cross-family/admin orchestration remains deliberately deferred.
 /// </summary>
 public abstract class RealmStoreContractTests : StorageContractTests
 {
@@ -149,28 +149,14 @@ public abstract class RealmStoreContractTests : StorageContractTests
         Assert.False(deleted);
     }
 
-    // RL-07 + DF20: observable effects of deleting a common realm, valid for both the fake's hard delete
-    // and the future EF tombstone — the realm stops resolving by id/path/domain and data previously stored
-    // in EVERY realm-bound store (ST-04..ST-11) becomes inaccessible. No physical presence (row/tombstone)
-    // is inspected.
+    // RL-07 + DF20: the Configuration owner creates the tombstone and removes the realm from every lookup.
+    // Operational purge is covered by OperationalPurgeRealmTests; coordinating it with Configuration and
+    // UserAccounts belongs to the deferred admin seam, not IRealmStore.
     [Fact]
-    public async Task Delete_CommonRealm_MakesRealmUnresolvable_AndAllRealmBoundDataInaccessible()
+    public async Task Delete_CommonRealm_MakesRealmUnresolvable()
     {
         await using var harness = await CreateHarnessAsync();
         var realm = await harness.CreateRealmAsync("delete-obs");
-
-        await harness.SeedClientAsync(NewClient(realm, "del-client"));
-        await harness.SeedIdentityScopeAsync(realm, NewIdentityScope("contract:del-scope"));
-        await harness.Storage.GetKeyStore(realm).AddKeyAsync(NewKey("del-key", Start), default);
-        await harness.Storage.GetAccessTokenStore(realm)
-            .StoreAsync(NewAccessToken(realm, "del-jti", "del-client"), default);
-        await harness.Storage.GetRefreshTokenStore(realm)
-            .StoreAsync(NewRefreshToken(realm, "del-handle", "del-subject", "del-client"), default);
-        var code = NewAuthorizationCode(realm, "del-client", "del-subject");
-        await harness.Storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
-        await harness.Storage.GetUserConsentStore(realm)
-            .StoreUserConsentAsync(NewConsent(realm, "del-subject", "del-client", "openid"), default);
-        await harness.Storage.GetUserSessionStore(realm).CreateAsync(NewSession("del-sid", "del-subject"));
 
         var deleted = await harness.Storage.Realms.DeleteAsync(realm.Id);
 
@@ -178,59 +164,14 @@ public abstract class RealmStoreContractTests : StorageContractTests
         Assert.Null(await harness.Storage.Realms.GetByIdAsync(realm.Id, default));
         Assert.Null(await harness.Storage.Realms.GetByPathAsync(realm.Path, default));
         Assert.Null(await harness.Storage.Realms.GetByDomainAsync(realm.Domain, default));
-
-        // Every realm-bound accessor (ST-04..ST-11) must refuse the binding or find nothing (EF purge).
-        Assert.Null(await ProbeAsync(async () =>
-            await harness.Storage.GetClientStore(realm).FindClientByIdAsync("del-client", default)));
-        Assert.Null(await ProbeAsync(async () =>
-        {
-            var resources = await harness.Storage.GetResourceStore(realm)
-                .FindResourcesByScopeAsync(["contract:del-scope"], onlyEnabled: false, default);
-            return resources.IdentityScopes.FirstOrDefault(s => s.Name == "contract:del-scope");
-        }));
-        Assert.Null(await ProbeAsync(async () =>
-            await harness.Storage.GetKeyStore(realm).GetKeyAsync("del-key", default)));
-        Assert.Null(await ProbeAsync(async () =>
-            await harness.Storage.GetAccessTokenStore(realm).GetAsync("del-jti", default)));
-        Assert.Null(await ProbeAsync(async () =>
-            await harness.Storage.GetRefreshTokenStore(realm).GetAsync("del-handle", default)));
-        Assert.Null(await ProbeAsync(async () =>
-            await harness.Storage.GetAuthorizationCodeStore(realm).GetAuthorizationCodeAsync(code.Code, default)));
-        Assert.Null(await ProbeAsync(async () =>
-            await harness.Storage.GetUserConsentStore(realm).GetUserConsentAsync("del-subject", "del-client", default)));
-        Assert.Null(await ProbeAsync(async () =>
-            await harness.Storage.GetUserSessionStore(realm).FindByIdAsync("del-sid", default)));
     }
 
-    // ArgumentException is the fake's current binding-refusal signal. It is an accepted observable effect of
-    // DF20, but not required from a synchronous EF accessor; returning no data after purge is equally valid.
-    // Any other exception is an infrastructure failure and fails the test.
-    private static async Task<T?> ProbeAsync<T>(Func<Task<T?>> read) where T : class
-    {
-        try
-        {
-            return await read();
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-    }
-
-    // ── Plano 2 acceptance (registered, NOT tested against the transitional fake — ADR-018/DF20): ──
-    // after deletion the EF provider keeps a permanent Configuration tombstone, invisible to normal lookups,
-    // and the deleted realm's path and domain remain reserved (SaveAsync/creation of a new realm reusing them
-    // must be refused). The fake removes physically and allows reuse; forcing parity here is forbidden.
-    // The EF configuration provider must add a scenario covering path/domain reservation in Plano 2.
-
-    public sealed class InMemory : RealmStoreContractTests
-    {
-        protected override Task<StorageContractHarness> CreateHarnessAsync() => InMemoryStorageHarness.CreateAsync();
-    }
+    // Provider-specific Configuration tests inspect the permanent tombstone and prove that path/domain remain
+    // reserved. This provider-neutral contract observes only the public lookup behavior.
 
     public sealed class Sqlite : RealmStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()
-            => SqliteConfigurationStorageHarness.CreateAsync();
+            => SqliteOperationalStorageHarness.CreateAsync();
     }
 }
