@@ -1019,6 +1019,15 @@ Comandos finais: `dotnet build RoyalIdentity.sln --no-restore` (sucesso);
 `dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-restore` (194 aprovados, 1 opt-in ignorado); e
 `./scripts/Test-ServerPostgreSql.ps1` (PostgreSQL 17 + runner + Server aprovados).
 
+Revisão posterior prendeu o segundo defeito com um aceite PostgreSQL opt-in: o
+`SigningKeyStartupValidator` percorre dois realms habilitados no gateway EF real sem sobrepor comandos Npgsql.
+O atalho público `AddUserAccountsPostgreSql` também ganhou uma guarda de composição com
+`ValidateOnBuild`/`ValidateScopes`; ela confirmou que o registro do WorkContext não reproduz o captive dependency
+do `DbContextPool` removido da composição do Server. Verificação posterior:
+`./scripts/Test-ConfigurationPostgreSql.ps1` (44/44 PostgreSQL);
+`dotnet test Tests.Storage/Tests.Storage.csproj --no-restore` (589 aprovados, 44 opt-in ignorados); e
+`dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-restore` (195 aprovados, 1 opt-in ignorado).
+
 ---
 
 ## Fase 4 - fixture SQLite unificada, handles e seeds

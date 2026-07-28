@@ -1,16 +1,21 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Configuration;
+using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Defaults;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Options;
+using RoyalIdentity.Security.Keys;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
 using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using RoyalIdentity.Storage.EntityFramework.PostgreSql;
+using RoyalIdentity.Utils.Caching;
 using Tests.Storage.Configuration;
 using Tests.Storage.Operational.Support;
 using Tests.Storage.Support;
@@ -120,6 +125,18 @@ public class PostgreSqlStorageGatewayTests
         Assert.Throws<ObjectDisposedException>(session.GetStorage);
     }
 
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public async Task SigningKeyStartupValidator_WithMultipleEnabledRealms_DoesNotOverlapCommands()
+    {
+        await using var composition = await GatewayComposition.CreateAsync();
+        await composition.SeedSigningKeysForTwoEnabledRealmsAsync();
+
+        await composition.Services
+            .GetRequiredService<SigningKeyStartupValidator>()
+            .StartAsync(default);
+    }
+
     /// <summary>The production composition under test: both EF families over one PostgreSQL database.</summary>
     private sealed class GatewayComposition : IAsyncDisposable
     {
@@ -161,6 +178,9 @@ public class PostgreSqlStorageGatewayTests
             collection.AddEntityFrameworkOperationalCleanup(
                 cleanup => cleanup.Mode = CleanupExecutionMode.External);
             collection.AddEntityFrameworkStorage();
+            collection.AddTransient<IKeyManager, DefaultKeyManager>();
+            collection.AddSingleton<RealmCaching>();
+            collection.AddTransient<SigningKeyStartupValidator>();
 
             var services = collection.BuildServiceProvider(new ServiceProviderOptions
             {
@@ -186,6 +206,33 @@ public class PostgreSqlStorageGatewayTests
         public async Task<Realm> LoadRealmAsync(IStorage storage)
             => await storage.Realms.GetByIdAsync("gateway-realm", default)
                 ?? throw new InvalidOperationException("The gateway fixture realm is missing.");
+
+        public async Task SeedSigningKeysForTwoEnabledRealmsAsync()
+        {
+            using var scope = Services.CreateScope();
+            var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
+            var first = await LoadRealmAsync(storage);
+            var second = new Realm(
+                "gateway-realm-2",
+                "gateway-2.contract.test",
+                "gateway-2",
+                "Gateway Realm 2",
+                false,
+                new RealmOptions(storage.ServerOptions));
+
+            await storage.Realms.SaveAsync(second);
+            await storage.GetKeyStore(first).AddKeyAsync(CreateUsableKey(first), default);
+            await storage.GetKeyStore(second).AddKeyAsync(CreateUsableKey(second), default);
+        }
+
+        private static KeyParameters CreateUsableKey(Realm realm)
+        {
+            var key = KeyMaterialFactory.Create(realm.Options.Keys.MainSigningCredentialsAlgorithm);
+            key.Created = Start.AddHours(-2);
+            key.NotBefore = Start.AddHours(-1);
+            key.Expires = Start.AddHours(1);
+            return key;
+        }
 
         private static async Task SeedAsync(IServiceProvider services, PostgreSqlOperationalDatabase database)
         {

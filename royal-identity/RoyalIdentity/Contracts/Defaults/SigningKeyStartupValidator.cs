@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Models;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
@@ -20,7 +21,7 @@ public sealed class SigningKeyStartupValidator(IServiceProvider applicationServi
 
         // Materialize before asking the key store. EF providers may use the same scoped DbContext for both
         // stores; querying keys while the realm reader is still open causes overlapping commands on Npgsql.
-        List<RoyalIdentity.Models.Realm> realms = [];
+        List<Realm> realms = [];
         await foreach (var realm in storage.Realms.GetAllAsync(cancellationToken))
             realms.Add(realm);
 
