@@ -1576,13 +1576,17 @@ $userLines = dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj `
 encontrou 98 concretizações EF nas mesmas onze famílias e com a mesma distribuição, incluindo os 2 casos novos
 `StorageSessionContractTests.SqliteGateway` sobre o `IStorageProvider` de produção. Encontrou também os mesmos 8
 casos de `UserDirectoryContractTests.UserAccountsSqlite`. Portanto, cada uma das 106 concretizações removidas tem
-substituto EF/módulo nominal; não houve queda não mapeada. Os dois testes do antigo composite foram preservados
-como `CompleteGatewayStorageSessionTests`, agora com Configuration e Operational EF reais.
+o mesmo cenário comportamental preservado: os métodos de teste permanecem nas classes abstratas, e somente a
+factory de harness passou do backing aposentado para EF/módulo. Não houve queda não mapeada. Os dois testes do
+antigo composite foram preservados como `CompleteGatewayStorageSessionTests`, agora com Configuration e
+Operational EF reais.
 
 O harness Configuration-only não oferece mais stores Operational em dictionaries: seus acessores falham
-explicitamente, e todo contrato cross-family usa `SqliteOperationalStorageHarness`. A caracterização da transição
-em `OperationalContractsShapeTests` usa somente `LegacyAuthorizationCodeStore` e `LegacyRefreshTokenStore` locais.
-Na Fase 8 saem `Capabilities_DeclareNoDefaultImplementation`,
+explicitamente, e todo contrato cross-family usa `SqliteOperationalStorageHarness`. Isso removeu a segunda
+implementação geral e invisível de Operational que existia dentro da infraestrutura de teste, sem substituí-la
+por outro backing local. A caracterização da transição em `OperationalContractsShapeTests` usa somente
+`LegacyAuthorizationCodeStore` e `LegacyRefreshTokenStore` locais e focados. Na Fase 8 saem
+`Capabilities_DeclareNoDefaultImplementation`,
 `CrudContracts_DoNotDeclareTheAtomicOperations`, `LegacyContractDoubles_DoNotImplementTheAtomicCapabilities` e os
 dois casos `FallsBack...`; `RefreshTokenConsumer_OnTheLegacyPath_ReportsAnAlreadyConsumedToken` também perde o
 ramo legacy. Os casos de capability, binding, already-consumed e conflict serão reformulados contra os stores base
