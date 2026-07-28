@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -100,7 +101,7 @@ public class SqliteDemoTests
             await factory.DisposeAsync();
         }
 
-        Assert.False(Directory.Exists(keyRingPath));
+        await WaitForDirectoryRemovalAsync(keyRingPath);
     }
 
     private static async Task AssertOnlyDemoRealmAsync(IServiceProvider services)
@@ -113,5 +114,14 @@ public class SqliteDemoTests
             realmIds.Add(realm.Id);
 
         Assert.Equal([DemoConstants.RealmId], realmIds);
+    }
+
+    private static async Task WaitForDirectoryRemovalAsync(string path)
+    {
+        var timeout = Stopwatch.StartNew();
+        while (Directory.Exists(path) && timeout.Elapsed < TimeSpan.FromSeconds(2))
+            await Task.Delay(10);
+
+        Assert.False(Directory.Exists(path));
     }
 }

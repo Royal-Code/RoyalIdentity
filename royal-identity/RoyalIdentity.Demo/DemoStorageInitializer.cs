@@ -59,11 +59,9 @@ public sealed class DemoStorageInitializer(
             throw new InvalidOperationException("The Demo account could not be provisioned.");
     }
 
-    public Task StopAsync(CancellationToken ct)
-    {
-        lifetime.Dispose();
-        return Task.CompletedTask;
-    }
+    // The DI container owns DemoStorageLifetime and disposes it after all hosted services and Data Protection.
+    // Disposing it here is too early: later provider teardown may touch the key ring again.
+    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
 
     private static void EnsureSucceeded(StorageMigrationReport report)
     {

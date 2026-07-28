@@ -14,8 +14,7 @@ internal sealed class ConfigurationSnapshotHostedService(
     ConfigurationSnapshotRefreshOptions options,
     TimeProvider clock) : IHostedService, IDisposable
 {
-    private CancellationTokenSource? stoppingSource;
-    private Task? periodicLoop;
+    private ShutdownState? shutdownState;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -24,23 +23,37 @@ internal sealed class ConfigurationSnapshotHostedService(
         // Initial load is not guarded: a failure here fails StartAsync and the host does not serve traffic.
         await refresher.RefreshAsync(cancellationToken);
 
-        stoppingSource = new CancellationTokenSource();
-        periodicLoop = RunPeriodicAsync(stoppingSource.Token);
+        var stoppingSource = new CancellationTokenSource();
+        shutdownState = new ShutdownState(
+            stoppingSource,
+            RunPeriodicAsync(stoppingSource.Token));
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (stoppingSource is null || periodicLoop is null)
+        var state = Interlocked.Exchange(ref shutdownState, null);
+        if (state is null)
             return;
 
-        await stoppingSource.CancelAsync();
-        await periodicLoop.WaitAsync(cancellationToken);
+        try
+        {
+            await state.StoppingSource.CancelAsync();
+            await state.PeriodicLoop.WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            state.StoppingSource.Dispose();
+        }
     }
 
     public void Dispose()
     {
-        stoppingSource?.Cancel();
-        stoppingSource?.Dispose();
+        var state = Interlocked.Exchange(ref shutdownState, null);
+        if (state is null)
+            return;
+
+        state.StoppingSource.Cancel();
+        state.StoppingSource.Dispose();
     }
 
     private async Task RunPeriodicAsync(CancellationToken ct)
@@ -56,4 +69,8 @@ internal sealed class ConfigurationSnapshotHostedService(
             // Normal hosted-service shutdown.
         }
     }
+
+    private sealed record ShutdownState(
+        CancellationTokenSource StoppingSource,
+        Task PeriodicLoop);
 }

@@ -1206,6 +1206,8 @@ Concluída em 2026-07-28. Quatorze classes HTTP/caracterizações, totalizando 8
 sessão, estabilidade de `SubjectId`, regressão integral de `UserAccounts`, authorize, code token, client token,
 discovery, JWK e algoritmos de assinatura. `UserAccountsOptInRegressionTests` foi renomeada para
 `UserAccountsPersistentRegressionTests`, pois a composição integral deixou de ser opt-in parcial.
+Somado o smoke `PersistentStorageOidcFlowTests` entregue na Fase 4, há 15 arquivos de classe sobre a factory
+persistente; 16 ainda usam diretamente a factory legada e pertencem à Fase 6.
 
 Os cenários agora usam handles provider-neutral para realms, clients e subjects. Clients são persistidos pelo
 helper Configuration e publicados por refresh explícito do snapshot; resources/scopes usam o source volátil da
@@ -1252,13 +1254,67 @@ adaptações de setup/observação ao backing real: o isolamento cross-realm usa
 origem, e testes de sessão/conta reconsultam o estado persistido em vez de observar objetos mutáveis do fake. Os
 status HTTP, erros, claims, issuers, PKCE, recursos e algoritmos esperados permaneceram iguais.
 
-Verificação final: busca estática nos arquivos migrados por
+Verificação final: busca estática nos quatorze arquivos migrados nesta fase por
 `MemoryStorage|RoyalIdentity.Storage.InMemory|GetDemoRealmStore|GetRealmMemoryStore|RealmMemoryStore|MemoryUser`
-sem ocorrências; `dotnet build RoyalIdentity.sln --no-restore` (sucesso, 0 erros);
+sem ocorrências. O smoke `PersistentStorageOidcFlowTests` da Fase 4, fora desse conjunto, conserva deliberadamente
+uma asserção negativa que resolve `MemoryStorage` e prova que o fake não está registrado. `dotnet build
+RoyalIdentity.sln --no-restore` (sucesso, 0 erros);
 `dotnet test Tests.Integration/Tests.Integration.csproj --no-build` (290/290); e
 `dotnet test Tests.Architecture/Tests.Architecture.csproj --no-build` (57/57). Os avisos do build são os já
 existentes de SDK preview, referências ASP.NET implícitas/pacote legado e duas anotações de nulabilidade em
 doubles de testes.
+
+Revisão posterior reproduziu uma intermitência de teardown que o resumo `290/290` podia ocultar como
+`Test Class Cleanup Failure`. A hipótese de que `WebApplicationFactory.Dispose()` não chama `StopAsync` não
+confere para a versão ASP.NET Core usada: o descarte síncrono encaminha internamente para `DisposeAsync()` e
+aguarda o host parar. Adicionar `IAsyncLifetime` à fixture também não é a correção: no xUnit v2 isso criou um
+segundo caminho de cleanup sobre uma hierarquia que já implementa `IDisposable`.
+
+O `.trx` da falha localizou a corrida em `ConfigurationSnapshotHostedService.StopAsync`: `StopAsync` e `Dispose`
+podiam disputar o mesmo `CancellationTokenSource`, e um deles o descartava enquanto o outro ainda tentava
+cancelá-lo. O hosted service passou a transferir atomicamente a propriedade do estado de shutdown com
+`Interlocked.Exchange`; somente o caminho que obtém o estado cancela/descarta, e chamadas posteriores são no-op.
+`StopAsync_AndDispose_AreIdempotentInEitherOrder` prende as duas ordens de teardown.
+
+O stress também revelou uma segunda corrida independente no teste do Demo: a remoção do key ring é eventual
+durante o fechamento completo do host/provider. `DemoStorageInitializer.StopAsync` deixou de descartar
+antecipadamente o owner; o container DI o descarta depois dos hosted services e Data Protection. O teste continua
+exigindo a remoção, agora com espera limitada a dois segundos, sem suprimir a asserção. Após esses ajustes, o loop
+abaixo foi executado sequencialmente: 20/20 execuções completas, todas 290/290, exit code zero e sem
+`Cleanup Failure`, `ObjectDisposedException` ou sinal equivalente.
+
+```powershell
+1..20 | ForEach-Object {
+    $output = dotnet test Tests.Integration/Tests.Integration.csproj --no-build --logger "console;verbosity=minimal" 2>&1
+    $exitCode = $LASTEXITCODE
+    $cleanupSignal = [bool]($output -match 'Cleanup Failure|ObjectDisposedException|Asynchronous disposal failed')
+    if ($exitCode -ne 0 -or $cleanupSignal) { throw "run $_ failed" }
+}
+```
+
+Validação complementar: `dotnet test Tests.Storage/Tests.Storage.csproj --no-build` (590 aprovados, 44
+PostgreSQL opt-in ignorados), incluindo 5/5 no filtro de `ConfigurationSnapshotHostedServiceTests`;
+`dotnet test Tests.Architecture/Tests.Architecture.csproj --no-build` (57/57); e novo
+`dotnet build RoyalIdentity.sln --no-restore` (0 erros).
+
+Medição intermediária posterior, no mesmo ambiente e com o projeto compilado, após um warm-up descartado:
+
+```powershell
+1..3 | ForEach-Object {
+    $exitCode = 0
+    $elapsed = Measure-Command {
+        dotnet test Tests.Integration/Tests.Integration.csproj --no-build --logger "console;verbosity=minimal" | Out-Null
+        $exitCode = $LASTEXITCODE
+    }
+    "$($elapsed.TotalSeconds) exit=$exitCode"
+}
+```
+
+As execuções foram `19,838 s`, `18,077 s` e `19,120 s`; mediana `19,120 s`, razão `1,638×` contra o baseline
+fake de `11,673 s`. Isso consome 81,9% do limite de `23,346 s`, mas ainda não aciona DF26. Extrapolar linearmente
+o custo das classes restantes não é evidência suficiente para escolher template ou collection fixture, pois o
+paralelismo pode saturar em qualquer direção. A Fase 6 ganhou um checkpoint intermediário obrigatório para medir
+o primeiro macrogrupo restante e decidir mitigação somente sobre tempo observado.
 
 ---
 
@@ -1294,6 +1350,9 @@ factory integral como única composição canônica das 29 classes.
   registrar no resultado as contagens esperada e executada.
 - [ ] Classificar e registrar toda asserção alterada nos quatro buckets de triagem.
 - [ ] Executar toda a suíte HTTP sobre o novo default antes de tocar nos contratos atômicos.
+- [ ] Depois de migrar o primeiro macrogrupo restante, repetir warm-up e três execuções `--no-build`, registrar a
+  mediana e compará-la com `23,346 s`; se o valor observado ultrapassar o limite, parar antes do macrogrupo
+  seguinte e decidir explicitamente a mitigação de topologia, sem extrapolação linear como substituto da medição.
 - [ ] Medir, no mesmo ambiente/protocolo da Fase 4, warm-up e três execuções `--no-build` da suíte persistente
   completa; registrar cada valor, mediana, razão contra o baseline e comparação com o limiar numérico fixado.
 - [ ] Se a mediana ultrapassar o limiar, tratar ou aceitar explicitamente a regressão com causa/evidência antes de

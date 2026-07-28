@@ -83,4 +83,25 @@ public class ConfigurationSnapshotHostedServiceTests
 
         Assert.True(cancellationObserved.Task.IsCompletedSuccessfully);
     }
+
+    [Fact]
+    public async Task StopAsync_AndDispose_AreIdempotentInEitherOrder()
+    {
+        using var disposeFirst = new SnapshotTestHarness(refreshInterval: TimeSpan.FromHours(1));
+        disposeFirst.Source.Data = SnapshotTestHarness.BuildData(new ServerOptions(), "server");
+        var disposeFirstService = disposeFirst.HostedService;
+        await disposeFirstService.StartAsync(CancellationToken.None);
+
+        ((IDisposable)disposeFirstService).Dispose();
+        await disposeFirstService.StopAsync(CancellationToken.None);
+
+        using var stopFirst = new SnapshotTestHarness(refreshInterval: TimeSpan.FromHours(1));
+        stopFirst.Source.Data = SnapshotTestHarness.BuildData(new ServerOptions(), "server");
+        var stopFirstService = stopFirst.HostedService;
+        await stopFirstService.StartAsync(CancellationToken.None);
+
+        await stopFirstService.StopAsync(CancellationToken.None);
+        ((IDisposable)stopFirstService).Dispose();
+        await stopFirstService.StopAsync(CancellationToken.None);
+    }
 }
