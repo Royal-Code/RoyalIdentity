@@ -1,17 +1,17 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fases 1-3 concluídas em 2026-07-27; Fase 4 pendente
+## Status: EM ANDAMENTO - Fases 1-4 concluídas em 2026-07-28; Fase 5 pendente
 
 ## Progresso
 
-`███░░░░░░` **33%** - 3 de 9 fases
+`████░░░░░` **44%** - 4 de 9 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contrato de configuração e composição | Concluida |
 | Fase 2 - provisionamento externo das três famílias | Concluida |
 | Fase 3 - composições reais e fail-fast do Server/Demo | Concluida |
-| Fase 4 - fixture SQLite unificada, handles e seeds | Pendente |
+| Fase 4 - fixture SQLite unificada, handles e seeds | Concluida |
 | Fase 5 - migração de login, profile, authorize e token | Pendente |
 | Fase 6 - migração dos fluxos restantes e troca do default | Pendente |
 | Fase 7 - desacoplamento dos contratos de teste do fake | Pendente |
@@ -1047,42 +1047,43 @@ global.
 
 **Tarefas:**
 
-- [ ] Medir e registrar, com comando e ambiente, o tempo da suíte `Tests.Integration` ainda fake e o startup
+- [x] Medir e registrar, com comando e ambiente, o tempo da suíte `Tests.Integration` ainda fake e o startup
   cold/warm da factory persistente. Usar warm-up e três execuções `--no-build`, registrar cada valor e a mediana.
-- [ ] Fixar no `Resultado da Fase 4`, antes da migração em massa, um limiar numérico de regressão material e sua
+- [x] Fixar no `Resultado da Fase 4`, antes da migração em massa, um limiar numérico de regressão material e sua
   justificativa; a comparação da Fase 6 usa exatamente o mesmo protocolo e ambiente comparável.
-- [ ] Manter `Tests.Host.Program` como composition root independente conforme DF29; remover
+- [x] Manter `Tests.Host.Program` como composition root independente conforme DF29; remover
   `AddInMemoryStorage()` e sua referência ao projeto fake, deixando o projeto storage-agnóstico.
-- [ ] Remover ou substituir os launch profiles de `Tests.Host` que o apresentam como executável standalone e
+- [x] Remover ou substituir os launch profiles de `Tests.Host` que o apresentam como executável standalone e
   atualizar qualquer script/documentação equivalente; depois desta fase o projeto só inicia por uma
   `WebApplicationFactory` que registra o backing antes do startup.
-- [ ] Fazer cada factory registrar diretamente uma única implementação dos contratos do IdP. Enquanto houver
+- [x] Fazer cada factory registrar diretamente uma única implementação dos contratos do IdP. Enquanto houver
   consumers legados, sua factory registra explicitamente o fake; a persistente registra EF + `UserAccounts`.
-- [ ] Fazer a factory persistente construir o service provider com `ValidateScopes` e `ValidateOnBuild`.
-- [ ] Criar por factory um banco SQLite in-memory nomeado/keep-alive compartilhado por Configuration e Operational;
+- [x] Fazer a factory persistente construir o service provider com `ValidateScopes` e `ValidateOnBuild`.
+- [x] Criar por factory um banco SQLite in-memory nomeado/keep-alive compartilhado por Configuration e Operational;
   registrar connection string própria em cada `DbContext`, aplicar suas migrations/histories distintas antes do
   host e manter a conexão aberta até o teardown.
-- [ ] Criar outro banco SQLite in-memory/keep-alive para `UserAccounts`, preservando sua ownership e migrations
+- [x] Criar outro banco SQLite in-memory/keep-alive para `UserAccounts`, preservando sua ownership e migrations
   próprias.
-- [ ] Registrar Configuration + Operational EF, `UserAccounts` SQLite e cleanup `External` na fixture.
-- [ ] Usar protectors determinísticos test-only sem variável de ambiente process-global compartilhada.
-- [ ] Semear Configuration demo/teste, Alice/Bob e property scopes por owner correto.
-- [ ] Mover `AliceSubjectId`/`BobSubjectId` para o seed test-only e remover seu import de InMemory.
-- [ ] Expor handles imutáveis para realms internos/demo, clients, resources e subjects usando somente ids
+- [x] Registrar Configuration + Operational EF, `UserAccounts` SQLite e cleanup `External` na fixture.
+- [x] Usar protectors determinísticos test-only sem variável de ambiente process-global compartilhada.
+- [x] Semear Configuration demo/teste, Alice/Bob e property scopes por owner correto.
+- [x] Mover `AliceSubjectId`/`BobSubjectId` para o seed test-only e remover seu import de InMemory.
+- [x] Expor handles imutáveis para realms internos/demo, clients, resources e subjects usando somente ids
   primitivos, paths e valores provider-neutral; nenhum handle pode conter `Realm`.
-- [ ] Obter qualquer objeto `Realm` usado pelo teste via `IRealmStore`/snapshot depois do seed e dentro da
+- [x] Obter qualquer objeto `Realm` usado pelo teste via `IRealmStore`/snapshot depois do seed e dentro da
   composição corrente.
-- [ ] Criar helper interno exclusivamente em `Tests.Integration/Prepare` que persiste clients pelo
+- [x] Criar helper interno exclusivamente em `Tests.Integration/Prepare` que persiste clients pelo
   `ConfigurationSqliteDbContext` e `ClientMaterializer` existentes, salva a alteração e chama
   `IConfigurationSnapshotRefresher` antes do request. Expor aos cenários somente a operação/handles
   provider-neutral, sem criar contrato público de escrita nem write model administrativo.
-- [ ] Criar source/hook explícito para resources/scopes voláteis, sem nova tabela/contrato público.
-- [ ] Criar operações test-only de conta via features reais do módulo para seed, claims e activate/deactivate.
-- [ ] Criar setup Operational focado apenas onde a API pública não permite preparar o cenário.
-- [ ] Provar smoke de discovery, login, authorize, token e sessão na composição integral.
-- [ ] Provar que `ValidateScopes`/`ValidateOnBuild` faz captive dependency falhar no startup da factory, em vez de
+- [x] Criar source/hook explícito para resources/scopes voláteis, sem nova tabela/contrato público.
+- [x] Criar operações test-only de conta via features reais do módulo para seed, claims e activate/deactivate.
+- [x] Avaliar setup Operational focado apenas onde a API pública não permite preparar o cenário; o smoke da fase
+  foi integralmente preparado pelo protocolo público, portanto nenhum seam relacional especulativo foi criado.
+- [x] Provar smoke de discovery, login, authorize, token e sessão na composição integral.
+- [x] Provar que `ValidateScopes`/`ValidateOnBuild` faz captive dependency falhar no startup da factory, em vez de
   produzir falha tardia/intermitente.
-- [ ] Garantir teardown de arquivos/conexões e ausência de contaminação entre duas factories paralelas.
+- [x] Garantir teardown de arquivos/conexões e ausência de contaminação entre duas factories paralelas.
 
 **Critérios de aceite:** uma factory inicia sem resolver `MemoryStorage`; os três backings reais estão presentes;
 Alice/Bob mantêm subjects determinísticos; writes de client são visíveis após refresh; resources usam a bridge;
@@ -1101,7 +1102,50 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~EntityFrameworkStorag
 
 ### Resultado da Fase 4
 
-*a preencher*
+Concluída em 2026-07-28. `Tests.Host` tornou-se storage-agnóstico: não registra backing, não referencia
+`RoyalIdentity.Storage.InMemory` e não possui mais launch profile standalone. A guarda
+`TestHost_IsStorageAgnostic_AndHasNoStandaloneLaunchProfile` prende as três propriedades. Durante a coexistência
+das Fases 4-6, `AppFactory` seleciona explicitamente o fake e a referência temporária correspondente pertence a
+`Tests.Integration`; `PersistentStorageAppFactory`, irmã sobre a base provider-neutral, seleciona exclusivamente
+Configuration/Operational EF e `UserAccounts` real.
+
+A factory persistente possui dois bancos SQLite in-memory nomeados por instância. Configuration e Operational
+compartilham um keep-alive e usam suas histories separadas; `UserAccounts` mantém conexão, migrations e
+keep-alive próprios. O runner provisiona tudo antes do host, o cleanup Operational fica `External`, e o key ring
+Data Protection é temporário e exclusivo da factory, compartilhado somente entre runner e runtime. O teardown
+fecha as conexões e apaga o key ring sem limpar pools globais.
+
+Foram introduzidos handles imutáveis apenas com ids/paths/credenciais primitivas, source test-only para
+resources/scopes, writer interno de clients baseado em `ClientMaterializer` seguido de refresh do snapshot e
+operações de conta pelos casos de uso/agregado reais do módulo. `AliceSubjectId`/`BobSubjectId` passaram para
+`UserAccountsModuleSeed`, que não importa o fake. O smoke persistente cobre discovery, login, authorize, sessão,
+code/token, userinfo e refresh; os acessos diretos ao contexto Operational nele são somente probes de estado, pois
+nenhuma preparação da Fase 4 exigiu seam relacional abaixo da API pública.
+
+O baseline foi medido no Windows 10.0.19045, Intel Core i7-10750H (6 cores/12 processadores lógicos), 15,8 GiB
+de RAM e SDK .NET `10.0.400-preview.0.26322.102`. Protocolo: projeto previamente compilado, uma passagem de
+aquecimento e três execuções independentes `--no-build`, medindo o tempo de parede do comando.
+
+- Suíte ainda fake:
+  `dotnet test Tests.Integration/Tests.Integration.csproj --no-build` — aquecimento `10,566 s`; execuções
+  `10,922 s`, `12,345 s`, `11,673 s`; mediana `11,673 s`.
+- Startup da factory persistente:
+  `dotnet test Tests.Integration/Tests.Integration.csproj --no-build --filter
+  "FullyQualifiedName~PersistentStorageCompositionTests.Host_UsesThreeRealBackings_AndDeterministicProviderNeutralHandles"`
+  — aquecimento `5,728 s`; execuções `5,756 s`, `6,143 s`, `5,711 s`; mediana `5,756 s`.
+
+Para DF26, regressão material fica fixada em **mais de 2,00× a mediana fake**, isto é, `23,346 s` neste ambiente.
+A razão, e não o valor absoluto, é o critério que a Fase 6 deve reproduzir no mesmo ambiente comparável: ela
+acomoda o custo esperado de migrations/seeds SQLite por fixture, mas torna um tempo superior ao dobro um sinal
+falsificável que exige otimização ou aceite explícito. Não é gate de CI.
+
+Verificação final: `dotnet build RoyalIdentity.sln --no-restore` (sucesso, 0 erros);
+`dotnet test Tests.Architecture/Tests.Architecture.csproj --no-restore` (57/57);
+filtro persistente da fase em `Tests.Integration` (10/10);
+`dotnet test Tests.Integration/Tests.Integration.csproj --no-build` (290/290); e
+`dotnet test Tests.UserAccounts/Tests.UserAccounts.csproj --no-build` (195 aprovados, 1 PostgreSQL opt-in
+ignorado). Os avisos do build são os já existentes de SDK preview, referências ASP.NET implícitas/pacote legado e
+duas anotações de nulabilidade em doubles de testes.
 
 ---
 
@@ -1170,8 +1214,9 @@ factory integral como única composição canônica das 29 classes.
 - [ ] Substituir `FakeSessionStorage` baseado em stores concretos por doubles locais de contratos ou gateway EF.
 - [ ] Mudar cada classe uma única vez para a factory persistente e remover a factory/ramo legado assim que seu
   último consumer for migrado.
-- [ ] Manter a factory persistente como única composição canônica, sem exigir renome; absorver/remover
-  `EntityFrameworkStorageAppFactory` e `UserAccountsAppFactory` parciais.
+- [ ] Manter a factory persistente como única composição canônica, sem exigir renome; a parcial
+  `EntityFrameworkStorageAppFactory` já foi absorvida/removida na Fase 4, e `UserAccountsAppFactory` deve ser
+  removida com seu último consumer.
 - [ ] Remover o global using e todas as referências a `MemoryStorage`/`RealmMemoryStore` de `Tests.Integration`.
 - [ ] Remover de `Tests.Integration` a referência temporária ao projeto fake criada para a coexistência da Fase 4.
 - [ ] Executar busca estática/guard arquitetural que rejeite handles contendo `Realm` e confirme que realms usados
@@ -1538,7 +1583,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 - `RoyalIdentity.Storage.EntityFramework/Extensions/OperationalServiceCollectionExtensions.cs`.
 - `RoyalIdentity.Migrations/StorageMigrationRunner.cs`.
 - `RoyalIdentity.UserAccounts.Integration/UserAccountsIntegrationExtensions.cs`.
-- `Tests.Integration/Prepare/EntityFrameworkStorageAppFactory.cs`.
+- `Tests.Integration/Prepare/PersistentStorageAppFactory.cs`.
 - `Tests.Integration/Prepare/UserAccountsAppFactory.cs`.
 - `Tests.Integration/Prepare/CharacterizationSeed.cs`.
 - `Tests.Storage/Storage/Support/InMemoryStorageHarness.cs`.

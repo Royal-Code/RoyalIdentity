@@ -6,6 +6,9 @@
 	  <ProjectReference Include="..\RoyalIdentity.Security\RoyalIdentity.Security.csproj" />
 	  <ProjectReference Include="..\RoyalIdentity.Server\RoyalIdentity.Server.csproj" />
 	  <ProjectReference Include="..\RoyalIdentity.Demo\RoyalIdentity.Demo.csproj" />
+	  <!-- Temporary during Plan 4 Fases 4-6: legacy AppFactory consumers still select the fake explicitly.
+	       Tests.Host itself is storage-agnostic, and the reference disappears with the last legacy consumer. -->
+	  <ProjectReference Include="..\RoyalIdentity.Storage.InMemory\RoyalIdentity.Storage.InMemory.csproj" />
 	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
 	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Sqlite\RoyalIdentity.UserAccounts.Sqlite.csproj" />
 	  <ProjectReference Include="..\Tests.Host\Tests.Host.csproj" />

@@ -13,20 +13,21 @@ using Tests.Integration.Prepare;
 namespace Tests.Integration.Endpoints;
 
 /// <summary>
-/// One complete OIDC flow over the <b>EF gateway</b> — authorize, login, code exchange, userinfo and refresh —
+/// One complete OIDC flow over the <b>EF gateway</b> — discovery, authorize, login, code exchange, userinfo
+/// and refresh —
 /// with Configuration and Operational persisted in one SQLite database migrated and seeded by the production
 /// runner (plan Fase 8). It is the end-to-end answer to "is this backing actually usable?", which no store
 /// contract can give on its own.
 /// <para>
-/// Opt-in by construction: it uses <see cref="EntityFrameworkStorageAppFactory"/> while every other suite keeps
+/// Opt-in by construction: it uses <see cref="PersistentStorageAppFactory"/> while every other suite keeps
 /// the in-memory backing, so nothing here changes the default the host or the other tests run on (ADR-018).
 /// </para>
 /// </summary>
-public class EntityFrameworkStorageOidcFlowTests : IClassFixture<EntityFrameworkStorageAppFactory>
+public class EntityFrameworkStorageOidcFlowTests : IClassFixture<PersistentStorageAppFactory>
 {
-    private readonly EntityFrameworkStorageAppFactory factory;
+    private readonly PersistentStorageAppFactory factory;
 
-    public EntityFrameworkStorageOidcFlowTests(EntityFrameworkStorageAppFactory factory)
+    public EntityFrameworkStorageOidcFlowTests(PersistentStorageAppFactory factory)
         => this.factory = factory;
 
     [Fact]
@@ -37,6 +38,14 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<EntityFramework
         var codeVerifier = CryptoRandom.CreateUniqueId();
         var codeChallenge = Base64Url.Encode(Encoding.ASCII.GetBytes(codeVerifier).Sha256());
         var redirectUri = $"{client.BaseAddress}callback";
+
+        var discoveryResponse = await client.GetAsync(
+            Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path));
+        Assert.Equal(HttpStatusCode.OK, discoveryResponse.StatusCode);
+        using var discovery = JsonDocument.Parse(await discoveryResponse.Content.ReadAsStringAsync());
+        Assert.Equal(
+            $"{client.BaseAddress!.ToString().TrimEnd('/')}/{factory.Handles.Demo.Path}",
+            discovery.RootElement.GetProperty("issuer").GetString());
 
         var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl("demo")
             .AddQueryString("client_id", "demo_client")
@@ -92,7 +101,7 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<EntityFramework
 
         // 4 — the access token works against a protected endpoint.
         var userInfo = await GetUserInfoAsync(client, tokens.GetProperty("access_token").GetString()!);
-        Assert.Equal(MemoryStorage.AliceSubjectId, userInfo.GetProperty("sub").GetString());
+        Assert.Equal(factory.Handles.Alice.SubjectId, userInfo.GetProperty("sub").GetString());
 
         // 5 — MP-3 through the flow: the refresh renews the access token, and the conditional transition marked
         // the very same row as consumed instead of writing a second one.
@@ -139,7 +148,7 @@ public class EntityFrameworkStorageOidcFlowTests : IClassFixture<EntityFramework
             "RoyalIdentity.Storage.EntityFramework",
             storage.GetType().FullName,
             StringComparison.Ordinal);
-        Assert.IsNotType<MemoryStorage>(storage);
+        Assert.Null(scope.ServiceProvider.GetService<RoyalIdentity.Storage.InMemory.MemoryStorage>());
     }
 
     // DF23: the host never migrates. The runner did, and both families recorded themselves separately.

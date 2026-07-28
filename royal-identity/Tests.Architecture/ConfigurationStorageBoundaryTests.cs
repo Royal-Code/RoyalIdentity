@@ -177,6 +177,31 @@ public class ConfigurationStorageBoundaryTests
     }
 
     [Fact]
+    public void TestHost_IsStorageAgnostic_AndHasNoStandaloneLaunchProfile()
+    {
+        var root = ProjectReferenceReader.FindRepositoryRoot();
+        var hostDirectory = Path.Combine(root, "Tests.Host");
+        var projectReferences = ProjectReferenceReader.ReadProjectReferences("Tests.Host/Tests.Host.csproj");
+        var source = Directory
+            .EnumerateFiles(hostDirectory, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Select(File.ReadAllText)
+            .ToArray();
+
+        Assert.DoesNotContain(
+            projectReferences,
+            reference => reference.Contains("RoyalIdentity.Storage.", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            source,
+            text => text.Contains("AddInMemoryStorage", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            source,
+            text => text.Contains("AddEntityFrameworkStorage", StringComparison.Ordinal));
+        Assert.False(File.Exists(Path.Combine(hostDirectory, "Properties", "launchSettings.json")));
+    }
+
+    [Fact]
     public void Server_UsesNamedEntryPoint_WithoutAssemblyAliasOrGlobalProgram()
     {
         var projectPath = Path.Combine(

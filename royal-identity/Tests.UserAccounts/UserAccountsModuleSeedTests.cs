@@ -62,10 +62,10 @@ public class UserAccountsModuleSeedTests
         Assert.Collection(
             accounts,
             account => AssertDefaultAccount(
-                account, MemoryStorage.AliceSubjectId, UserAccountsModuleSeed.AliceUsername,
+                account, UserAccountsModuleSeed.AliceSubjectId, UserAccountsModuleSeed.AliceUsername,
                 "Alice", "Alice@example.com"),
             account => AssertDefaultAccount(
-                account, MemoryStorage.BobSubjectId, UserAccountsModuleSeed.BobUsername,
+                account, UserAccountsModuleSeed.BobSubjectId, UserAccountsModuleSeed.BobUsername,
                 "Bob", "bob@example.com"));
         Assert.Equal(2, await assertDb.Set<UserAccountCredential>().CountAsync(c => c.RealmId == RealmId));
         Assert.Equal(2, await assertDb.Set<UserAccountEmail>().CountAsync(e => e.RealmId == RealmId));

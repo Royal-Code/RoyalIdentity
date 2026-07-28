@@ -32,7 +32,7 @@ Completed refactoring plans (useful as historical record and for understanding d
 
 Active plans (check status before modifying affected areas):
 
-**The default host and the default composition of `Tests.Integration` are still in-memory.** `Tests.Storage` already runs on EF (SQLite always, PostgreSQL opt-in) for the contract, parity, concurrency, migration and gateway suites; what remains in-memory is the host wiring, with `Tests.Integration/Prepare/EntityFrameworkStorageAppFactory` as the opt-in reference composition and the only integration suite on it. The transitional non-atomic fallback in `DefaultAuthorizationCodeConsumer`/`DefaultRefreshTokenConsumer` exists for that default and is removed together with it, never before (ADR-018). Next macro-plan item: `plan-data-test-migration.md` (Plan 4).
+**The default composition of `Tests.Integration` is still in-memory, selected explicitly by its legacy `AppFactory`; `Tests.Host` itself is storage-agnostic.** `Tests.Storage` already runs on EF (SQLite always, PostgreSQL opt-in), and `PersistentStorageAppFactory` is the opt-in integral SQLite composition with Configuration + Operational in one database and `UserAccounts` in another. The transitional non-atomic fallback in `DefaultAuthorizationCodeConsumer`/`DefaultRefreshTokenConsumer` exists for the fake default and is removed together with it, never before (ADR-018). Active macro-plan: `plan-data-test-migration.md` (Plan 4; Fases 1-4 complete).
 
 Roadmap of the plans that come after the ones above: [.ai/plans/plans-roadmap-02.md](.ai/plans/plans-roadmap-02.md) (supersedes `plans-roadmap-01.md`) — includes `.ai/plans/plan-data-macro.md`, the sequencing map for the IdP's own data persistence work.
 

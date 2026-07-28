@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using RoyalIdentity.Storage.InMemory;
 using RoyalIdentity.UserAccounts.Features.Accounts.Domain;
 using RoyalIdentity.UserAccounts.Features.Accounts.UseCases;
 using RoyalIdentity.UserAccounts.Features.ScopeProperties.Domain;
@@ -16,14 +15,18 @@ namespace Tests.UserAccounts;
 /// maintaining independent copies. There is deliberately no public seed API on the module itself (Q8): this
 /// is test infrastructure, not a module capability.
 /// <para>
-/// Alice/Bob reuse the fake's subject ids (<see cref="MemoryStorage.AliceSubjectId"/>/
-/// <see cref="MemoryStorage.BobSubjectId"/>) so a test written against the shared
-/// <c>UserDirectoryContractTests</c> contract (or any HTTP characterization test) observes the same subject
-/// identity regardless of which backing (fake or module) it runs against.
+/// Alice/Bob own deterministic subject ids here, in test infrastructure, so fixtures and HTTP characterization
+/// tests observe the same identity without importing constants from a storage implementation.
 /// </para>
 /// </summary>
 public static class UserAccountsModuleSeed
 {
+    /// <summary>Deterministic, opaque subject id for Alice.</summary>
+    public const string AliceSubjectId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+
+    /// <summary>Deterministic, opaque subject id for Bob.</summary>
+    public const string BobSubjectId = "6f9619ff-8b86-d011-b42d-00cf4fc964ff";
+
     /// <summary>Alice's username, matching the in-memory fake's seeded account.</summary>
     public const string AliceUsername = "alice";
 
@@ -80,11 +83,11 @@ public static class UserAccountsModuleSeed
     {
         await SeedAccountAsync(
             services, realmId, options,
-            MemoryStorage.AliceSubjectId, AliceUsername, "Alice", "Alice@example.com", AlicePassword,
+            AliceSubjectId, AliceUsername, "Alice", "Alice@example.com", AlicePassword,
             isActive: true, roles: ["admin"], now, ct);
         await SeedAccountAsync(
             services, realmId, options,
-            MemoryStorage.BobSubjectId, BobUsername, "Bob", "bob@example.com", BobPassword,
+            BobSubjectId, BobUsername, "Bob", "bob@example.com", BobPassword,
             isActive: true, roles: ["admin"], now, ct);
     }
 

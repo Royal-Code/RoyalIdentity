@@ -1,5 +1,4 @@
 ﻿using RoyalIdentity.Extensions;
-using RoyalIdentity.Storage.InMemory.Extensions;
 
 namespace Tests.Host;
 
@@ -13,9 +12,6 @@ public static class HostServices
 
         // Services for the authentication server
         services.AddRoyalIdentityRazor();
-
-        // Storage Services
-        services.AddInMemoryStorage();
 
         // RoyalIdentity Services
         services.AddOpenIdConnectProviderServices();
