@@ -210,14 +210,15 @@
   store; execuções não se sobrepõem; o comportamento é provado com relógio controlado, de forma determinística; e
   há teste provando que `TryAddAsync` **não** consulta expiração — um registro vencido e ainda não podado
   continua respondendo replay. Fonte: revisão externa.
-- **DF21 — Valor e faixa do teto:** default de **10 minutos**; faixa configurável por realm de `> 0` até
-  `<= 1 hora`. Dez minutos é o piso coerente com o `ClockSkew` de 5 minutos já aplicado na validação: um client
-  que emita assertion de 5 minutos com relógio 5 minutos adiantado produz `exp = now + 10min` no relógio do
-  servidor e continua aceito. Um teto de 5 minutos comparado contra o relógio do servidor contradiria a própria
-  tolerância. Uma hora fica reservada como override máximo para integração legada, não como default, porque
-  amplia sem necessidade a janela de uso de uma assertion vazada. A option valida faixa e protege
-  `now + lifetime` contra overflow de `DateTimeOffset`. Se o `ClockSkew` deixar de ser constante, os dois passam
-  a ser validados juntos: o teto nunca pode ser menor que a tolerância. Fonte: resposta humana a Q5.
+- **DF21 — Valor e faixa do teto:** default de **10 minutos**; faixa configurável por realm de **1 segundo** até
+  **1 hora**, inclusive. Dez minutos é o default coerente com o `ClockSkew` de 5 minutos já aplicado na validação:
+  um client que emita assertion de 5 minutos com relógio 5 minutos adiantado produz `exp = now + 10min` no
+  relógio do servidor e continua aceito. Um teto de 5 minutos comparado contra o relógio do servidor contradiria
+  a própria tolerância. Uma hora fica reservada como override máximo para integração legada, não como default,
+  porque amplia sem necessidade a janela de uso de uma assertion vazada. A option valida faixa e protege
+  `now + lifetime` contra overflow de `DateTimeOffset`. Valores configurados abaixo do `ClockSkew` são permitidos
+  como endurecimento deliberado do realm, mas reduzem a interoperabilidade com clients cujo relógio esteja
+  adiantado. Fonte: resposta humana a Q5.
 
 ---
 
@@ -273,12 +274,14 @@
 **Fase 1 (teto de duração):**
 
 - **Q5 — Valor default de `ClientAssertionMaxLifetime`:** 1 hora, 5-10 minutos, ou outro valor.
-  - **Resposta:** opção B com default exato de **10 minutos**, faixa `> 0` a `<= 1 hora`, e documentação
-    orientando clientes a emitirem assertions de 1 a 5 minutos.
-  - **Considerações:** 10 minutos é o piso coerente com o `ClockSkew` de 5 minutos já aplicado — um client com
+  - **Resposta:** opção B com default exato de **10 minutos**, faixa inclusiva de **1 segundo** a **1 hora**, e
+    documentação orientando clientes a emitirem assertions de 1 a 5 minutos.
+  - **Considerações:** 10 minutos é o default coerente com o `ClockSkew` de 5 minutos já aplicado — um client com
     assertion de 5 minutos e relógio 5 minutos adiantado produz `exp = now + 10min` no servidor e continua
     aceito, enquanto um teto de 5 minutos contradiria a própria tolerância. Uma hora como default ampliaria sem
     necessidade a janela de uso de uma assertion vazada; fica como override máximo para integração legada.
+    Valores abaixo do `ClockSkew` permanecem possíveis como política mais estrita do realm, com a perda de
+    interoperabilidade correspondente.
   - **Conclusão Q5:** fechada por DF21.
 
 **Segunda revisão externa (2026-07-29):**
@@ -429,11 +432,13 @@ em todas as composition roots e instalar o startup validator — tudo no mesmo c
   `ServiceCollectionExtensions.cs:63`, sem substituí-los por outro default (DF12).
 - [ ] Reduzir o par das linhas 154/160 do evaluator a uma única chamada, passando `context.Realm.Id` e o
   `client_id` validado; preservar DF5.
-- [ ] Acrescentar `ClientAssertionMaxLifetime` a `RealmOptions` com default de **10 minutos** e faixa válida
-  `> 0` até `<= 1 hora` (DF21), cópia no construtor de cópia e aritmética protegida contra overflow em
-  `now + lifetime`, seguindo o padrão das demais options por realm.
+- [ ] Acrescentar `RealmOptions.Authentication.ClientAssertionMaxLifetime` a `AuthenticationOptions`, com default
+  de **10 minutos** e faixa inclusiva de **1 segundo** a **1 hora** (DF21); copiar o valor no construtor de cópia,
+  validá-lo em `AuthenticationOptions.Validate()` e proteger `now + lifetime` contra overflow.
 - [ ] Recusar no evaluator assertion cujo `exp` ultrapasse `now + ClientAssertionMaxLifetime`, com `now` de
   `TimeProvider`, antes de tocar o replay store (DF19).
+- [ ] Atribuir o mesmo `TimeProvider` injetado a `TokenValidationParameters.TimeProvider`, para que a validação
+  de `exp`/`nbf`, o teto de DF19 e os testes com relógio controlado usem a mesma autoridade temporal.
 - [ ] Declarar a escolha em `RoyalIdentity.Server`, `RoyalIdentity.Demo` e na factory persistente de
   `Tests.Integration` (Fase 1 usa in-memory em todas; o Server troca para a durável na Fase 2).
 - [ ] Criar a infraestrutura de teste de `private_key_jwt`: client com chave assimétrica, assertion assinada com
@@ -441,8 +446,9 @@ em todas as composition roots e instalar o startup validator — tudo no mesmo c
 - [ ] Cobrir com teste: primeira apresentação aceita; segunda recusada; mesmo `jti` em clients distintos do mesmo
   realm não interfere; mesmo `jti` em realms distintos não interfere; assertion com `exp` além do teto é recusada
   e **não** registra handle; assertion dentro do teto é aceita; assertion de 5 minutos emitida com relógio 5
-  minutos adiantado continua aceita sob o default de 10 minutos; a option recusa zero, negativo e valor acima de
-  1 hora, e aceita os dois limites válidos; a poda do in-memory remove vencidos com relógio controlado e um
+  minutos adiantado continua aceita sob o default de 10 minutos; a option recusa zero, negativo, valor abaixo de
+  1 segundo e valor acima de 1 hora, e aceita exatamente 1 segundo e 1 hora; valor abaixo do `ClockSkew` é aceito
+  como política estrita documentada; a poda do in-memory remove vencidos com relógio controlado e um
   registro vencido ainda não podado continua respondendo replay; duas estratégias declaradas simultaneamente
   falham o startup; host em ambiente **Production** sem declaração
   falha no startup com mensagem citando as extensions; nenhuma mensagem contém a assertion ou o `jti`.
@@ -450,7 +456,9 @@ em todas as composition roots e instalar o startup validator — tudo no mesmo c
 **Critérios de aceite:** `IReplayCache` não existe; `IReplayProtectionStore` expõe somente a operação atômica
 realm/issuer-bound com `CancellationToken`; nenhum default é registrado e nenhum no-op existe; o host em
 Production sem declaração falha antes de aceitar tráfego, provado por teste; replay é recusado e os dois
-isolamentos são provados; assertion acima de `ClientAssertionMaxLifetime` é recusada sem registrar handle;
+isolamentos são provados; assertion acima de `ClientAssertionMaxLifetime` é recusada sem registrar handle; a
+faixa e a cópia de `Authentication.ClientAssertionMaxLifetime` são provadas; a poda in-memory é determinística,
+não se sobrepõe, encerra seu timer no descarte e não participa da decisão de `TryAddAsync`;
 `dotnet build RoyalIdentity.sln` e todas as suítes seguem verdes (DF15).
 
 **Testes:**
@@ -541,8 +549,9 @@ real e fechar o registro normativo.
   reclassificação de `Adapter/Infrastructure` para Operational (DF16).
 - [ ] Remover o item de replay do `backlog-001.md` e a menção condicionada no `plan-data-macro.md`.
 - [ ] Atualizar READMEs do Server e do Demo com a extension declarada e, no Demo, a limitação de instância única.
-- [ ] Documentar `ClientAssertionMaxLifetime`: default de 10 minutos, faixa até 1 hora como override para
-  integração legada, e orientação para clientes emitirem assertions de 1 a 5 minutos.
+- [ ] Documentar `ClientAssertionMaxLifetime`: default de 10 minutos, faixa inclusiva de 1 segundo a 1 hora,
+  sendo o máximo um override para integração legada, e orientação para clientes emitirem assertions de 1 a
+  5 minutos.
 - [ ] Executar `dotnet build` e `dotnet test` da solução completa.
 
 **Critérios de aceite:** guards distinguem qual implementação cada composição resolve, e não apenas a ausência de
@@ -574,7 +583,9 @@ dotnet test RoyalIdentity.sln
 | 3 — isolamento por realm e emissor | 1, 2 | DF13 | mesmo `jti` em clients/realms distintos não interfere | filtros `PrivateKeyJwt`/`ReplayProtection` |
 | 4 — duas implementações com vencedor único | 1, 2 | DF6, DF8, DF10 | exatamente um `true` sob concorrência, SQLite e PostgreSQL | `Tests.Storage`, script PostgreSQL |
 | 5 — cobertura do que não tinha teste | 1, 2, 3 | DF5, DF6 | replay recusado; corrida; fail-closed; aceite PostgreSQL com replay real | filtros + scripts |
-| 6 — registro normativo fechado | 3 | DF7, DF16 | RC-01/RC-02 sem `substituir` e reclassificados | revisão documental + suíte completa |
+| 6 — poda in-memory fora da decisão | 1 | DF8, DF20 | poda determinística; timer descartado; sem sobreposição; registro vencido ainda retido recusa | filtro `ReplayProtection` |
+| 7 — teto de client assertion | 1, 3 | DF19, DF21 | default 10 min; faixa 1 s–1 h; relógio único; documentação para clients | filtros `PrivateKeyJwt`/`ReplayProtection` |
+| 8 — registro normativo fechado | 3 | DF7, DF16 | RC-01/RC-02 sem `substituir` e reclassificados | revisão documental + suíte completa |
 
 ---
 
@@ -588,10 +599,12 @@ dotnet test RoyalIdentity.sln
 6. A expiração do registro nunca é menor que a da assertion mais o `ClockSkew` aplicado.
 7. A retenção máxima é determinada pelo servidor, nunca pelo `exp` escolhido pelo cliente (DF19).
 8. A correção não depende de limpeza nem de comparação de relógio no caminho de escrita (DF8).
-9. O processo web não aplica migration nem seed; provisionamento continua externo.
-10. Nenhuma composição obtém proteção aparente com efeito nulo.
-11. Toda fase termina com build e suítes verdes (DF15).
-12. Nenhuma semântica fechada na matriz é reaberta além de RC-01/RC-02.
+9. A validação do JWT, o teto de duração e os backings usam o `TimeProvider` injetado como uma única autoridade
+   temporal.
+10. O processo web não aplica migration nem seed; provisionamento continua externo.
+11. Nenhuma composição obtém proteção aparente com efeito nulo.
+12. Toda fase termina com build e suítes verdes (DF15).
+13. Nenhuma semântica fechada na matriz é reaberta além de RC-01/RC-02.
 
 ---
 
@@ -602,7 +615,12 @@ dotnet test RoyalIdentity.sln
 - Nenhuma implementação no-op existe no repositório e nenhum default é registrado.
 - Host em Production sem declaração falha antes de aceitar tráfego, provado por teste.
 - Vencedor único provado nas duas implementações; a durável em SQLite e no aceite PostgreSQL opt-in.
-- Assertion acima do teto de duração é recusada sem registrar handle, e a faixa da option é validada nos limites.
+- Assertion acima do teto de duração é recusada sem registrar handle; a option vive em
+  `RealmOptions.Authentication`, usa default de 10 minutos e aceita somente a faixa inclusiva de 1 segundo a
+  1 hora.
+- Poda in-memory provada com relógio controlado, sem sobreposição, com descarte do timer e sem consulta de
+  expiração no caminho de `TryAddAsync`.
+- `TokenValidationParameters`, o teto de duração e os backings usam o mesmo `TimeProvider`.
 - Aceite PostgreSQL apresenta a mesma assertion duas vezes contra o backing real.
 - Guards provam a implementação específica resolvida por Server e por Demo.
 - RC-01/RC-02 atualizados e reclassificados; item removido do backlog e da órbita do plano de caching.
