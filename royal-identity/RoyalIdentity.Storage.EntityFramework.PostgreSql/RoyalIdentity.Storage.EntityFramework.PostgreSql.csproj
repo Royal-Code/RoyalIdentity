@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<!--
 		PostgreSQL provider for both core storage families: schema/jsonb/collation refinements, contexts and
@@ -11,8 +11,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" PrivateAssets="all" />
+		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="$(NpgsqlVer)" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVer)" PrivateAssets="all" />
 	</ItemGroup>
 
 </Project>

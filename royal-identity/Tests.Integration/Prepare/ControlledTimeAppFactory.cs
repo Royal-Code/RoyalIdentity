@@ -6,11 +6,26 @@ namespace Tests.Integration.Prepare;
 public class ControlledTimeAppFactory : PersistentStorageAppFactory
 {
     public ControlledTimeProvider Clock { get; } =
-        new(new DateTimeOffset(2026, 7, 29, 0, 0, 0, TimeSpan.Zero));
+        new(TimeProvider.System.GetUtcNow());
+
+    /// <summary>
+    /// Ensures provisioning/startup has completed, then starts a scenario from the current real instant. The
+    /// runner seeds signing keys with the system clock, so a historical fixed instant could put those keys in
+    /// this factory's future and make the host fail before the scenario begins.
+    /// </summary>
+    public void ResetClock()
+    {
+        _ = Services;
+        Clock.SetUtcNow(TimeProvider.System.GetUtcNow());
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
+
+        // base.ConfigureWebHost provisions Configuration first. Move the controlled clock to an instant after
+        // that seed and before hosted-service validation starts.
+        Clock.SetUtcNow(TimeProvider.System.GetUtcNow());
 
         builder.ConfigureServices(services =>
         {

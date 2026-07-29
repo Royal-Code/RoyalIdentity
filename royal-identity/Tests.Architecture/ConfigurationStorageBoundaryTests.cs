@@ -177,11 +177,13 @@ public class ConfigurationStorageBoundaryTests
     }
 
     [Fact]
-    public void TestHost_IsStorageAgnostic_AndHasNoStandaloneLaunchProfile()
+    public void TestHost_IsStorageAgnostic_AndDoesNotPublishAStandaloneLaunchProfile()
     {
         var root = ProjectReferenceReader.FindRepositoryRoot();
         var hostDirectory = Path.Combine(root, "Tests.Host");
+        var projectPath = Path.Combine(hostDirectory, "Tests.Host.csproj");
         var projectReferences = ProjectReferenceReader.ReadProjectReferences("Tests.Host/Tests.Host.csproj");
+        var project = XDocument.Load(projectPath);
         var source = Directory
             .EnumerateFiles(hostDirectory, "*.cs", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
@@ -195,7 +197,29 @@ public class ConfigurationStorageBoundaryTests
         Assert.DoesNotContain(
             source,
             text => text.Contains("AddEntityFrameworkStorage", StringComparison.Ordinal));
-        Assert.False(File.Exists(Path.Combine(hostDirectory, "Properties", "launchSettings.json")));
+        Assert.Contains(
+            project.Descendants("NoDefaultLaunchSettingsFile"),
+            element => bool.TryParse(element.Value, out var value) && value);
+
+        var gitIgnore = FindNearestFile(root, ".gitignore");
+        Assert.Contains(
+            "royal-identity/Tests.Host/Properties/launchSettings.json",
+            File.ReadLines(gitIgnore).Select(line => line.Trim()));
+    }
+
+    private static string FindNearestFile(string startDirectory, string fileName)
+    {
+        var directory = new DirectoryInfo(startDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, fileName);
+            if (File.Exists(candidate))
+                return candidate;
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"Could not locate '{fileName}' from '{startDirectory}'.");
     }
 
     [Fact]

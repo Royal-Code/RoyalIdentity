@@ -9,9 +9,12 @@
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 	<PropertyGroup>
-		<AspVer>10.0.0</AspVer>
-		<ExtVer>10.0.0</ExtVer>
-		<IdVer>8.19.1</IdVer>
+		<AspVer>10.0.10</AspVer>
+		<ExtVer>10.0.10</ExtVer>
+		<EfCoreVer>10.0.10</EfCoreVer>
+		<IdVer>8.21.0</IdVer>
+		<SqliteVer>3.0.3</SqliteVer>
+		<NpgsqlVer>10.0.3</NpgsqlVer>
 	</PropertyGroup>
 	<!-- RoyalCode library versions for the UserAccounts module family (validated on net10.0, plan v2 Fase 3). -->
 	<PropertyGroup>

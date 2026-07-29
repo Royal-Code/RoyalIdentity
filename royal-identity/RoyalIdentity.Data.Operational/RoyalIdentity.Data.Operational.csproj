@@ -13,7 +13,7 @@
 
 	<ItemGroup>
 		<!-- Relational APIs (ToTable/HasColumnName/composite keys) for the neutral mappings. -->
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EfCoreVer)" />
 	</ItemGroup>
 
 </Project>

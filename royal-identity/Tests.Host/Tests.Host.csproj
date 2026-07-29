@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\RoyalIdentity.Razor\RoyalIdentity.Razor.csproj" />
     <ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />

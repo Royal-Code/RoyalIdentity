@@ -1713,9 +1713,28 @@ legítimas a `UpdateAsync` não relacionadas a refresh ou a texto histórico dev
   consent, `IRealmManager.UpdateAsync` e o guard que prova a ausência de `IRefreshTokenStore.UpdateAsync`. As
   ocorrências de `fallback` tratam exclusivamente de proteção Plain explícita ou harness Configuration-only, não
   de authorization code/refresh token.
-- Triagem: nenhuma asserção normativa de produto mudou e nenhum defeito de produto/módulo foi revelado. Os 13 casos
-  removidos são dívida transitória explicitamente listada na Fase 7, não perda de cobertura: atomicidade,
-  binding, conflito, rematerialização e tolerância continuam cobertos pelos stores/fluxos EF reais.
+- Revisão pós-fase em 2026-07-29 encontrou uma falha latente da infraestrutura migrada na Fase 6:
+  `ControlledTimeAppFactory` e os quatro `PromptInteractionCharacterizationTests` restauravam o relógio para
+  `2026-07-29T00:00:00Z`, enquanto o runner semeava as signing keys com `TimeProvider.System`. Depois desse instante,
+  a chave podia ter `NotBefore` posterior ao relógio da fixture e `SigningKeyStartupValidator` recusava o startup.
+  A factory agora sincroniza o relógio controlado depois do provisionamento e `ResetClock()` garante startup antes
+  de iniciar cada cenário no instante real corrente; os testes continuam controlando somente os avanços relativos
+  de `1` e `61` segundos. O filtro
+  `dotnet test Tests.Integration --no-build --filter "FullyQualifiedName~PromptInteractionCharacterizationTests"`
+  executou 4/4 e a suíte completa voltou a 281/281.
+- A mesma revisão confirmou que o Visual Studio recriava localmente
+  `Tests.Host/Properties/launchSettings.json`. Como o arquivo já era ignorado, o guard baseado em `File.Exists`
+  tornava a suíte local vermelha sem representar o estado versionado. O arquivo local foi removido,
+  `Tests.Host.csproj` agora declara `NoDefaultLaunchSettingsFile=true`, e o guard prova essa política mais a regra
+  exata do `.gitignore`; `git ls-files Tests.Host/Properties/launchSettings.json` retorna zero e
+  `dotnet test Tests.Architecture --no-build` executa 61/61.
+- Triagem: nenhuma asserção normativa de produto mudou e não houve `regressão-do-módulo`,
+  `defeito-de-produto` ou `sem-decisão-normativa`. Há uma ocorrência de **artefato-do-fake na infraestrutura de
+  teste**: o instante absoluto histórico era inofensivo no backing anterior, mas inválido diante de signing keys
+  reais com vigência. Os 13 casos removidos continuam sendo dívida transitória explicitamente listada na Fase 7,
+  não perda de cobertura: atomicidade, binding, conflito, rematerialização e tolerância permanecem cobertos pelos
+  stores/fluxos EF reais. A correção do guard de launch profile é manutenção da verificação arquitetural, sem
+  mudança de asserção de produto.
 
 ---
 

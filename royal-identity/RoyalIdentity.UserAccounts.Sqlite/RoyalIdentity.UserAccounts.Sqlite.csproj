@@ -12,9 +12,9 @@
 	<ItemGroup>
 		<PackageReference Include="RoyalCode.WorkContext.Sqlite" Version="$(RcWorkContextVer)" />
 		<!-- Promote the transitive SQLitePCLRaw native bundle past the 2.1.11 advisory (NU1903). -->
-		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="$(SqliteVer)" />
 		<!-- Design-time tooling only (dotnet ef migrations): not part of the shipped runtime surface. -->
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVer)" PrivateAssets="all" />
 	</ItemGroup>
 
 </Project>

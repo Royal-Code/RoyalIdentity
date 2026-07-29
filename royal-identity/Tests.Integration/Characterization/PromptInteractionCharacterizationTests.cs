@@ -16,9 +16,6 @@ namespace Tests.Integration.Characterization;
 /// </summary>
 public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTimeAppFactory>
 {
-    private static readonly DateTimeOffset BaseTime =
-        new(2026, 7, 29, 0, 0, 0, TimeSpan.Zero);
-
     private readonly ControlledTimeAppFactory factory;
 
     public PromptInteractionCharacterizationTests(ControlledTimeAppFactory factory)
@@ -49,7 +46,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
     [Fact]
     public async Task Authorize_WhenAuthenticated_WithoutPrompt_IssuesCodeWithoutInteraction()
     {
-        factory.Clock.SetUtcNow(BaseTime);
+        factory.ResetClock();
 
         // baseline: a fresh, authenticated session goes straight to the callback with a code
         var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
@@ -68,7 +65,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
     [Fact]
     public async Task Authorize_WhenAuthenticated_WithPromptLogin_ForcesLogin()
     {
-        factory.Clock.SetUtcNow(BaseTime);
+        factory.ResetClock();
 
         var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -86,7 +83,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
     [Fact]
     public async Task Authorize_WhenAuthenticated_WithMaxAgeZero_ForcesLogin()
     {
-        factory.Clock.SetUtcNow(BaseTime);
+        factory.ResetClock();
 
         var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -106,7 +103,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
     [Fact]
     public async Task Authorize_WhenClientUserSsoLifetimeExpires_ForcesLogin()
     {
-        factory.Clock.SetUtcNow(BaseTime);
+        factory.ResetClock();
 
         var subject = await CharacterizationSeed.SeedUserAsync(factory, factory.Handles.Demo);
 
