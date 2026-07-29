@@ -1,6 +1,6 @@
 # Plan: Proteção real contra replay de `jti` (`plan-replay-protection`)
 
-## Status: RASCUNHO - Q1-Q4 fechadas; implementação não iniciada
+## Status: RASCUNHO - Q1-Q5 fechadas; implementação não iniciada
 
 ## Progresso
 
@@ -149,12 +149,15 @@
   implementações; a durável em SQLite sempre e em PostgreSQL opt-in. Fonte: Plano 3.
 - **DF7 — Sem CI:** este plano não cria pipeline; PostgreSQL permanece aceite local/opt-in. Fonte: DF24 do
   Plano 4.
-- **DF8 — Conflito é sempre replay; limpeza é volume:** a operação não distingue registro vigente de registro
-  expirado ainda não removido — qualquer conflito de chave responde replay. A correção não depende da limpeza em
-  nenhum momento, e não há comparação de expiração no caminho de escrita, portanto não há corrida entre expirar e
-  inserir. Reusar um `jti` é violação do cliente (RFC 7523 exige unicidade por emissor), e recusá-lo é o
-  comportamento correto. Fonte: revisão externa 2026-07-29; alternativa de upsert condicional avaliada e
-  descartada em `Histórico de decisões`.
+- **DF8 — Enquanto o registro estiver retido, conflito é replay:** a operação não consulta a expiração do
+  registro existente — qualquer conflito de chave responde replay. A limpeza só remove um registro depois que a
+  assertion original já não pode ser aceita; depois disso, o mesmo `jti` pode ser inserido de novo, sem perda de
+  proteção. Não há comparação de expiração no caminho de escrita, portanto não há corrida entre expirar e
+  inserir, e a correção não depende da limpeza. Recusar um `jti` ainda retido é o comportamento correto:
+  RFC 7519 §4.1.7 exige que o valor seja atribuído de modo a tornar colisão desprezível, e OpenID Connect Core §9
+  exige `jti` na client assertion e uso único do token. RFC 7523 §3 apenas autoriza o servidor a reter os `jti`
+  pelo tempo em que o JWT seria válido — sustenta a retenção, não uma proibição permanente. Fonte: revisão
+  externa 2026-07-29; alternativa de upsert condicional avaliada e descartada em `Histórico de decisões`.
 - **DF9 — Seleção por extension, não por configuração:** a composition root escolhe o backing chamando uma
   extension dedicada; a configuração fornece apenas parâmetros. Fonte: resposta humana a Q2; idioma de cleanup,
   proteção de payload e protector de signing keys; validação do Server que recusa `Provider` em configuração.
@@ -167,14 +170,18 @@
 - **DF12 — Sem registro default; a composition root declara:** `AddOpenIdConnectProviderServices()` não registra
   o contrato. Fonte: resposta humana a Q1.
 - **DF13 — Chave por realm e emissor:** a identidade do registro é `(realmId, issuer, purpose, handleDigest)`.
-  O `jti` é único por emissor (RFC 7523) e o evaluator já valida `iss = client_id`, então um client não pode
-  bloquear o `jti` de outro, nem um realm o de outro. Fonte: resposta humana a Q3, estendida pela revisão
+  RFC 7519 §4.1.7 exige que o `jti` seja atribuído de modo a tornar colisão desprezível, inclusive entre
+  emissores distintos, e OpenID Connect Core §9 exige uso único da client assertion; o evaluator já valida
+  `iss = client_id`. Assim, um client não pode bloquear o `jti` de outro, nem um realm o de outro. Fonte: resposta humana a Q3, estendida pela revisão
   externa 2026-07-29.
-- **DF14 — Falha explícita no startup, não por acidente de DI:** as extensions registram um marker da estratégia
-  escolhida e um startup validator recusa a subida quando o marker ou o contrato faltam, em qualquer ambiente. A
-  mensagem nomeia `AddInMemoryReplayProtection()` e `AddOperationalReplayProtection()`. Fonte: revisão externa;
-  `ValidateOnBuild` não é garantido em Production; precedentes `SigningKeyStartupValidator` e
-  `OperationalPayloadProfilesStartupValidator`.
+- **DF14 — Exatamente uma estratégia, verificada no startup:** as extensions registram um marker da estratégia
+  escolhida e um startup validator recusa a subida, em qualquer ambiente, em cinco casos: nenhuma estratégia;
+  mais de uma; marker sem store correspondente; store sem marker; marker e implementação incompatíveis. A ordem
+  de registro nunca decide silenciosamente entre in-memory e Operational. A mensagem nomeia
+  `AddInMemoryReplayProtection()` e `AddOperationalReplayProtection()`. Fonte: revisão externa;
+  `ValidateOnBuild` não é garantido em Production; precedentes `SigningKeyStartupValidator`,
+  `OperationalPayloadProfilesStartupValidator` e a recusa de seleção dupla em
+  `AddEntityFrameworkOperationalCleanup`.
 - **DF15 — Toda fase termina verde:** nenhuma fase entrega um estado em que o contrato esteja trocado sem
   implementação registrada nas composições. Build e suítes verdes são aceite de cada fase, não só do plano.
   Fonte: revisão externa.
@@ -186,15 +193,31 @@
   não se assume resistência a enumeração por dicionário sobre `jti` previsível. A justificativa de alta entropia
   do `OperationalLookupDigest` **não** é herdada. Se confidencialidade perante acesso ao banco entrar no threat
   model, a troca por digest autenticado é alteração isolada de implementação. Fonte: revisão externa.
-- **DF19 — Duração máxima aceita da client assertion:** o evaluator recusa assertion cujo `exp` ultrapasse
-  `now + ClientAssertionMaxLifetime`, com `now` vindo de `TimeProvider` e a tolerância de `ClockSkew` já aplicada
-  na validação. O teto é uma option por realm, com default de **1 hora**. A comparação é contra o instante do
-  servidor, e não contra `exp - iat`: `iat` é opcional e pode vir adiantado, enquanto o que precisa ser limitado
-  é exatamente a retenção do registro, que é função de `exp` e do relógio do servidor. Recusa segue DF5 —
-  credencial inválida e log explícito, sem expor a assertion. Fonte: resposta humana a Q4.
 - **DF18 — Renomear o contrato:** `IReplayCache` passa a `IReplayProtectionStore`. O nome atual descreve cache
   opcional e foi o que manteve este item arquivado junto de um plano de performance. Como a quebra pública já
   ocorre, o rename é custo marginal. Fonte: revisão externa.
+- **DF19 — Duração máxima aceita da client assertion:** o evaluator recusa assertion cujo `exp` ultrapasse
+  `now + ClientAssertionMaxLifetime`, com `now` vindo de `TimeProvider` e a tolerância de `ClockSkew` já aplicada
+  na validação. O teto é uma option por realm. A comparação é contra o instante do servidor, e não contra
+  `exp - iat`: `iat` é opcional e pode vir adiantado, enquanto o que precisa ser limitado é exatamente a retenção
+  do registro, que é função de `exp` e do relógio do servidor. Recusa segue DF5. Fonte: resposta humana a Q4;
+  revisão externa.
+- **DF20 — Poda periódica do backing in-memory:** a implementação in-memory remove registros expirados por poda
+  periódica, fora do caminho de decisão de `TryAddAsync`. A poda não é necessária para impedir replay da assertion
+  original — ela só evita crescimento indefinido em processo longevo. Depois da poda, o mesmo `jti` numa nova
+  assertion pode ser aceito, que é o mesmo comportamento da limpeza do backing durável. Critérios mínimos:
+  remove quando `ExpiresAtUtc <= now`; o timer é criado por `TimeProvider`; o timer é encerrado no descarte da
+  store; execuções não se sobrepõem; o comportamento é provado com relógio controlado, de forma determinística; e
+  há teste provando que `TryAddAsync` **não** consulta expiração — um registro vencido e ainda não podado
+  continua respondendo replay. Fonte: revisão externa.
+- **DF21 — Valor e faixa do teto:** default de **10 minutos**; faixa configurável por realm de `> 0` até
+  `<= 1 hora`. Dez minutos é o piso coerente com o `ClockSkew` de 5 minutos já aplicado na validação: um client
+  que emita assertion de 5 minutos com relógio 5 minutos adiantado produz `exp = now + 10min` no relógio do
+  servidor e continua aceito. Um teto de 5 minutos comparado contra o relógio do servidor contradiria a própria
+  tolerância. Uma hora fica reservada como override máximo para integração legada, não como default, porque
+  amplia sem necessidade a janela de uso de uma assertion vazada. A option valida faixa e protege
+  `now + lifetime` contra overflow de `DateTimeOffset`. Se o `ClockSkew` deixar de ser constante, os dois passam
+  a ser validados juntos: o teto nunca pode ser menor que a tolerância. Fonte: resposta humana a Q5.
 
 ---
 
@@ -243,9 +266,38 @@
   - **Alternativa proposta e descartada — upsert condicional** (`inserir; em conflito, substituir se
     `ExpiresAtUtc <= now`): resolve a contradição, mas coloca uma comparação de tempo no caminho de escrita, cria
     a necessidade de compare/update atômico também no in-memory e torna a correção dependente de relógio.
-  - **Conclusão:** fechada por DF8 no sentido oposto — o conflito responde replay sempre, e a afirmação de que
-    registro expirado não bloqueia foi **removida** do plano. É mais simples, mais estrito e mantém a correção
-    independente de limpeza e de relógio.
+  - **Conclusão:** fechada por DF8 no sentido oposto — enquanto o registro estiver retido, o conflito responde
+    replay, e a afirmação de que registro expirado não bloqueia foi **removida** do plano. É mais simples, mais
+    estrito e mantém a correção independente de limpeza e de relógio.
+
+**Fase 1 (teto de duração):**
+
+- **Q5 — Valor default de `ClientAssertionMaxLifetime`:** 1 hora, 5-10 minutos, ou outro valor.
+  - **Resposta:** opção B com default exato de **10 minutos**, faixa `> 0` a `<= 1 hora`, e documentação
+    orientando clientes a emitirem assertions de 1 a 5 minutos.
+  - **Considerações:** 10 minutos é o piso coerente com o `ClockSkew` de 5 minutos já aplicado — um client com
+    assertion de 5 minutos e relógio 5 minutos adiantado produz `exp = now + 10min` no servidor e continua
+    aceito, enquanto um teto de 5 minutos contradiria a própria tolerância. Uma hora como default ampliaria sem
+    necessidade a janela de uso de uma assertion vazada; fica como override máximo para integração legada.
+  - **Conclusão Q5:** fechada por DF21.
+
+**Segunda revisão externa (2026-07-29):**
+
+- **Atribuição normativa da DF8:** apontado que a RFC 7523 §3 apenas autoriza reter `jti` pelo tempo de validade
+  do JWT, não exige unicidade por emissor. Verificado e corrigido: a exigência de atribuição sem colisão está na
+  RFC 7519 §4.1.7 e o uso único da client assertion em OpenID Connect Core §9. A redação de DF8 passou de
+  "conflito é sempre replay" para "enquanto o registro estiver retido", porque depois da limpeza o mesmo `jti`
+  pode ser inserido de novo.
+- **Expiração do in-memory indefinida:** apontado que "expiração respeitada" não se sustenta se DF8 proíbe
+  consultar expiração na inserção e não há manutenção definida. Fechado por DF20, com poda periódica fora do
+  caminho de decisão; a alternativa de reter até o descarte da instância foi descartada por contradizer a
+  apresentação da in-memory como válida em qualquer host de instância única.
+- **Default de uma hora:** apontado que é política de produto, não consequência de especificação. Reaberto como
+  Q5, junto da exigência de faixa válida e proteção contra overflow em `now + lifetime`.
+- **Marker sem exclusividade:** apontado que DF14 não cobria duas estratégias declaradas. Estendida para cinco
+  casos de recusa.
+- **Sequência 1→2 não liberável:** aceito como restrição declarada de rollout em vez de fusão das fases; o estado
+  intermediário é estritamente melhor que o atual, mas não é o alvo.
 
 ---
 
@@ -287,7 +339,7 @@ operation.replay_handles          (nome final a definir na Fase 2)
   RealmId            text      not null
   Issuer             text      not null
   Purpose            text      not null
-  HandleDigest       text      not null   -- digest do jti, com separação de domínio (DF4/DF17)
+  HandleDigest       text      not null   -- digest de (versão + domínio + jti); realm/issuer/purpose ficam fora
   ExpiresAtUtc       timestamp not null
   unique (RealmId, Issuer, Purpose, HandleDigest)
   index (ExpiresAtUtc)                    -- limpeza por TTL
@@ -328,6 +380,9 @@ Tests.Integration/Prepare/              declara explicitamente, conforme o cená
   (DF15). Nenhuma fase entrega o contrato trocado sem backing declarado.
 - Não há dado a migrar: handles são efêmeros.
 - Composições existentes precisam declarar a escolha (DF12/DF14); a ausência é falha explícita no startup.
+- **Fases 1 e 2 formam uma sequência não liberável.** Entre elas o Server declara a in-memory, então um deploy
+  multi-instância teria proteção por processo, não compartilhada. É estritamente melhor que o estado atual, em que
+  não há proteção alguma, mas não é o alvo: não publicar o Server entre as duas fases.
 
 ---
 
@@ -348,7 +403,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - contrato atômico, in-memory e composições declaradas
 
-**Depende de:** DF1-DF5, DF8, DF9, DF10, DF12-DF15, DF17, DF18, DF19.
+**Depende de:** DF1-DF5, DF8-DF10, DF12-DF15, DF17-DF21.
 
 **Escopo:** `RoyalIdentity/Contracts/Storage`, `Contracts/Defaults`, `SecretsEvaluators`,
 `Extensions/ServiceCollectionExtensions.cs`, `RoyalIdentity.Server`, `RoyalIdentity.Demo`,
@@ -361,17 +416,22 @@ em todas as composition roots e instalar o startup validator — tudo no mesmo c
 
 - [ ] Criar `IReplayProtectionStore` com a operação atômica realm/issuer-bound e `CancellationToken`
   (DF1/DF2/DF13/DF18); remover `IReplayCache`.
-- [ ] Implementar a in-memory por instância com **uma** operação atômica de dicionário, sem remove-then-add, com
-  expiração respeitada e `TimeProvider` injetado.
+- [ ] Implementar a in-memory por instância com **uma** operação atômica de dicionário, sem remove-then-add e
+  sem consultar expiração na decisão, com `TimeProvider` injetado.
+- [ ] Implementar a poda periódica do in-memory conforme DF20: remoção em `ExpiresAtUtc <= now`, timer criado por
+  `TimeProvider`, timer encerrado no descarte da store e sem execuções sobrepostas; documentar no tipo que ela é
+  higiene de memória, não condição de proteção.
 - [ ] Criar `AddInMemoryReplayProtection()` com warning explícito de validade em instância única (DF10).
-- [ ] Registrar o marker de estratégia nas extensions e implementar o startup validator de DF14, com mensagem
-  nomeando as duas extensions.
+- [ ] Registrar o marker de estratégia nas extensions e implementar o startup validator de DF14, cobrindo os
+  cinco casos de recusa — nenhuma estratégia, mais de uma, marker sem store, store sem marker e par
+  incompatível — com mensagem nomeando as duas extensions.
 - [ ] Remover `DefaultReplayNoCache`, `DefaultReplayDistributedCache` e o registro em
   `ServiceCollectionExtensions.cs:63`, sem substituí-los por outro default (DF12).
 - [ ] Reduzir o par das linhas 154/160 do evaluator a uma única chamada, passando `context.Realm.Id` e o
   `client_id` validado; preservar DF5.
-- [ ] Acrescentar `ClientAssertionMaxLifetime` a `RealmOptions`, com default de 1 hora, cópia no construtor de
-  cópia e validação de valor positivo, seguindo o padrão das demais options por realm.
+- [ ] Acrescentar `ClientAssertionMaxLifetime` a `RealmOptions` com default de **10 minutos** e faixa válida
+  `> 0` até `<= 1 hora` (DF21), cópia no construtor de cópia e aritmética protegida contra overflow em
+  `now + lifetime`, seguindo o padrão das demais options por realm.
 - [ ] Recusar no evaluator assertion cujo `exp` ultrapasse `now + ClientAssertionMaxLifetime`, com `now` de
   `TimeProvider`, antes de tocar o replay store (DF19).
 - [ ] Declarar a escolha em `RoyalIdentity.Server`, `RoyalIdentity.Demo` e na factory persistente de
@@ -380,7 +440,11 @@ em todas as composition roots e instalar o startup validator — tudo no mesmo c
   `iss`/`sub`/`aud`/`exp`/`jti` corretos, reutilizável pelas Fases 2 e 3.
 - [ ] Cobrir com teste: primeira apresentação aceita; segunda recusada; mesmo `jti` em clients distintos do mesmo
   realm não interfere; mesmo `jti` em realms distintos não interfere; assertion com `exp` além do teto é recusada
-  e **não** registra handle; assertion dentro do teto é aceita; host em ambiente **Production** sem declaração
+  e **não** registra handle; assertion dentro do teto é aceita; assertion de 5 minutos emitida com relógio 5
+  minutos adiantado continua aceita sob o default de 10 minutos; a option recusa zero, negativo e valor acima de
+  1 hora, e aceita os dois limites válidos; a poda do in-memory remove vencidos com relógio controlado e um
+  registro vencido ainda não podado continua respondendo replay; duas estratégias declaradas simultaneamente
+  falham o startup; host em ambiente **Production** sem declaração
   falha no startup com mensagem citando as extensions; nenhuma mensagem contém a assertion ou o `jti`.
 
 **Critérios de aceite:** `IReplayCache` não existe; `IReplayProtectionStore` expõe somente a operação atômica
@@ -417,10 +481,11 @@ o Server para ela, mantendo tudo verde.
 **Tarefas:**
 
 - [ ] Criar a entidade de replay em `RoyalIdentity.Data.Operational` com a unique de DF13 e índice de expiração.
-- [ ] Implementar o digest com separação de domínio e codificação inequívoca dos campos (DF4/DF17), documentando
-  no próprio tipo por que a justificativa de alta entropia do `OperationalLookupDigest` não se aplica.
-- [ ] Implementar a store durável com inserção condicional; traduzir violação de unicidade em `false`, sem
-  consulta prévia e sem comparar expiração (DF8).
+- [ ] Implementar o digest sobre `versão + domínio + handle` apenas — `RealmId`, `Issuer` e `Purpose` permanecem
+  colunas próprias e não entram no digest (DF4/DF17) —, documentando no tipo por que a justificativa de alta
+  entropia do `OperationalLookupDigest` não se aplica.
+- [ ] Implementar a store durável com inserção protegida por unique constraint — não upsert; traduzir violação de
+  unicidade em `false`, sem consulta prévia e sem comparar expiração (DF8).
 - [ ] Criar mapeamentos e migrations por provider, sem colidir com as histories existentes.
 - [ ] Criar `AddOperationalReplayProtection()` com o marker de estratégia de DF14.
 - [ ] Fazer falha de infraestrutura falhar fechado, nunca retornando `true`.
@@ -476,6 +541,8 @@ real e fechar o registro normativo.
   reclassificação de `Adapter/Infrastructure` para Operational (DF16).
 - [ ] Remover o item de replay do `backlog-001.md` e a menção condicionada no `plan-data-macro.md`.
 - [ ] Atualizar READMEs do Server e do Demo com a extension declarada e, no Demo, a limitação de instância única.
+- [ ] Documentar `ClientAssertionMaxLifetime`: default de 10 minutos, faixa até 1 hora como override para
+  integração legada, e orientação para clientes emitirem assertions de 1 a 5 minutos.
 - [ ] Executar `dotnet build` e `dotnet test` da solução completa.
 
 **Critérios de aceite:** guards distinguem qual implementação cada composição resolve, e não apenas a ausência de
@@ -530,12 +597,12 @@ dotnet test RoyalIdentity.sln
 
 ## Critérios globais de conclusão
 
-- Nenhuma decisão aberta: Q1-Q4 fechadas por DF9-DF19.
+- Nenhuma decisão aberta: Q1-Q5 fechadas por DF9-DF21.
 - `IReplayProtectionStore` expõe somente a operação atômica realm/issuer-bound com `CancellationToken`.
 - Nenhuma implementação no-op existe no repositório e nenhum default é registrado.
 - Host em Production sem declaração falha antes de aceitar tráfego, provado por teste.
 - Vencedor único provado nas duas implementações; a durável em SQLite e no aceite PostgreSQL opt-in.
-- Assertion acima do teto de duração é recusada sem registrar handle.
+- Assertion acima do teto de duração é recusada sem registrar handle, e a faixa da option é validada nos limites.
 - Aceite PostgreSQL apresenta a mesma assertion duas vezes contra o backing real.
 - Guards provam a implementação específica resolvida por Server e por Demo.
 - RC-01/RC-02 atualizados e reclassificados; item removido do backlog e da órbita do plano de caching.
@@ -552,7 +619,9 @@ dotnet test RoyalIdentity.sln
 | In-memory usada em cluster | operador escolhe a extension in-memory em host replicado | replay atravessa instâncias e a proteção some | warning no registro, README e nome da extension declarando a limitação (DF10); guard prova que o Server usa a durável | Aberto |
 | Fase intermediária deixa o produto quebrado | contrato trocado sem backing declarado | suítes vermelhas e host sem subir entre cortes | DF15: contrato, implementação e registros no mesmo corte | Mitigado |
 | Linha expirada bloqueia registro legítimo | cliente reusa `jti` após o `exp` | autenticação recusada até a limpeza passar | DF8: reuso de `jti` é violação do cliente; recusar é o comportamento correto | Aceito |
-| Teto de assertion recusa cliente legítimo | client emite assertion de validade acima do default de 1 hora | autenticação para após o upgrade, sem mudança do lado do cliente | DF19 torna o teto option por realm; default escolhido para não recusar prática comum; README documenta o ajuste | Aberto |
+| Teto de assertion recusa cliente legítimo | client emite assertion com `exp` acima de 10 minutos à frente do relógio do servidor | autenticação para após o upgrade, sem mudança do lado do cliente | DF21 mantém o teto como option por realm, com override até 1 hora para integração legada; README orienta assertions de 1 a 5 minutos | Aberto |
+| Server publicado entre as Fases 1 e 2 | deploy multi-instância com a in-memory declarada | proteção por processo, não compartilhada entre réplicas | sequência declarada não liberável; Fase 2 troca o Server para a durável | Aberto |
+| In-memory cresce indefinidamente | host longevo com a in-memory declarada e sem poda | consumo de memória proporcional ao volume de autenticações | DF20: poda periódica por `TimeProvider`, fora do caminho de decisão | Mitigado |
 | Digest tratado como confidencialidade | `jti` previsível e acesso ao banco no threat model | enumeração por dicionário sobre os digests | DF17 declara o escopo; troca por digest autenticado é alteração isolada | Aceito |
 | Guard aceita implementação errada | guard só rejeita no-op | in-memory registrada no Server passa despercebida | Fase 3 exige guard por implementação específica | Mitigado |
 | Teste de concorrência passa por acaso | duas chamadas serializadas pelo harness | corrida não é exercitada | reusar o formato dos testes de MP-2, que já provam paralelismo real | Aberto |
