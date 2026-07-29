@@ -1792,9 +1792,13 @@ pertence à administração, não a migrations ou startup.
 A primeira execução completa dos opt-ins encontrou um defeito na infraestrutura de teste, não no provider:
 `PostgreSqlConfigurationContractTests.RealmContracts` ainda usava o harness Configuration-only, embora um cenário
 do contrato de realm também prove que um update de Configuration preserva estado Operational. A concretização
-PostgreSQL passou a usar `PostgreSqlOperationalStorageHarness`, simétrica à concretização SQLite. Nenhuma asserção
-normativa mudou e não houve `regressão-do-módulo`, `defeito-de-produto` ou `sem-decisão-normativa`; foi wiring
-residual do teste revelado pelo aceite real.
+PostgreSQL passou a usar `PostgreSqlOperationalStorageHarness`, simétrica à concretização SQLite. A quebra estava
+latente desde a Fase 7: naquela fase o harness Configuration-only deixou de fornecer dicionários Operational
+silenciosos e passou a falhar alto, mas a variante PostgreSQL permaneceu nesse harness e a suíte default sempre
+verde não a executava. Foi o gate PostgreSQL opt-in de DF24 que impediu essa divergência de provider de atravessar
+o fechamento e chegar ao caminho produtivo sem cobertura. Nenhuma asserção normativa mudou e não houve
+`regressão-do-módulo`, `defeito-de-produto` ou `sem-decisão-normativa`; foi wiring residual da infraestrutura de
+teste revelado pelo aceite real.
 
 Comandos e resultados finais:
 
@@ -1809,7 +1813,8 @@ Comandos e resultados finais:
   `Tests.UserAccounts` 187 aprovados + 1 PostgreSQL opt-in ignorado, `Tests.Storage` 482 aprovados + 44
   PostgreSQL opt-in ignorados, `Tests.Integration` 281/281 e `Aspire.Tests` 1 opt-in ignorado.
 
-Documentação fechada: ADR-018 recebeu apenas a seção de revisão; o índice `ADR.md` já estava correto até ADR-019;
+Documentação fechada: ADR-018 recebeu apenas a seção de revisão; o índice `ADR.md` já havia sido atualizado até
+ADR-019 na Fase 1 (commit `2c3d988`) e foi somente verificado, sem nova alteração, na Fase 9;
 foundations, macro/roadmap, backlog, `AGENTS.md` e runbooks refletem EF/SQLite/PostgreSQL, Demo efêmero e runner
 externo. O próximo item de produto apontado no roadmap é `plan-session-administration.md`; caching e audit/outbox
 continuam opcionais e condicionados. Desvios: o script foi ampliado porque sua versão da Fase 3 comprovava somente
