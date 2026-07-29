@@ -7,16 +7,16 @@ namespace RoyalIdentity.Contexts.Decorators;
 
 public class LoadCode : IDecorator<AuthorizationCodeContext>
 {
-    private readonly IAuthorizationCodeConsumer consumer;
+    private readonly IStorage storage;
     private readonly TimeProvider clock;
     private readonly ILogger logger;
 
     public LoadCode(
-        IAuthorizationCodeConsumer consumer,
+        IStorage storage,
         TimeProvider clock,
         ILogger<LoadCode> logger)
     {
-        this.consumer = consumer;
+        this.storage = storage;
         this.clock = clock;
         this.logger = logger;
     }
@@ -24,6 +24,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
     public async Task Decorate(AuthorizationCodeContext context, Func<Task> next, CancellationToken ct)
     {
         context.AssertHasRedirectUri();
+        context.ClientParameters.AssertHasClient();
 
         var restrictions = context.Options.InputLengthRestrictions;
         var code = context.Code;
@@ -45,7 +46,8 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         // Single-use consumption: the expected client and redirect URI are part of the operation, so exactly
         // one concurrent caller obtains the code and a request whose binding does not match consumes nothing
         // (MP-2 / plan-data-operational-storage DF11).
-        var authorizationCode = await consumer.ConsumeAsync(context.Realm, code, context.ClientId, context.RedirectUri, ct);
+        var authorizationCode = await storage.GetAuthorizationCodeStore(context.Realm)
+            .ConsumeAuthorizationCodeAsync(code, context.ClientParameters.Client.Id, context.RedirectUri, ct);
 
         if (authorizationCode is null)
         {

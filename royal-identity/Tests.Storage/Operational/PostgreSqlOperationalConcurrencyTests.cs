@@ -71,7 +71,7 @@ public class PostgreSqlOperationalConcurrencyTests
         await SqliteOperationalFileDatabase.RunTogetherAsync(consumers, async (index, ready, release) =>
         {
             await using var scope = database.CreateScope();
-            var store = (IVersionedRefreshTokenStore)database.StoresOf(scope).GetRefreshTokenStore(realm);
+            var store = database.StoresOf(scope).GetRefreshTokenStore(realm);
 
             ready.SetResult();
             await release;

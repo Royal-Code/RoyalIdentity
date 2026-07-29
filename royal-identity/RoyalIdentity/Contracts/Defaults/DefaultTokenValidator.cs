@@ -113,8 +113,8 @@ public class DefaultTokenValidator : ITokenValidator
         }
 
         // Only a reference token may be presented as an opaque bearer. A JWT access token is persisted for
-        // metadata/full or by the transitional in-memory backing, and its `jti` travels in the (unencrypted)
-        // JWT payload — so without this check anyone holding a JWT could read its `jti` and present it as a
+        // metadata/full, and its `jti` travels in the (unencrypted) JWT payload — so without this check anyone
+        // holding a JWT could read its `jti` and present it as a
         // second bearer, skipping signature validation entirely. The response is deliberately the same as for
         // an absent token, so it is no oracle about which jtis exist.
         if (token.AccessTokenType is not AccessTokenType.Reference)

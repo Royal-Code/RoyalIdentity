@@ -105,12 +105,11 @@ public static class OperationalServiceCollectionExtensions
     /// <para>
     ///     Composes the complete production gateway — <c>IStorage</c>, <c>IStorageProvider</c> and
     ///     <c>IStorageSession</c> — over Configuration EF plus Operational EF (plan DF21). It is an explicit
-    ///     opt-in: the default host stays in-memory until Plano 4.
+    ///     opt-in composition of the two EF families.
     /// </para>
     /// <para>
-    ///     Both families must already be registered. The Operational family is the one that carries the atomic
-    ///     capabilities MP-2/MP-3, which its store contracts guarantee at compile time (plan DF46) — so a
-    ///     composition built this way can never reach the transitional fallback.
+    ///     Both families must already be registered. Atomic authorization-code consumption and conditional
+    ///     refresh-token transitions are required by the base store contracts (plan DF46).
     /// </para>
     /// <para>
     ///     A cleanup execution mode must have been selected first (plan DF17). Persisting operational data with

@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.EntityFrameworkCore;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Data.Operational.Entities;
 using RoyalIdentity.Models;
 using RoyalIdentity.Models.Tokens;
@@ -22,7 +23,7 @@ internal sealed class EntityFrameworkAuthorizationCodeStore(
     IOperationalDbContextAccessor accessor,
     OperationalLookupDigest digest,
     AuthorizationCodePayloadSerializer serializer,
-    OperationalPayloadProtection protection) : IOperationalAuthorizationCodeStore
+    OperationalPayloadProtection protection) : IAuthorizationCodeStore
 {
     public async Task<string> StoreAuthorizationCodeAsync(AuthorizationCode code, CancellationToken ct)
     {

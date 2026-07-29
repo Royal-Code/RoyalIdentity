@@ -172,10 +172,9 @@ public class SqliteOperationalAuthorizationCodeConcurrencyTests
         Assert.Equal(0, await database.CountAsync("protocol_artifacts"));
     }
 
-    // MP-2 belongs to the store the EF factory returns: the capability is a compile-time guarantee (DF46), so
-    // the transitional fallback is unreachable from this adapter.
+    // MP-2 belongs directly to the base store contract returned by the EF factory (DF46).
     [Fact]
-    public async Task TheEfCodeStore_AlwaysCarriesTheSingleUseCapability()
+    public async Task TheEfCodeStore_ExposesAtomicConsumptionThroughTheBaseContract()
     {
         await using var database = await SqliteOperationalFileDatabase.CreateMigratedAsync();
         var realm = SqliteOperationalFileDatabase.NewRealm();
@@ -183,7 +182,6 @@ public class SqliteOperationalAuthorizationCodeConcurrencyTests
         await using var scope = database.CreateScope();
         var store = database.StoresOf(scope).GetAuthorizationCodeStore(realm);
 
-        Assert.IsAssignableFrom<ISingleUseAuthorizationCodeStore>(store);
         Assert.IsAssignableFrom<IAuthorizationCodeStore>(store);
     }
 }

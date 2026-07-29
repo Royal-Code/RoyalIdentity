@@ -15,8 +15,8 @@ namespace Tests.Integration.Endpoints;
 /// A bearer without a dot is routed to reference validation, and the store is keyed by <c>jti</c> — which for a
 /// JWT travels in its own (unencrypted) payload whenever <c>Client.IncludeJwtId</c> is on, as it is by default.
 /// Without a type check, anyone holding a JWT access token could read its <c>jti</c> and present it as a second
-/// bearer, skipping signature validation. Persisting a JWT — by the transitional in-memory backing, or by the
-/// EF provider under <c>Metadata</c>/<c>Full</c> (plan DF31) — must never turn it into an opaque credential.
+/// bearer, skipping signature validation. Persisting a JWT under the EF provider's
+/// <c>Metadata</c>/<c>Full</c> modes (plan DF31) must never turn it into an opaque credential.
 /// </para>
 /// </summary>
 public class ReferenceTokenBearerTests : IClassFixture<PersistentStorageAppFactory>

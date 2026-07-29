@@ -3,12 +3,9 @@ using Tests.Storage.Support;
 namespace Tests.Storage.Contracts;
 
 /// <summary>
-/// Contract of <c>IRefreshTokenStore</c> (matrix RT-01..RT-05). RT-03 (<c>UpdateAsync</c>) has no scenario
-/// here on purpose: the fake's live-reference backing makes any persistence assertion pass trivially (a
-/// mutation is visible before the update call) and its reference-equality CAS rejects a rematerialized
-/// instance, so explicit-update persistence cannot be falsified against the fake (DF17/ADR-018). Both the
-/// persistence of the update and the conditional/atomic consumed transition (DF15) are Plano 3 acceptance
-/// requirements of the EF provider — see the acceptance table in plan-data-storage-matrix.md.
+/// Provider-neutral contract of <c>IRefreshTokenStore</c> (matrix RT-01..RT-05). The conditional update and
+/// atomic consumption semantics depend on real provider concurrency and are covered by the EF acceptances in
+/// <c>SqliteOperationalRefreshTokenTests</c> and the provider concurrency suites.
 /// </summary>
 public abstract class RefreshTokenStoreContractTests : StorageContractTests
 {

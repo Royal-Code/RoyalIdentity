@@ -12,8 +12,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 /// </para>
 /// <para>
 ///     Like <c>IConfigurationStoreFactory</c>, it deliberately does not implement <see cref="IStorage"/>: the
-///     complete production gateway composes both families explicitly, and the default host stays in-memory
-///     until Plano 4 (plan DF21).
+///     complete production gateway composes both families explicitly (plan DF21).
 /// </para>
 /// </summary>
 public interface IOperationalStoreFactory
@@ -25,16 +24,14 @@ public interface IOperationalStoreFactory
     IAccessTokenStore GetAccessTokenStore(Realm realm);
 
     /// <summary>
-    /// Creates the realm-bound refresh-token store. Its return type carries the MP-3 capability, so this
-    /// adapter cannot produce a store without it and can never reach the transitional fallback (plan DF39).
+    /// Creates the realm-bound refresh-token store. The base contract requires its conditional transitions.
     /// </summary>
-    IOperationalRefreshTokenStore GetRefreshTokenStore(Realm realm);
+    IRefreshTokenStore GetRefreshTokenStore(Realm realm);
 
     /// <summary>
-    /// Creates the realm-bound authorization-code store, carrying the MP-2 capability under the same rule as
-    /// above.
+    /// Creates the realm-bound authorization-code store. The base contract requires atomic consumption.
     /// </summary>
-    IOperationalAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm);
+    IAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm);
 
     /// <summary>Creates the realm-bound user consent store.</summary>
     IUserConsentStore GetUserConsentStore(Realm realm);

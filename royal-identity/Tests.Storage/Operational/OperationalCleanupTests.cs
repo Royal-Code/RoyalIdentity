@@ -121,8 +121,7 @@ public abstract class OperationalCleanupTests : OperationalParitySuite
         var store = harness.Storage.GetRefreshTokenStore(realm);
         await store.StoreAsync(NewRefreshToken(realm, "rt-consumed", 86400), default);
         var loaded = await store.GetAsync("rt-consumed", default);
-        await ((RoyalIdentity.Contracts.Storage.IVersionedRefreshTokenStore)store)
-            .TryConsumeAsync("rt-consumed", loaded!.StateVersion, Start, default);
+        await store.TryConsumeAsync("rt-consumed", loaded!.StateVersion, Start, default);
 
         var report = await Maintenance(harness).CleanupAsync(Start.AddHours(1), 100);
 
@@ -141,8 +140,7 @@ public abstract class OperationalCleanupTests : OperationalParitySuite
         var store = harness.Storage.GetRefreshTokenStore(realm);
         await store.StoreAsync(NewRefreshToken(realm, "rt-consumed", 86400), default);
         var loaded = await store.GetAsync("rt-consumed", default);
-        await ((RoyalIdentity.Contracts.Storage.IVersionedRefreshTokenStore)store)
-            .TryConsumeAsync("rt-consumed", loaded!.StateVersion, Start, default);
+        await store.TryConsumeAsync("rt-consumed", loaded!.StateVersion, Start, default);
 
         // Still inside the tolerance.
         Assert.Equal(0, (await Maintenance(harness).CleanupAsync(Start.AddMinutes(29), 100)).RefreshTokens);

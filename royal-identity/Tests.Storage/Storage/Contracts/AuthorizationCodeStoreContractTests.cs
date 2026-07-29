@@ -3,10 +3,9 @@ using Tests.Storage.Support;
 namespace Tests.Storage.Contracts;
 
 /// <summary>
-/// Contract of <c>IAuthorizationCodeStore</c> (matrix AC-01..AC-03). The separated get+remove pair used as
-/// "consumption" today is classified `substituir`: the atomic single-use consumption under concurrency is a
-/// Plano 3 acceptance requirement (DF15) and is NOT asserted against the transitional fake. Here only the
-/// storage/lookup/removal primitives the current flow depends on are locked.
+/// Provider-neutral contract of <c>IAuthorizationCodeStore</c> (matrix AC-01..AC-03). Atomic single-use
+/// consumption under concurrency is covered by the EF provider acceptances; this base suite also locks the
+/// administrative lookup/removal primitives.
 /// </summary>
 public abstract class AuthorizationCodeStoreContractTests : StorageContractTests
 {

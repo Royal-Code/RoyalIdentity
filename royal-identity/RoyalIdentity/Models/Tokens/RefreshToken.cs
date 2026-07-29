@@ -71,7 +71,7 @@ public class RefreshToken: TokenBase
     /// <summary>
     /// <para>
     ///     State version of the persisted token, owned by the store: materialization publishes the version the
-    ///     row had, and the conditional transitions of <see cref="Contracts.Storage.IVersionedRefreshTokenStore"/>
+    ///     row had, and the conditional transitions of <see cref="Contracts.Storage.IRefreshTokenStore"/>
     ///     use it as the expected value (plan-data-operational-storage DF12).
     /// </para>
     /// <para>

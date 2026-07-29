@@ -4,9 +4,9 @@ namespace RoyalIdentity.Users.Contracts;
 
 /// <summary>
 /// Dedicated gateway to the realm-bound account ports (Q1, ADR-014 §2.4). Keeps account data out of
-/// <c>IStorage</c> (which holds only IdP data, incl. session). Backed in-memory now; by the
-/// RoyalIdentity.UserAccounts module later — swapping is a DI registration. Each getter binds the realm
-/// at construction, so the returned ports take no realm parameter.
+/// <c>IStorage</c> (which holds only IdP data, incl. session). The RoyalIdentity.UserAccounts integration
+/// implements this edge through DI. Each getter binds the realm at construction, so the returned ports take
+/// no realm parameter.
 /// </summary>
 public interface IUserDirectory
 {

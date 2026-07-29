@@ -50,18 +50,17 @@ public class EntityFrameworkStorageGatewayTests
         Assert.NotNull(storage.GetAuthorizeParametersStore(realm));
     }
 
-    // DF46: the Operational family the gateway composes carries the atomic capabilities at compile time, so a
-    // production composition can never fall back to the transitional read-modify-write.
+    // DF46: the base Operational contracts require the atomic operations at compile time.
     [Fact]
-    public async Task Storage_ExposesTheAtomicOperationalCapabilities()
+    public async Task Storage_ExposesTheDefinitiveAtomicOperationalContracts()
     {
         await using var composition = await GatewayComposition.CreateAsync();
         using var scope = composition.Services.CreateScope();
         var storage = scope.ServiceProvider.GetRequiredService<IStorage>();
         var realm = await composition.LoadRealmAsync(storage);
 
-        Assert.IsAssignableFrom<IOperationalAuthorizationCodeStore>(storage.GetAuthorizationCodeStore(realm));
-        Assert.IsAssignableFrom<IOperationalRefreshTokenStore>(storage.GetRefreshTokenStore(realm));
+        Assert.IsAssignableFrom<IAuthorizationCodeStore>(storage.GetAuthorizationCodeStore(realm));
+        Assert.IsAssignableFrom<IRefreshTokenStore>(storage.GetRefreshTokenStore(realm));
     }
 
     // DF22: the synchronous member reads the published snapshot, so it opens no connection and issues no command.

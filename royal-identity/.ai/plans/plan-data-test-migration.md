@@ -1,10 +1,10 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fases 1-7 concluídas em 2026-07-28; Fase 8 pendente
+## Status: EM ANDAMENTO - Fases 1-8 concluídas em 2026-07-28; Fase 9 pendente
 
 ## Progresso
 
-`███████░░` **78%** - 7 de 9 fases
+`████████░` **89%** - 8 de 9 fases
 
 | Fase | Estado |
 |---|---|
@@ -15,7 +15,7 @@
 | Fase 5 - migração de login, profile, authorize e token | Concluida |
 | Fase 6 - migração dos fluxos restantes e troca do default | Concluida |
 | Fase 7 - desacoplamento dos contratos de teste do fake | Concluida |
-| Fase 8 - remoção da transição e exclusão do fake | Pendente |
+| Fase 8 - remoção da transição e exclusão do fake | Concluida |
 | Fase 9 - PostgreSQL, regressão final e fechamento documental | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -1638,24 +1638,24 @@ fase.
 
 **Tarefas:**
 
-- [ ] Tornar consumo de authorization code single-use uma dependência obrigatória de compilação.
-- [ ] Tornar transição de refresh token versionada/condicional uma dependência obrigatória de compilação.
-- [ ] Fazer `LoadCode` consumir diretamente o `IAuthorizationCodeStore` realm-bound e remover
+- [x] Tornar consumo de authorization code single-use uma dependência obrigatória de compilação.
+- [x] Tornar transição de refresh token versionada/condicional uma dependência obrigatória de compilação.
+- [x] Fazer `LoadCode` consumir diretamente o `IAuthorizationCodeStore` realm-bound e remover
   `IAuthorizationCodeConsumer`, `DefaultAuthorizationCodeConsumer`, seus registros, casts, logging de fallback e
   get-then-remove.
-- [ ] Fazer `RefreshTokenHandler` consumir diretamente o `IRefreshTokenStore` realm-bound e remover
+- [x] Fazer `RefreshTokenHandler` consumir diretamente o `IRefreshTokenStore` realm-bound e remover
   `IRefreshTokenConsumer`, `DefaultRefreshTokenConsumer`, seus registros, casts, fallback não condicional e
   `IRefreshTokenStore.UpdateAsync`.
-- [ ] Remover `ISingleUseAuthorizationCodeStore`, `IVersionedRefreshTokenStore` e composites redundantes conforme
+- [x] Remover `ISingleUseAuthorizationCodeStore`, `IVersionedRefreshTokenStore` e composites redundantes conforme
   DF28.
-- [ ] Preservar no `RefreshTokenHandler` a tolerância pós-consumo existente e provar que a retirada da indireção não
+- [x] Preservar no `RefreshTokenHandler` a tolerância pós-consumo existente e provar que a retirada da indireção não
   altera sua janela/política.
-- [ ] Atualizar adapter EF, mocks/doubles locais e testes de shape para o contrato final.
-- [ ] Preservar testes concorrentes de code single-use e refresh transition/tolerance.
-- [ ] Remover `AddInMemoryStorage`, extensões, facades e todos os arquivos de
+- [x] Atualizar adapter EF, mocks/doubles locais e testes de shape para o contrato final.
+- [x] Preservar testes concorrentes de code single-use e refresh transition/tolerance.
+- [x] Remover `AddInMemoryStorage`, extensões, facades e todos os arquivos de
   `RoyalIdentity.Storage.InMemory`.
-- [ ] Remover o projeto da solução, props/referências e guards históricos restantes.
-- [ ] Executar busca estática em código/projetos/solução para provar ausência do fake e dos fallbacks.
+- [x] Remover o projeto da solução, props/referências e guards históricos restantes.
+- [x] Executar busca estática em código/projetos/solução para provar ausência do fake e dos fallbacks.
 
 **Critérios de aceite:** nenhum handler possui ramo não atômico; as duas interfaces/classes consumer e
 `IRefreshTokenStore.UpdateAsync` não existem; handlers dependem dos stores base realm-bound; a composição EF
@@ -1680,7 +1680,42 @@ legítimas a `UpdateAsync` não relacionadas a refresh ou a texto histórico dev
 
 ### Resultado da Fase 8
 
-*a preencher*
+- A quebra pública foi aplicada em um único corte compilável. `IAuthorizationCodeStore` agora exige
+  `ConsumeAuthorizationCodeAsync`; `IRefreshTokenStore` exige `TryConsumeAsync`/`TryUpdateAsync` e não possui mais
+  `UpdateAsync`. `LoadCode` e `RefreshTokenHandler` obtêm os stores realm-bound diretamente de `IStorage`.
+- Foram removidos os consumers/defaults transitórios, as interfaces de capability
+  `ISingleUseAuthorizationCodeStore`/`IVersionedRefreshTokenStore`, os composites EF e seus registros de DI. O
+  adapter EF e o double focado de sessão passaram a implementar somente os contratos-base definitivos.
+- A tolerância pós-consumo permaneceu no `RefreshTokenHandler`, depois da transição condicional e aplicada somente
+  ao estado rematerializado. `Tests.Integration/Endpoints/RefreshTokenClaimsModeTests.cs` continuou cobrindo
+  tolerância zero, finita dentro e fora da janela e infinita; os testes SQLite/PostgreSQL de concorrência
+  continuaram cobrindo vencedor único para code e refresh.
+- `RoyalIdentity.Storage.InMemory` foi removido integralmente e sua entrada/configurações saíram de
+  `RoyalIdentity.sln`. Nenhum projeto consumidor ou guard conservava referência ao fake após a Fase 7.
+- A contagem de `Tests.Storage` mudou de 495 para 482 casos aprovados. O comando
+  `dotnet test Tests.Storage --no-build` produziu 482 aprovados e 44 PostgreSQL opt-in ignorados. A redução de 13
+  é exata: os 15 casos transitórios de `OperationalContractsShapeTests` foram substituídos por 4 guards do contrato
+  definitivo (`-11`), e saíram 2 casos que exercitavam o consumer removido/`UpdateAsync`; a sequência condicional
+  equivalente e a ausência de `UpdateAsync` permanecem verificadas.
+- Validações executadas:
+  - `dotnet build RoyalIdentity.sln --no-restore`: sucesso, 0 erros; os avisos emitidos já eram preexistentes
+    (SDK/package/analyzers);
+  - `dotnet test Tests.Identity --no-build`: 13/13;
+  - `dotnet test Tests.Storage --no-build`: 482 aprovados, 44 opt-in ignorados;
+  - `dotnet test Tests.Integration --no-build`: 281/281;
+  - `dotnet test Tests.UserAccounts --no-build`: 187 aprovados, 1 opt-in ignorado;
+  - `dotnet test Tests.Architecture --no-build`: 61/61.
+- A busca
+  `rg -n "RoyalIdentity\.Storage\.InMemory|AddInMemoryStorage|MemoryStorage|RealmMemoryStore" . -g "*.cs" -g "*.csproj" -g "*.sln" -g "!old-is4/**" -g "!**/obj/**" -g "!**/bin/**"`
+  retornou zero. A busca equivalente pelos oito símbolos transitórios removidos, restrita a `*.cs`/`*.csproj` e
+  excluindo `obj`/`bin`, também retornou zero.
+- As ocorrências restantes de `UpdateAsync` são `TryUpdateAsync`, `ExecuteUpdateAsync`, atualização privada de
+  consent, `IRealmManager.UpdateAsync` e o guard que prova a ausência de `IRefreshTokenStore.UpdateAsync`. As
+  ocorrências de `fallback` tratam exclusivamente de proteção Plain explícita ou harness Configuration-only, não
+  de authorization code/refresh token.
+- Triagem: nenhuma asserção normativa de produto mudou e nenhum defeito de produto/módulo foi revelado. Os 13 casos
+  removidos são dívida transitória explicitamente listada na Fase 7, não perda de cobertura: atomicidade,
+  binding, conflito, rematerialização e tolerância continuam cobertos pelos stores/fluxos EF reais.
 
 ---
 

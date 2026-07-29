@@ -138,9 +138,9 @@ public class SqliteOperationalRefreshTokenConcurrencyTests
         Assert.Equal(consumedAt[winner], persisted!.ConsumedTime);
     }
 
-    // MP-3 belongs to the store the EF factory returns: the capability is a compile-time guarantee (DF46).
+    // MP-3 belongs directly to the base store contract returned by the EF factory (DF46).
     [Fact]
-    public async Task TheEfRefreshTokenStore_AlwaysCarriesTheVersionedCapability()
+    public async Task TheEfRefreshTokenStore_ExposesConditionalTransitionsThroughTheBaseContract()
     {
         await using var database = await SqliteOperationalFileDatabase.CreateMigratedAsync();
         var realm = SqliteOperationalFileDatabase.NewRealm();
@@ -148,7 +148,6 @@ public class SqliteOperationalRefreshTokenConcurrencyTests
         await using var scope = database.CreateScope();
         var store = database.StoresOf(scope).GetRefreshTokenStore(realm);
 
-        Assert.IsAssignableFrom<IVersionedRefreshTokenStore>(store);
         Assert.IsAssignableFrom<IRefreshTokenStore>(store);
     }
 }

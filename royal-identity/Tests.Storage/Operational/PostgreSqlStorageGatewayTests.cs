@@ -33,7 +33,7 @@ public class PostgreSqlStorageGatewayTests
 
     [StoragePostgreSqlFact]
     [Trait("Category", "PostgreSql")]
-    public async Task Gateway_ResolvesEveryMember_AndExposesTheAtomicCapabilities()
+    public async Task Gateway_ResolvesEveryMember_AndExposesTheDefinitiveAtomicContracts()
     {
         await using var composition = await GatewayComposition.CreateAsync();
         using var scope = composition.Services.CreateScope();
@@ -49,9 +49,9 @@ public class PostgreSqlStorageGatewayTests
         Assert.NotNull(storage.GetUserSessionStore(realm));
         Assert.NotNull(storage.GetAuthorizeParametersStore(realm));
 
-        // DF46: the capabilities MP-2/MP-3 are guaranteed at compile time on every provider.
-        Assert.IsAssignableFrom<IOperationalAuthorizationCodeStore>(storage.GetAuthorizationCodeStore(realm));
-        Assert.IsAssignableFrom<IOperationalRefreshTokenStore>(storage.GetRefreshTokenStore(realm));
+        // DF46: MP-2/MP-3 are required by the base contracts on every provider.
+        Assert.IsAssignableFrom<IAuthorizationCodeStore>(storage.GetAuthorizationCodeStore(realm));
+        Assert.IsAssignableFrom<IRefreshTokenStore>(storage.GetRefreshTokenStore(realm));
     }
 
     // DF2/DF3: one database, still two contexts and two connections — and no transaction spanning them.

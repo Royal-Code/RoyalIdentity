@@ -35,7 +35,7 @@ public static class ServiceCollectionExtensions
 
         // Configuration snapshot (plan DF7): the singleton holder is the sync view; the hosted refresher loads
         // it before traffic and refreshes periodically. The snapshot source and refresh interval are supplied
-        // by the storage backing (in-memory host default, or the EF composition).
+        // by the storage composition.
         services.AddConfigurationSnapshot();
 
         // jobs
@@ -66,12 +66,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
         services.AddTransient<ITokenValidator, DefaultTokenValidator>();
         services.AddSingleton<IMessageStore, ProtectedDataMessageStore>();
-
-        // Operational storage capability seams (MP-2/MP-3). They use the atomic primitive when the backing
-        // provides it and take the legacy path explicitly otherwise; both the fallback and the detection are
-        // transitional and go away with the default backing swap in Plano 4 (DF39).
-        services.AddScoped<IAuthorizationCodeConsumer, DefaultAuthorizationCodeConsumer>();
-        services.AddScoped<IRefreshTokenConsumer, DefaultRefreshTokenConsumer>();
 
         // Secret Evaluators
         services.AddTransient<IClientSecretEvaluator, BasicSecretEvaluator>();

@@ -25,7 +25,6 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
 {
     private readonly ILogger logger;
     private readonly IStorage storage;
-    private readonly IRefreshTokenConsumer refreshTokenConsumer;
     private readonly ITokenFactory tokenFactory;
     private readonly TimeProvider clock;
     private readonly IJwtFactory jwtFactory;
@@ -33,14 +32,12 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
     public RefreshTokenHandler(
         ILogger<RefreshTokenHandler> logger,
         IStorage storage,
-        IRefreshTokenConsumer refreshTokenConsumer,
         ITokenFactory tokenFactory,
         TimeProvider clock,
         IJwtFactory jwtFactory)
     {
         this.logger = logger;
         this.storage = storage;
-        this.refreshTokenConsumer = refreshTokenConsumer;
         this.tokenFactory = tokenFactory;
         this.clock = clock;
         this.jwtFactory = jwtFactory;
@@ -156,7 +153,8 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         RefreshTokenContext context, Models.Client client, RefreshToken refreshToken, CancellationToken ct)
     {
         var now = clock.GetUtcNow().UtcDateTime;
-        var transition = await refreshTokenConsumer.TryConsumeAsync(context.Realm, refreshToken, now, ct);
+        var transition = await storage.GetRefreshTokenStore(context.Realm)
+            .TryConsumeAsync(refreshToken.Token, refreshToken.StateVersion, now, ct);
 
         if (transition.IsSuccess)
             return transition.Current ?? refreshToken;
@@ -264,7 +262,8 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
             // materialized, so a concurrent writer cannot be lost.
             logger.LogDebug("Updating Refresh Token");
 
-            var updated = await refreshTokenConsumer.TryUpdateAsync(context.Realm, refreshToken, ct);
+            var updated = await storage.GetRefreshTokenStore(context.Realm)
+                .TryUpdateAsync(refreshToken, refreshToken.StateVersion, ct);
             if (!updated.IsSuccess)
                 logger.LogWarning("The reusable refresh token was moved concurrently; keeping the issued tokens.");
 

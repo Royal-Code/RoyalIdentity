@@ -132,10 +132,46 @@ internal sealed class SessionStorageDouble(TimeProvider clock) : IStorage
             return Task.FromResult(refreshToken);
         }
 
-        public Task UpdateAsync(RefreshToken token, CancellationToken ct)
+        public Task<RefreshTokenTransition> TryConsumeAsync(
+            string token,
+            int expectedStateVersion,
+            DateTime consumedAt,
+            CancellationToken ct)
         {
-            RefreshTokens[token.Token] = token;
-            return Task.CompletedTask;
+            lock (RefreshTokens)
+            {
+                if (!RefreshTokens.TryGetValue(token, out var current))
+                    return Task.FromResult(RefreshTokenTransition.NotFound());
+
+                if (current.ConsumedTime is not null)
+                    return Task.FromResult(RefreshTokenTransition.AlreadyConsumed(current));
+
+                if (current.StateVersion != expectedStateVersion)
+                    return Task.FromResult(RefreshTokenTransition.Conflict(current));
+
+                current.ConsumedTime = consumedAt;
+                current.StateVersion++;
+                return Task.FromResult(RefreshTokenTransition.Succeeded(current));
+            }
+        }
+
+        public Task<RefreshTokenTransition> TryUpdateAsync(
+            RefreshToken token,
+            int expectedStateVersion,
+            CancellationToken ct)
+        {
+            lock (RefreshTokens)
+            {
+                if (!RefreshTokens.TryGetValue(token.Token, out var current))
+                    return Task.FromResult(RefreshTokenTransition.NotFound());
+
+                if (current.StateVersion != expectedStateVersion)
+                    return Task.FromResult(RefreshTokenTransition.Conflict(current));
+
+                token.StateVersion++;
+                RefreshTokens[token.Token] = token;
+                return Task.FromResult(RefreshTokenTransition.Succeeded(token));
+            }
         }
 
         public Task RemoveAsync(string token, CancellationToken ct)

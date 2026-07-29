@@ -1,8 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-	<ItemGroup>
-		<ProjectReference Include="..\RoyalIdentity\RoyalIdentity.csproj" />
-		<ProjectReference Include="..\RoyalIdentity.Security\RoyalIdentity.Security.csproj" />
-	</ItemGroup>
-
-</Project>

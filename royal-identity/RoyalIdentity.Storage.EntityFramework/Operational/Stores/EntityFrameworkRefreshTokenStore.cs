@@ -24,7 +24,7 @@ internal sealed class EntityFrameworkRefreshTokenStore(
     IOperationalDbContextAccessor accessor,
     OperationalLookupDigest digest,
     RefreshTokenPayloadSerializer serializer,
-    OperationalPayloadProtection protection) : IOperationalRefreshTokenStore
+    OperationalPayloadProtection protection) : IRefreshTokenStore
 {
     public async Task StoreAsync(RefreshToken token, CancellationToken ct)
     {
@@ -71,23 +71,6 @@ internal sealed class EntityFrameworkRefreshTokenStore(
         // RT-02: neither expiration nor consumption filters the read — the tolerance policy needs to see a
         // consumed token, and the expiration rule belongs to the pipeline.
         return row is null ? null : await MaterializeAsync(row, token, ct);
-    }
-
-    public async Task UpdateAsync(RefreshToken token, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(token);
-
-        // The unconditional update exists only for the legacy CRUD contract; in this adapter every write goes
-        // through the conditional transition. Reporting the result matters: silently returning success on a
-        // conflict would reintroduce exactly the lost update MP-3 exists to prevent, through the older API.
-        var transition = await TryUpdateAsync(token, token.StateVersion, ct);
-
-        if (!transition.IsSuccess)
-        {
-            throw new InvalidOperationException(
-                $"The refresh token could not be updated: {transition.Outcome}. Use the conditional transition " +
-                "(IVersionedRefreshTokenStore) to handle a concurrent writer explicitly.");
-        }
     }
 
     public async Task RemoveAsync(string token, CancellationToken ct)

@@ -51,9 +51,8 @@ public class SqliteOperationalAuthorizationCodeTests
             .ToListAsync();
     }
 
-    private static ISingleUseAuthorizationCodeStore SingleUse(SqliteOperationalStorageHarness harness, Realm realm)
-        => Assert.IsAssignableFrom<ISingleUseAuthorizationCodeStore>(
-            harness.Storage.GetAuthorizationCodeStore(realm));
+    private static IAuthorizationCodeStore SingleUse(SqliteOperationalStorageHarness harness, Realm realm)
+        => harness.Storage.GetAuthorizationCodeStore(realm);
 
     // AC-01: create-only. A duplicate handle in the same realm fails visibly instead of overwriting a live code.
     [Fact]

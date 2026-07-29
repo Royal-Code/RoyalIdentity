@@ -46,14 +46,14 @@ internal sealed class EntityFrameworkOperationalStoreFactory(
         return new EntityFrameworkUserSessionStore(realm, accessor, clock);
     }
 
-    public IOperationalAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm)
+    public IAuthorizationCodeStore GetAuthorizationCodeStore(Realm realm)
     {
         ArgumentNullException.ThrowIfNull(realm);
         return new EntityFrameworkAuthorizationCodeStore(
             realm, accessor, digest, authorizationCodeSerializer, protection);
     }
 
-    public IOperationalRefreshTokenStore GetRefreshTokenStore(Realm realm)
+    public IRefreshTokenStore GetRefreshTokenStore(Realm realm)
     {
         ArgumentNullException.ThrowIfNull(realm);
         return new EntityFrameworkRefreshTokenStore(

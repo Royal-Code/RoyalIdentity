@@ -1,7 +1,5 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
-using RoyalIdentity.Contracts.Defaults;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Data.Operational.Entities;
 using RoyalIdentity.Models;
@@ -55,8 +53,8 @@ public class SqliteOperationalRefreshTokenTests
             .ToListAsync();
     }
 
-    private static IVersionedRefreshTokenStore Versioned(SqliteOperationalStorageHarness harness, Realm realm)
-        => Assert.IsAssignableFrom<IVersionedRefreshTokenStore>(harness.Storage.GetRefreshTokenStore(realm));
+    private static IRefreshTokenStore Versioned(SqliteOperationalStorageHarness harness, Realm realm)
+        => harness.Storage.GetRefreshTokenStore(realm);
 
     // RT-01: create-only. A duplicate handle in the same realm fails visibly.
     [Fact]
@@ -229,8 +227,7 @@ public class SqliteOperationalRefreshTokenTests
 
     // The sequence the handler actually performs: consume, then update the reusable token. The update must use
     // the version the consumption produced — the instance loaded before it is already stale. This is the whole
-    // integration between MP-3 and the handler, and it cannot be observed against the in-memory fake, whose
-    // fallback mutates the very instance the caller holds.
+    // integration between MP-3 and the handler: only the rematerialized state carries the winning version.
     [Fact]
     public async Task ConsumeThenUpdate_UsingTheRematerializedToken_Succeeds()
     {
@@ -247,29 +244,6 @@ public class SqliteOperationalRefreshTokenTests
         // The handler continues with transition.Current, not with `loaded`.
         var effective = consumed.Current!;
         var updated = await versioned.TryUpdateAsync(effective, effective.StateVersion, default);
-
-        Assert.True(updated.IsSuccess);
-    }
-
-    // The same sequence through the seam the handler actually calls, so the integration between the consumer
-    // and the EF capability is covered and not only the store in isolation. Against the in-memory fake this
-    // would pass either way — its fallback mutates the caller's instance — which is why it belongs here.
-    [Fact]
-    public async Task Consumer_ConsumeThenUpdate_Succeeds_WhenCarryingTheRematerializedToken()
-    {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
-        var store = harness.Storage.GetRefreshTokenStore(harness.RealmA);
-        await store.StoreAsync(NewToken(harness.RealmA), default);
-        var consumer = new DefaultRefreshTokenConsumer(
-            harness.Storage, NullLogger<DefaultRefreshTokenConsumer>.Instance);
-
-        var loaded = await store.GetAsync("rt-handle", default);
-        var consumed = await consumer.TryConsumeAsync(harness.RealmA, loaded!, Start.AddMinutes(1));
-        Assert.True(consumed.IsSuccess);
-
-        // What the handler carries forward from here.
-        var effective = consumed.Current!;
-        var updated = await consumer.TryUpdateAsync(harness.RealmA, effective);
 
         Assert.True(updated.IsSuccess);
     }
@@ -312,21 +286,6 @@ public class SqliteOperationalRefreshTokenTests
         Assert.Contains(reloaded.Claims, claim => claim.Type == "added-by-update");
         // The version moved, so the instance that produced this write cannot silently write again.
         Assert.NotEqual(0, reloaded.StateVersion);
-    }
-
-    // DF12 via the legacy CRUD surface: a conflict must not be reported as a normal completion.
-    [Fact]
-    public async Task UpdateAsync_OnConflict_Throws()
-    {
-        await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
-        var store = harness.Storage.GetRefreshTokenStore(harness.RealmA);
-        await store.StoreAsync(NewToken(harness.RealmA), default);
-        var loaded = await store.GetAsync("rt-handle", default);
-        var stale = await store.GetAsync("rt-handle", default);
-
-        await Versioned(harness, harness.RealmA).TryUpdateAsync(loaded!, loaded!.StateVersion, default);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await store.UpdateAsync(stale!, default));
     }
 
     // RT-02: the read returns an expired or consumed token — the tolerance policy needs to see it.
