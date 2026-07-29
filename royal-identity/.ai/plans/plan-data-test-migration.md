@@ -1,10 +1,10 @@
 # Plan: Composição persistente do host e migração dos testes (`plan-data-test-migration`)
 
-## Status: EM ANDAMENTO - Fases 1-8 concluídas em 2026-07-28; Fase 9 pendente
+## Status: CONCLUÍDO - 9/9 fases em 2026-07-29
 
 ## Progresso
 
-`████████░` **89%** - 8 de 9 fases
+`█████████` **100%** - 9 de 9 fases
 
 | Fase | Estado |
 |---|---|
@@ -16,7 +16,7 @@
 | Fase 6 - migração dos fluxos restantes e troca do default | Concluida |
 | Fase 7 - desacoplamento dos contratos de teste do fake | Concluida |
 | Fase 8 - remoção da transição e exclusão do fake | Concluida |
-| Fase 9 - PostgreSQL, regressão final e fechamento documental | Pendente |
+| Fase 9 - PostgreSQL, regressão final e fechamento documental | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -66,17 +66,13 @@
 - `RoyalIdentity.Migrations/*` — runner externo atual para Configuration + Operational e seeds de produto/demo.
 - `RoyalIdentity.UserAccounts.Integration/*`, `RoyalIdentity.UserAccounts.Sqlite/*` e
   `RoyalIdentity.UserAccounts.PostgreSql/*` — adapter e providers reais da borda de contas.
-- `Tests.Integration/Prepare/AppFactory.cs`, `EntityFrameworkStorageAppFactory.cs`,
-  `UserAccountsAppFactory.cs` e `CharacterizationSeed.cs` — default fake e duas composições opt-in parciais.
-- `Tests.Storage/Storage/Support/InMemoryStorageHarness.cs`,
-  `Tests.UserAccounts/UserDirectoryContractTests.cs` e
-  `Tests.Architecture/ModuleBoundaryTests.cs` — consumidores restantes do projeto fake fora da suíte HTTP.
-- `RoyalIdentity/Contracts/Defaults/DefaultAuthorizationCodeConsumer.cs` e
-  `DefaultRefreshTokenConsumer.cs` — capability detection e fallbacks transitórios.
-- `RoyalIdentity/Contracts/Storage/ISingleUseAuthorizationCodeStore.cs` e
-  `IVersionedRefreshTokenStore.cs` — interfaces das capabilities atômicas.
+- Inventário inicial de `Tests.Integration/Prepare/AppFactory.cs`, `EntityFrameworkStorageAppFactory.cs`,
+  `UserAccountsAppFactory.cs`, `CharacterizationSeed.cs`,
+  `Tests.Storage/Storage/Support/InMemoryStorageHarness.cs` e consumers/fallbacks em
+  `RoyalIdentity/Contracts/Defaults`: estes caminhos identificavam a transição e foram removidos/renomeados nas
+  Fases 4-8; não são instrução vigente.
 
-### Estado atual do código (verificado em 2026-07-26)
+### Estado inicial do código (verificado em 2026-07-26)
 
 - **O host oficial ainda é in-memory:** `RoyalIdentity.Server.HostServices.AddHostServices()` chama
   `AddInMemoryStorage()`, e o projeto referencia apenas Razor, core e `RoyalIdentity.Storage.InMemory`.
@@ -1750,23 +1746,24 @@ toda documentação ao estado real. Não criar CI nem marcar conclusão com test
 
 **Tarefas:**
 
-- [ ] Provisionar PostgreSQL 17 efêmero com porta dinâmica não padrão e as três famílias.
-- [ ] Executar startup/fluxo OIDC PostgreSQL local/opt-in conforme DF24 e registrar comando, contagens e skips.
-- [ ] Executar novamente contratos, migrations, concorrência e gateway SQLite/PostgreSQL afetados.
-- [ ] Executar `dotnet build` e `dotnet test` da solução completa.
-- [ ] Atualizar ADR-018 adicionando uma seção `## 4. Revisão` que registre a conclusão da migração e a remoção
+- [x] Provisionar PostgreSQL 17 efêmero com porta dinâmica não padrão e as três famílias.
+- [x] Executar startup/fluxo OIDC PostgreSQL local/opt-in conforme DF24 e registrar comando, contagens e skips.
+- [x] Executar novamente contratos, migrations, concorrência e gateway SQLite/PostgreSQL afetados.
+- [x] Executar `dotnet build` e `dotnet test` da solução completa.
+- [x] Atualizar ADR-018 adicionando uma seção `## 4. Revisão` que registre a conclusão da migração e a remoção
   efetiva do fake, sem reescrever o corpo da decisão, conforme a regra de revisão de `ADR.md`.
-- [ ] Atualizar o índice de ADRs em `ADR.md`, que ainda lista somente ADR-001 a ADR-009.
-- [ ] Atualizar `product.md`, `tech.md`, `structure.md` e `architecture.md` onde ainda descrevem o default antigo.
-- [ ] Atualizar `plans-roadmap-02.md`, `plan-data-macro.md`, backlog e `AGENTS.md` com Plano 4 concluído e próximo
+- [x] Validar o índice de ADRs em `ADR.md`; ele já lista ADR-001 a ADR-019, portanto nenhuma edição corretiva foi
+  necessária.
+- [x] Atualizar `product.md`, `tech.md`, `structure.md` e `architecture.md` onde ainda descrevem o default antigo.
+- [x] Atualizar `plans-roadmap-02.md`, `plan-data-macro.md`, backlog e `AGENTS.md` com Plano 4 concluído e próximo
   item real.
-- [ ] Atualizar README/scripts do provisionamento PostgreSQL com três conexões/famílias, protection, cleanup,
+- [x] Atualizar README/scripts do provisionamento PostgreSQL com três conexões/famílias, protection, cleanup,
   Podman local e execução obrigatória do runner antes do Server.
-- [ ] Criar/atualizar README do `RoyalIdentity.Demo` com o comando direto, ausência de configuração de storage e o
+- [x] Criar/atualizar README do `RoyalIdentity.Demo` com o comando direto, ausência de configuração de storage e o
   caráter efêmero do SQLite in-memory: cada restart perde usuários, consents, tokens e sessões.
-- [ ] Confirmar que documentação histórica não é apresentada como instrução vigente.
-- [ ] Preencher `Resultado da Fase` de todas as fases, riscos, desvios e pendências.
-- [ ] Marcar o plano `CONCLUIDO` e atualizar a barra somente após todas as decisões e gates de aceite.
+- [x] Confirmar que documentação histórica não é apresentada como instrução vigente.
+- [x] Preencher `Resultado da Fase` de todas as fases, riscos, desvios e pendências.
+- [x] Marcar o plano `CONCLUIDO` e atualizar a barra somente após todas as decisões e gates de aceite.
 
 **Critérios de aceite:** evidência PostgreSQL cumpre DF24; solução completa verde; nenhuma instrução vigente indica
 InMemory como default; ADR-018 registra a consequência já realizada; documentação operacional permite provisionar e
@@ -1785,7 +1782,39 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 
 ### Resultado da Fase 9
 
-*a preencher*
+Concluída em 2026-07-29. `scripts/Test-ServerPostgreSql.ps1` passou a alocar portas dinâmicas não padrão para
+PostgreSQL e Server, preservar/restaurar as variáveis do processo e limpar container, processo web e key ring em
+`finally`. O aceite aplicou Configuration, Operational e UserAccounts no mesmo PostgreSQL 17, cada qual com sua
+history, usando Product + Data Protection; iniciou o Server; validou discovery; e conduziu um authorization-code
+request com PKCE até o challenge interativo de login. O limite é deliberado: Product não cria contas, porque isso
+pertence à administração, não a migrations ou startup.
+
+A primeira execução completa dos opt-ins encontrou um defeito na infraestrutura de teste, não no provider:
+`PostgreSqlConfigurationContractTests.RealmContracts` ainda usava o harness Configuration-only, embora um cenário
+do contrato de realm também prove que um update de Configuration preserva estado Operational. A concretização
+PostgreSQL passou a usar `PostgreSqlOperationalStorageHarness`, simétrica à concretização SQLite. Nenhuma asserção
+normativa mudou e não houve `regressão-do-módulo`, `defeito-de-produto` ou `sem-decisão-normativa`; foi wiring
+residual do teste revelado pelo aceite real.
+
+Comandos e resultados finais:
+
+- `./scripts/Test-ServerPostgreSql.ps1`: aprovado na forma final; PostgreSQL 17 na porta dinâmica `40981`, Server na `51803`,
+  três famílias `Applied`, Product seed, discovery e authorization challenge OIDC;
+- `./scripts/Test-OperationalPostgreSql.ps1`: 44/44 aprovados, 0 ignorados, cobrindo contratos, migrations,
+  runner das três famílias, concorrência, parity, cleanup/purge e gateway PostgreSQL;
+- `./scripts/Test-UserAccountsPostgreSql.ps1`: 1/1 aprovado, 0 ignorados;
+- `dotnet build RoyalIdentity.sln`: sucesso, 0 erros e 12 warnings preexistentes de SDK/package;
+- `dotnet test RoyalIdentity.sln --no-build`: todas as suítes verdes — `Tests.Pipelines` 3/3,
+  `Tests.Identity` 13/13, `Tests.Architecture` 61/61, `Tests.Security` 116/116,
+  `Tests.UserAccounts` 187 aprovados + 1 PostgreSQL opt-in ignorado, `Tests.Storage` 482 aprovados + 44
+  PostgreSQL opt-in ignorados, `Tests.Integration` 281/281 e `Aspire.Tests` 1 opt-in ignorado.
+
+Documentação fechada: ADR-018 recebeu apenas a seção de revisão; o índice `ADR.md` já estava correto até ADR-019;
+foundations, macro/roadmap, backlog, `AGENTS.md` e runbooks refletem EF/SQLite/PostgreSQL, Demo efêmero e runner
+externo. O próximo item de produto apontado no roadmap é `plan-session-administration.md`; caching e audit/outbox
+continuam opcionais e condicionados. Desvios: o script foi ampliado porque sua versão da Fase 3 comprovava somente
+startup em portas fixas, insuficiente para DF24. Pendências deste plano: nenhuma; os itens deliberadamente
+diferidos permanecem na seção própria.
 
 ---
 
@@ -1888,37 +1917,37 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Runner e host usam Data Protection incompatível | key ring, application name ou purposes divergem | signing keys/payloads ficam ilegíveis e host não sobe | DF20, configuração única e teste cross-process/instância | Aberto |
-| Initializer e runtime do Demo usam key rings diferentes | diretório temporário é criado tarde, recriado ou removido antes do shutdown | signing keys do seed ficam ilegíveis ainda na mesma execução | criar key ring por processo antes do runner, compartilhar application name/purposes e remover somente no teardown | Aberto |
-| Banco não foi provisionado antes do host | operador inicia Server sem executar o runner | falha funcional no primeiro bootstrap/acesso | runbook externo, erro sanitizado e nenhuma tentativa automática de migration | Aberto |
-| Demo deixa de autenticar | initializer chama runner/seed sem accounts/resources/signing keys compatíveis | `dotnet run` parece funcional, mas login/authorize falha | DF27, modo Demo do runner + seed de contas e fluxo OIDC completo a partir de memória vazia | Aberto |
-| Entry points web colidem com `Tests.Host.Program` | Server ou Demo expõe outro `Program` no namespace global | `Tests.Integration` falha com `CS0433` ou exige aliases contagiosos para consumir tipos dos hosts | substituir top-level statements por `RoyalIdentity.Server.ServerProgram` e usar `RoyalIdentity.Demo.DemoProgram`, ambos públicos/não estáticos com `Main` estático; somente `Tests.Host` mantém `Program` global | Aberto |
-| SQLite Demo desaparece após o runner | keep-alive é aberto depois das conexões transitórias do migration runner | schema/seed somem antes do startup | abrir os dois keep-alives nomeados antes de invocar o runner e mantê-los até o shutdown | Aberto |
-| Bootstrap Demo vaza para o Server | composição/extension compartilhada inclui migration ou seed | processo produtivo altera schema/dados | executáveis irmãos, guards bidirecionais e extension compartilhado limitado ao protocolo | Aberto |
-| Demo absorve ownership de `UserAccounts` | host manipula entidades/tabelas internas do módulo para semear contas | viola ADR-013/ADR-015 | Demo usa migrations do provider e casos de uso públicos do módulo | Aberto |
-| Modos Product/Demo são confundidos | entry point seleciona o modo errado da implementação compartilhada | dados administrativos entram no Demo ou dados demo em produção | Server nunca chama runner; CLI produtivo seleciona Product; Demo seleciona Demo e prova somente `demo_realm`; testes negativos dos dois entry points | Aberto |
-| Server local parece simples mas não foi provisionado | PostgreSQL Podman sobe vazio e o Server é iniciado diretamente | bootstrap funcional falha | runbook único Podman → runner → Server, erro sanitizado e nenhuma migration automática | Aberto |
-| Histories colidem em banco compartilhado | terceira família usa nome/schema incompatível | migrations são ignoradas ou reaplicadas | teste same-database e history explícita por owner | Aberto |
-| Snapshot não reflete setup | helper grava client e não publica refresh | testes falham ou exercitam dados antigos | helper único + `IConfigurationSnapshotRefresher` obrigatório | Aberto |
-| Estado global contamina fixtures | env AES estática, arquivo ou connection compartilhada | flakiness/paralelismo inseguro | material/lifetime por fixture e teste com duas factories | Aberto |
-| Topologia persistente degrada a suíte | migrations/seed se repetem nas factories | feedback local fica mais lento | baseline, três medições, mediana e limiar numérico nas Fases 4/6 conforme DF26 | Aberto |
-| Composição resolve backing incorreto | duas implementações dos mesmos contratos são registradas | teste passa pelo storage errado | `Tests.Host` agnóstico, registro explícito por factory e validação de resolução | Aberto |
-| Extension protocolar vira bootstrap geral | `UseRoyalIdentityProtocol` passa a registrar storage, UI ou endpoints test-only | hosts deixam de ser composition roots independentes | limite de DF29 + guard contra referências a Server/providers/Razor no extension | Aberto |
-| Ordem de middleware é usada incorretamente | host chama o extension antes de routing ou mistura antiforgery/UI dentro dele | realm discovery/authentication ou endpoints falham | precondições XML, ordem explícita nos três entry points e testes de composição | Aberto |
-| `Tests.Host` parece executável mas não possui storage | launch profile antigo inicia o projeto fora de uma factory | snapshot hosted service falha no startup | remover/substituir profiles e documentar uso exclusivo por `WebApplicationFactory` | Aberto |
-| Live references são reproduzidas em outro seam | setup altera entidade EF diretamente | teste deixa de representar comportamento real | features do módulo ou hook test-only explícito | Aberto |
-| Handle estático mascara options/realm atual | fixture carrega `Realm` no handle e o reutiliza entre composições | teste lê estado/options fora do snapshot corrente | handles primitivos, carga por store/snapshot e guard estático | Aberto |
-| Resource bridge é “resolvida” com persistência acidental | cenário precisa adicionar/remover resource | quebra DF13 e antecipa redesign | source volátil da fixture + guard de arquitetura | Aberto |
-| Limpeza direta de Operational vira API pública genérica | teste chama `Clear()` por conveniência | contrato de produto cresce por setup | remover handle conhecido ou hook test-only focado | Aberto |
-| Reset administrativo é confundido com cleanup | option EF apaga dados válidos como se fossem expirados | perda cross-family sem coordenação/auditoria | manter fora do runtime; futuro comando/admin explícito, autorizado e orquestrado | Aberto |
-| Quebra atômica ocorre cedo demais | DF28 é aplicada com fake ainda referenciado | fake precisa ganhar paridade ou solução não compila | Fases 6-8 e corte coordenado DF7 | Aberto |
-| Testes concretos do fake somem sem equivalente | variante/harness é apagado sem mapa | perda silenciosa de regressão | inventário por cenário na Fase 7 | Aberto |
-| Divergência real é tratada como artefato do fake | asserção muda apenas para a suíte voltar a passar ou defeito de lifecycle fica fora da triagem | regressão de módulo ou defeito do core fica mascarado | triagem obrigatória em quatro buckets para asserções e defeitos revelados, com correção no owner | Aberto |
-| Filtro executa zero testes | nome/classe muda durante a migração | fase aparenta verde sem exercitar o grupo | `--list-tests`, contagem esperada/executada e registro por filtro | Aberto |
-| SQLite mascara diferença produtiva | fluxo só é executado no default SQLite | regressão de provider chega a produção | aceite PostgreSQL real local/opt-in de DF24 | Aberto |
-| Cleanup Hosted disputa entre réplicas | várias instâncias escolhem Hosted | carga/locks apesar de batches idempotentes | configuração explícita, documentar External para cluster | Aberto |
-| Secrets aparecem em CLI/log | conexão/key é passada como argumento ou exception | exposição operacional | env/secret store, sanitização e testes negativos | Aberto |
-| Foundations continuam instruindo fake | docs não são atualizadas no fechamento | nova implementação reintroduz padrão removido | Fase 9 documental obrigatória | Aberto |
+| Runner e host usam Data Protection incompatível | key ring, application name ou purposes divergem | signing keys/payloads ficam ilegíveis e host não sobe | DF20, configuração única e teste cross-process/instância | Mitigado e verificado |
+| Initializer e runtime do Demo usam key rings diferentes | diretório temporário é criado tarde, recriado ou removido antes do shutdown | signing keys do seed ficam ilegíveis ainda na mesma execução | criar key ring por processo antes do runner, compartilhar application name/purposes e remover somente no teardown | Mitigado e verificado |
+| Banco não foi provisionado antes do host | operador inicia Server sem executar o runner | falha funcional no primeiro bootstrap/acesso | runbook externo, erro sanitizado e nenhuma tentativa automática de migration | Aceito por desenho; runbook |
+| Demo deixa de autenticar | initializer chama runner/seed sem accounts/resources/signing keys compatíveis | `dotnet run` parece funcional, mas login/authorize falha | DF27, modo Demo do runner + seed de contas e fluxo OIDC completo a partir de memória vazia | Mitigado e verificado |
+| Entry points web colidem com `Tests.Host.Program` | Server ou Demo expõe outro `Program` no namespace global | `Tests.Integration` falha com `CS0433` ou exige aliases contagiosos para consumir tipos dos hosts | substituir top-level statements por `RoyalIdentity.Server.ServerProgram` e usar `RoyalIdentity.Demo.DemoProgram`, ambos públicos/não estáticos com `Main` estático; somente `Tests.Host` mantém `Program` global | Mitigado por tipos nomeados |
+| SQLite Demo desaparece após o runner | keep-alive é aberto depois das conexões transitórias do migration runner | schema/seed somem antes do startup | abrir os dois keep-alives nomeados antes de invocar o runner e mantê-los até o shutdown | Mitigado e verificado |
+| Bootstrap Demo vaza para o Server | composição/extension compartilhada inclui migration ou seed | processo produtivo altera schema/dados | executáveis irmãos, guards bidirecionais e extension compartilhado limitado ao protocolo | Mitigado por guards |
+| Demo absorve ownership de `UserAccounts` | host manipula entidades/tabelas internas do módulo para semear contas | viola ADR-013/ADR-015 | Demo usa migrations do provider e casos de uso públicos do módulo | Mitigado por fronteira |
+| Modos Product/Demo são confundidos | entry point seleciona o modo errado da implementação compartilhada | dados administrativos entram no Demo ou dados demo em produção | Server nunca chama runner; CLI produtivo seleciona Product; Demo seleciona Demo e prova somente `demo_realm`; testes negativos dos dois entry points | Mitigado e verificado |
+| Server local parece simples mas não foi provisionado | PostgreSQL Podman sobe vazio e o Server é iniciado diretamente | bootstrap funcional falha | runbook único Podman → runner → Server, erro sanitizado e nenhuma migration automática | Aceito por desenho; runbook |
+| Histories colidem em banco compartilhado | terceira família usa nome/schema incompatível | migrations são ignoradas ou reaplicadas | teste same-database e history explícita por owner | Mitigado e verificado |
+| Snapshot não reflete setup | helper grava client e não publica refresh | testes falham ou exercitam dados antigos | helper único + `IConfigurationSnapshotRefresher` obrigatório | Mitigado e verificado |
+| Estado global contamina fixtures | env AES estática, arquivo ou connection compartilhada | flakiness/paralelismo inseguro | material/lifetime por fixture e teste com duas factories | Mitigado e verificado |
+| Topologia persistente degrada a suíte | migrations/seed se repetem nas factories | feedback local fica mais lento | baseline, três medições, mediana e limiar numérico nas Fases 4/6 conforme DF26 | Aceito; duração baixa |
+| Composição resolve backing incorreto | duas implementações dos mesmos contratos são registradas | teste passa pelo storage errado | `Tests.Host` agnóstico, registro explícito por factory e validação de resolução | Mitigado por guards |
+| Extension protocolar vira bootstrap geral | `UseRoyalIdentityProtocol` passa a registrar storage, UI ou endpoints test-only | hosts deixam de ser composition roots independentes | limite de DF29 + guard contra referências a Server/providers/Razor no extension | Mitigado por guard |
+| Ordem de middleware é usada incorretamente | host chama o extension antes de routing ou mistura antiforgery/UI dentro dele | realm discovery/authentication ou endpoints falham | precondições XML, ordem explícita nos três entry points e testes de composição | Mitigado e verificado |
+| `Tests.Host` parece executável mas não possui storage | launch profile antigo inicia o projeto fora de uma factory | snapshot hosted service falha no startup | remover/substituir profiles e documentar uso exclusivo por `WebApplicationFactory` | Mitigado por projeto/guard |
+| Live references são reproduzidas em outro seam | setup altera entidade EF diretamente | teste deixa de representar comportamento real | features do módulo ou hook test-only explícito | Mitigado por helpers focados |
+| Handle estático mascara options/realm atual | fixture carrega `Realm` no handle e o reutiliza entre composições | teste lê estado/options fora do snapshot corrente | handles primitivos, carga por store/snapshot e guard estático | Mitigado por handles/guard |
+| Resource bridge é “resolvida” com persistência acidental | cenário precisa adicionar/remover resource | quebra DF13 e antecipa redesign | source volátil da fixture + guard de arquitetura | Aceito/diferido |
+| Limpeza direta de Operational vira API pública genérica | teste chama `Clear()` por conveniência | contrato de produto cresce por setup | remover handle conhecido ou hook test-only focado | Mitigado por hook focado |
+| Reset administrativo é confundido com cleanup | option EF apaga dados válidos como se fossem expirados | perda cross-family sem coordenação/auditoria | manter fora do runtime; futuro comando/admin explícito, autorizado e orquestrado | Aceito/diferido |
+| Quebra atômica ocorre cedo demais | DF28 é aplicada com fake ainda referenciado | fake precisa ganhar paridade ou solução não compila | Fases 6-8 e corte coordenado DF7 | Encerrado |
+| Testes concretos do fake somem sem equivalente | variante/harness é apagado sem mapa | perda silenciosa de regressão | inventário por cenário na Fase 7 | Mitigado e verificado |
+| Divergência real é tratada como artefato do fake | asserção muda apenas para a suíte voltar a passar ou defeito de lifecycle fica fora da triagem | regressão de módulo ou defeito do core fica mascarado | triagem obrigatória em quatro buckets para asserções e defeitos revelados, com correção no owner | Mitigado por triagem |
+| Filtro executa zero testes | nome/classe muda durante a migração | fase aparenta verde sem exercitar o grupo | `--list-tests`, contagem esperada/executada e registro por filtro | Mitigado por contagens |
+| SQLite mascara diferença produtiva | fluxo só é executado no default SQLite | regressão de provider chega a produção | aceite PostgreSQL real local/opt-in de DF24 | Mitigado e verificado |
+| Cleanup Hosted disputa entre réplicas | várias instâncias escolhem Hosted | carga/locks apesar de batches idempotentes | configuração explícita, documentar External para cluster | Aceito; External padrão |
+| Secrets aparecem em CLI/log | conexão/key é passada como argumento ou exception | exposição operacional | env/secret store, sanitização e testes negativos | Mitigado por env/sanitização |
+| Foundations continuam instruindo fake | docs não são atualizadas no fechamento | nova implementação reintroduz padrão removido | Fase 9 documental obrigatória | Encerrado |
 
 ---
 
@@ -1930,7 +1959,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 - Reproteção/rotação de signing keys e KMS — destino: plano KMS.
 - Coordenação idempotente de tombstone Configuration + purge Operational + `UserAccounts` — destino: plano
   administrativo/ADR própria.
-- Orquestração Aspire e deployment workloads — destino: `.ai/backlogs/backlog-001.md`.
+- Deployment/orquestração além do AppHost Aspire local já entregue — destino: backlog operacional/deployment.
 - Lock distribuído para cleanup Hosted — destino: backlog operacional, se métricas demonstrarem necessidade.
 - API/UI administrativa e gerenciamento de realms/clients/users — destino: roadmap administrativo.
 - Reset destrutivo de realm/instalação — futuro comando ou módulo administrativo que orquestre Configuration,
@@ -1962,9 +1991,7 @@ Executar também o script PostgreSQL definido/atualizado pela fase e registrar o
 - `RoyalIdentity.Migrations/StorageMigrationRunner.cs`.
 - `RoyalIdentity.UserAccounts.Integration/UserAccountsIntegrationExtensions.cs`.
 - `Tests.Integration/Prepare/PersistentStorageAppFactory.cs`.
-- `Tests.Integration/Prepare/UserAccountsAppFactory.cs`.
-- `Tests.Integration/Prepare/CharacterizationSeed.cs`.
-- `Tests.Storage/Storage/Support/InMemoryStorageHarness.cs`.
 - `Tests.UserAccounts/UserDirectoryContractTests.cs`.
-- `RoyalIdentity/Contracts/Defaults/DefaultAuthorizationCodeConsumer.cs`.
-- `RoyalIdentity/Contracts/Defaults/DefaultRefreshTokenConsumer.cs`.
+- `scripts/Test-ServerPostgreSql.ps1`.
+- `RoyalIdentity.Server/README.md`.
+- `RoyalIdentity.Demo/README.md`.

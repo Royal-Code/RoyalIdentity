@@ -82,7 +82,9 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 **Deferral:** O básico (LogoUri, FaviconUri, PrimaryColor) é implementado no `plan-realm-hardening.md`. O avançado fica para depois.
 **Quando revisitar:** Quando houver demanda de white-labeling ou quando stakeholders priorizarem customização visual.
 **Nota de design:**
-- **Demo logo ausente:** O plano pedia `DemoRealm.Options.Branding.LogoUri = "/images/demo-logo.png"` em `MemoryStorage.cs`. O ativo `/images/demo-logo.png` não existe em `wwwroot` — optou-se por não adicionar uma URI apontando para arquivo inexistente, pois renderizaria `<img>` quebrada. Quando o ativo existir (upload ou asset estático incluído), basta adicionar a linha em `MemoryStorage.cs` estático e o layout já o renderiza corretamente.
+- **Demo logo ausente:** o antigo seed fake mencionava `/images/demo-logo.png`, mas o ativo não existe em
+  `wwwroot`; por isso o seed atual do `RoyalIdentity.Demo` não anuncia uma imagem quebrada. Quando houver asset ou
+  upload real, a configuração deve entrar no owner de branding/seed vigente — `MemoryStorage` foi removido.
 - **Upload de imagens:** logo e favicon via upload (armazenados por realm), não apenas URI externo. Requer endpoint de upload e storage de assets.
 - **CSS injetável:** campo `string? CustomCss` em `RealmBrandingOptions` — CSS injetado em `<style>` no layout, permitindo override de qualquer estilo. Sem sanitização obrigatória (é configuração de admin).
 - **Theming avançado (Keycloak-style):** motor de templates HTML/CSS com themes por realm — escopo alto, avaliar quando a base de usuários justificar.
@@ -113,17 +115,19 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 ## Persistência de Dados (EFCore: Postgres/Sqlite) e Caching
 
 **Área:** Storage / Persistência
-**Deferral:** Parcialmente entregue pelo [plan-data-configuration-storage.md](../plans/plan-data-configuration-storage.md)
-(7/7): Configuration já possui EFCore SQLite/PostgreSQL, migrations, runner/SQL e stores de leitura do IdP.
-Continuam diferidos Operational, o gateway EF completo, a migração do backing padrão dos testes e caching.
-**Quando revisitar:** Ao criar `plan-data-operational-storage.md` (Plano 3 do macro-plano); depois, executar o Plano 4
-para substituir o backing in-memory dos testes.
+**Deferral:** O primeiro corte foi concluído pelos Planos 2-4 do
+[plan-data-macro.md](../plans/plan-data-macro.md): Configuration e Operational usam EFCore
+SQLite/PostgreSQL, o gateway é completo, o runner provisiona também UserAccounts, o Server usa PostgreSQL e os
+testes default usam EF/SQLite + módulo real. O fake foi removido. Continuam diferidos caching e a persistência do
+catálogo de resources/scopes.
+**Quando revisitar:** Caching somente depois de existir mecanismo claro de invalidação administrativa;
+resources/scopes no plano específico de redesign.
 **Nota de design:**
 - Entregues: `RoyalIdentity.Data.Configuration`, `RoyalIdentity.Storage.EntityFramework`, providers
   `.PostgreSql`/`.Sqlite` e `RoyalIdentity.Migrations`. Resources/scopes permanecem voláteis por DF22; não são
   entidades de `Data.Configuration`.
-- Pendentes: `RoyalIdentity.Data.Operational` (sessions/tokens/codes/consents), composição do gateway completo,
-  migração dos testes e `RoyalIdentity.Storage.Caching`.
+- Entregues também: `RoyalIdentity.Data.Operational`, gateway completo, migração dos testes e remoção do fake.
+- Pendente: `RoyalIdentity.Storage.Caching`, caso medições e invalidação administrativa justifiquem.
 - Só `Storage.EntityFramework` implementa as facades do IdP; `Data.*` contêm DbContext/entidades/queries. Divisão config × operacional por ciclo de vida/volume (TTL/cache no operacional).
 - Esboço de fases: entidades/DbContext → mapeamentos por provedor → impl. das facades → cache → migração in-memory→Sqlite nos testes.
 
@@ -132,11 +136,11 @@ para substituir o backing in-memory dos testes.
 ## Aspire e orquestração de ambiente
 
 **Área:** Host / Operação / Developer Experience
-**Deferral:** O [plan-data-configuration-storage.md](../plans/plan-data-configuration-storage.md) entregou o executável
-geral `RoyalIdentity.Migrations`, separado dos hosts. A solução ainda não possui projetos Aspire nem composição de
-containers para todos os hosts e dependências.
-**Quando revisitar:** Depois dos Planos 2 e 3 do `plan-data-macro.md`, quando Configuration e Operational possuírem
-migrations executáveis pelo mesmo runner.
+**Deferral:** A composição local foi entregue em `Aspire/Aspire.AppHost`: PostgreSQL 17, três databases, execução
+de `RoyalIdentity.Migrations` como job e startup do Server condicionado ao sucesso do runner. O aceite integral
+permanece opt-in em `Aspire.Tests`.
+**Quando revisitar:** Quando novos hosts/dependências precisarem entrar no AppHost ou quando houver desenho de
+deployment além do ambiente local.
 **Nota de design:**
 - O AppHost Aspire deve subir bancos e demais dependências e executar `RoyalIdentity.Migrations` como
   workload/container separado antes dos hosts.
@@ -237,31 +241,23 @@ do **motor de permissões** futuro (funções administrativas gated por permiss�
 ## Substituir o storage fake in-memory pelo módulo + Sqlite in-memory nos testes
 
 **Área:** Testes / Storage
-**Deferral:** Decidido o rumo em [ADR-018](../../adrs/ADR-018.md): o fake in-memory (`MemoryStorage`,
-`MemoryUserDirectory`, `MemoryLocalUserAuthenticator`) é transitório e **não** recebe mais investimento de paridade. A
-substituição em si — remover as facades fake e fazer os testes semearem via o módulo + Sqlite in-memory — é o trabalho
-diferido. Encaixa no recorte de testes do futuro `plan-data-persistence` (ver item "Persistência de Dados", nota de
-design: "migração in-memory→Sqlite nos testes").
-**Quando revisitar:** Junto do `plan-data-persistence`, ou quando a divergência fake×módulo nos comportamentos
-compartilhados começar a custar mais do que manter o fake.
-**Nota de design:**
+**Estado:** CONCLUÍDO em 2026-07-29 pelo
+[plan-data-test-migration.md](../plans/plan-data-test-migration.md), conforme a revisão da
+[ADR-018](../../adrs/ADR-018.md). `Tests.Integration` usa EF/SQLite + `UserAccounts`; as facades, contracts
+concretos e o projeto `RoyalIdentity.Storage.InMemory` foram removidos.
+**Registro histórico:**
 - **Primeiro passo (habilitador) — ✅ CONCLUÍDO** (`plan-users-accounts-sqlite-hardening.md` Fase 3, Q8): o **seed
   reutilizável do módulo** existe em `Tests.UserAccounts/UserAccountsModuleSeed.cs` — Alice/Bob determinísticos
   (`sub`, username, displayName, email verificado, roles, property scopes `profile`/`email`), idempotente. É
-  *linked* (não `ProjectReference` teste-para-teste) em `Tests.Integration`, substituindo as cópias antes
-  duplicadas em `Tests.Integration/Prepare/UserAccountsAppFactory.cs` (+ `UserAccountsSeedHostedService`) e no seed
-  inline do `UserDirectoryContractTests.UserAccountsSqlite` — hoje ambos consomem a mesma fonte, o ponto único de
-  seed para contract tests e regressão OIDC opt-in.
-- **Migração:** apontar a suíte do IdP para o módulo opt-in como default (hoje o fake é default e o módulo é opt-in via
-  `UserAccountsAppFactory`); então remover `RoyalIdentity.Storage.InMemory` e o lado fake do `UserDirectoryContractTests`.
-  A regressão opt-in (`UserAccountsOptInRegressionTests`) foi ampliada de 5 para 6 casos (Q9, mesma Fase 3) — inclui
-  agora senha inválida com mensagem genérica anti-enumeration e verificação de que nenhuma sessão é criada — mas
-  continua **representativa**, não a suíte inteira; o flip completo do default para o módulo segue dependendo desta
-  migração.
+  *linked* (não `ProjectReference` teste-para-teste) em `Tests.Integration` e substituiu as antigas cópias de
+  `UserAccountsAppFactory` e do contrato SQLite.
+- **Migração concluída:** o seed reutilizável tornou-se parte da fixture persistente; a suíte integral substituiu a
+  antiga regressão opt-in representativa, e os contratos restantes rodam somente contra implementações reais.
 - **Comportamentos do ciclo de segurança** (required action, security-state/`SessionsValidAfter`, verificação) deixam de
   ser "module-only por falta de fake" e passam a poder subir ao contrato — agora com as duas pontas sendo módulo+Sqlite
   (ou módulo vs. providers `.Sqlite`/`.PostgreSql`), não fake vs. módulo.
-- O lado de **storage do core** (realms/clients/keys/sessions/tokens) segue o mesmo rumo no `plan-data-persistence`.
+- O lado de **storage do core** (realms/clients/keys/sessions/tokens) concluiu a mesma migração para EF/SQLite e
+  PostgreSQL no primeiro corte do macro-plano.
 
 ---
 

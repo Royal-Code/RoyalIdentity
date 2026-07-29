@@ -16,7 +16,7 @@ The goal is a **complete, turnkey, production-ready product** deployable as a Do
 | No built-in UI | Complete Razor-based UI: login, consent, logout, admin |
 | ASP.NET Identity required for users | Custom user management, realm-specific per design |
 | Procedural pipeline, hard to extend | Pipeline architecture: validators/decorators/handlers |
-| Tight coupling in tests | Integration-first tests with in-memory storage |
+| Tight coupling in tests | Integration-first tests over the same storage contracts, with EF/SQLite as the local backing |
 
 Source of truth for these decisions: ADR-002 through ADR-005.
 
@@ -31,7 +31,7 @@ A **Realm** is the top-level organizational boundary. All data and configuration
 - **A realm owns**: clients, keys, scopes/resources, users, sessions, configuration
 - **Internal realms** (server, account, admin) are system-managed and cannot be deleted or have their domain changed
 - **Known internal realms**: ServerRealm, AccountRealm, AdminRealm
-- **Demo realm** provided in in-memory storage for development
+- **Demo realm** provided only by the zero-configuration `RoyalIdentity.Demo` executable
 
 A middleware (`RealmDiscoveryMiddleware`) identifies the realm from the route before any authentication or pipeline processing. The `Realm` model carries `RealmOptions`, which **composes** `ServerOptions` via a property (`RealmOptions.ServerOptions`) — realm-level options supplement server defaults but do not automatically override them. Promoting a setting to realm-level requires explicit work: adding the property to `RealmOptions` and updating every service that currently reads from `storage.ServerOptions` directly.
 
@@ -152,7 +152,10 @@ The edge (borda) was redesigned into **facades + a lean model** (plan `plan-user
 
 **Decision (ADR-005, refined by ADR-013/014)**: RoyalIdentity has its own user management, not dependent on ASP.NET Identity. User data and rules are configurable per realm.
 
-**In-memory is fake/reference only** (`MemoryUserAccount` + `MemoryUserDirectory` in `RoyalIdentity.Storage.InMemory`). The rich account model and persistence are deferred to the **RoyalIdentity.UserAccounts** module (a DI swap; see ADR-015 + `plan-users-accounts-module-v2`).
+**UserAccounts is the active implementation.** `RoyalIdentity.UserAccounts.Integration` adapts the module's
+realm-bound ports to the core edge, with SQLite in the Demo/default integration tests and PostgreSQL in the
+production Server. The former `RoyalIdentity.Storage.InMemory` fake was removed by
+`plan-data-test-migration.md` (ADR-018 review).
 
 ---
 

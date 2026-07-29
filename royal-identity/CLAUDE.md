@@ -29,16 +29,21 @@ Completed refactoring plans (useful as historical record and for understanding d
 - [.ai/plans/plan-data-storage-baseline.md](.ai/plans/plan-data-storage-baseline.md) — COMPLETED (5/5 fases; storage contracts characterized and `plan-data-storage-matrix.md` fixed as the normative semantics)
 - [.ai/plans/plan-data-configuration-storage.md](.ai/plans/plan-data-configuration-storage.md) — COMPLETED (7/7 fases; Configuration family over EF — ServerOptions/realms/clients/signing keys, async snapshot, key protectors, migration/seed runner and reviewable SQL, SQLite + real PostgreSQL 17)
 - [.ai/plans/plan-data-operational-storage.md](.ai/plans/plan-data-operational-storage.md) — COMPLETED (8/8 fases; Operational family over EF — single-use authorization codes (MP-2) and conditional refresh transitions (MP-3) under real concurrency, realm-bound authorize parameters with absolute TTL (MP-5), cleanup/purge behind an explicitly selected execution mode (MP-6/MP-7), per-realm payload protection, split migrations histories per family (DF23), complete `AddEntityFrameworkStorage()` gateway, SQLite + real PostgreSQL 17. Fase 8 fixed three product defects the in-memory fake masked: a captive `IClientSecretChecker` singleton, a malformed derived issuer, and a validator that depended on the issuer being cached into `RealmOptions`)
+- [.ai/plans/plan-data-test-migration.md](.ai/plans/plan-data-test-migration.md) — COMPLETED (9/9 fases; production Server on externally provisioned PostgreSQL, zero-configuration ephemeral SQLite Demo, default integration tests on EF/SQLite + real UserAccounts, definitive atomic contracts and removal of the fake/fallbacks)
 
 Active plans (check status before modifying affected areas):
 
-**The default composition of `Tests.Integration` is still in-memory, selected explicitly by its legacy `AppFactory`; `Tests.Host` itself is storage-agnostic.** `Tests.Storage` already runs on EF (SQLite always, PostgreSQL opt-in), and `PersistentStorageAppFactory` is the integral SQLite composition used by the Phase 5 login/account/authorize/token groups, with Configuration + Operational in one database and `UserAccounts` in another. The remaining groups still use `AppFactory` until Phase 6 changes the default. The transitional non-atomic fallback in `DefaultAuthorizationCodeConsumer`/`DefaultRefreshTokenConsumer` exists for the fake default and is removed together with it, never before (ADR-018). Active macro-plan: `plan-data-test-migration.md` (Plan 4; Fases 1-5 complete).
+No implementation plan is currently active. `Tests.Host` is storage-agnostic and `Tests.Integration` uses
+`PersistentStorageAppFactory` by default: Configuration + Operational share one isolated SQLite in-memory
+database and UserAccounts owns another. PostgreSQL storage/Aspire acceptances remain local opt-in. The production
+Server is PostgreSQL-only and must be provisioned by `RoyalIdentity.Migrations`; `RoyalIdentity.Demo` is the
+self-provisioned ephemeral local experience.
 
 Roadmap of the plans that come after the ones above: [.ai/plans/plans-roadmap-02.md](.ai/plans/plans-roadmap-02.md) (supersedes `plans-roadmap-01.md`) — includes `.ai/plans/plan-data-macro.md`, the sequencing map for the IdP's own data persistence work.
 
 Architectural Decision Records (accepted decisions; read before changing the affected area):
 
-- [adrs/](adrs/) — ADR-001..018 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**, **ADR-016 shared technical library `RoyalIdentity.Security` (leaf technical lib in the product namespace — not the external `RoyalCode.*` ecosystem); amends ADR-013**, **ADR-017 account security lifecycle — `RequiredAction`, `SecurityStamp` + `SessionsValidAfter`, `IUserSecurityStateProvider`/`ISessionRevocationService` seams, per-realm `SecurityLifecycleOptions`; amends ADR-014/015**, **ADR-018 in-memory storage fake is transitional — converge tests on module + Sqlite in-memory, no further fake feature-parity; amends ADR-013/014/015**)
+- [adrs/](adrs/) — ADR-001..019 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**, **ADR-016 shared technical library `RoyalIdentity.Security` (leaf technical lib in the product namespace — not the external `RoyalCode.*` ecosystem); amends ADR-013**, **ADR-017 account security lifecycle — `RequiredAction`, `SecurityStamp` + `SessionsValidAfter`, `IUserSecurityStateProvider`/`ISessionRevocationService` seams, per-realm `SecurityLifecycleOptions`; amends ADR-014/015**, **ADR-018 in-memory storage fake was transitional and its removal is recorded in §4; amends ADR-013/014/015**)
 
 Backlog (deferred items with design notes):
 
@@ -61,8 +66,11 @@ dotnet test Tests.Integration
 # Run a single test by name
 dotnet test Tests.Pipelines --filter "FullyQualifiedName~PipelineDispatcher_Must_Dispatch"
 
-# Run the server
-dotnet run --project RoyalIdentity.Server
+# Run the zero-configuration demo
+dotnet run --project RoyalIdentity.Demo
+
+# Validate disposable PostgreSQL provisioning + Server startup/OIDC
+./scripts/Test-ServerPostgreSql.ps1
 ```
 
 ## Architecture in Brief

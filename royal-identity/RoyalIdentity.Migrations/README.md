@@ -63,6 +63,10 @@ dotnet run --project RoyalIdentity.Migrations -- `
 No Server oficial, Data Protection é o protector transitório até a futura integração KMS. O key ring precisa ser
 persistente, compartilhado pelas instâncias e protegido em repouso.
 
+O runner não executa cleanup de registros Operational expirados nem reset administrativo. Depois do
+provisionamento, a composição escolhe explicitamente `RoyalIdentity:Cleanup:Mode`: `External` deixa o agendamento
+fora do processo web; `Hosted` registra o worker periódico e deve ter apenas uma instância responsável.
+
 ## Bancos separados e seleção parcial
 
 Sem `--database-topology shared`, múltiplas famílias são tratadas como bancos separados. É possível migrar apenas
@@ -106,5 +110,5 @@ selecionadas concluem. O relatório identifica `Applied`, `Failed`, `Skipped` ou
 afirma rollback conjunto.
 
 Para produção, os scripts revisáveis em `scripts/sql/` continuam disponíveis para Configuration e Operational.
-O futuro Aspire executará este runner como workload/container separado dos hosts, conforme
-`.ai/backlogs/backlog-001.md`.
+O ambiente local em `Aspire/Aspire.AppHost` executa este runner como job separado e só inicia o Server depois de
+seu sucesso; hosts nunca aplicam migrations implicitamente.

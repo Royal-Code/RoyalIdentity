@@ -1,5 +1,6 @@
 using Tests.Storage.Configuration.Support;
 using Tests.Storage.Contracts;
+using Tests.Storage.Operational.Support;
 using Tests.Storage.Support;
 
 namespace Tests.Storage.Configuration;
@@ -42,7 +43,7 @@ public class PostgreSqlConfigurationContractTests
     private sealed class PostgreSqlRealmContracts : RealmStoreContractTests
     {
         protected override Task<StorageContractHarness> CreateHarnessAsync()
-            => PostgreSqlConfigurationStorageHarness.CreateAsync();
+            => PostgreSqlOperationalStorageHarness.CreateAsync();
     }
 
     private sealed class PostgreSqlResourceContracts : ResourceStoreContractTests

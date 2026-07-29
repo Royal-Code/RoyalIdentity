@@ -1,6 +1,6 @@
 # Macro-plano: Persistência de dados do IdP e aposentadoria do fake
 
-## Status: EM EXECUÇÃO — Planos 0, 1, 2 e 3 concluídos; Plano 4 é o próximo e ainda não foi criado
+## Status: PRIMEIRO CORTE CONCLUÍDO — Planos 0-4 concluídos; Planos 5/6 permanecem opcionais
 
 Este documento organiza os próximos planos de dados após:
 
@@ -21,7 +21,7 @@ com SQLite/PostgreSQL, preservando as fronteiras da ADR-013:
 - `RoyalIdentity.Data.Configuration` e `RoyalIdentity.Data.Operational` são projetos de dados puros.
 - `RoyalIdentity.Storage.EntityFramework` adapta `Data.*` às facades do core.
 - `RoyalIdentity.UserAccounts` mantém persistência própria e não entra no storage EF do IdP.
-- O fake in-memory deixa de ser referência de longo prazo, mas só é removido quando o storage do core estiver pronto.
+- O fake in-memory foi removido depois que Configuration, Operational e a composição real ficaram prontas.
 
 ---
 
@@ -33,7 +33,7 @@ com SQLite/PostgreSQL, preservando as fronteiras da ADR-013:
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos atuais e comportamento do `MemoryStorage`. **CONCLUÍDO (2026-07-22, 5/5 fases).** |
 | 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. **CONCLUÍDO (2026-07-22, 7/7 fases).** |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais do IdP. **CONCLUÍDO (2026-07-26, 8/8 fases).** |
-| 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real. |
+| 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real. **CONCLUÍDO (2026-07-29, 9/9 fases).** |
 | 5 | `plan-data-caching.md` | Adicionar cache sobre os stores EF quando a semântica estiver estável. |
 | 6 | `plan-data-audit-outbox.md` | Store durável de auditoria e outbox seletivo, se ainda fizer sentido. |
 
@@ -82,9 +82,9 @@ O Plano 2 foi concluído consumindo a matriz sem re-inferir semântica; o Plano 
 
 Saída entregue: modelo Configuration puro, mappings/migrations SQLite e PostgreSQL, stores EF de
 ServerOptions/realms/clients/keys, snapshot assíncrono defensivo, protectors explícitos, runner/seed/SQL separado
-do host e paridade P2 validada contra PostgreSQL 17 real. O host padrão permanece in-memory e o adapter não
-registra um `IStorage` parcial. A composição produtiva completa (`AddEntityFrameworkStorage`) foi entregue
-pelo Plano 3; trocar o default do host e das suítes é o Plano 4.
+do host e paridade P2 validada contra PostgreSQL 17 real. Ao término do Plano 2, o host padrão permanecia
+in-memory e o adapter não registrava um `IStorage` parcial. A composição produtiva completa
+(`AddEntityFrameworkStorage`) foi entregue pelo Plano 3, e o default foi trocado pelo Plano 4.
 
 **Escopo:** dados de configuração duráveis e de baixa rotatividade.
 
@@ -123,8 +123,9 @@ Fora de escopo:
 - UI/API administrativa;
 - KMS completo.
 
-Decisões operacionais principais: o host padrão continua in-memory; o IdP não escreve Configuration; migrations e
-seed opcional rodam em `RoyalIdentity.Migrations`, nunca no host; SQL revisável é o caminho preferido em produção.
+Decisões operacionais entregues por este plano: à época o host padrão ainda era in-memory; o IdP não escreve
+Configuration; migrations e seed opcional rodam em `RoyalIdentity.Migrations`, nunca no host; SQL revisável é um
+caminho disponível em produção. O default foi trocado posteriormente pelo Plano 4.
 
 ---
 
@@ -133,9 +134,8 @@ seed opcional rodam em `RoyalIdentity.Migrations`, nunca no host; SQL revisável
 **CONCLUÍDO (2026-07-26, 8/8 fases.)** Saída entregue: família Operational sobre EF nos dois providers, code
 single-use e transição condicional de refresh sob concorrência real, authorize parameters realm-bound com TTL
 absoluto, cleanup/purge sob modo de execução explícito, proteção de payload por realm, histories de migrations
-separadas por família e o gateway `AddEntityFrameworkStorage()` completo. O host padrão e a composição de
-`Tests.Integration` continuam in-memory, e o fallback transitório dos consumers segue vivo enquanto esse default
-existir; trocar ambos é o Plano 4.
+separadas por família e o gateway `AddEntityFrameworkStorage()` completo. Ao término deste plano, o host e
+`Tests.Integration` ainda eram in-memory e o fallback transitório continuava vivo; o Plano 4 removeu ambos.
 
 **Escopo:** dados operacionais de alta rotatividade.
 
@@ -173,22 +173,21 @@ Pontos de atenção:
 
 ## Plano 4 - `plan-data-test-migration.md`
 
-**Escopo:** trocar o backing dos testes sem misturar com o desenho dos stores.
+**CONCLUÍDO em 2026-07-29 (9/9 fases).**
 
-Fases sugeridas:
+Saída entregue:
 
-1. Criar uma factory de testes com `Storage.EntityFramework.Sqlite` para o core.
-2. Combinar essa factory com `UserAccounts` + SQLite como backing de contas.
-3. Migrar a suíte OIDC por grupos: login/profile, authorize/token, refresh/revocation, logout/session, realm isolation.
-4. Tornar SQLite/EF o default dos testes de integração.
-5. Manter `MemoryStorage` apenas em testes específicos de fake, se ainda houver valor.
-6. Remover o lado fake dos contract tests quando não houver mais contrato real a proteger.
-
-Critério de aceite:
-
-- suíte de integração verde sem depender de usuários fake;
-- `MemoryStorage` não é mais o caminho principal de regressão;
-- ADR-018 atualizada com o estado real.
+- `RoyalIdentity.Server` tornou-se um composition root exclusivamente PostgreSQL, com três conexões explícitas,
+  Data Protection e provisionamento externo obrigatório;
+- `RoyalIdentity.Demo` foi criado como executável zero-configuração sobre SQLite in-memory, com seed e conta reais,
+  inteiramente efêmero;
+- `RoyalIdentity.Migrations` passou a provisionar Configuration, Operational e UserAccounts, preservando conexão,
+  history e resultado por família;
+- `PersistentStorageAppFactory` tornou-se o default de `Tests.Integration`, com EF/SQLite + `UserAccounts`;
+- as capabilities atômicas passaram ao contrato base, os consumers/fallbacks transitórios foram removidos e
+  `RoyalIdentity.Storage.InMemory` foi excluído;
+- PostgreSQL 17 real validou migrations, contratos, concorrência, gateway, startup do Server e authorization
+  challenge OIDC; ADR-018 foi revisada com a consequência realizada.
 
 ---
 
@@ -241,9 +240,9 @@ por um tempo.
 
 ---
 
-## Critério para iniciar o primeiro plano de dados
+## Gate histórico usado para iniciar o primeiro plano de dados
 
-Antes de criar `plan-data-storage-baseline.md`, concluir ou rebaixar formalmente:
+Antes de criar `plan-data-storage-baseline.md`, era necessário concluir ou rebaixar formalmente:
 
 - achados restantes do `plan-users-security-lifecycle.md`;
 - fases do `plan-users-accounts-sqlite-hardening.md`;

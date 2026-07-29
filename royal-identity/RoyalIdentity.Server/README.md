@@ -54,7 +54,15 @@ $env:RoyalIdentity__DataProtection__OperationalPayloadProfileId = "default"
 dotnet run --project RoyalIdentity.Server
 ```
 
+`RoyalIdentity:Cleanup:Mode` is explicit. The checked-in local default is `External`, so the web process does not
+run a cleanup scheduler; an external job must invoke the same Operational maintenance operation. `Hosted` is
+appropriate only when exactly one process is intentionally responsible for the periodic worker. Neither mode
+performs an administrative reset.
+
 Stop the local database with `podman stop royalidentity-postgres`.
 
-To validate the complete disposable sequence (PostgreSQL 17 → runner → Server startup) without keeping local
-state, run `./scripts/Test-ServerPostgreSql.ps1`.
+To validate the complete disposable sequence without keeping local state, run
+`./scripts/Test-ServerPostgreSql.ps1`. It allocates non-default dynamic PostgreSQL and Server ports, applies the
+three families with the Product seed, starts the Server, validates OIDC discovery and drives an authorization-code
+request through the interactive login challenge. Product provisioning deliberately creates no user account, so
+token issuance begins only after an administrator creates one.

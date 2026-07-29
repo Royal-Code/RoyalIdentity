@@ -21,7 +21,7 @@ persistence projects (**`.PostgreSql`**, **`.Sqlite`**). API/UI are separate pro
 |---|---|---|---|
 | `RoyalIdentity.Pipelines` | pipeline infra | No | dependency-free chain-of-responsibility (see `tech.md`) |
 | `RoyalIdentity` (core/IdP) | OIDC engine | No | endpoint → pipeline (`IDecorator`/`IValidator`/`IHandler`) → response (`structure.md`) |
-| `RoyalIdentity.Storage.*` (InMemory, EntityFramework[.PostgreSql/.Sqlite], Caching) | storage adapters | No | implement the core `IStorage` facades |
+| `RoyalIdentity.Storage.EntityFramework[.PostgreSql/.Sqlite]` (and future Caching) | storage adapters | No | implement the core `IStorage` facades |
 | `RoyalIdentity.Data.Configuration` / `.Operational` | **pure data** | No | `DbContext` + persistence entities + queries only. **No domain, no core types, no business rules** (ADR-013 §2.2) |
 | `RoyalIdentity.Razor` | IdP account UI | No | Razor SSR + `I*PageService` (`structure.md`) |
 | `RoyalIdentity.Server` | host | No | composition/wiring |
@@ -164,8 +164,8 @@ internal sealed class UserAccountsUserDirectory(/* module features + options res
 }
 ```
 
-> Swapping the in-memory backing for the real module is a **DI registration change** in the host
-> (`AddUserAccountsForRoyalIdentity(...)`). The edge (ADR-014) must not be rewritten when the module lands.
+> The real module is composed through `AddUserAccountsForRoyalIdentity(...)` in the Server, Demo and integration
+> fixtures. Changing its provider remains a composition concern; the core edge from ADR-014 is not rewritten.
 
 ---
 

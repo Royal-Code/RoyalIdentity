@@ -60,14 +60,20 @@ definida em `../analisys/`.
   execução explícito (MP-6/MP-7), proteção de payload por realm, histories de migrations separadas por família
   (DF23), gateway `AddEntityFrameworkStorage()` completo e paridade validada contra PostgreSQL 17 real. O host
   padrão e a composição de `Tests.Integration` continuam in-memory; trocar esse default é o Plano 4.
+- [plan-data-test-migration.md](plan-data-test-migration.md) — CONCLUÍDO (2026-07-29), 9/9 fases.
+  Sub-plano 4 do `plan-data-macro.md`: `RoyalIdentity.Server` exclusivamente PostgreSQL e externamente
+  provisionado; `RoyalIdentity.Demo` fixo em SQLite in-memory e self-provisioned; as três famílias no runner;
+  `Tests.Integration` integralmente sobre EF/SQLite + `UserAccounts`; contratos atômicos definitivos; fallback,
+  consumers transitórios e `RoyalIdentity.Storage.InMemory` removidos. O aceite local cobriu PostgreSQL 17,
+  migrations/histories das três famílias, gateway, concorrência, startup e authorization challenge OIDC.
 
 ## Em andamento
 
-Nenhum plano de implementação está ativo. O próximo item do macro-plano é criar
-`plan-data-test-migration.md` (Plano 4), que troca o backing padrão dos testes e do host e remove o fallback
-transitório junto com o fake. `plan-data-operational-storage.md` (Plano 3) foi concluído em 2026-07-26 (8/8) e
-entregou a família Operational sobre EF mais o gateway completo, ambos opt-in. Nenhum plano novo pode reabrir
-as semânticas fechadas na matriz do baseline.
+Nenhum plano de implementação está ativo. O primeiro corte de persistência (Planos 0-4) está concluído.
+O próximo item de produto executável deste roadmap é planejar `plan-session-administration.md`. Os Planos 5
+(caching) e 6 (audit/outbox) do macro permanecem opcionais e condicionados, respectivamente, a um mecanismo claro
+de invalidação administrativa e a um requisito real de durabilidade/integração. Nenhum plano novo pode reabrir as
+semânticas fechadas na matriz do baseline.
 
 ## Próximos planos
 
@@ -84,7 +90,7 @@ que nenhum deles fique grande demais:
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | Concluído (ver acima) |
 | 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; resources/scopes continuam voláteis) | Concluído (2026-07-22, 7/7) |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | Concluído (2026-07-26, 8/8) |
-| 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | Não criado |
+| 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | Concluído (2026-07-29, 9/9) |
 | 5 | `plan-data-caching.md` | Cache sobre os stores EF, quando a semântica estiver estável | Não criado (pode ficar fora do primeiro corte) |
 | 6 | `plan-data-audit-outbox.md` | Store durável de auditoria e outbox seletivo, se ainda fizer sentido | Não criado (pode ficar fora do primeiro corte) |
 

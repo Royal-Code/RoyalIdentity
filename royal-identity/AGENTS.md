@@ -39,29 +39,23 @@ which future EF providers reuse by adding fixtures only), and
 `.ai/plans/plan-data-configuration-storage.md` (7/7 phases: pure Configuration data model;
 SQLite/PostgreSQL mappings and migrations; EF stores for ServerOptions, realms, clients and signing keys;
 async snapshot; explicit Plain/Data Protection/AES key protectors; dedicated migration/seed runner and SQL;
-provider-neutral P2 contracts and acceptances validated against PostgreSQL 17 real). Treat each as the
+provider-neutral P2 contracts and acceptances validated against PostgreSQL 17 real),
+`.ai/plans/plan-data-operational-storage.md` (8/8 phases: Operational EF, atomic code/refresh transitions,
+cleanup/purge and the complete gateway), and `.ai/plans/plan-data-test-migration.md` (9/9 phases: production
+PostgreSQL composition, zero-configuration SQLite Demo, default integration fixtures on EF/SQLite +
+`UserAccounts`, definitive atomic contracts and removal of `RoyalIdentity.Storage.InMemory`). Treat each as the
 implemented target architecture before changing the area it covers.
 
-The active implementation plan is `.ai/plans/plan-data-test-migration.md` (Plan 4; Fases 1-5 complete).
-`.ai/plans/plan-data-operational-storage.md` (Plan 3) is COMPLETE
-(2026-07-26, 8/8): the Operational family is persisted over SQLite and PostgreSQL, authorization codes are
-single-use and refresh transitions conditional under real concurrency, authorize parameters are realm-bound with
-an absolute TTL, cleanup/purge exist behind an explicitly selected execution mode, and the complete EF gateway
-(`AddEntityFrameworkStorage`) composes both families. Plan 4 is swapping the default backing.
-
-Until Plan 4 is complete, resources/scopes remain volatile per baseline DF22. The production
-`RoyalIdentity.Server` is PostgreSQL-only and externally provisioned, while `RoyalIdentity.Demo` is a
-self-provisioned SQLite in-memory executable. `Tests.Host` is storage-agnostic. **The default composition of
-`Tests.Integration` still uses the in-memory fake**, now selected explicitly by its legacy `AppFactory`;
-`PersistentStorageAppFactory` is the opt-in integral SQLite composition until the default fixture changes.
-`Tests.Storage` runs on EF — SQLite always,
-PostgreSQL opt-in — for the contract, parity, concurrency, migration and gateway suites. The transitional
-non-atomic fallback in
-`DefaultAuthorizationCodeConsumer`/`DefaultRefreshTokenConsumer` exists for that in-memory default and is
-removed together with it, never before (ADR-018). New work must consume
+No implementation plan is currently active. Resources/scopes remain volatile per baseline DF22. The production
+`RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
+migrates or seeds. `RoyalIdentity.Demo` is a self-provisioned, ephemeral SQLite in-memory executable.
+`Tests.Host` is storage-agnostic, and the default `Tests.Integration` composition uses
+`PersistentStorageAppFactory` with EF/SQLite plus real `UserAccounts`. `Tests.Storage` runs SQLite by default and
+PostgreSQL opt-in for contracts, parity, concurrency, migrations and gateway suites. The former non-atomic
+consumers/fallbacks and storage fake no longer exist. New work must consume
 `.ai/plans/plan-data-storage-matrix.md` without re-inferring its closed semantics.
 
-Accepted architectural decisions live in `adrs/` (ADR-001..018). Read the relevant
+Accepted architectural decisions live in `adrs/` (ADR-001..019). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:
 `ADR-013` (modular architecture & boundaries — storages as facades) and `ADR-014`
 (users edge + session redesign, which **refines** `ADR-005`), implemented by
@@ -72,8 +66,8 @@ module — rich accounts, own persistence, `.Integration` adapter, claims seam
 `RoyalCode.*` ecosystem), which **amends** `ADR-013`; `ADR-017` (account security
 lifecycle — `RequiredAction`, `SecurityStamp`/`SessionsValidAfter`,
 `IUserSecurityStateProvider`/`ISessionRevocationService`), which **amends**
-`ADR-014`/`ADR-015`; and `ADR-018` (the in-memory storage fake is transitional —
-converge tests on the module + Sqlite, no further fake feature-parity), which
+`ADR-014`/`ADR-015`; and `ADR-018` (the in-memory storage fake was transitional —
+its convergence to module + SQLite and removal are now recorded in §4), which
 **amends** `ADR-013`/`ADR-014`/`ADR-015`.
 
 ## Commands
@@ -85,8 +79,12 @@ dotnet test Tests.Pipelines
 dotnet test Tests.Identity
 dotnet test Tests.Integration
 dotnet test Tests.Pipelines --filter "FullyQualifiedName~PipelineDispatcher_Must_Dispatch"
-dotnet run --project RoyalIdentity.Server
+dotnet run --project RoyalIdentity.Demo
+./scripts/Test-ServerPostgreSql.ps1
 ```
+
+For a persistent local `RoyalIdentity.Server`, follow `RoyalIdentity.Server/README.md`: PostgreSQL and the external
+migration runner must complete before the web host starts.
 
 Run the narrowest relevant test project after focused changes. Run
 `dotnet test RoyalIdentity.sln` for cross-cutting pipeline, realm, token, storage,
@@ -116,14 +114,14 @@ Respect the dependency layers:
 - `RoyalIdentity.Pipelines` is the dependency-free pipeline infrastructure layer.
 - `RoyalIdentity` depends on `RoyalIdentity.Pipelines` and owns domain,
   contracts, contexts, handlers, endpoints, options, events, and users.
-- `RoyalIdentity.Storage.InMemory` implements storage and depends on
-  `RoyalIdentity`.
+- `RoyalIdentity.Data.Configuration` and `.Operational` are pure persistence models.
+- `RoyalIdentity.Storage.EntityFramework` is the only adapter between `Data.*` and the core storage facades;
+  `.Sqlite`/`.PostgreSql` own provider mappings and migrations.
 - `RoyalIdentity.Razor` owns account UI components and UI services.
-- `RoyalIdentity.Server` is the host and wiring layer.
+- `RoyalIdentity.Server`, `RoyalIdentity.Demo` and `Tests.Host` are independent composition roots.
 
-Do not make `RoyalIdentity` depend on `RoyalIdentity.Storage.InMemory`,
-`RoyalIdentity.Server`, or UI projects. Do not make `RoyalIdentity.Pipelines`
-depend on domain code.
+Do not make `RoyalIdentity` depend on providers, hosts, modules or UI projects. Do not make `Data.*` depend on
+the core, and do not make `RoyalIdentity.Pipelines` depend on domain code.
 
 Rich domain modules (`RoyalIdentity.UserAccounts`, and future `RoyalIdentity.KMS`)
 follow a separate Feature-Slice architecture — see `.ai/foundation/architecture.md`.
@@ -165,11 +163,10 @@ edge data goes through `IUserDirectory` and its realm-bound ports, not through
 When adding storage operations:
 
 1. Add the method to the relevant interface under `RoyalIdentity/Contracts/Storage/`.
-2. Implement it in `RoyalIdentity.Storage.InMemory`.
-3. Update tests with in-memory storage; tests should not require an external DB.
-4. Add or update the provider-neutral contract tests in `Tests.Storage` (scenarios
-   never reference fake types; only the fixture/harness does) and record the
-   semantics in `.ai/plans/plan-data-storage-matrix.md`.
+2. Record ownership and semantics in `.ai/plans/plan-data-storage-matrix.md`.
+3. Implement it in the owning EF adapter/module and supported providers.
+4. Add or update provider-neutral contract tests in `Tests.Storage`; default scenarios use isolated SQLite and
+   PostgreSQL-specific acceptances remain local/opt-in.
 
 Cross-realm data access is an architectural bug. Preserve these invariants:
 

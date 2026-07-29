@@ -7,19 +7,27 @@ royal-identity/
 ├── .ai/foundation/          ← AI context files (this directory)
 ├── RoyalIdentity/           ← Core library: domain, contracts, contexts, handlers, endpoints
 ├── RoyalIdentity.Pipelines/ ← Pipeline infrastructure: abstractions, chains, dispatcher, mapping
-├── RoyalIdentity.Storage.InMemory/ ← In-memory storage implementation
+├── RoyalIdentity.Data.Configuration/ ← Pure Configuration persistence model
+├── RoyalIdentity.Data.Operational/   ← Pure Operational persistence model
+├── RoyalIdentity.Storage.EntityFramework/ ← Adapter from Data.* to core storage facades
+├── RoyalIdentity.Storage.EntityFramework.Sqlite/ ← SQLite provider/migrations
+├── RoyalIdentity.Storage.EntityFramework.PostgreSql/ ← PostgreSQL provider/migrations
+├── RoyalIdentity.UserAccounts*/ ← Pure account module, integration adapter and providers
+├── RoyalIdentity.Migrations/ ← External migration/seed runner for all three families
 ├── RoyalIdentity.Razor/     ← UI: Razor Components (Blazor Server)
-├── RoyalIdentity.Server/    ← Host: WebApplication, Program.cs, config
-├── RoyalIdentity.Users/     ← (directory exists, no active csproj — planned)
-├── RoyalIdentity.Web/       ← (directory exists, no active csproj — planned)
+├── RoyalIdentity.Server/    ← PostgreSQL-only production host
+├── RoyalIdentity.Demo/      ← Zero-configuration, ephemeral SQLite demo host
+├── Aspire/                  ← Local PostgreSQL orchestration and opt-in acceptance
 ├── Tests.Pipelines/         ← Unit tests for pipeline infrastructure
 ├── Tests.Integration/       ← End-to-end flow tests
-├── Tests.Host/              ← Hosted application tests
+├── Tests.Storage/           ← Provider-neutral storage contracts and provider acceptances
+├── Tests.UserAccounts/      ← Module contracts/use cases/provider acceptances
+├── Tests.Architecture/      ← Project/composition boundary guards
+├── Tests.Host/              ← Storage-agnostic WebApplicationFactory target
 ├── Tests.WebApp/            ← Web UI tests
 ├── Tests.Identity/          ← Identity/user tests
-├── Tests.Endpoints/         ← Endpoint creation tests
-├── ADR-002.md through ADR-005.md
-├── redesign-todo.md
+├── Tests.Security/          ← Shared security library tests
+├── adrs/                    ← Accepted architecture decisions
 └── Directory.Build.props    ← Root shared build config
 ```
 
@@ -30,16 +38,23 @@ royal-identity/
 ```
 RoyalIdentity.Server
   ├── RoyalIdentity.Razor
-  ├── RoyalIdentity.Storage.InMemory
+  ├── RoyalIdentity.Storage.EntityFramework
+  ├── RoyalIdentity.Storage.EntityFramework.PostgreSql
+  ├── RoyalIdentity.UserAccounts.Integration
+  ├── RoyalIdentity.UserAccounts.PostgreSql
   └── RoyalIdentity
-        └── RoyalIdentity.Pipelines    (no dependencies — base layer)
+        ├── RoyalIdentity.Pipelines    (no dependencies — base layer)
+        └── RoyalIdentity.Security     (shared crypto/key material)
 ```
 
 `RoyalIdentity.Pipelines` is the **only leaf project with no dependencies**. It defines all pipeline abstractions and infrastructure. Everything builds on it.
 
-`RoyalIdentity` depends only on `RoyalIdentity.Pipelines` and Microsoft.IdentityModel + ASP.NET Core packages. It must not take dependencies on storage implementations.
+`RoyalIdentity` depends on `RoyalIdentity.Pipelines`, `RoyalIdentity.Security` and platform/protocol packages. It
+must not take dependencies on storage implementations, hosts, UI or feature modules.
 
-`RoyalIdentity.Storage.InMemory` depends on `RoyalIdentity`.
+`RoyalIdentity.Storage.EntityFramework` is the only adapter that references both the core and the pure `Data.*`
+families. Provider projects own mappings/migrations. The pure `UserAccounts` module never references the core;
+only `RoyalIdentity.UserAccounts.Integration` knows both sides.
 
 ---
 
@@ -336,8 +351,8 @@ Users/                                  ← Edge (borda) facades + lean session 
   ISignOutManager.cs
 
   > The rich account model (IdentityUser/UserDetails/IUserStore/IUserDetailsStore/IdentitySession and
-  > the credentials-result structs) was removed (ADR-014 §2.11). The in-memory fake keeps its own account
-  > record (MemoryUserAccount) in RoyalIdentity.Storage.InMemory; the UserAccounts module replaces it later.
+  > the credentials-result structs) was removed (ADR-014 §2.11). The active implementation is the separate
+  > `RoyalIdentity.UserAccounts` family, adapted to this lean edge only by `.Integration`.
 
 Utils/
   Base64Url.cs
@@ -416,23 +431,25 @@ Extensions/
 ## Architectural Layers & Allowed Dependencies
 
 ```
-Layer 4: RoyalIdentity.Server (host, wiring)
-    ↓
-Layer 3: RoyalIdentity.Razor (UI) + RoyalIdentity.Storage.InMemory (data)
-    ↓
-Layer 2: RoyalIdentity (domain, contracts, endpoints, handlers, contexts)
-    ↓
-Layer 1: RoyalIdentity.Pipelines (infrastructure, no domain knowledge)
+Composition roots: RoyalIdentity.Server / RoyalIdentity.Demo
+    ├── UI: RoyalIdentity.Razor
+    ├── IdP adapter: Storage.EntityFramework → Data.Configuration / Data.Operational
+    ├── account adapter: UserAccounts.Integration → UserAccounts + provider
+    └── core: RoyalIdentity → Pipelines + Security
 ```
 
 **Dependency rules** (inferred from csproj):
 - `RoyalIdentity.Pipelines` → no project references (foundation layer)
-- `RoyalIdentity` → only `RoyalIdentity.Pipelines`
-- `RoyalIdentity.Storage.InMemory` → `RoyalIdentity`
+- `RoyalIdentity` → `RoyalIdentity.Pipelines` + `RoyalIdentity.Security`
+- `RoyalIdentity.Data.*` → EF/provider abstractions only; never core domain
+- `RoyalIdentity.Storage.EntityFramework` → `RoyalIdentity` + `RoyalIdentity.Data.*`
+- `RoyalIdentity.UserAccounts` → RoyalCode libraries + EF Core; never `RoyalIdentity`
+- `RoyalIdentity.UserAccounts.Integration` → core + module
 - `RoyalIdentity.Razor` → `RoyalIdentity`
-- `RoyalIdentity.Server` → all above
+- `RoyalIdentity.Server` → Razor, EF/PostgreSQL adapters, UserAccounts integration/PostgreSQL and core
 
-**Forbidden**: `RoyalIdentity` must NOT reference `RoyalIdentity.Storage.InMemory` or `RoyalIdentity.Server`. `RoyalIdentity.Pipelines` must NOT reference `RoyalIdentity`.
+**Forbidden**: `RoyalIdentity` must NOT reference providers, hosts, UI or feature modules.
+`RoyalIdentity.Data.*` must NOT reference the core. `RoyalIdentity.Pipelines` must NOT reference `RoyalIdentity`.
 
 ---
 
@@ -489,8 +506,9 @@ Constants: all protocol strings live in the single `Constants` static class (`Ro
 ### New Storage Operation
 
 1. Add method to relevant `I*Store` interface in `RoyalIdentity/Contracts/Storage/`
-2. Implement in `RoyalIdentity.Storage.InMemory` for `MemoryStorage`
-3. Any future SQL/Redis implementation must implement all store interfaces
+2. Record the owner and semantics in `.ai/plans/plan-data-storage-matrix.md`
+3. Implement it in `RoyalIdentity.Storage.EntityFramework` and both supported providers
+4. Add/update provider-neutral contracts in `Tests.Storage`; PostgreSQL-specific behavior remains opt-in
 
 ### New Option
 

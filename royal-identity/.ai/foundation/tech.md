@@ -128,24 +128,34 @@ All storage is abstracted. The main gateway is `IStorage`:
 - `IStorage.GetClientStore(realm)` → `IClientStore`
 - `IStorage.GetResourceStore(realm)` → resource store
 - `IStorage.GetKeyStore(realm)` → `IKeyStore`
-- `IStorage.GetRealmStore()` → realm data
+- `IStorage.Realms` → global realm catalog; every realm-owned store is reached through a `Realm`
 
 Individual store interfaces:
 - `IClientStore` — `FindClientByIdAsync`, `FindEnabledClientByIdAsync`
 - `IAccessTokenStore` — `StoreAsync`, `GetAsync`, `RemoveAsync`, `RemoveReferenceTokensAsync`
-- `IRefreshTokenStore` — CRUD for refresh tokens
-- `IAuthorizationCodeStore` — `StoreAuthorizationCodeAsync`, `GetAuthorizationCodeAsync`, `RemoveAuthorizationCodeAsync`
+- `IRefreshTokenStore` — store/read/remove plus mandatory conditional `TryConsumeAsync`/`TryUpdateAsync`
+- `IAuthorizationCodeStore` — store/read/remove plus mandatory atomic, binding-aware
+  `ConsumeAuthorizationCodeAsync`
 - `IAuthorizeParametersStore` — stores authorization request parameters (for redirect-based flows)
 - `IUserConsentStore` — `StoreUserConsentAsync`, `GetUserConsentAsync`, `RemoveUserConsentAsync`
 - `IKeyStore` — `ListAllCurrentKeysIdsAsync`, `ListAllKeysIdsAsync`, `GetKeyAsync`, `GetKeysAsync`
 - `IMessageStore` — protected data storage (uses data protection)
 - `IReplayCache` — nonce/code replay prevention
 
-### In-Memory Implementation (`RoyalIdentity.Storage.InMemory`)
+### Entity Framework implementations
 
-`MemoryStorage` uses `ConcurrentDictionary` for all stores. Pre-seeds four realms: Server, Account, Admin, Demo. This is the only current storage implementation — production persistence (SQL, etc.) is not yet implemented.
+`RoyalIdentity.Storage.EntityFramework` adapts the pure `RoyalIdentity.Data.Configuration` and
+`RoyalIdentity.Data.Operational` models to the core storage facades. The `.Sqlite` and `.PostgreSql` projects own
+provider mappings and migrations. `RoyalIdentity.UserAccounts` owns its separate persistence family and reaches
+the IdP only through `.Integration`.
 
-**Constraint**: Any new storage implementation must implement all store interfaces from `IStorage` downward. Never add persistence logic directly to domain services.
+`RoyalIdentity.Server` composes PostgreSQL only and never migrates or seeds. `RoyalIdentity.Migrations` provisions
+Configuration, Operational and UserAccounts externally, with one explicit connection per DbContext.
+`RoyalIdentity.Demo` and `Tests.Integration` use isolated SQLite in-memory databases; resources/scopes remain a
+deliberately volatile bridge pending their redesign.
+
+**Constraint**: Every adapter must satisfy the complete core contracts it exposes. Add persistence behavior to the
+owning store/module and its provider-neutral contract suite, never directly to domain services or handlers.
 
 ---
 
@@ -255,13 +265,20 @@ Explicit enable/disable flags for each endpoint. Future feature work that introd
 
 - `Directory.Build.props` — root-level shared properties (framework, nullable, package versions)
 - `tests.targets` — shared test configuration imported by all test projects
-- Standard `dotnet build` / `dotnet test` — no custom scripts observed
+- Standard `dotnet build` / `dotnet test`; `scripts/Test-*PostgreSql.ps1` provide disposable local opt-in
+  acceptances, and `Aspire/Aspire.AppHost` provides the persistent local orchestration
 
 ### Tests
 
-- All xUnit, in-memory storage
-- ADR-003 mandates: integration-focused, no external dependencies, no database
-- Test projects: `Tests.Pipelines`, `Tests.Integration`, `Tests.Host`, `Tests.WebApp`, `Tests.Identity`, `Tests.Endpoints`
+- All tests use xUnit.
+- `Tests.Integration` runs by default with EF/SQLite plus real `UserAccounts`; each fixture owns its databases and
+  Data Protection material.
+- `Tests.Storage` runs the provider-neutral contracts, migrations, concurrency and gateway suites on SQLite by
+  default and PostgreSQL 17 through explicit local opt-in scripts.
+- The solution-wide default remains self-contained: PostgreSQL and Aspire acceptances are opt-in and skipped when
+  their environment variables are absent.
+- Test projects include `Tests.Pipelines`, `Tests.Identity`, `Tests.Security`, `Tests.Storage`,
+  `Tests.UserAccounts`, `Tests.Integration`, `Tests.Architecture`, `Tests.Host`, `Tests.WebApp` and `Aspire.Tests`.
 - `Tests.Identity/read.md`: "focus on unit level and, when necessary, integration level — contexts, validators, decorators, handlers and default service implementations will be tested"
 
 ---
@@ -291,7 +308,8 @@ Standard JWT claim names (`sub`, `aud`, `iss`, `exp`, etc.) come from `JwtRegist
 
 1. **New endpoint**: create `*Endpoint : IEndpointHandler`, context class inheriting `EndpointContextBase`, register in `AddOpenIdConnectProviderServices`, add route in `MapOpenIdConnectProviderEndpoints`
 2. **New pipeline step**: implement `IValidator<T>`, `IDecorator<T>`, or `IHandler<T>` → register in DI → add to `builder.For<T>()` chain
-3. **New storage**: add interface to `IStorage`, implement in `MemoryStorage` first
+3. **New storage**: evolve the owner contract deliberately, implement the EF/module providers, update the
+   provider-neutral contracts in `Tests.Storage`, and preserve realm isolation
 4. **New option**: add property to appropriate `*Options` class; for realm-specific config, add to `RealmOptions`; for server-wide config, add to `ServerOptions`
 5. **Error signaling in validators**: set `context.Response` — never throw for expected validation failures
 6. **Decorator abort**: do not call `next()` to abort pipeline from a decorator
