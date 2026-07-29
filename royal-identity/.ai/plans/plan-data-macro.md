@@ -34,7 +34,7 @@ com SQLite/PostgreSQL, preservando as fronteiras da ADR-013:
 | 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração do IdP. **CONCLUÍDO (2026-07-22, 7/7 fases).** |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais do IdP. **CONCLUÍDO (2026-07-26, 8/8 fases).** |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real. **CONCLUÍDO (2026-07-29, 9/9 fases).** |
-| 5 | `plan-data-caching.md` | Adicionar cache sobre os stores EF quando a semântica estiver estável. |
+| 5 | `plan-data-caching.md` | Adicionar cache sobre os stores EF quando a semântica estiver estável. **NÃO NECESSÁRIO no momento:** o essencial já está coberto (ver Plano 5). |
 | 6 | `plan-data-audit-outbox.md` | Store durável de auditoria e outbox seletivo, se ainda fizer sentido. |
 
 Se o trabalho precisar ser menor, as ordens 1 e 2 podem ser unidas. As ordens 5
@@ -195,7 +195,22 @@ Saída entregue:
 
 **Escopo:** cache sobre stores EF já estáveis.
 
-Fases sugeridas:
+**Estado em 2026-07-29 — não criar este plano agora.** O que a fase 1 abaixo listaria como cacheável já está
+coberto pelos Planos 2 e 3, e o caminho quente não bate no banco:
+
+- **realms, clients e `ServerOptions`:** o snapshot de Configuration é cache em memória com publish atômico,
+  intervalo de refresh, last-known-good em falha e reload após write de realm. Discovery lê de lá;
+- **signing keys:** `RealmCaching`/`KeyCache` por realm, com TTL em `RealmOptions.Caching.KeyCacheDuration`;
+- **resources/scopes:** já são memória, pela bridge volátil da DF22 — não há leitura de banco a evitar.
+
+Sobra Operational, e é justamente onde cache é proibido: `ConsumeAuthorizationCodeAsync` (MP-2) e
+`TryConsumeAsync`/`TryUpdateAsync` (MP-3) perdem a atomicidade com leitura stale, e cachear
+`SecurityStamp`/`SessionsValidAfter` reabre a janela de revogação do ADR-017.
+
+**Gatilho para revisitar:** um endpoint com latência medida e atribuída a acesso a dados — não a expectativa de
+que cache seja bom por princípio. Sem esse número, o plano compra pouco e paga em risco de invalidação.
+
+Fases sugeridas, se o gatilho ocorrer:
 
 1. Classificar dados cacheáveis: discovery, realms, clients, scopes/resources e keys públicas.
 2. Definir invalidação por atualização administrativa.
@@ -206,7 +221,12 @@ Fases sugeridas:
 Não iniciar antes de:
 
 - configuração EF estar estável;
-- APIs administrativas ou mecanismo claro de update existirem.
+- APIs administrativas ou mecanismo claro de update existirem — sem caminho de escrita não há invalidação a testar.
+
+**Item que não deve herdar esta condicionalidade:** o replay cache com proteção real (RC-01/RC-02 da matriz,
+marcados `substituir`). O default `DefaultReplayNoCache` não oferece proteção contra replay de `jti` em
+`private_key_jwt`, e o check+add do caller não é atômico. Está parado aqui só porque este plano introduziria
+backing distribuído, mas é requisito de segurança, independente de performance, e deve ser tratado por si.
 
 ---
 
