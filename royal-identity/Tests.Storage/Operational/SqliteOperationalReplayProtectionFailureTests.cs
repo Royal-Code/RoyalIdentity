@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 using Tests.Storage.Operational.Support;
 
@@ -36,13 +37,13 @@ public class SqliteOperationalReplayProtectionFailureTests
         // that must rethrow rather than return false.
         interceptor.Arm();
 
-        var error = await Assert.ThrowsAnyAsync<Exception>(() => store.TryAddAsync(
+        // Typed on purpose: EF wraps a command failure raised during SaveChanges in DbUpdateException, which is
+        // the very type the store catches. Asserting it — rather than any exception — pins that the failure went
+        // through the branch that has to tell a conflict apart from an outage, instead of merely bypassing it.
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => store.TryAddAsync(
             realm.Id, Issuer, Purpose, "jti-1", Expiration, default));
 
-        Assert.Contains(
-            FailingInsertInterceptor.FailureMessage,
-            error.ToString(),
-            StringComparison.Ordinal);
+        Assert.Contains(Causes(error), cause => cause is DbUpdateStagedFailureException);
         Assert.Equal(0, await database.CountAsync("replay_handles"));
     }
 
@@ -83,14 +84,9 @@ public class SqliteOperationalReplayProtectionFailureTests
         Assert.NotEqual(digest.Compute("jti-1"), digest.Compute("jti-2"));
     }
 
-    // Length-prefixing is what makes the encoding unambiguous: two handles that a naive concatenation could not
-    // tell apart must still differ here.
-    [Fact]
-    public void Digest_SeparatesHandlesANaiveConcatenationWouldMerge()
+    private static IEnumerable<Exception> Causes(Exception exception)
     {
-        var digest = new ReplayHandleDigest();
-
-        Assert.NotEqual(digest.Compute("ab|c"), digest.Compute("ab|c "));
-        Assert.NotEqual(digest.Compute("a|bc"), digest.Compute("ab|c"));
+        for (var cause = exception; cause is not null; cause = cause.InnerException)
+            yield return cause;
     }
 }

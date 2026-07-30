@@ -4,12 +4,51 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 
 ---
 
+## Aderência RFC 9700 e assessment de clients
+
+**Identificador:** `BL-SEC-RFC9700`
+
+**Área:** OAuth2/OIDC / Segurança / Clients / Admin
+
+**Status:** Promovido a plano em 2026-07-30.
+
+**Plano:** [plan-rfc9700-security-hardening.md](../plans/plan-rfc9700-security-hardening.md).
+
+**Roadmap:** item “Aderência e hardening OAuth 2.0 conforme RFC 9700” de
+[plans-roadmap-02.md](../plans/plans-roadmap-02.md); a apresentação dos findings também se relaciona ao item
+“API e UI Administrativa”.
+
+**Deferral original:** a base herdada/rearquitetada do IS4 mantém alguns comportamentos configuráveis que não
+representam os defaults da BCP atual: redirect wildcard/ignore-case, implicit/hybrid e refresh token reutilizável.
+O password grant já foi removido desde o início. Antes do Admin expor essas opções, o core precisa aplicar defaults
+seguros, corrigir os requisitos não configuráveis e oferecer um diagnóstico derivado.
+
+**Quando revisitar:** após concluir `plan-replay-protection.md`; executar antes ou em paralelo à fundação do Admin,
+mas antes de publicar telas de configuração de clients.
+
+**Decisões de design:**
+
+- Não criar `OAuthSecurityProfile` ou preset equivalente.
+- Criar `ClientSecurityAssessment` com factory method puro e findings identificados por `RuleId`.
+- Não criar `IClientSecurityAssessor`, snapshot, cache ou persistência do assessment.
+- Calcular o assessment a partir do `Client` e das opções efetivas do realm.
+- Manter somente comparação case-insensitive e wildcard de redirect como relaxamentos configuráveis, ambos
+  desabilitados por default e classificados como não aderentes.
+- Corrigir PKCE downgrade, front-channel legado, replay de refresh, clickjacking, metadata e logs sem switches de
+  compatibilidade.
+- O futuro Admin calcula o resultado em leitura/após edição, localiza a apresentação por `RuleId` e nunca grava
+  status/findings derivados.
+
+---
+
 ## Gestão de Realms via API Administrativa
 
 **Área:** Realm / Admin API
 **Deferral:** A camada de domínio (`IRealmManager`) é criada no `plan-realm-hardening.md`. Endpoints REST e UI ficam para quando a demanda por administração remota for real.
 **Quando revisitar:** Ao iniciar o desenvolvimento de APIs administrativas ou do painel admin.
-**Nota de design:** Endpoints em `/{admin}/manage/realms/*` como Minimal APIs, no realm `admin` já existente como constante.
+**Nota de design:** Endpoints em `/{admin}/manage/realms/*` como Minimal APIs, no realm `admin` já existente como
+constante. O CRUD de clients/realm deve consumir `ClientSecurityAssessment` conforme
+[plan-rfc9700-security-hardening.md](../plans/plan-rfc9700-security-hardening.md), sem persistir o resultado.
 
 ---
 
@@ -18,6 +57,11 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 **Área:** UI / Admin
 **Deferral:** O realm `admin` existe como constante mas não tem páginas. Depende da API administrativa e de decisões de UX sobre o painel.
 **Quando revisitar:** Junto com a API administrativa.
+**Relações:** item “API e UI Administrativa” de [plans-roadmap-02.md](../plans/plans-roadmap-02.md) e
+[plan-rfc9700-security-hardening.md](../plans/plan-rfc9700-security-hardening.md).
+**Nota de design:** Nas telas de client, calcular o assessment em tempo real; mostrar
+`Compliant`/`Warning`/`NonCompliant`, localizar mensagens por `RuleId` e destacar opções de redirect relaxadas
+como inseguras/não aderentes. Não criar tabela, snapshot ou campo persistido para assessment/findings.
 
 ---
 

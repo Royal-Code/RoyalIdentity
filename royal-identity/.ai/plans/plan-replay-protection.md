@@ -773,21 +773,39 @@ de entity types (`OperationalModelTests`, migration tests dos dois providers,
    unicidade exigida é a própria **primary key**. `tech.md` deixou de anunciar o backing durável como futuro.
 5. **Risco novo registrado: mudança de versão do digest.** Elevar `CurrentVersion` não é operação livre. Num
    rolling deployment as duas versões servem ao mesmo tempo, e um handle registrado por instância antiga não
-   colide na nova — replay reaberto enquanto as assertions em voo valerem, limitado por
-   `ClientAssertionMaxLifetime`. O XML doc do tipo passou a exigir janela de deploy maior que o teto sem
-   instância antiga servindo, ou transição escrevendo os dois digests. Linha correspondente na tabela de riscos.
+   colide na nova — replay reaberto enquanto as assertions em voo continuarem aceitáveis. O XML doc do tipo e a
+   tabela de riscos passaram a exigir uma janela de silêncio sem instância antiga servindo, ou transição
+   mantendo os dois digests compatíveis.
+
+**Segunda revisão externa (2026-07-30)**
+
+- **A janela de troca de versão estava subestimada.** Eu havia escrito `ClientAssertionMaxLifetime`; a janela
+  correta é `ClientAssertionMaxLifetime + ClockSkew`. O teto limita o quão à frente o `exp` pode estar, mas o
+  evaluator retém o registro até `exp + ClockSkew` — é a própria fórmula do invariante 6, e minha nota
+  contradizia o código que eu mesmo documentei. Nos valores atuais são **15 minutos, não 10**, e a contagem só
+  começa quando a **última** instância antiga para de registrar. Corrigido no tipo e na tabela de riscos. Sem
+  defeito no código enquanto `CurrentVersion` for 1.
+- **`Assert.ThrowsAnyAsync<Exception>` era fraco demais.** Verifiquei por sonda que EF embrulha a falha do
+  interceptor em `DbUpdateException`, com a exceção staged na cadeia de `InnerException` — ou seja, o `catch`
+  da store é mesmo percorrido. O teste passou a `Assert.ThrowsAsync<DbUpdateException>` mais a asserção da causa
+  na cadeia, fixando estruturalmente que a falha entrou pelo ramo que precisa distinguir conflito de
+  indisponibilidade, em vez de apenas contorná-lo.
+- **`Digest_SeparatesHandlesANaiveConcatenationWouldMerge` não demonstrava o que dizia.** Com `purpose` fora do
+  digest resta um único campo variável, e o handle é o último — nenhuma concatenação ingênua fundiria dois
+  handles distintos. O teste apenas comparava handles diferentes, o que `Digest_DependsOnTheHandleAlone` já
+  cobre. Removido; o vetor conhecido continua fixando a codificação.
 
 **Verificação**
 
 ```
 dotnet build RoyalIdentity.sln            → 0 erros
-dotnet test RoyalIdentity.sln             → 1211 aprovados, 0 falhas, 49 ignorados
+dotnet test RoyalIdentity.sln             → 1210 aprovados, 0 falhas, 49 ignorados
 ./scripts/Test-OperationalPostgreSql.ps1  → 47 aprovados, 0 falhas (PostgreSQL 17 real, porta dinâmica)
 podman ps -a                              → nenhum container residual
 ```
 
 Por suíte: Tests.Security 116; Tests.Identity 47; Tests.Pipelines 3; Tests.UserAccounts 187 (+1 opt-in);
-Tests.Storage 502 (+47 opt-in); Tests.Architecture 63; Tests.Integration 293; Aspire.Tests 0 (+1 opt-in).
+Tests.Storage 501 (+47 opt-in); Tests.Architecture 63; Tests.Integration 293; Aspire.Tests 0 (+1 opt-in).
 
 ---
 
@@ -907,7 +925,7 @@ dotnet test RoyalIdentity.sln
 | Server publicado entre as Fases 1 e 2 | deploy multi-instância com a in-memory declarada | proteção por processo, não compartilhada entre réplicas | sequência declarada não liberável; Fase 2 troca o Server para a durável | Fechado na Fase 2 |
 | In-memory cresce indefinidamente | host longevo com a in-memory declarada e sem poda | consumo de memória proporcional ao volume de autenticações | DF20: poda periódica por `TimeProvider`, fora do caminho de decisão | Mitigado |
 | Digest tratado como confidencialidade | `jti` previsível e acesso ao banco no threat model | enumeração por dicionário sobre os digests | DF17 declara o escopo; troca por digest autenticado é alteração isolada | Aceito |
-| Mudança de versão do digest reabre replay | `ReplayHandleDigest.CurrentVersion` alterado e rolling deployment com as duas versões servindo | um handle registrado por instância antiga não colide na nova; replay aceito enquanto as assertions em voo valerem, limitado por `ClientAssertionMaxLifetime` | documentado no próprio tipo: mudar a versão exige janela de deploy maior que o teto sem instância antiga servindo, ou transição que escreva os dois digests até os antigos expirarem | Aberto (nenhuma mudança de versão planejada) |
+| Mudança de versão do digest reabre replay | `ReplayHandleDigest.CurrentVersion` alterado e rolling deployment com as duas versões servindo | um handle registrado por instância antiga não colide na nova; replay aceito por `ClientAssertionMaxLifetime + ClockSkew` — o teto limita o `exp`, e a assertion segue aceitável até `exp + skew`, ou seja 15 min nos valores atuais, contados a partir do momento em que a **última** instância antiga parar de registrar | documentado no próprio tipo: exige janela de silêncio maior que essa soma sem instância antiga servindo, ou transição mantendo os dois digests compatíveis durante ela | Aberto (nenhuma mudança de versão planejada) |
 | Guard aceita implementação errada | guard só rejeita no-op | in-memory registrada no Server passa despercebida | Fase 3 exige guard por implementação específica | Mitigado |
 | Teste de concorrência passa por acaso | duas chamadas serializadas pelo harness | corrida não é exercitada | reusar o formato dos testes de MP-2, que já provam paralelismo real | Mitigado — confirmado real na Fase 2: com 2 chamadores o mutante fiel passa, com 8 falha; a teoria roda os dois |
 | `jti` aparece em log ou exceção | mensagem de erro inclui o handle | vazamento de valor de credencial em texto | asserção negativa nos testes de mensagem (DF5) | Aberto |

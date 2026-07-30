@@ -69,11 +69,15 @@ definida em `../analisys/`.
 
 ## Em andamento
 
-Nenhum plano de implementação está ativo. O primeiro corte de persistência (Planos 0-4) está concluído.
-O próximo item de produto executável deste roadmap é planejar `plan-session-administration.md`. Os Planos 5
-(caching) e 6 (audit/outbox) do macro permanecem opcionais e condicionados, respectivamente, a um mecanismo claro
-de invalidação administrativa e a um requisito real de durabilidade/integração. Nenhum plano novo pode reabrir as
-semânticas fechadas na matriz do baseline.
+[plan-replay-protection.md](plan-replay-protection.md) está EM ANDAMENTO, com as Fases 1-2 concluídas e a Fase 3
+de aceites/fechamento pendente. Depois desse fechamento, o próximo plano de segurança executável é
+[plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
+“Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md).
+
+O primeiro corte de persistência (Planos 0-4) está concluído. Os Planos 5 (caching) e 6 (audit/outbox) do macro
+permanecem opcionais e condicionados, respectivamente, a um mecanismo claro de invalidação administrativa e a um
+requisito real de durabilidade/integração. Nenhum plano novo pode reabrir as semânticas fechadas na matriz do
+baseline; o plano RFC 9700 apenas as estende onde a rotação/família de refresh token exigir.
 
 ## Próximos planos
 
@@ -98,7 +102,32 @@ que nenhum deles fique grande demais:
 da ADR-013). Critério para avançar de 0 para 1: `UserAccounts` com schema versionado, seed único e concorrência
 real testada.
 
-### 2. Administração de Sessões por Dispositivo
+### 2. Aderência e hardening OAuth 2.0 conforme RFC 9700
+
+**Plano criado:** [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md)
+(RASCUNHO — 0/6 fases)
+
+**Backlog relacionado:** item “Aderência RFC 9700 e assessment de clients” em
+[backlog-001.md](../backlogs/backlog-001.md).
+
+Estabelece defaults seguros e enforcement para os requisitos aplicáveis do RFC 9700 sem criar um
+`OAuthSecurityProfile`. O estado real de `Client` + `RealmOptions` é avaliado sob demanda por
+`ClientSecurityAssessment.Create(...)`; assessment e findings não são persistidos.
+
+Escopo principal:
+
+- `ClientSecurityAssessment` determinístico, com `RuleId` e `ClientSecurityFinding`.
+- Redirect URI ordinal/sem wildcard por default, com os dois relaxamentos configuráveis por realm e classificados
+  como não aderentes.
+- Correção de PKCE downgrade e remoção de implicit/hybrid/front-channel token.
+- Rotação de refresh token com família, retry sem ramificação e revogação no replay.
+- Clickjacking, referrer, metadata/mTLS, issuer identification e redação de logs.
+- Contrato/handoff para o futuro Admin calcular e apresentar findings em tempo real, sem snapshot.
+
+O plano depende do fechamento de `plan-replay-protection.md`. A apresentação administrativa depende também do
+item 4 deste roadmap; a implementação do core não depende da existência do Admin.
+
+### 3. Administração de Sessões por Dispositivo
 
 **Plano sugerido:** `plan-session-administration.md`
 
@@ -114,9 +143,16 @@ Escopo principal:
 A sessão básica já é coberta pelo `plan-users-edge-session.md` (concluído). Este plano trata a camada
 administrativa e operacional mais rica.
 
-### 3. API e UI Administrativa
+### 4. API e UI Administrativa
 
 **Plano sugerido:** `plan-admin-api-ui.md`
+
+**Backlogs relacionados:** “Gestão de Realms via API Administrativa”, “UI Administrativa (realm `admin`)” e
+“Aderência RFC 9700 e assessment de clients” em [backlog-001.md](../backlogs/backlog-001.md).
+
+**Dependência de segurança:** consumir o contrato entregue por
+[plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), calcular o assessment em leitura/após
+edição, localizar mensagens por `RuleId` e nunca persistir status/findings derivados.
 
 Criação das APIs e telas administrativas, em projetos separados dos módulos de domínio.
 
@@ -131,7 +167,7 @@ Escopo principal:
 Este plano depende das decisões de API/UI administrativa e deve respeitar a regra da ADR-013: módulos contêm
 domínio + persistência; API e UI ficam separados.
 
-### 4. Federation / Identity Brokering
+### 5. Federation / Identity Brokering
 
 **Plano sugerido:** `plan-federation-identity-brokering.md`
 
@@ -148,7 +184,7 @@ Escopo principal:
 
 O `plan-users-edge-session.md` preparou a costura para métodos externos, mas não implementa federação.
 
-### 5. MFA e Passwordless
+### 6. MFA e Passwordless
 
 **Plano sugerido:** `plan-auth-methods-mfa-passwordless.md`
 
@@ -164,7 +200,7 @@ Escopo principal:
 
 Este plano depende do módulo de contas e do ciclo de credenciais já concluídos (ambos estão — ver "Concluído").
 
-### 6. Key Management Service
+### 7. Key Management Service
 
 **Plano sugerido:** `plan-kms.md`
 
@@ -188,6 +224,8 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 2. ~~Criar e executar o sub-plano 1 do `plan-data-macro.md` (storage-baseline).~~ CONCLUÍDO. Criar e executar
    os sub-planos 2-4 (configuration-storage → operational-storage → test-migration); avaliar caching e
    audit-outbox (5-6) depois, só se ainda fizerem sentido no momento.
-3. Evoluir administração de sessões por dispositivo.
-4. Criar API/UI administrativa.
-5. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.
+3. Concluir `plan-replay-protection.md` (Fase 3).
+4. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
+5. Evoluir administração de sessões por dispositivo.
+6. Criar API/UI administrativa, consumindo `ClientSecurityAssessment`.
+7. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.

@@ -4,7 +4,7 @@
 
 - **Target Framework**: .NET 10.0 (`net10.0`), `LangVersion: latest`
 - **Global settings** (Directory.Build.props): `ImplicitUsings = enable`, `Nullable = enable`
-- **Package version pins**: `AspVer=10.0.0`, `ExtVer=10.0.0`, `IdVer=8.14.0` — all package refs use these properties
+- **Package version pins**: `AspVer=10.0.0`, `ExtVer=10.0.0`, `IdVer=8.21.0` — all package refs use these properties
 - The repo carries an upgrade path through net7.0/net8.0/net9.0 to the current **net10.0**
 
 ---
@@ -19,7 +19,7 @@
 - Razor Components (Blazor Server) for UI
 - Cookie Authentication + custom Policy Scheme for realm-based session management
 
-### Token / Identity (8.14.0)
+### Token / Identity (8.21.0)
 
 - `Microsoft.IdentityModel.Protocols.OpenIdConnect` — OIDC protocol types, OpenIdConnectGrantTypes
 - `Microsoft.IdentityModel.Tokens` — SecurityKey, token validation parameters

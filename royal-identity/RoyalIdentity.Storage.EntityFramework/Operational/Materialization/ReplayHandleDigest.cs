@@ -26,8 +26,9 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 /// </para>
 /// <para>
 ///     Fields are length-prefixed rather than joined by a separator, so no combination of inputs can produce the
-///     same digest as a different combination — including a handle containing whatever character a separator
-///     would have used.
+///     same digest as a different combination. With the handle as the only variable field that property is not
+///     yet load-bearing — the fixed prefix already separates any two handles. It is what makes adding a field
+///     later safe, and the known-answer vector in the tests pins the encoding so a change cannot pass unnoticed.
 /// </para>
 /// </summary>
 public sealed class ReplayHandleDigest
@@ -41,9 +42,15 @@ public sealed class ReplayHandleDigest
     ///     stop matching. Cleanup will remove them in time, which is harmless on its own — but during a rolling
     ///     deployment the two versions run side by side, and a handle registered by an old instance does not
     ///     collide with the same handle presented to a new one. That reopens replay for as long as the artifacts
-    ///     in flight stay valid, bounded by <c>Authentication.ClientAssertionMaxLifetime</c>. A version change
-    ///     therefore needs either a deployment window longer than that ceiling with no old instance still
-    ///     serving, or a transition that writes both digests until the old ones have expired.
+    ///     in flight stay acceptable.
+    /// </para>
+    /// <para>
+    ///     That window is <c>Authentication.ClientAssertionMaxLifetime + ClockSkew</c>, not the ceiling alone:
+    ///     the ceiling bounds how far ahead <c>exp</c> may sit, and the assertion stays acceptable — and its
+    ///     record retained — until <c>exp</c> plus the tolerated skew. At today's values that is 15 minutes, not
+    ///     10, and it starts counting only once the <b>last</b> old instance has stopped registering handles.
+    ///     A version change therefore needs either a deployment quiet period longer than that sum with no old
+    ///     instance still serving, or a transition that keeps both digests compatible throughout it.
     /// </para>
     /// </summary>
     public const int CurrentVersion = 1;
