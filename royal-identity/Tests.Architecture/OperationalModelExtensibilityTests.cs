@@ -27,6 +27,7 @@ public class OperationalModelExtensibilityTests
         typeof(UserSessionEntity),
         typeof(UserSessionClientEntity),
         typeof(AuthorizeParametersEntity),
+        typeof(ReplayHandleEntity),
     ];
 
     private static readonly Type[] ConfigurationEntityTypes =

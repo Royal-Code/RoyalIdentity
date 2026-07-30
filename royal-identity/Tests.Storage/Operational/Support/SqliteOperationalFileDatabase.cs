@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
@@ -65,6 +66,7 @@ internal sealed class SqliteOperationalFileDatabase : IAsyncDisposable
             },
             ServiceLifetime.Scoped);
         collection.AddEntityFrameworkOperationalStorage<OperationalSqliteDbContext>();
+        collection.AddOperationalReplayProtection();
         collection.AddOperationalAesGcmPayloadProtection(
             OperationalStorageOptions.DefaultPayloadProtectionProfile, [.. ProtectorKey]);
 
@@ -122,6 +124,10 @@ internal sealed class SqliteOperationalFileDatabase : IAsyncDisposable
 
     public IOperationalStoreFactory StoresOf(AsyncServiceScope scope)
         => scope.ServiceProvider.GetRequiredService<IOperationalStoreFactory>();
+
+    /// <summary>The durable replay-protection backing of this scope, over this scope's own connection.</summary>
+    public IReplayProtectionStore ReplayProtectionOf(AsyncServiceScope scope)
+        => scope.ServiceProvider.GetRequiredService<IReplayProtectionStore>();
 
     /// <summary>Removes a session out-of-band, standing in for cleanup or a realm purge.</summary>
     public async Task DeleteSessionAsync(string sessionId)

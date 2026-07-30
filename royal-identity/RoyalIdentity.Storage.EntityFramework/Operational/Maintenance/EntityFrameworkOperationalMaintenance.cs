@@ -57,8 +57,17 @@ internal sealed class EntityFrameworkOperationalMaintenance(
             Set<AuthorizeParametersEntity>().Where(record => record.ExpiresAtUtc <= now),
             batchSize, ct);
 
+        // Replay handles are strict, and this is the one boundary worth spelling out: a handle's ExpiresAtUtc is
+        // the artifact's own expiration plus the clock skew the validation tolerates, and the validation accepts
+        // up to that instant inclusive. Deleting at `now == ExpiresAtUtc` would therefore drop the protection at
+        // the last instant the artifact it protects can still be replayed.
+        var replayHandles = await DeleteBatchAsync(
+            Set<ReplayHandleEntity>().Where(record => record.ExpiresAtUtc < now),
+            batchSize, ct);
+
         return new OperationalCleanupReport(
-            accessTokens, refreshTokens, authorizationCodes, consents, sessions, authorizeParameters);
+            accessTokens, refreshTokens, authorizationCodes, consents, sessions, authorizeParameters,
+            replayHandles);
     }
 
     public async Task<OperationalPurgeReport> PurgeRealmAsync(string realmId, CancellationToken ct = default)
@@ -89,7 +98,12 @@ internal sealed class EntityFrameworkOperationalMaintenance(
             .Where(record => record.RealmId == realmId)
             .ExecuteDeleteAsync(ct);
 
-        return new OperationalPurgeReport(artifacts, consents, sessions, authorizeParameters);
+        var replayHandles = await Set<ReplayHandleEntity>()
+            .Where(record => record.RealmId == realmId)
+            .ExecuteDeleteAsync(ct);
+
+        return new OperationalPurgeReport(
+            artifacts, consents, sessions, authorizeParameters, replayHandles);
     }
 
     /// <summary>

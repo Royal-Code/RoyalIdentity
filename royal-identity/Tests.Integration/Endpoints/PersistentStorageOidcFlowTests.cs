@@ -167,9 +167,13 @@ public class PersistentStorageOidcFlowTests : IClassFixture<PersistentStorageApp
         Assert.Contains(
             await configuration.Database.GetAppliedMigrationsAsync(),
             id => id.EndsWith("_InitialConfiguration", StringComparison.Ordinal));
-        Assert.All(
-            await operational.Database.GetAppliedMigrationsAsync(),
-            id => Assert.EndsWith("_InitialOperational", id, StringComparison.Ordinal));
+        // Stated as set equality rather than as a name suffix, so it keeps meaning what it says as each family
+        // gains migrations: each history holds exactly its own family's evolution line.
+        Assert.Equal(
+            operational.Database.GetMigrations().Order(StringComparer.Ordinal),
+            (await operational.Database.GetAppliedMigrationsAsync()).Order(StringComparer.Ordinal));
+        Assert.Empty((await configuration.Database.GetAppliedMigrationsAsync())
+            .Intersect(await operational.Database.GetAppliedMigrationsAsync(), StringComparer.Ordinal));
     }
 
     private async Task<HttpResponseMessage> PostTokenAsync(

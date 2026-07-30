@@ -69,6 +69,15 @@ public static class SqliteOperationalModelBuilderExtensions
             entity.Property(e => e.HandleDigest).UseCollation(Ordinal);
         });
 
+        // Every column of this table backs the key that decides replay, so every one of them is pinned.
+        modelBuilder.Entity<ReplayHandleEntity>(entity =>
+        {
+            entity.Property(e => e.RealmId).UseCollation(Ordinal);
+            entity.Property(e => e.Issuer).UseCollation(Ordinal);
+            entity.Property(e => e.Purpose).UseCollation(Ordinal);
+            entity.Property(e => e.HandleDigest).UseCollation(Ordinal);
+        });
+
         return modelBuilder;
     }
 

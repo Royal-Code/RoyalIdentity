@@ -96,10 +96,10 @@ public static class HostServices
         services.AddAspNetDataProtectionKeyMaterialProtector();
         services.AddEntityFrameworkStorage();
 
-        // plan-replay-protection Fase 1. Protection is per process until Fase 2 delivers the Operational
-        // backing, so do not publish a replicated deployment of the Server between the two phases: replicas
-        // would each protect only what they saw themselves.
-        services.AddInMemoryReplayProtection();
+        // Replay handles live in the Operational database, so every replica of this host shares them. The
+        // in-memory backing would give each replica its own view and let a replayed assertion succeed against a
+        // replica that had not seen it (plan-replay-protection DF10).
+        services.AddOperationalReplayProtection();
 
         services.AddUserAccountsPostgreSqlConnection(userAccountsConnection);
         services.AddUserAccountsForRoyalIdentity();

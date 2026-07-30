@@ -203,10 +203,19 @@ record is retained a conflict answers replay — implementations never consult i
 depends on the clock or on pruning.
 
 `AddOpenIdConnectProviderServices()` registers **no default**. Each composition root declares its backing —
-`AddInMemoryReplayProtection()` (single instance only; warns on construction) — and
+`AddInMemoryReplayProtection()` (single instance only; warns on construction) or
+`AddOperationalReplayProtection()` (durable, shared by every instance reading the same Operational database) — and
 `ReplayProtectionStartupValidator` fails startup, in every environment, when a composition declares none, more
 than one, or one inconsistent with the store actually resolved. `WebApplication.CreateBuilder` only enables
 container validation in Development, which is why the check is a hosted service and not left to `ValidateOnBuild`.
+
+The durable backing is table `replay_handles`, whose primary key `(realm_id, issuer, purpose, handle_digest)` is
+itself the decision: the second insert violates it, and that violation is the answer. The handle is stored as a
+`ReplayHandleDigest` — length-prefixed fields, versioned — which deliberately does not reuse
+`OperationalLookupDigest`, because that type skips HMAC on the grounds that its handles are generated here with
+high entropy and a `jti` is chosen by the client. Cleanup of replay handles is strict (`ExpiresAtUtc < now`): a
+handle's expiration already includes the tolerated clock skew, and the artifact is still acceptable at that exact
+instant.
 
 How far ahead an assertion may claim to expire is capped by `Authentication.ClientAssertionMaxLifetime` (default
 10 minutes; accepted range 1 second to 1 hour), so the record's retention is a server value and not the client's

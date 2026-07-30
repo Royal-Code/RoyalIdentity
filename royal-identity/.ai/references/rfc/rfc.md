@@ -13,6 +13,10 @@ RFC 9728
 OAuth 2.0 Protected Resource Metadata
 https://www.rfc-editor.org/rfc/rfc9728.html
 
+RFC 9126
+OAuth 2.0 Pushed Authorization Requests
+https://www.rfc-editor.org/info/rfc9126/
+
 ---
 
 RFC 9709

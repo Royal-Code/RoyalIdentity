@@ -25,4 +25,7 @@ public static class OperationalRecordTypes
 
     /// <summary>Authorize-parameters continuations (table <c>authorize_parameters</c>).</summary>
     public const string AuthorizeParameters = "authorize_parameters";
+
+    /// <summary>Replay-protection handles (table <c>replay_handles</c>).</summary>
+    public const string ReplayHandle = "replay_handles";
 }

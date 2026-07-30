@@ -46,13 +46,21 @@ PostgreSQL composition, zero-configuration SQLite Demo, default integration fixt
 `UserAccounts`, definitive atomic contracts and removal of `RoyalIdentity.Storage.InMemory`). Treat each as the
 implemented target architecture before changing the area it covers.
 
-`.ai/plans/plan-replay-protection.md` is **active (1/3 phases)**. Fase 1 replaced `IReplayCache` with
+`.ai/plans/plan-replay-protection.md` is **active (2/3 phases)**. Fase 2 delivered the durable backing over the
+Operational family: table `replay_handles`, whose primary key `(realm_id, issuer, purpose, handle_digest)` **is**
+the decision — a conflict answers replay with no prior read and no expiration comparison (DF8) — plus its own
+length-prefixed `ReplayHandleDigest`, which deliberately does not reuse `OperationalLookupDigest` because that
+type's high-entropy justification does not transfer to a client-chosen `jti`. `RoyalIdentity.Server` declares
+`AddOperationalReplayProtection()`; `RoyalIdentity.Demo` and the test fixtures stay in-memory. Cleanup of replay
+handles is strict (`ExpiresAtUtc < now`): the artifact is still acceptable at that exact instant.
+
+Fase 1 replaced `IReplayCache` with
 `IReplayProtectionStore` — one atomic `TryAddAsync`, keyed by realm and issuer, taking a `CancellationToken`. There
 is **no default registration**: every composition root declares its backing (`AddInMemoryReplayProtection()` today,
 `AddOperationalReplayProtection()` in Fase 2), and `ReplayProtectionStartupValidator` fails startup in any
 environment when none, two, or an inconsistent strategy is declared. `Authentication.ClientAssertionMaxLifetime`
 (default 10 minutes, range 1 second–1 hour) caps how far ahead a client assertion may expire, so retention is a
-server value. Fases 1 and 2 form a non-releasable sequence: do not publish a replicated Server between them.
+server value. The non-releasable window between Fases 1 and 2 is closed: the Server no longer holds per-process protection.
 
 Resources/scopes remain volatile per baseline DF22. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never

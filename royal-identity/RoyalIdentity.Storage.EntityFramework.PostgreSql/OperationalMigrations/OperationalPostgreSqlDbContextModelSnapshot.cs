@@ -188,6 +188,40 @@ namespace RoyalIdentity.Storage.EntityFramework.PostgreSql.OperationalMigrations
                     b.ToTable("protocol_artifacts", "operation");
                 });
 
+            modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.ReplayHandleEntity", b =>
+                {
+                    b.Property<string>("RealmId")
+                        .HasColumnType("text")
+                        .HasColumnName("realm_id")
+                        .UseCollation("C");
+
+                    b.Property<string>("Issuer")
+                        .HasColumnType("text")
+                        .HasColumnName("issuer")
+                        .UseCollation("C");
+
+                    b.Property<string>("Purpose")
+                        .HasColumnType("text")
+                        .HasColumnName("purpose")
+                        .UseCollation("C");
+
+                    b.Property<string>("HandleDigest")
+                        .HasColumnType("text")
+                        .HasColumnName("handle_digest")
+                        .UseCollation("C");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.HasKey("RealmId", "Issuer", "Purpose", "HandleDigest");
+
+                    b.HasIndex("ExpiresAtUtc")
+                        .HasDatabaseName("ix_replay_handles_expiration");
+
+                    b.ToTable("replay_handles", "operation");
+                });
+
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.UserSessionClientEntity", b =>
                 {
                     b.Property<string>("RealmId")

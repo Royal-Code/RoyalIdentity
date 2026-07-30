@@ -130,6 +130,26 @@ public static class OperationalModelBuilderExtensions
             entity.HasIndex(e => e.ExpiresAtUtc).HasDatabaseName("ix_authorize_parameters_expiration");
         });
 
+        modelBuilder.Entity<ReplayHandleEntity>(entity =>
+        {
+            entity.ToTable("replay_handles", schema);
+
+            // The key is the protection (plan-replay-protection DF13): the second insert of the same identity
+            // violates it, and that violation is what answers replay. It is the primary key rather than a
+            // separate unique index because there is nothing else to identify a row by, and — like every table
+            // in this family — it starts with realm_id (plan DF5).
+            entity.HasKey(e => new { e.RealmId, e.Issuer, e.Purpose, e.HandleDigest });
+            entity.Property(e => e.RealmId).HasColumnName("realm_id");
+            entity.Property(e => e.Issuer).HasColumnName("issuer");
+            entity.Property(e => e.Purpose).HasColumnName("purpose");
+            entity.Property(e => e.HandleDigest).HasColumnName("handle_digest");
+            entity.Property(e => e.ExpiresAtUtc).HasColumnName("expires_at_utc");
+
+            // The only query this table ever serves besides the insert: the cleanup sweep, which filters on
+            // expiration alone. Everything realm-bound is already served by the primary key.
+            entity.HasIndex(e => e.ExpiresAtUtc).HasDatabaseName("ix_replay_handles_expiration");
+        });
+
         return modelBuilder;
     }
 }

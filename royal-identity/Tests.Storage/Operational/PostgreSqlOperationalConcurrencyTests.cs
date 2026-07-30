@@ -25,6 +25,7 @@ public class PostgreSqlOperationalConcurrencyTests
     private const string ClientId = "client-race";
     private const string RedirectUri = "https://client.contract.test/callback";
     private const string Handle = "rt-contended";
+    private const string ReplayPurpose = "PrivateKeyJwtSecretEvaluator";
 
     // MP-2: N consumers, one code, exactly one gets it — and the code is gone afterwards.
     [StoragePostgreSqlFact]
@@ -54,6 +55,63 @@ public class PostgreSqlOperationalConcurrencyTests
         var winner = Assert.Single(results, result => result is not null);
         Assert.Equal(code.Code, winner!.Code);
         Assert.Equal(0, await database.CountAsync("protocol_artifacts"));
+    }
+
+    // plan-replay-protection DF6: N presentations of the same handle, exactly one registered. Unlike MP-2/MP-3
+    // this one does not decide on an affected-row count — it decides on a primary-key violation, so PostgreSQL's
+    // own uniqueness enforcement is what is being asked about here.
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public async Task ConcurrentReplayRegistrationsOfTheSameHandle_ProduceExactlyOneWinner()
+    {
+        await using var database = await PostgreSqlOperationalConcurrencyDatabase.CreateMigratedAsync();
+        var realm = PostgreSqlOperationalConcurrencyDatabase.NewRealm();
+        const int callers = 8;
+        var expiration = new DateTimeOffset(Start.AddMinutes(15), TimeSpan.Zero);
+
+        var results = new bool[callers];
+        await SqliteOperationalFileDatabase.RunTogetherAsync(callers, async (index, ready, release) =>
+        {
+            await using var scope = database.CreateScope();
+            var store = database.ReplayProtectionOf(scope);
+
+            ready.SetResult();
+            await release;
+
+            results[index] = await store.TryAddAsync(
+                realm.Id, ClientId, ReplayPurpose, "contended-jti", expiration, default);
+        });
+
+        Assert.Single(results, added => added);
+        Assert.Equal(1, await database.CountAsync("replay_handles"));
+    }
+
+    // And contention on one handle must not refuse another: a backing that simply failed under load would also
+    // produce a single winner above.
+    [StoragePostgreSqlFact]
+    [Trait("Category", "PostgreSql")]
+    public async Task ConcurrentReplayRegistrationsOfDifferentHandles_AllSucceed()
+    {
+        await using var database = await PostgreSqlOperationalConcurrencyDatabase.CreateMigratedAsync();
+        var realm = PostgreSqlOperationalConcurrencyDatabase.NewRealm();
+        const int callers = 8;
+        var expiration = new DateTimeOffset(Start.AddMinutes(15), TimeSpan.Zero);
+
+        var results = new bool[callers];
+        await SqliteOperationalFileDatabase.RunTogetherAsync(callers, async (index, ready, release) =>
+        {
+            await using var scope = database.CreateScope();
+            var store = database.ReplayProtectionOf(scope);
+
+            ready.SetResult();
+            await release;
+
+            results[index] = await store.TryAddAsync(
+                realm.Id, ClientId, ReplayPurpose, $"jti-{index}", expiration, default);
+        });
+
+        Assert.All(results, added => Assert.True(added));
+        Assert.Equal(callers, await database.CountAsync("replay_handles"));
     }
 
     // MP-3: N transitions from the same version — exactly one succeeds, the rest are conflicts, and the state

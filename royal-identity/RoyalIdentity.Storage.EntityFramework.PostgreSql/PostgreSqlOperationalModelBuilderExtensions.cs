@@ -72,6 +72,17 @@ public static class PostgreSqlOperationalModelBuilderExtensions
             entity.Property(e => e.HandleDigest).UseCollation(Ordinal);
         });
 
+        // Every column of this table backs the key that decides replay, so every one of them is pinned. A
+        // locale-dependent collation here would mean two handles differing only in case could collide, or fail
+        // to collide, depending on where the deployment runs.
+        modelBuilder.Entity<ReplayHandleEntity>(entity =>
+        {
+            entity.Property(e => e.RealmId).UseCollation(Ordinal);
+            entity.Property(e => e.Issuer).UseCollation(Ordinal);
+            entity.Property(e => e.Purpose).UseCollation(Ordinal);
+            entity.Property(e => e.HandleDigest).UseCollation(Ordinal);
+        });
+
         return modelBuilder;
     }
 

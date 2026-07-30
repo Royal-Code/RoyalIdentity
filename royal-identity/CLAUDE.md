@@ -33,7 +33,15 @@ Completed refactoring plans (useful as historical record and for understanding d
 
 Active plans (check status before modifying affected areas):
 
-- [.ai/plans/plan-replay-protection.md](.ai/plans/plan-replay-protection.md) — **ACTIVE (1/3 fases)**. Fase 1 done:
+- [.ai/plans/plan-replay-protection.md](.ai/plans/plan-replay-protection.md) — **ACTIVE (2/3 fases)**. Fase 2 done:
+  durable backing over the Operational family — table `replay_handles`, whose primary key
+  `(realm_id, issuer, purpose, handle_digest)` **is** the decision, so a conflict answers replay without any prior
+  read and without comparing expiration (DF8). Its own `ReplayHandleDigest` (length-prefixed fields, versioned)
+  deliberately does not reuse `OperationalLookupDigest`, whose high-entropy justification does not transfer to a
+  client-chosen `jti` (DF17). `RoyalIdentity.Server` now declares `AddOperationalReplayProtection()`; Demo and test
+  fixtures stay in-memory. Cleanup of replay handles is **strict** (`ExpiresAtUtc < now`) because the artifact is
+  still acceptable at that exact instant. Single winner proved under real concurrency on SQLite and on real
+  PostgreSQL 17. Fase 1 done:
   `IReplayCache` replaced by `IReplayProtectionStore` (single atomic `TryAddAsync`, realm- and issuer-bound, with
   `CancellationToken`); no default registration — every composition root declares its backing via
   `AddInMemoryReplayProtection()` and `ReplayProtectionStartupValidator` refuses a host that declared none, two, or
@@ -41,8 +49,7 @@ Active plans (check status before modifying affected areas):
   range 1 s–1 h) bounds the retention (DF19/DF21). Fase 1 also fixed two product defects the missing coverage hid:
   `client_credentials` with `private_key_jwt` returned 500 (`AssertHasClientSecret` demanded a stored
   `ClientSecret` nothing reads), and a replay-store infrastructure failure came disguised as `invalid_client`.
-  **Fases 1 and 2 are a non-releasable sequence** — the Server holds per-process protection until Fase 2 delivers
-  the Operational backing, so do not publish a replicated Server between them.
+  The non-releasable window between the two phases is closed: the Server no longer holds per-process protection.
 
 `Tests.Host` is storage-agnostic and `Tests.Integration` uses
 `PersistentStorageAppFactory` by default: Configuration + Operational share one isolated SQLite in-memory

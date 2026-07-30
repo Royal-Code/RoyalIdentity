@@ -73,6 +73,7 @@ internal sealed class SqliteOperationalStorageHarness
                     options.Mode = CleanupExecutionMode.External;
                     cleanup?.Invoke(options);
                 });
+                services.AddOperationalReplayProtection();
 
                 // The Plain profile warns on construction, so the fixture needs logging registered.
                 services.AddLogging();

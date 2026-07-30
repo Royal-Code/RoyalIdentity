@@ -1,15 +1,15 @@
 # Plan: Proteção real contra replay de `jti` (`plan-replay-protection`)
 
-## Status: EM ANDAMENTO - Q1-Q5 fechadas; Fase 1 concluída
+## Status: EM ANDAMENTO - Q1-Q5 fechadas; Fases 1-2 concluídas
 
 ## Progresso
 
-`█░░` **33%** - 1 de 3 fases
+`██░` **67%** - 2 de 3 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contrato atômico, in-memory e composições declaradas | Concluida |
-| Fase 2 - backing durável Operational e concorrência | Pendente |
+| Fase 2 - backing durável Operational e concorrência | Concluida |
 | Fase 3 - aceites reais e fechamento | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -620,23 +620,23 @@ o Server para ela, mantendo tudo verde.
 
 **Tarefas:**
 
-- [ ] Criar a entidade de replay em `RoyalIdentity.Data.Operational` com a unique de DF13 e índice de expiração.
-- [ ] Implementar o digest sobre `versão + domínio + handle` apenas — `RealmId`, `Issuer` e `Purpose` permanecem
+- [x] Criar a entidade de replay em `RoyalIdentity.Data.Operational` com a unique de DF13 e índice de expiração.
+- [x] Implementar o digest sobre `versão + domínio + handle` apenas — `RealmId`, `Issuer` e `Purpose` permanecem
   colunas próprias e não entram no digest (DF4/DF17) —, documentando no tipo por que a justificativa de alta
   entropia do `OperationalLookupDigest` não se aplica.
-- [ ] Implementar a store durável com inserção protegida por unique constraint — não upsert; traduzir violação de
+- [x] Implementar a store durável com inserção protegida por unique constraint — não upsert; traduzir violação de
   unicidade em `false`, sem consulta prévia e sem comparar expiração (DF8).
-- [ ] Criar mapeamentos e migrations por provider, sem colidir com as histories existentes.
-- [ ] Criar `AddOperationalReplayProtection()` com o marker de estratégia de DF14.
-- [ ] Fazer falha de infraestrutura falhar fechado, nunca retornando `true`.
-- [ ] Estender `EntityFrameworkOperationalMaintenance`: limpeza em lotes por expiração e purge por realm.
-- [ ] Acrescentar o novo contador a `OperationalCleanupReport` e a `OperationalPurgeReport`, incluindo `Total` e
+- [x] Criar mapeamentos e migrations por provider, sem colidir com as histories existentes.
+- [x] Criar `AddOperationalReplayProtection()` com o marker de estratégia de DF14.
+- [x] Fazer falha de infraestrutura falhar fechado, nunca retornando `true`.
+- [x] Estender `EntityFrameworkOperationalMaintenance`: limpeza em lotes por expiração e purge por realm.
+- [x] Acrescentar o novo contador a `OperationalCleanupReport` e a `OperationalPurgeReport`, incluindo `Total` e
   `Add`, e atualizar os testes que fixam o shape desses relatórios.
-- [ ] Cobrir o limite exato de expiração na limpeza, coerente com a semântica já usada pelos demais tipos.
-- [ ] Provar vencedor único com dois chamadores simultâneos na implementação durável, em SQLite sempre e em
+- [x] Cobrir o limite exato de expiração na limpeza, coerente com a semântica já usada pelos demais tipos.
+- [x] Provar vencedor único com dois chamadores simultâneos na implementação durável, em SQLite sempre e em
   PostgreSQL opt-in, reusando o formato dos testes de concorrência de authorization code.
-- [ ] Trocar a declaração do `RoyalIdentity.Server` para a durável, mantendo Demo e testes na in-memory.
-- [ ] Não adicionar `PackageReference` de cache distribuído a nenhum projeto (DF11).
+- [x] Trocar a declaração do `RoyalIdentity.Server` para a durável, mantendo Demo e testes na in-memory.
+- [x] Não adicionar `PackageReference` de cache distribuído a nenhum projeto (DF11).
 
 **Critérios de aceite:** duas chamadas simultâneas com a mesma identidade produzem exatamente um `true`, provado
 em SQLite e no aceite PostgreSQL opt-in; nenhuma linha persiste `jti` em claro; falha do backing não autoriza;
@@ -653,7 +653,113 @@ dotnet test RoyalIdentity.sln
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Entregue.** O backing durável existe sobre a família Operational, o Server aponta para ele, a manutenção
+contabiliza o novo tipo e o vencedor único está provado nos dois providers. Build e todas as suítes verdes (DF15),
+inclusive o aceite PostgreSQL opt-in executado nesta sessão.
+
+**Modelo e persistência**
+
+- `RoyalIdentity.Data.Operational/Entities/ReplayHandleEntity.cs` — `RealmId`, `Issuer`, `Purpose`,
+  `HandleDigest`, `ExpiresAtUtc`. A identidade de DF13 é a **primary key**, não um índice unique separado: não há
+  outra coisa por que identificar uma linha, e assim ela também começa por `realm_id` como toda a família (DF5).
+  Sem `created_at_utc` — as outras tabelas têm porque algo lê; nada leria este.
+- Tabela `replay_handles` (`operation.replay_handles` no PostgreSQL), com `ix_replay_handles_expiration`, que é a
+  única consulta que a tabela serve além do insert.
+- Collations Ordinal em **todas** as quatro colunas de identidade nos dois providers: `BINARY` no SQLite, `C` no
+  PostgreSQL. Todas elas sustentam a chave que decide replay, então nenhuma pode depender do locale do deployment.
+- Migrations por provider, geradas pelas design-time factories existentes e portanto nas histories corretas:
+  `20260730012818_AddReplayHandles` (SQLite, `__OperationalMigrationsHistory`) e `20260730012828_AddReplayHandles`
+  (PostgreSQL, `operation."__EFMigrationsHistory"`). SQL revisável correspondente em
+  `scripts/sql/operational/{sqlite,postgresql}/0002_add_replay_handles.sql`, a versão PostgreSQL idempotente como
+  as anteriores.
+
+**Digest próprio, não o `OperationalLookupDigest` (DF4/DF17)**
+
+`ReplayHandleDigest` é um tipo novo, e deliberadamente não reúso do existente: o XML doc daquele justifica
+dispensar HMAC *porque os handles que ele cobre são gerados por este servidor com alta entropia*, e um `jti` é
+escolhido pelo cliente. A garantia declarada aqui é mais estreita — pseudonimização e separação de domínio, não
+confidencialidade perante quem já lê a tabela. Os campos são **length-prefixed** em vez de unidos por separador,
+então nenhuma combinação de entradas produz o digest de outra, inclusive um handle contendo o caractere que um
+separador usaria. `CurrentVersion` entra como campo próprio, e o length-prefix usa endianness fixa: o digest é
+persistido, então não pode depender da arquitetura que o escreveu.
+
+**Store durável**
+
+`EntityFrameworkReplayProtectionStore` faz **um** insert. Sem leitura antes — uma leitura deixaria dois
+chamadores concorrentes não encontrarem nada — e sem upsert: a primary key é a decisão. Não é realm-bound na
+construção como os outros stores da família, porque replay é perguntado sobre um realm por chamada e nunca
+enumera.
+
+A tradução de conflito em `false` **não** usa código de erro de provider — isso exigiria referenciar
+`Npgsql`/`Microsoft.Data.Sqlite` no adaptador neutro, quebrando a fronteira. Em `DbUpdateException` a store
+pergunta diretamente se a identidade está presente: é a pergunta real (um código apenas a aproxima), roda só no
+caminho de falha e não lê a expiração do que encontra (DF8). Se a identidade não estiver lá, a exceção
+**propaga** — reportar indisponibilidade de banco como ataque de replay seria mentira e alarme sobre o qual
+ninguém age.
+
+**Manutenção — e o limite que importa**
+
+`OperationalCleanupReport` e `OperationalPurgeReport` ganharam `ReplayHandles`, com `Total` e `Add` atualizados.
+A limpeza é **estrita** (`ExpiresAtUtc < now`), e essa é a decisão de fronteira desta fase: a expiração de um
+handle é o `exp` do artefato mais o `ClockSkew` tolerado, e a validação aceita **até aquele instante inclusive**.
+Uma varredura inclusiva removeria a proteção no último instante em que a assertion que ela protege ainda pode ser
+replayada. É o mesmo raciocínio que a família já aplica a access/refresh tokens e codes, e o oposto do de
+authorize parameters — cuja leitura é fail-closed em `<= now`.
+
+**Composição**
+
+`RoyalIdentity.Server` passou a declarar `AddOperationalReplayProtection()`; Demo e fixtures de teste continuam
+na in-memory, coerentes com serem processo único. Nenhum `PackageReference` de cache distribuído entrou em
+projeto algum — verificado por varredura: `Caching.Distributed`, `StackExchangeRedis`, `Caching.Memory`,
+`AddDistributedMemoryCache` e `IDistributedCache` não aparecem em nenhum `.csproj` nem `.cs` (DF11).
+
+**Cobertura**
+
+- `Tests.Storage/Operational/OperationalReplayProtectionTests.cs` — suíte de paridade (SQLite sempre, PostgreSQL
+  opt-in): primeiro registro aceito e segundo recusado; as **quatro** dimensões de isolamento; registro vencido e
+  não limpo ainda responde replay; o handle bruto não aparece em nenhuma coluna; realm/issuer/purpose seguem
+  consultáveis em claro; limpeza estrita no limite exato; limpeza respeitando `batchSize`; purge por realm sem
+  tocar o outro realm; identidade incompleta recusada.
+- `Tests.Storage/Operational/SqliteOperationalReplayProtectionConcurrencyTests.cs` — vencedor único com 2 e 8
+  chamadores; handles distintos todos aceitos; **issuers distintos com o mesmo handle todos aceitos**, que é a
+  prova de que um client não pode negar a autenticação de outro adivinhando seu `jti`.
+- `PostgreSqlOperationalConcurrencyTests` ganhou os dois equivalentes contra PostgreSQL real. Diferente de
+  MP-2/MP-3, estes não decidem por contagem de linhas afetadas e sim por violação de primary key, então o que se
+  pergunta ali é sobre a própria imposição de unicidade do PostgreSQL.
+- Harnesses de paridade, `SqliteOperationalFileDatabase` e `PostgreSqlOperationalConcurrencyDatabase` passaram a
+  registrar a extension e a expor `IReplayProtectionStore`.
+
+**Prova por mutação do aceite de concorrência — e uma correção do próprio método**
+
+A primeira mutação que tentei (acrescentar um check antes do insert, mantendo o insert como decisão) **passou**, e
+com razão: continua atômica, só desperdiça uma consulta. O mutante fiel é a semântica pré-Fase 1 — checar, inserir
+em best-effort e engolir o conflito. Com ele, `ConcurrentRegistrationsOfTheSameHandle_ProduceExactlyOneWinner`
+falha com **8** chamadores e **passa** com 2, porque com dois o SQLite serializa o suficiente para o check ver a
+linha. É a razão de a teoria ter os dois valores, e vale registrar: um aceite de concorrência com dois chamadores
+teria deixado o defeito passar.
+
+**Testes existentes ajustados, com o motivo**
+
+Quatro asserções assumiam que a família Operational tinha exatamente uma migration
+(`Assert.All(applied, id => Assert.EndsWith("_InitialOperational", id))`) — em `SqliteOperationalMigrationTests`,
+`PostgreSqlOperationalMigrationTests` e `PersistentStorageOidcFlowTests`. Elas foram reescritas como **igualdade
+de conjuntos** contra `Database.GetMigrations()` mais a disjunção entre as duas histories: expressa o invariante
+real de DF23 e continua significando o mesmo à medida que cada família ganha migrations. Os testes de SQL
+revisável passaram a aplicar a **sequência** de scripts em ordem, que é o que um revisor faz. Listas de tabelas e
+de entity types (`OperationalModelTests`, migration tests dos dois providers,
+`Tests.Architecture/OperationalModelExtensibilityTests`) passaram de cinco para seis.
+
+**Verificação**
+
+```
+dotnet build RoyalIdentity.sln            → 0 erros
+dotnet test RoyalIdentity.sln             → 1207 aprovados, 0 falhas, 49 ignorados
+./scripts/Test-OperationalPostgreSql.ps1  → 47 aprovados, 0 falhas (PostgreSQL 17 real, porta dinâmica 43641)
+podman ps -a                              → nenhum container residual
+```
+
+Por suíte: Tests.Security 116; Tests.Identity 47; Tests.Pipelines 3; Tests.UserAccounts 187 (+1 opt-in);
+Tests.Storage 498 (+47 opt-in); Tests.Architecture 63; Tests.Integration 293; Aspire.Tests 0 (+1 opt-in).
 
 ---
 
@@ -770,11 +876,11 @@ dotnet test RoyalIdentity.sln
 | Fase intermediária deixa o produto quebrado | contrato trocado sem backing declarado | suítes vermelhas e host sem subir entre cortes | DF15: contrato, implementação e registros no mesmo corte | Mitigado |
 | Linha expirada bloqueia registro legítimo | cliente reusa `jti` após o `exp` | autenticação recusada até a limpeza passar | DF8: reuso de `jti` é violação do cliente; recusar é o comportamento correto | Aceito |
 | Teto de assertion recusa cliente legítimo | client emite assertion com `exp` acima de 10 minutos à frente do relógio do servidor | autenticação para após o upgrade, sem mudança do lado do cliente | DF21 mantém o teto como option por realm, com override até 1 hora para integração legada; README orienta assertions de 1 a 5 minutos | Aberto |
-| Server publicado entre as Fases 1 e 2 | deploy multi-instância com a in-memory declarada | proteção por processo, não compartilhada entre réplicas | sequência declarada não liberável; Fase 2 troca o Server para a durável | Aberto |
+| Server publicado entre as Fases 1 e 2 | deploy multi-instância com a in-memory declarada | proteção por processo, não compartilhada entre réplicas | sequência declarada não liberável; Fase 2 troca o Server para a durável | Fechado na Fase 2 |
 | In-memory cresce indefinidamente | host longevo com a in-memory declarada e sem poda | consumo de memória proporcional ao volume de autenticações | DF20: poda periódica por `TimeProvider`, fora do caminho de decisão | Mitigado |
 | Digest tratado como confidencialidade | `jti` previsível e acesso ao banco no threat model | enumeração por dicionário sobre os digests | DF17 declara o escopo; troca por digest autenticado é alteração isolada | Aceito |
 | Guard aceita implementação errada | guard só rejeita no-op | in-memory registrada no Server passa despercebida | Fase 3 exige guard por implementação específica | Mitigado |
-| Teste de concorrência passa por acaso | duas chamadas serializadas pelo harness | corrida não é exercitada | reusar o formato dos testes de MP-2, que já provam paralelismo real | Aberto |
+| Teste de concorrência passa por acaso | duas chamadas serializadas pelo harness | corrida não é exercitada | reusar o formato dos testes de MP-2, que já provam paralelismo real | Mitigado — confirmado real na Fase 2: com 2 chamadores o mutante fiel passa, com 8 falha; a teoria roda os dois |
 | `jti` aparece em log ou exceção | mensagem de erro inclui o handle | vazamento de valor de credencial em texto | asserção negativa nos testes de mensagem (DF5) | Aberto |
 
 ---

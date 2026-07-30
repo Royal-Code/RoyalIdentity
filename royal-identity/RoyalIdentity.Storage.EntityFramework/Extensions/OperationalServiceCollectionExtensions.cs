@@ -10,6 +10,7 @@ using RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 using RoyalIdentity.Storage.EntityFramework.Operational.Protection;
 using RoyalIdentity.Storage.EntityFramework.Operational.Stores;
 using RoyalIdentity.Storage.EntityFramework.Storage;
+using RoyalIdentity.Contracts.Defaults.ReplayProtection;
 using RoyalIdentity.Contracts.Storage;
 
 namespace RoyalIdentity.Storage.EntityFramework.Extensions;
@@ -185,6 +186,33 @@ public static class OperationalServiceCollectionExtensions
         services.AddSingleton<IOperationalPayloadProtector>(provider =>
             new PlainOperationalPayloadProtector(
                 profileId, provider.GetRequiredService<ILogger<PlainOperationalPayloadProtector>>()));
+
+        return services;
+    }
+
+    /// <summary>
+    /// <para>
+    ///     Declares replay protection backed by the Operational family: handles live in <c>replay_handles</c> and
+    ///     are therefore shared by every instance reading the same database — the only shape that protects a
+    ///     replicated deployment (plan-replay-protection DF10).
+    /// </para>
+    /// <para>
+    ///     The Operational family must already be registered, since this store writes through the same scoped
+    ///     context. Like every other choice in this composition it is explicit: there is no default, and
+    ///     <c>ReplayProtectionStartupValidator</c> refuses a host that declares none, two, or one inconsistent
+    ///     with the store actually resolved (DF12/DF14).
+    /// </para>
+    /// </summary>
+    public static IServiceCollection AddOperationalReplayProtection(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<ReplayHandleDigest>();
+        services.AddScoped<IReplayProtectionStore, EntityFrameworkReplayProtectionStore>();
+        services.AddSingleton(new ReplayProtectionRegistration(
+            "operational",
+            $"{nameof(AddOperationalReplayProtection)}()",
+            typeof(EntityFrameworkReplayProtectionStore)));
 
         return services;
     }

@@ -23,6 +23,7 @@ public class PostgreSqlOperationalMigrationTests
         "authorize_parameters",
         "consents",
         "protocol_artifacts",
+        "replay_handles",
         "user_session_clients",
         "user_sessions",
     ];
@@ -62,10 +63,18 @@ public class PostgreSqlOperationalMigrationTests
         var configurationApplied = await configuration.Database.GetAppliedMigrationsAsync();
         var operationalApplied = await operational.Database.GetAppliedMigrationsAsync();
 
-        // Each family sees only its own evolution line, which is the whole point of the split.
+        // Each family sees only its own evolution line, which is the whole point of the split. Stated as set
+        // equality rather than as a name suffix, so it keeps meaning what it says as each family gains
+        // migrations.
         Assert.Contains(configurationApplied, id => id.EndsWith("_InitialConfiguration", StringComparison.Ordinal));
-        Assert.DoesNotContain(configurationApplied, id => id.EndsWith("_InitialOperational", StringComparison.Ordinal));
-        Assert.All(operationalApplied, id => Assert.EndsWith("_InitialOperational", id, StringComparison.Ordinal));
+        Assert.Contains(operationalApplied, id => id.EndsWith("_InitialOperational", StringComparison.Ordinal));
+        Assert.Empty(configurationApplied.Intersect(operationalApplied, StringComparer.Ordinal));
+        Assert.Equal(
+            configuration.Database.GetMigrations().Order(StringComparer.Ordinal),
+            configurationApplied.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            operational.Database.GetMigrations().Order(StringComparer.Ordinal),
+            operationalApplied.Order(StringComparer.Ordinal));
         Assert.Empty(await configuration.Database.GetPendingMigrationsAsync());
         Assert.Empty(await operational.Database.GetPendingMigrationsAsync());
     }
@@ -81,6 +90,8 @@ public class PostgreSqlOperationalMigrationTests
         Assert.Equal("C", await CollationAsync(connection, "protocol_artifacts", "lookup_digest"));
         Assert.Equal("C", await CollationAsync(connection, "protocol_artifacts", "realm_id"));
         Assert.Equal("C", await CollationAsync(connection, "authorize_parameters", "handle_digest"));
+        Assert.Equal("C", await CollationAsync(connection, "replay_handles", "handle_digest"));
+        Assert.Equal("C", await CollationAsync(connection, "replay_handles", "issuer"));
         // Opaque payloads carry no collation: they are never compared.
         Assert.Null(await CollationAsync(connection, "protocol_artifacts", "protected_payload"));
     }
@@ -265,12 +276,21 @@ public class PostgreSqlOperationalMigrationTests
         await using var database = await PostgreSqlOperationalDatabase.CreateEmptyAsync();
         await using var connection = await OpenAsync(database);
 
-        var script = await File.ReadAllTextAsync(Path.Combine(
-            FindRepositoryRoot(), "scripts", "sql", "operational", "postgresql", "0001_initial_operational.sql"));
+        // The scripts are an evolution line: a reviewer applies them in order, and each one is idempotent on its
+        // own, so the whole sequence can be replayed over an up-to-date database.
+        string[] scripts =
+        [
+            "0001_initial_operational.sql",
+            "0002_add_replay_handles.sql",
+        ];
 
-        await using (var command = new NpgsqlCommand(script, connection) { CommandTimeout = 60 })
+        foreach (var name in scripts)
         {
-            // The production script is idempotent: once the history row is present, repeating it is a no-op.
+            var script = await File.ReadAllTextAsync(Path.Combine(
+                FindRepositoryRoot(), "scripts", "sql", "operational", "postgresql", name));
+
+            await using var command = new NpgsqlCommand(script, connection) { CommandTimeout = 60 };
+            // The production scripts are idempotent: once the history row is present, repeating one is a no-op.
             await command.ExecuteNonQueryAsync();
             await command.ExecuteNonQueryAsync();
         }

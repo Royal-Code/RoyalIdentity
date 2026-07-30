@@ -153,7 +153,7 @@ public class OperationalCleanupWorkerTests
 
             return mustFail
                 ? Task.FromException<OperationalCleanupReport>(new InvalidOperationException("staged pass failure"))
-                : Task.FromResult(new OperationalCleanupReport(1, 0, 0, 0, 0, 0));
+                : Task.FromResult(new OperationalCleanupReport(1, 0, 0, 0, 0, 0, 0));
         }
 
         public Task<OperationalPurgeReport> PurgeRealmAsync(string realmId, CancellationToken ct = default)

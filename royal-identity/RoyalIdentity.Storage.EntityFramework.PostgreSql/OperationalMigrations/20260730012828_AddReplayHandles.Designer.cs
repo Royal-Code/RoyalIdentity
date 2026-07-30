@@ -2,48 +2,56 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using RoyalIdentity.Storage.EntityFramework.Sqlite;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using RoyalIdentity.Storage.EntityFramework.PostgreSql;
 
 #nullable disable
 
-namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
+namespace RoyalIdentity.Storage.EntityFramework.PostgreSql.OperationalMigrations
 {
-    [DbContext(typeof(OperationalSqliteDbContext))]
-    partial class OperationalSqliteDbContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(OperationalPostgreSqlDbContext))]
+    [Migration("20260730012828_AddReplayHandles")]
+    partial class AddReplayHandles
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.AuthorizeParametersEntity", b =>
                 {
                     b.Property<string>("RealmId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("realm_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("HandleDigest")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("handle_digest")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
 
                     b.Property<int>("PayloadVersion")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("integer")
                         .HasColumnName("payload_version");
 
                     b.Property<string>("ProtectedPayload")
                         .IsRequired()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("protected_payload");
 
                     b.HasKey("RealmId", "HandleDigest");
@@ -51,41 +59,41 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
                     b.HasIndex("ExpiresAtUtc")
                         .HasDatabaseName("ix_authorize_parameters_expiration");
 
-                    b.ToTable("authorize_parameters", (string)null);
+                    b.ToTable("authorize_parameters", "operation");
                 });
 
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.ConsentEntity", b =>
                 {
                     b.Property<string>("RealmId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("realm_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("SubjectId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("subject_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("ClientId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("client_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
                     b.Property<DateTime?>("ExpiresAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
 
                     b.Property<int>("PayloadVersion")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("integer")
                         .HasColumnName("payload_version");
 
                     b.Property<string>("ProtectedPayload")
                         .IsRequired()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("protected_payload");
 
                     b.HasKey("RealmId", "SubjectId", "ClientId");
@@ -93,78 +101,78 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
                     b.HasIndex("ExpiresAtUtc")
                         .HasDatabaseName("ix_consents_expiration");
 
-                    b.ToTable("consents", (string)null);
+                    b.ToTable("consents", "operation");
                 });
 
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.ProtocolArtifactEntity", b =>
                 {
                     b.Property<string>("RealmId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("realm_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("ArtifactType")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("artifact_type")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("LookupDigest")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("lookup_digest")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<int?>("AccessTokenType")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("integer")
                         .HasColumnName("access_token_type");
 
                     b.Property<int?>("ClaimsMode")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("integer")
                         .HasColumnName("claims_mode");
 
                     b.Property<string>("ClientId")
                         .IsRequired()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("client_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<DateTime?>("ConsumedAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("consumed_at_utc");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
 
                     b.Property<int?>("PayloadVersion")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("integer")
                         .HasColumnName("payload_version");
 
                     b.Property<string>("ProtectedPayload")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("protected_payload");
 
                     b.Property<string>("RedirectUri")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("redirect_uri")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("SessionId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("session_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<int>("StateVersion")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("integer")
                         .HasColumnName("state_version");
 
                     b.Property<string>("SubjectId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("subject_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.HasKey("RealmId", "ArtifactType", "LookupDigest");
 
@@ -180,33 +188,33 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
                     b.HasIndex("RealmId", "ArtifactType", "SubjectId", "ClientId")
                         .HasDatabaseName("ix_protocol_artifacts_subject");
 
-                    b.ToTable("protocol_artifacts", (string)null);
+                    b.ToTable("protocol_artifacts", "operation");
                 });
 
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.ReplayHandleEntity", b =>
                 {
                     b.Property<string>("RealmId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("realm_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("Issuer")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("issuer")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("Purpose")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("purpose")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("HandleDigest")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("handle_digest")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
 
                     b.HasKey("RealmId", "Issuer", "Purpose", "HandleDigest");
@@ -214,90 +222,90 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
                     b.HasIndex("ExpiresAtUtc")
                         .HasDatabaseName("ix_replay_handles_expiration");
 
-                    b.ToTable("replay_handles", (string)null);
+                    b.ToTable("replay_handles", "operation");
                 });
 
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.UserSessionClientEntity", b =>
                 {
                     b.Property<string>("RealmId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("realm_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("SessionId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("session_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("ClientId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("client_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<DateTime>("FirstSeenAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("first_seen_at_utc");
 
                     b.Property<DateTime>("LastSeenAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_seen_at_utc");
 
                     b.HasKey("RealmId", "SessionId", "ClientId");
 
-                    b.ToTable("user_session_clients", (string)null);
+                    b.ToTable("user_session_clients", "operation");
                 });
 
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.UserSessionEntity", b =>
                 {
                     b.Property<string>("RealmId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("realm_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("SessionId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("session_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.Property<string>("AuthenticationMethod")
                         .IsRequired()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("authentication_method");
 
                     b.Property<DateTime?>("EndedAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_at_utc");
 
                     b.Property<DateTime?>("ExpiresAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
 
                     b.Property<string>("IdentityProvider")
                         .IsRequired()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("identity_provider");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
                     b.Property<DateTime>("LastSeenAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_seen_at_utc");
 
                     b.Property<string>("SecurityStamp")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("security_stamp");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasColumnName("started_at_utc");
 
                     b.Property<string>("SubjectId")
                         .IsRequired()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasColumnName("subject_id")
-                        .UseCollation("BINARY");
+                        .UseCollation("C");
 
                     b.HasKey("RealmId", "SessionId");
 
@@ -310,7 +318,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Sqlite.OperationalMigrations
                     b.HasIndex("RealmId", "SubjectId", "IsActive")
                         .HasDatabaseName("ix_user_sessions_subject");
 
-                    b.ToTable("user_sessions", (string)null);
+                    b.ToTable("user_sessions", "operation");
                 });
 
             modelBuilder.Entity("RoyalIdentity.Data.Operational.Entities.UserSessionClientEntity", b =>

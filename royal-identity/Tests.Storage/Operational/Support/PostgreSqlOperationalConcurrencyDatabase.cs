@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Extensions;
@@ -66,6 +67,7 @@ internal sealed class PostgreSqlOperationalConcurrencyDatabase : IAsyncDisposabl
             options => options.UseNpgsql(connectionString, npgsql => npgsql.UseOperationalMigrationsHistory()),
             ServiceLifetime.Scoped);
         collection.AddEntityFrameworkOperationalStorage<OperationalPostgreSqlDbContext>();
+        collection.AddOperationalReplayProtection();
         collection.AddOperationalAesGcmPayloadProtection(
             OperationalStorageOptions.DefaultPayloadProtectionProfile, [.. ProtectorKey]);
 
@@ -95,6 +97,10 @@ internal sealed class PostgreSqlOperationalConcurrencyDatabase : IAsyncDisposabl
 
     /// <summary>An independent scope: its own <c>DbContext</c> and, with pooling off, its own connection.</summary>
     public AsyncServiceScope CreateScope() => services.CreateAsyncScope();
+
+    /// <summary>The durable replay-protection backing of this scope, over this scope's own connection.</summary>
+    public IReplayProtectionStore ReplayProtectionOf(AsyncServiceScope scope)
+        => scope.ServiceProvider.GetRequiredService<IReplayProtectionStore>();
 
     public IOperationalStoreFactory StoresOf(AsyncServiceScope scope)
         => scope.ServiceProvider.GetRequiredService<IOperationalStoreFactory>();

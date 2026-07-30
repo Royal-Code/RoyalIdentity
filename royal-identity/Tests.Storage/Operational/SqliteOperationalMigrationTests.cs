@@ -19,6 +19,7 @@ public class SqliteOperationalMigrationTests
         "authorize_parameters",
         "consents",
         "protocol_artifacts",
+        "replay_handles",
         "user_session_clients",
         "user_sessions",
     ];
@@ -74,11 +75,18 @@ public class SqliteOperationalMigrationTests
         // Each family sees only its own evolution line: no Operational id leaks into the Configuration history
         // or the other way round, which is the whole point of the split.
         Assert.Contains(configurationApplied, id => id.EndsWith("_InitialConfiguration", StringComparison.Ordinal));
-        Assert.DoesNotContain(configurationApplied, id => id.EndsWith("_InitialOperational", StringComparison.Ordinal));
         Assert.Contains(operationalApplied, id => id.EndsWith("_InitialOperational", StringComparison.Ordinal));
-        Assert.All(
-            operationalApplied,
-            id => Assert.EndsWith("_InitialOperational", id, StringComparison.Ordinal));
+
+        // Stated as set equality rather than as a name suffix, so it keeps meaning what it says as each family
+        // gains migrations: each history holds exactly its own family's evolution line, and the two never share
+        // an id.
+        Assert.Empty(configurationApplied.Intersect(operationalApplied, StringComparer.Ordinal));
+        Assert.Equal(
+            configuration.Database.GetMigrations().Order(StringComparer.Ordinal),
+            configurationApplied.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            operational.Database.GetMigrations().Order(StringComparer.Ordinal),
+            operationalApplied.Order(StringComparer.Ordinal));
         Assert.Empty(await configuration.Database.GetPendingMigrationsAsync());
         Assert.Empty(await operational.Database.GetPendingMigrationsAsync());
     }
@@ -258,15 +266,25 @@ public class SqliteOperationalMigrationTests
     [Fact]
     public async Task GeneratedSqlScript_ExecutesAgainstEmptyDatabase()
     {
-        var scriptPath = Path.Combine(
-            FindRepositoryRoot(), "scripts", "sql", "operational", "sqlite", "0001_initial_operational.sql");
-        var script = await File.ReadAllTextAsync(scriptPath);
+        // The scripts are an evolution line, not a snapshot: applying them in order is what a reviewer running
+        // them against a database would do, and it is the only way the sequence stays verified as it grows.
+        string[] scripts =
+        [
+            "0001_initial_operational.sql",
+            "0002_add_replay_handles.sql",
+        ];
+
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = script;
 
-        await command.ExecuteNonQueryAsync();
+        foreach (var name in scripts)
+        {
+            var scriptPath = Path.Combine(
+                FindRepositoryRoot(), "scripts", "sql", "operational", "sqlite", name);
+            await using var command = connection.CreateCommand();
+            command.CommandText = await File.ReadAllTextAsync(scriptPath);
+            await command.ExecuteNonQueryAsync();
+        }
 
         var tables = await TableNamesAsync(connection);
         Assert.All(ExpectedOperationalTables, table => Assert.Contains(table, tables));

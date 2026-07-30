@@ -22,6 +22,7 @@ public class OperationalModelTests
         typeof(UserSessionEntity),
         typeof(UserSessionClientEntity),
         typeof(AuthorizeParametersEntity),
+        typeof(ReplayHandleEntity),
     ];
 
     private static IModel BuildModel()
@@ -42,9 +43,9 @@ public class OperationalModelTests
         => entityType.GetIndexes().Any(index =>
             index.Properties.Select(p => p.Name).SequenceEqual(properties, StringComparer.Ordinal));
 
-    // DF36: five business tables — one shared, discriminated artifact table plus four of their own.
+    // DF36: six business tables — one shared, discriminated artifact table plus five of their own.
     [Fact]
-    public void Model_MapsExactlyTheFiveOperationalTables()
+    public void Model_MapsExactlyTheSixOperationalTables()
     {
         var model = BuildModel();
 
@@ -54,7 +55,10 @@ public class OperationalModelTests
         Assert.Equal(EntityTypes.ToHashSet(), mapped);
         Assert.Equal(
             new HashSet<string?>(
-                ["protocol_artifacts", "consents", "user_sessions", "user_session_clients", "authorize_parameters"],
+                [
+                    "protocol_artifacts", "consents", "user_sessions", "user_session_clients",
+                    "authorize_parameters", "replay_handles",
+                ],
                 StringComparer.Ordinal),
             tables);
     }

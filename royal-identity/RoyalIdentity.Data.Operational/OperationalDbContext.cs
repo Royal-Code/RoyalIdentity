@@ -31,6 +31,8 @@ public class OperationalDbContext : DbContext
 
     public DbSet<AuthorizeParametersEntity> AuthorizeParameters => Set<AuthorizeParametersEntity>();
 
+    public DbSet<ReplayHandleEntity> ReplayHandles => Set<ReplayHandleEntity>();
+
     protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

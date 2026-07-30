@@ -7,18 +7,23 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Maintenance;
 /// <param name="Consents">Consents that had an expiration and reached it.</param>
 /// <param name="UserSessions">Sessions that expired or reached a terminal state.</param>
 /// <param name="AuthorizeParameters">Authorize continuations that expired.</param>
+/// <param name="ReplayHandles">
+/// Replay handles whose artifact can no longer be accepted at all, so retaining them protects nothing.
+/// </param>
 public sealed record OperationalCleanupReport(
     int AccessTokens,
     int RefreshTokens,
     int AuthorizationCodes,
     int Consents,
     int UserSessions,
-    int AuthorizeParameters)
+    int AuthorizeParameters,
+    int ReplayHandles)
 {
-    public static OperationalCleanupReport Empty { get; } = new(0, 0, 0, 0, 0, 0);
+    public static OperationalCleanupReport Empty { get; } = new(0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>Total rows removed, for a caller that only needs to know whether the pass did anything.</summary>
-    public int Total => AccessTokens + RefreshTokens + AuthorizationCodes + Consents + UserSessions + AuthorizeParameters;
+    public int Total => AccessTokens + RefreshTokens + AuthorizationCodes + Consents + UserSessions
+        + AuthorizeParameters + ReplayHandles;
 
     public OperationalCleanupReport Add(OperationalCleanupReport other) => new(
         AccessTokens + other.AccessTokens,
@@ -26,7 +31,8 @@ public sealed record OperationalCleanupReport(
         AuthorizationCodes + other.AuthorizationCodes,
         Consents + other.Consents,
         UserSessions + other.UserSessions,
-        AuthorizeParameters + other.AuthorizeParameters);
+        AuthorizeParameters + other.AuthorizeParameters,
+        ReplayHandles + other.ReplayHandles);
 }
 
 /// <summary>How many rows a realm purge removed, by table.</summary>
@@ -34,13 +40,15 @@ public sealed record OperationalCleanupReport(
 /// <param name="Consents">Consents.</param>
 /// <param name="UserSessions">Sessions; their clients go with them through the owning foreign key.</param>
 /// <param name="AuthorizeParameters">Authorize continuations.</param>
+/// <param name="ReplayHandles">Replay handles presented to the realm.</param>
 public sealed record OperationalPurgeReport(
     int ProtocolArtifacts,
     int Consents,
     int UserSessions,
-    int AuthorizeParameters)
+    int AuthorizeParameters,
+    int ReplayHandles)
 {
-    public int Total => ProtocolArtifacts + Consents + UserSessions + AuthorizeParameters;
+    public int Total => ProtocolArtifacts + Consents + UserSessions + AuthorizeParameters + ReplayHandles;
 }
 
 /// <summary>
