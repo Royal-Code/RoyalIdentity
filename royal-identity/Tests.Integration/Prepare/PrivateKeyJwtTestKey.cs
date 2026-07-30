@@ -48,15 +48,17 @@ public sealed class PrivateKeyJwtTestKey : IDisposable
         };
 
     /// <summary>
-    /// Signs a client assertion. <paramref name="expires"/> is expressed against the <b>server's</b> clock,
-    /// which is what the realm ceiling is compared to: an assertion of five minutes emitted by a client whose
-    /// clock runs five minutes ahead arrives here as <c>now + 10min</c>.
+    /// Signs a client assertion. <paramref name="notBefore"/> and <paramref name="expires"/> are expressed against
+    /// the <b>server's</b> clock. The former represents the client's issuance instant as the token's
+    /// <c>nbf</c>; the helper deliberately does not add the optional <c>iat</c> claim. An assertion of five minutes
+    /// emitted by a client whose clock runs five minutes ahead therefore arrives with
+    /// <c>nbf = now + 5min</c> and <c>exp = now + 10min</c>.
     /// </summary>
     public string CreateAssertion(
         string clientId,
         string audience,
         string jti,
-        DateTimeOffset issuedAt,
+        DateTimeOffset notBefore,
         DateTimeOffset expires)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
@@ -75,11 +77,51 @@ public sealed class PrivateKeyJwtTestKey : IDisposable
                 new Claim(JwtRegisteredClaimNames.Sub, clientId),
                 new Claim(JwtRegisteredClaimNames.Jti, jti),
             ],
-            notBefore: issuedAt.UtcDateTime,
+            notBefore: notBefore.UtcDateTime,
             expires: expires.UtcDateTime,
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    /// <summary>
+    /// Signs an assertion whose <c>nbf</c> and <c>exp</c> are written as raw claims, so the pair may be
+    /// incoherent. <see cref="JwtSecurityToken"/>'s own constructor refuses <c>nbf &gt;= exp</c>, which is why a
+    /// token describing no valid window has to be assembled from header and payload to be tested at all.
+    /// </summary>
+    public string CreateAssertionWithRawLifetime(
+        string clientId,
+        string audience,
+        string jti,
+        DateTimeOffset notBefore,
+        DateTimeOffset expires)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(audience);
+        ArgumentException.ThrowIfNullOrWhiteSpace(jti);
+
+        var credentials = new SigningCredentials(
+            new RsaSecurityKey(rsa) { KeyId = KeyId },
+            SecurityAlgorithms.RsaSha256);
+
+        var payload = new JwtPayload(
+        [
+            new Claim(JwtRegisteredClaimNames.Iss, clientId),
+            new Claim(JwtRegisteredClaimNames.Sub, clientId),
+            new Claim(JwtRegisteredClaimNames.Aud, audience),
+            new Claim(JwtRegisteredClaimNames.Jti, jti),
+            new Claim(
+                JwtRegisteredClaimNames.Nbf,
+                notBefore.ToUnixTimeSeconds().ToString(),
+                ClaimValueTypes.Integer64),
+            new Claim(
+                JwtRegisteredClaimNames.Exp,
+                expires.ToUnixTimeSeconds().ToString(),
+                ClaimValueTypes.Integer64),
+        ]);
+
+        return new JwtSecurityTokenHandler().WriteToken(
+            new JwtSecurityToken(new JwtHeader(credentials), payload));
     }
 
     public void Dispose()

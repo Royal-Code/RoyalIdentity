@@ -25,7 +25,11 @@ public interface IReplayProtectionStore
     /// cross issuers, so one client can never block another client's handle.
     /// </param>
     /// <param name="purpose">The kind of artifact being protected, so unrelated uses never share a namespace.</param>
-    /// <param name="handle">The value that must be single-use. Implementations never store it in the clear.</param>
+    /// <param name="handle">
+    /// The value that must be single-use. Implementations that <b>persist</b> records store a digest of it and
+    /// never the literal value; an implementation holding records only in process memory may keep it as-is, since
+    /// the value already lives in memory for the duration of the request that carried it.
+    /// </param>
     /// <param name="expiration">
     /// The instant after which the record may be discarded. It must cover at least the artifact's own validity
     /// plus the clock skew the caller tolerates; otherwise the record would expire while the artifact is still

@@ -140,7 +140,7 @@ Individual store interfaces:
 - `IUserConsentStore` — `StoreUserConsentAsync`, `GetUserConsentAsync`, `RemoveUserConsentAsync`
 - `IKeyStore` — `ListAllCurrentKeysIdsAsync`, `ListAllKeysIdsAsync`, `GetKeyAsync`, `GetKeysAsync`
 - `IMessageStore` — protected data storage (uses data protection)
-- `IReplayCache` — nonce/code replay prevention
+- `IReplayProtectionStore` — single-use protection for handles that must never be accepted twice (`TryAddAsync`)
 
 ### Entity Framework implementations
 
@@ -192,9 +192,26 @@ Reference tokens: stored via `IAccessTokenStore`, only a random ID is issued to 
 
 ### Replay Protection
 
-`IReplayCache` prevents replay of nonces and one-time tokens. Two implementations:
-- `DefaultReplayDistributedCache` — uses distributed cache (production)
-- `DefaultReplayNoCache` — no replay protection (development/testing only)
+`IReplayProtectionStore` refuses a handle that has already been presented — today the `jti` of a
+`private_key_jwt` client assertion, consumed only by `PrivateKeyJwtSecretEvaluator`.
+
+The contract is one operation: `TryAddAsync(realmId, issuer, purpose, handle, expiration, ct)`, an atomic
+add-if-absent returning `false` when the handle was already registered. There is deliberately no `ExistsAsync` to
+pair with an `AddAsync`: two concurrent callers both pass a check before either writes, which is the very replay
+being prevented. Records are keyed by realm **and** issuer, so no client can burn another's identifier. While a
+record is retained a conflict answers replay — implementations never consult its expiration — so correctness never
+depends on the clock or on pruning.
+
+`AddOpenIdConnectProviderServices()` registers **no default**. Each composition root declares its backing —
+`AddInMemoryReplayProtection()` (single instance only; warns on construction) — and
+`ReplayProtectionStartupValidator` fails startup, in every environment, when a composition declares none, more
+than one, or one inconsistent with the store actually resolved. `WebApplication.CreateBuilder` only enables
+container validation in Development, which is why the check is a hosted service and not left to `ValidateOnBuild`.
+
+How far ahead an assertion may claim to expire is capped by `Authentication.ClientAssertionMaxLifetime` (default
+10 minutes; accepted range 1 second to 1 hour), so the record's retention is a server value and not the client's
+choice. See [plan-replay-protection.md](../plans/plan-replay-protection.md); a durable backing shared across
+instances arrives in its Fase 2.
 
 ---
 

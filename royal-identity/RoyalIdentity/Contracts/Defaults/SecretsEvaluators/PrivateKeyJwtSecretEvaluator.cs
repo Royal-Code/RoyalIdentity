@@ -168,6 +168,21 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
         }
 
         var maxLifetime = context.Options.Authentication.ClientAssertionMaxLifetime;
+
+        // Nothing validates RealmOptions when the configuration snapshot is published, so the persisted value
+        // reaches here unchecked. Refusing out of range is the only fail-closed answer: honouring a value above
+        // the maximum would contradict the option's own contract, and the arithmetic below overflows outright on
+        // a negative one. A configuration error must never become an accepted credential.
+        if (maxLifetime < Server.MinClientAssertionMaxLifetime
+            || maxLifetime > Server.MaxClientAssertionMaxLifetime)
+        {
+            logger.LogError(
+                context,
+                "Authentication.ClientAssertionMaxLifetime is outside the accepted range for this realm, so no " +
+                "client assertion can be accepted until it is corrected.");
+            return new EvaluatedClient(client, InvalidCredentials, AuthenticationMethod);
+        }
+
         var now = clock.GetUtcNow();
         var latestAcceptedExpiration = now < DateTimeOffset.MaxValue - maxLifetime
             ? now + maxLifetime
@@ -209,12 +224,20 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
     }
 
     /// <summary>
-    /// Replicates the default lifetime validation over the injected clock: <c>exp</c> is required, and both
-    /// bounds are compared with the same <see cref="ClockSkew"/> the parameters declare.
+    /// Replicates the default lifetime validation over the injected clock, refusal for refusal: <c>exp</c> is
+    /// required, the window itself must be coherent (<c>nbf &lt;= exp</c>, which the default validation rejects
+    /// independently of the current instant), and both bounds are compared with the same
+    /// <see cref="ClockSkew"/> the parameters declare.
     /// </summary>
     private bool IsWithinLifetime(DateTime? notBefore, DateTime? expires)
     {
         if (!expires.HasValue)
+            return false;
+
+        // A token valid "from later than it expires" describes no window at all. Each bound can still pass on
+        // its own — expiring now while starting four minutes from now clears both skew comparisons — so this has
+        // to be checked before them, not derived from them.
+        if (notBefore.HasValue && notBefore.Value > expires.Value)
             return false;
 
         var now = clock.GetUtcNow().UtcDateTime;

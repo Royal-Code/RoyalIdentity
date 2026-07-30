@@ -118,8 +118,10 @@ public class PrivateKeyJwtReplayProtectionTests : IClassFixture<LogCapturingAppF
         Assert.Equal(HttpStatusCode.OK, withinCeiling.StatusCode);
     }
 
-    // The ten-minute default exists precisely so this case keeps working: a client emitting a five-minute
-    // assertion from a clock five minutes ahead of the server produces exp = now + 10min on the server's clock.
+    // The ten-minute default exists precisely so this case keeps working. The client's clock is five minutes
+    // ahead, so it stamps nbf five minutes into the server's future and exp five minutes after that: the
+    // assertion is five minutes long from the client's point of view and ten minutes ahead from the server's.
+    // This is the only case that exercises an `nbf` inside the tolerated skew through the real flow.
     [Fact]
     public async Task AssertionOfFiveMinutesFromAClockFiveMinutesAhead_IsStillAccepted()
     {
@@ -127,10 +129,67 @@ public class PrivateKeyJwtReplayProtectionTests : IClassFixture<LogCapturingAppF
         var clientId = await SaveClientAsync(factory.Handles.Demo, "pkj_skewed_clock_client");
         var tokenEndpoint = await GetTokenEndpointAsync(http, factory.Handles.Demo);
 
-        var response = await PresentAsync(http, tokenEndpoint, CreateAssertion(
-            clientId, tokenEndpoint, "pkj-skewed-jti", TimeSpan.FromMinutes(10)));
+        var clientNow = DateTimeOffset.UtcNow + TimeSpan.FromMinutes(5);
+        var assertion = key.CreateAssertion(
+            clientId, tokenEndpoint, "pkj-skewed-jti", clientNow, clientNow + TimeSpan.FromMinutes(5));
+
+        var response = await PresentAsync(http, tokenEndpoint, assertion);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // The default lifetime validation refuses a window that describes nothing, and the injected-clock delegate
+    // that replaced it has to refuse the same. Each bound passes its own skew comparison here — the assertion
+    // expires now and claims to start four minutes from now — so only the coherence check can catch it.
+    [Fact]
+    public async Task AssertionStartingAfterItExpires_IsRefused()
+    {
+        var http = factory.CreateClient();
+        var clientId = await SaveClientAsync(factory.Handles.Demo, "pkj_incoherent_window_client");
+        var tokenEndpoint = await GetTokenEndpointAsync(http, factory.Handles.Demo);
+
+        var now = DateTimeOffset.UtcNow;
+        var assertion = key.CreateAssertionWithRawLifetime(
+            clientId,
+            tokenEndpoint,
+            "pkj-incoherent-window-jti",
+            notBefore: now + TimeSpan.FromMinutes(4),
+            expires: now);
+
+        await AssertRefusedAsCredentialAsync(await PresentAsync(http, tokenEndpoint, assertion));
+    }
+
+    // Nothing validates RealmOptions when the snapshot is published, so an out-of-range ceiling reaches the
+    // evaluator as persisted. It must refuse rather than honour a value above the option's maximum, and rather
+    // than crash on a negative one — where `now + lifetime` overflows.
+    [Theory]
+    [InlineData(-10)]
+    [InlineData(120)]
+    public async Task CeilingOutsideTheAcceptedRange_RefusesTheAssertionWithoutCrashing(int configuredMinutes)
+    {
+        var http = factory.CreateClient();
+        var clientId = await SaveClientAsync(factory.Handles.Demo, $"pkj_bad_ceiling_{configuredMinutes}_client");
+        var tokenEndpoint = await GetTokenEndpointAsync(http, factory.Handles.Demo);
+
+        await factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options => options.Authentication.ClientAssertionMaxLifetime =
+                TimeSpan.FromMinutes(configuredMinutes));
+        try
+        {
+            var response = await PresentAsync(http, tokenEndpoint, CreateAssertion(
+                clientId, tokenEndpoint, $"pkj-bad-ceiling-{configuredMinutes}-jti"));
+
+            Assert.NotEqual(HttpStatusCode.InternalServerError, response.StatusCode);
+            await AssertRefusedAsCredentialAsync(response);
+        }
+        finally
+        {
+            await factory.UpdateRealmAsync(
+                factory.Handles.Demo,
+                options => options.Authentication.ClientAssertionMaxLifetime =
+                    Server.DefaultClientAssertionMaxLifetime);
+        }
     }
 
     [Fact]

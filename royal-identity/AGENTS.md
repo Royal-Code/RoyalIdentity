@@ -105,6 +105,14 @@ RoyalIdentity is a multi-tenant OpenID Connect / OAuth2 authorization server in
 clients, keys, users, sessions, scopes, tokens, consents, or configuration must be
 realm-scoped unless a foundation document explicitly says otherwise.
 
+The project is still under active development and has no production clients or
+external consumers that require backward compatibility. Prefer the clean,
+correct target design over compatibility shims: breaking changes to APIs,
+configuration, persistence models, migrations, and defaults are acceptable when
+they improve that design. Update affected seeds, migrations, tests, plans, and
+documentation together, and still respect explicit invariants and decisions in
+active plans and ADRs.
+
 Every HTTP request flows through:
 
 1. `IEndpointHandler` to parse raw HTTP and create a typed context.

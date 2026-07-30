@@ -205,13 +205,12 @@ Contracts/                              ← Service interfaces (domain boundary)
     IUserConsentStore.cs
     IKeyStore.cs
     IMessageStore.cs
-    IReplayCache.cs
+    IReplayProtectionStore.cs
 
   Defaults/                             ← Default implementations of contracts
     DefaultServerJobsStartup.cs
-    DefaultReplayDistributedCache.cs
-    DefaultReplayNoCache.cs
     ProtectedDataMessageStore.cs
+    ReplayProtection/                   ← in-memory backing, strategy marker, startup validator
     SecretsEvaluators/
     Jobs/
 
@@ -529,7 +528,7 @@ Constants: all protocol strings live in the single `Constants` static class (`Ro
 | Logging | `ILogger<T>` injected per class |
 | Events | `IEventDispatcher.RaiseAsync()` |
 | Caching | `ICached<T>`, `CacheDictionary<K,V>`, wrapping `IMemoryCache` |
-| Replay protection | `IReplayCache.AddAsync()` / `ExistsAsync()` |
+| Replay protection | `IReplayProtectionStore.TryAddAsync()` — one atomic add-if-absent; no default registration, the composition root declares the backing |
 | Data protection | `ProtectedDataMessageStore` (wraps ASP.NET Core Data Protection) |
 
 ---

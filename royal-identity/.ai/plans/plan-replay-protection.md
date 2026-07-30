@@ -511,9 +511,51 @@ declaram a escolha e o startup validator recusa qualquer outra forma. Build e to
 A tarefa previa atribuir o clock injetado a essa propriedade. Ela está documentada no XML do pacote 8.21.0 mas
 **não é acessível** (`CS0117` na compilação — verificado no build, não inferido). Como a autoridade temporal única
 é a exigência real (invariante 9), o clock entra por `LifetimeValidator`, que substitui a validação default de
-lifetime mantendo o mesmo `ClockSkew` e as mesmas recusas: `exp` obrigatório, `nbf` futuro além da tolerância e
-`exp` passado além da tolerância. O `ClockSkew` deixou de ser literal e virou campo, usado tanto na validação
-quanto na retenção do registro — que é o invariante 6 escrito em um lugar só.
+lifetime. O `ClockSkew` deixou de ser literal e virou campo, usado tanto na validação quanto na retenção do
+registro — que é o invariante 6 escrito em um lugar só.
+
+**Correções aplicadas após revisão externa (2026-07-29)**
+
+Três das quatro recusas do `LifetimeValidator` estavam completas; a revisão encontrou uma faltando e um defeito
+próprio da guarda de teto. Ambos verificados antes de corrigir, e ambos provados por mutação depois.
+
+1. **`nbf > exp` não era recusado.** O XML do pacote 8.21.0 documenta
+   `SecurityTokenInvalidLifetimeException: If 'notBefore' is > 'expires'` como recusa da validação original,
+   independente do instante corrente. O delegate comparava cada limite contra o relógio, mas não os comparava
+   entre si — e a combinação é alcançável: uma assertion que expira agora e diz começar em quatro minutos passa
+   as duas comparações de skew. A checagem de coerência entrou antes delas. A afirmação anterior de que o desvio
+   preservava "as mesmas recusas" era **falsa** e foi corrigida acima.
+2. **Teto fora da faixa quebrava ou era honrado.** Nada valida `RealmOptions` na publicação do snapshot — o único
+   `Validate()` de produção é o de `ConfigurationSnapshotRefreshOptions` —, então o valor persistido chegava ao
+   evaluator sem verificação. Com valor negativo, `DateTimeOffset.MaxValue - maxLifetime` **lança**
+   `ArgumentOutOfRangeException` (confirmado por experimento, não por leitura): a "proteção contra overflow" da
+   tarefa era unidirecional e virava 500. Com valor acima de uma hora, o teto era honrado, contrariando DF21. O
+   evaluator agora recusa fora da faixa antes da aritmética, com log nomeando a option — fail-closed, porque erro
+   de configuração nunca deve virar credencial aceita.
+3. **O teste de relógio adiantado não simulava relógio adiantado.** Ele emitia `exp = now + 10min` com `nbf = now`,
+   o que exercita o teto mas não o `nbf` futuro. Passou a emitir `nbf = serverNow + 5min` e
+   `exp = nbf + 5min`, que é o
+   que um client cinco minutos adiantado produz — e é o único caso que cobre `nbf` dentro do `ClockSkew` no fluxo
+   real.
+4. **A propagação de falha do backing não tinha guarda.** O estreitamento do `try/catch` foi apresentado como
+   defeito corrigido sem teste que impeça o retrocesso. Criado
+   `Tests.Integration/Endpoints/PrivateKeyJwtBackingFailureTests.cs` sobre
+   `FailingReplayProtectionAppFactory`, cuja store sempre lança: a resposta não traz `access_token` **nem**
+   `invalid_client`. A factory substitui store e marker juntos, porque deixar a declaração in-memory no lugar
+   seriam duas estratégias e o startup validator recusaria — o que também exercita o marker com um backing de
+   terceiro.
+
+Ajustes menores da mesma revisão: o XML de `IReplayProtectionStore` afirmava que nenhuma implementação guarda o
+handle em claro, mas DF4 proíbe **persistência** em claro, não retenção volátil — a in-memory usa o `jti` como
+chave de dicionário; a redação foi corrigida. `.ai/foundation/tech.md` e `.ai/foundation/structure.md` ainda
+descreviam `IReplayCache` e as duas implementações removidas: corrigidos agora, não empurrados para a Fase 3,
+porque são documentos lidos antes de qualquer trabalho.
+
+**Prova por mutação das duas correções de código**
+
+Removida a checagem de coerência, `AssertionStartingAfterItExpires_IsRefused` falha. Anulada a guarda de faixa,
+`CeilingOutsideTheAcceptedRange_RefusesTheAssertionWithoutCrashing` falha nos dois casos (`-10` e `120` minutos).
+Ambos os defeitos eram reais e os testes os detectam.
 
 **Composições**
 
@@ -540,22 +582,28 @@ quanto na retenção do registro — que é o invariante 6 escrito em um lugar s
 - `Tests.Integration/Endpoints/PrivateKeyJwtReplayProtectionTests.cs` — fluxo real no token endpoint: primeira
   apresentação aceita e a mesma recusada; `jti` reusado em assertion nova recusado; mesmo `jti` em dois clients do
   mesmo realm sem interferência; mesmo `jti` em dois realms sem interferência; `exp` além do teto recusado **e sem
-  registrar handle** (provado apresentando depois o mesmo `jti` dentro do teto e obtendo 200); assertion de 5 min
-  com relógio 5 min adiantado aceita sob o default; teto configurável por realm; e a asserção negativa de que nem
-  a assertion nem o `jti` aparecem no log.
+  registrar handle** (provado apresentando depois o mesmo `jti` dentro do teto e obtendo 200); assertion emitida
+  por relógio 5 min adiantado (`nbf` no futuro dentro do skew) aceita sob o default; `nbf > exp` recusado; teto
+  configurável por realm; teto fora da faixa recusado sem 500; e a asserção negativa de que nem a assertion nem o
+  `jti` aparecem no log.
+- `Tests.Integration/Endpoints/PrivateKeyJwtBackingFailureTests.cs` — falha do backing não vira nem token nem
+  veredito de credencial.
 - Infraestrutura reutilizável pelas Fases 2 e 3: `Tests.Integration/Prepare/PrivateKeyJwtTestKey.cs` (JWK pública
-  como client secret + assinatura de assertions) e `Tests.Integration/Prepare/LogCapturingAppFactory.cs` (captura
-  de log, necessária porque vazamento em log é invisível a qualquer asserção sobre a resposta HTTP).
+  como client secret, assinatura de assertions e assinatura com `nbf`/`exp` crus — necessária porque o construtor
+  de `JwtSecurityToken` recusa criar `nbf >= exp`, então uma janela incoerente só é testável montando header e
+  payload); `Tests.Integration/Prepare/LogCapturingAppFactory.cs` (captura de log, necessária porque vazamento em
+  log é invisível a qualquer asserção sobre a resposta HTTP); e
+  `Tests.Integration/Prepare/FailingReplayProtectionAppFactory.cs`.
 
 **Verificação**
 
 ```
 dotnet build RoyalIdentity.sln   → 0 erros
-dotnet test RoyalIdentity.sln    → 1186 aprovados, 0 falhas, 46 ignorados
+dotnet test RoyalIdentity.sln    → 1191 aprovados, 0 falhas, 46 ignorados
 ```
 
 Por suíte: Tests.Security 116; Tests.Pipelines 3; Tests.Identity 47; Tests.UserAccounts 187 (+1 opt-in);
-Tests.Storage 482 (+44 opt-in); Tests.Architecture 63; Tests.Integration 289; Aspire.Tests 0 (+1 opt-in).
+Tests.Storage 482 (+44 opt-in); Tests.Architecture 63; Tests.Integration 293; Aspire.Tests 0 (+1 opt-in).
 Os ignorados são os aceites opt-in de PostgreSQL/Aspire já existentes, inalterados por esta fase (DF7).
 
 ---
@@ -737,6 +785,13 @@ dotnet test RoyalIdentity.sln
   existir deployment que precise (DF11). Exige operação condicional nativa; `IDistributedCache` não serve.
 - Digest autenticado/HMAC para o replay store — destino: alteração isolada, se confidencialidade perante acesso
   ao banco entrar no threat model (DF17).
+- **Validação de `RealmOptions` na publicação do snapshot** — destino: plano próprio, fora deste. A revisão externa
+  da Fase 1 mostrou que nada chama `Validate()` das sub-options de realm quando o snapshot é publicado; o único
+  `Validate()` de produção é o de `ConfigurationSnapshotRefreshOptions`. É lacuna **pré-existente e mais ampla que
+  replay** — `Authentication.AuthorizationInteractionLifetime` tem exatamente o mesmo problema desde
+  plan-data-operational-storage DF40. O alvo é validar o snapshot antes de publicá-lo, mantendo o último válido,
+  como já se faz para falha de refresh (DF26 do Plano 2). Nesta fase o evaluator apenas recusa fora da faixa, o que
+  fecha o buraco no ponto de uso sem ampliar o escopo para todas as options de realm.
 - Inspeção/limpeza administrativa de handles registrados — destino: roadmap administrativo.
 - Aplicação de proteção contra replay a outros artefatos de uso único — destino: avaliação futura.
 
