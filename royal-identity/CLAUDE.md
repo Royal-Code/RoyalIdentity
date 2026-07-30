@@ -31,27 +31,24 @@ Completed refactoring plans (useful as historical record and for understanding d
 - [.ai/plans/plan-data-operational-storage.md](.ai/plans/plan-data-operational-storage.md) — COMPLETED (8/8 fases; Operational family over EF — single-use authorization codes (MP-2) and conditional refresh transitions (MP-3) under real concurrency, realm-bound authorize parameters with absolute TTL (MP-5), cleanup/purge behind an explicitly selected execution mode (MP-6/MP-7), per-realm payload protection, split migrations histories per family (DF23), complete `AddEntityFrameworkStorage()` gateway, SQLite + real PostgreSQL 17. Fase 8 fixed three product defects the in-memory fake masked: a captive `IClientSecretChecker` singleton, a malformed derived issuer, and a validator that depended on the issuer being cached into `RealmOptions`)
 - [.ai/plans/plan-data-test-migration.md](.ai/plans/plan-data-test-migration.md) — COMPLETED (9/9 fases; production Server on externally provisioned PostgreSQL, zero-configuration ephemeral SQLite Demo, default integration tests on EF/SQLite + real UserAccounts, definitive atomic contracts and removal of the fake/fallbacks)
 
+- [.ai/plans/plan-replay-protection.md](.ai/plans/plan-replay-protection.md) — COMPLETED (3/3 fases; real replay
+  protection for `private_key_jwt`. `IReplayCache` became `IReplayProtectionStore` — one atomic `TryAddAsync`,
+  keyed by realm and issuer, taking a `CancellationToken`. **No default registration:** every composition root
+  declares `AddInMemoryReplayProtection()` or `AddOperationalReplayProtection()`, and
+  `ReplayProtectionStartupValidator` fails startup in any environment when none, two, or an inconsistent strategy
+  is declared. The durable backing is the Operational table `replay_handles`, whose primary key
+  `(realm_id, issuer, purpose, handle_digest)` **is** the decision — a conflict answers replay with no prior read
+  and no expiration comparison. Its own length-prefixed `ReplayHandleDigest` does not reuse
+  `OperationalLookupDigest`, whose high-entropy justification does not transfer to a client-chosen `jti`; cleanup
+  of replay handles is strict (`ExpiresAtUtc < now`) because the artifact is still acceptable at that instant.
+  `Authentication.ClientAssertionMaxLifetime` (default 10 min, range 1 s–1 h) makes retention a server value.
+  Server uses the durable backing, Demo the in-memory one. Fase 1 also fixed two product defects the missing
+  coverage hid: `client_credentials` with `private_key_jwt` returned 500, and a replay-store infrastructure
+  failure came disguised as `invalid_client`)
+
 Active plans (check status before modifying affected areas):
 
-- [.ai/plans/plan-replay-protection.md](.ai/plans/plan-replay-protection.md) — **ACTIVE (2/3 fases)**. Fase 2 done:
-  durable backing over the Operational family — table `replay_handles`, whose primary key
-  `(realm_id, issuer, purpose, handle_digest)` **is** the decision, so a conflict answers replay without any prior
-  read and without comparing expiration (DF8). Its own `ReplayHandleDigest` (length-prefixed fields, versioned)
-  deliberately does not reuse `OperationalLookupDigest`, whose high-entropy justification does not transfer to a
-  client-chosen `jti` (DF17). `RoyalIdentity.Server` now declares `AddOperationalReplayProtection()`; Demo and test
-  fixtures stay in-memory. Cleanup of replay handles is **strict** (`ExpiresAtUtc < now`) because the artifact is
-  still acceptable at that exact instant. Single winner proved under real concurrency on SQLite and on real
-  PostgreSQL 17. Fase 1 done:
-  `IReplayCache` replaced by `IReplayProtectionStore` (single atomic `TryAddAsync`, realm- and issuer-bound, with
-  `CancellationToken`); no default registration — every composition root declares its backing via
-  `AddInMemoryReplayProtection()` and `ReplayProtectionStartupValidator` refuses a host that declared none, two, or
-  one inconsistent with the store resolved (DF12/DF14); `Authentication.ClientAssertionMaxLifetime` (default 10 min,
-  range 1 s–1 h) bounds the retention (DF19/DF21). Fase 1 also fixed two product defects the missing coverage hid:
-  `client_credentials` with `private_key_jwt` returned 500 (`AssertHasClientSecret` demanded a stored
-  `ClientSecret` nothing reads), and a replay-store infrastructure failure came disguised as `invalid_client`.
-  The non-releasable window between the two phases is closed: the Server no longer holds per-process protection.
-
-`Tests.Host` is storage-agnostic and `Tests.Integration` uses
+No implementation plan is currently active. `Tests.Host` is storage-agnostic and `Tests.Integration` uses
 `PersistentStorageAppFactory` by default: Configuration + Operational share one isolated SQLite in-memory
 database and UserAccounts owns another. PostgreSQL storage/Aspire acceptances remain local opt-in. The production
 Server is PostgreSQL-only and must be provisioned by `RoyalIdentity.Migrations`; `RoyalIdentity.Demo` is the
@@ -89,6 +86,9 @@ dotnet run --project RoyalIdentity.Demo
 
 # Validate disposable PostgreSQL provisioning + Server startup/OIDC
 ./scripts/Test-ServerPostgreSql.ps1
+
+# Present the same private_key_jwt assertion twice against the durable replay backing (PostgreSQL 17)
+./scripts/Test-ReplayProtectionPostgreSql.ps1
 ```
 
 ## Architecture in Brief

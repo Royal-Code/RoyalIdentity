@@ -43,6 +43,8 @@
   transição condicional/atômica e a tolerância é aplicada pelo caller sobre estado rematerializado.
 - [plan-replay-protection.md](plan-replay-protection.md) — proteção de replay de `private_key_jwt` está na Fase 3;
   o Server já usa backing Operational durável.
+- [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — baseline anterior para
+  taxonomia, status e headers do token endpoint; a Fase 3 deste plano consome sua classificação de PKCE.
 - [plans-roadmap-02.md](plans-roadmap-02.md) e [backlog-001.md](../backlogs/backlog-001.md) — API/UI
   administrativa ainda não existem; este plano deve entregar um contrato puro que o futuro Admin consuma.
 
@@ -196,6 +198,10 @@
   por `RuleId` e não grava status derivado. Fonte: decisão humana nesta discussão.
 - **DF17 — Sequenciamento:** os aceites finais dependem da conclusão da Fase 3 de
   `plan-replay-protection.md`; não duplicar a solução de replay. Fonte: plano ativo e `AGENTS.md`.
+- **DF18 — Baseline de erros do token endpoint:** a Fase 3 depende da conclusão de
+  `plan-oauth21-token-error-responses.md`; verifier sem challenge retorna `invalid_request`, enquanto verifier
+  incorreto contra challenge existente permanece `invalid_grant`. Não duplicar neste plano o redesign de
+  respostas. Fonte: OAuth 2.1 draft-15 §§3.2.4/4.1.3 + RFC 7636 §4.6.
 
 ---
 
@@ -306,7 +312,7 @@ Futuro Admin/
 
 - Assessment nunca é usado como autorização runtime; validators/handlers enforçam as regras diretamente.
 - Redirect default usa comparação ordinal exata, sem wildcard, sem fragment e HTTPS.
-- Token request com `code_verifier` e code sem `code_challenge` falha com `invalid_grant`.
+- Token request com `code_verifier` e code sem `code_challenge` falha com `invalid_request`.
 - Nenhum access token ou ID token é emitido na authorization response; discovery não anuncia suporte removido.
 - Rotação de refresh não emite/persiste tokens antes de uma decisão atômica; um replay não cria dois sucessores.
 - Retry tolerado usa o mesmo sucessor ainda ativo; replay real revoga a família antes de nova emissão.
@@ -333,7 +339,8 @@ Futuro Admin/
 
 1. **Fase 1 (assessment)** — fixa o vocabulário e torna cada correção observável.
 2. **Fase 2 (redirect)** — introduz a única compatibilidade configurável decidida.
-3. **Fase 3 (authorization flow)** — remove superfícies legadas antes de consolidar metadata/headers.
+3. **Fase 3 (authorization flow)** — depende da baseline de erros OAuth 2.1 e remove superfícies legadas antes
+   de consolidar metadata/headers.
 4. **Fase 4 (refresh)** — estende Operational com decisão atômica e depende de Q1.
 5. **Fase 5 (HTTP/metadata/logs)** — fecha recomendações transversais sobre as superfícies restantes.
 6. **Fase 6 (handoff/aceites)** — valida ambos os providers, hosts, documentação e rastreabilidade administrativa.
@@ -435,7 +442,8 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RedirectUri"
 
 ## Fase 3 - Authorization Code, PKCE e remoção do front-channel legado
 
-**Depende de:** Fases 1-2, DF10-DF12, DF15.
+**Depende de:** Fases 1-2, DF10-DF12, DF15, DF18 e conclusão de
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
 
 **Escopo:** `PkceValidator`, `PkceMatchValidator`, `AuthorizeMainValidator`, `AuthorizeHandler`,
 `DiscoveryOptions`, `DiscoveryHandler`, response modes/results, constants apenas se ficarem sem consumidores,
@@ -447,6 +455,7 @@ emissão/anúncio de tokens no front-channel sem opção legada.
 **Tarefas:**
 
 - [ ] Rejeitar token request com `code_verifier` quando o code não contém `code_challenge`.
+- [ ] Consumir a taxonomia e o writer entregues pelo plano OAuth 2.1 sem reintroduzir helpers paralelos.
 - [ ] Preservar rejeição de verifier ausente/incorreto e comparação em tempo constante.
 - [ ] Manter S256 como default/suporte anunciado; plain continua somente como setting inseguro do client e gera
   finding enquanto existir no modelo.
@@ -459,7 +468,7 @@ emissão/anúncio de tokens no front-channel sem opção legada.
 - [ ] Atualizar assessment para refletir comportamento removido e dados de configuração residuais.
 
 **Critérios de aceite:** discovery anuncia somente response types realmente executáveis; nenhuma authorization
-response contém access token/ID token; downgrade de PKCE retorna `invalid_grant`; authorization code continua
+response contém access token/ID token; downgrade de PKCE retorna `invalid_request`; authorization code continua
 single-use e bound a client/redirect; password grant retorna grant não suportado.
 
 **Testes:**
@@ -666,6 +675,7 @@ dotnet test RoyalIdentity.sln
 | Mudança de factory persiste token antes de vencer | token factory grava durante construção | credencial órfã/emitida ao perdedor | separar construção e persistência; teste de falha | Aberto |
 | RuleId muda após integração Admin | rename sem coordenação | localização/UX quebradas | constantes estáveis + documentação + testes de unicidade | Aberto |
 | Plano conflita com replay ativo | edits simultâneos em auth/options/tests | regressão ou diff sobreposto | DF17; concluir plano de replay antes do aceite final | Aberto |
+| Fase 3 duplica a taxonomia OAuth 2.1 | helpers/códigos são recriados no hardening | contratos divergentes para o mesmo erro | DF18; consumir o plano de erros concluído | Aberto |
 | Config JSON ausente materializa relaxamento antigo | default de deserialização incorreto | realm não aderente silencioso | roundtrip/legacy payload test com defaults seguros | Aberto |
 
 ---
@@ -695,5 +705,6 @@ dotnet test RoyalIdentity.sln
 - [plan-data-configuration-storage.md](plan-data-configuration-storage.md).
 - [plan-data-operational-storage.md](plan-data-operational-storage.md).
 - [plan-replay-protection.md](plan-replay-protection.md).
+- [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
 - [plans-roadmap-02.md](plans-roadmap-02.md).
 - [backlog-001.md](../backlogs/backlog-001.md).

@@ -8,6 +8,9 @@
 	  <ProjectReference Include="..\RoyalIdentity.Demo\RoyalIdentity.Demo.csproj" />
 	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Integration\RoyalIdentity.UserAccounts.Integration.csproj" />
 	  <ProjectReference Include="..\RoyalIdentity.UserAccounts.Sqlite\RoyalIdentity.UserAccounts.Sqlite.csproj" />
+	  <!-- Opt-in PostgreSQL acceptance of plan-replay-protection Fase 3: the durable replay backing on the
+	       engine the production Server runs. Skipped unless a server is published for the suite. -->
+	  <ProjectReference Include="..\RoyalIdentity.Storage.EntityFramework.PostgreSql\RoyalIdentity.Storage.EntityFramework.PostgreSql.csproj" />
 	  <ProjectReference Include="..\Tests.Host\Tests.Host.csproj" />
 	  <!-- Canonical persistent composition: the shared runner applies all three storage families before
 	       the storage-agnostic Tests.Host starts (plan-data-test-migration Fase 6). -->

@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using RoyalIdentity.Storage.EntityFramework.Sqlite;
+using RoyalIdentity.Data.Operational;
 
 namespace Tests.Integration.Prepare;
 
@@ -7,7 +7,7 @@ namespace Tests.Integration.Prepare;
 /// Read-only Operational probe for assertions that public protocol/store APIs cannot express, such as finding
 /// the session created for a subject before its sid is known. It never prepares or mutates relational state.
 /// </summary>
-internal sealed class PersistentOperationalProbe(OperationalSqliteDbContext db)
+internal sealed class PersistentOperationalProbe(OperationalDbContext db)
 {
     public async Task<IReadOnlyList<PersistentSessionState>> FindSessionsAsync(
         string realmId,

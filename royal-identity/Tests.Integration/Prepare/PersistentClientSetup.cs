@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.Configuration;
 using RoyalIdentity.Models;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
-using RoyalIdentity.Storage.EntityFramework.Sqlite;
+using RoyalIdentity.Data.Configuration;
 
 namespace Tests.Integration.Prepare;
 
@@ -12,7 +12,7 @@ namespace Tests.Integration.Prepare;
 /// <see cref="TestClientBuilder"/> and observe the refreshed runtime configuration.
 /// </summary>
 internal sealed class PersistentClientSetup(
-    ConfigurationSqliteDbContext db,
+    ConfigurationDbContext db,
     ClientMaterializer materializer,
     IConfigurationSnapshotRefresher refresher)
 {

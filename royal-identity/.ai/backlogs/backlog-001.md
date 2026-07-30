@@ -322,15 +322,16 @@ realm, client, TTL nem consumo atômico e não deve ser assumido como store de P
 
 ---
 
-## Replay cache com proteção real (check+add atômico)
+## Replay cache com proteção real (check+add atômico) — ✅ CONCLUÍDO
 
-**Área:** Segurança / `private_key_jwt` / Infraestrutura adjacente de storage
-**Deferral:** O default DI é `DefaultReplayNoCache`, que não oferece proteção contra replay de `jti` (sempre
-responde "não visto"); a implementação opcional sobre `IDistributedCache` existe, mas o padrão check+add do
-caller (`PrivateKeyJwtSecretEvaluator`) não é atômico. O baseline de storage (Fase 5) classificou RC-01/RC-02
-como `substituir` e deliberadamente não criou contract test para não cristalizar o no-op.
-**Quando revisitar:** Quando `private_key_jwt` for exposto em ambiente onde replay importa (produção
-multi-instância) ou junto ao plano de caching (`plan-data-caching.md`), que introduz backing distribuído.
-**Nota de design:** A operação alvo é um `TryAddAsync` atômico (add-if-absent com expiração) substituindo o
-par `ExistsAsync`+`AddAsync`; a API atual também não recebe `CancellationToken` (DF23). Ver
-`plan-data-storage-matrix.md`, linhas RC-01/RC-02 e tabela de aceites.
+**Status:** CONCLUÍDO (2026-07-30) por [plan-replay-protection.md](../plans/plan-replay-protection.md).
+
+**Área:** Segurança / `private_key_jwt` / Operational
+
+**Resultado:** `IReplayCache` e as duas implementações antigas foram removidas. O contrato é
+`IReplayProtectionStore`, com uma única operação atômica `TryAddAsync(realmId, issuer, purpose, handle,
+expiration, ct)`. Não há registro default: cada composition root declara `AddInMemoryReplayProtection()` ou
+`AddOperationalReplayProtection()`, e o startup falha em qualquer ambiente se nenhuma, duas ou uma inconsistente
+for declarada. O Server usa a durável sobre `replay_handles`; o Demo, a in-memory. `Redis` e demais backings
+distribuídos continuam fora — entram como extension adicional sobre o mesmo contrato quando existir deployment
+que precise, e nenhum pacote de cache distribuído entrou no grafo.

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RoyalIdentity.Data.Operational.Entities;
 using RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
-using RoyalIdentity.Storage.EntityFramework.Sqlite;
+using RoyalIdentity.Data.Operational;
 
 namespace Tests.Integration.Prepare;
 
@@ -10,7 +10,7 @@ namespace Tests.Integration.Prepare;
 /// Scenarios identify records by their public opaque handle and never depend on relational entities.
 /// </summary>
 internal sealed class PersistentOperationalSetup(
-    OperationalSqliteDbContext db,
+    OperationalDbContext db,
     OperationalLookupDigest digest)
 {
     public async Task SetRefreshTokenConsumedTimeAsync(

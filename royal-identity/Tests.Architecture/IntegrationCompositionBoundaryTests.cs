@@ -23,6 +23,10 @@ public class IntegrationCompositionBoundaryTests
                 "RoyalIdentity.UserAccounts.Sqlite",
                 "Tests.Host",
                 "RoyalIdentity.Migrations",
+                // The default composition stays on SQLite. This one exists for the opt-in acceptance of
+                // plan-replay-protection Fase 3, which has to run the durable replay backing on the engine the
+                // production Server runs; it is skipped unless a PostgreSQL server is published for the suite.
+                "RoyalIdentity.Storage.EntityFramework.PostgreSql",
             },
             references);
     }

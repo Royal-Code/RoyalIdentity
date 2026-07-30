@@ -1,16 +1,16 @@
 # Plan: Proteção real contra replay de `jti` (`plan-replay-protection`)
 
-## Status: EM ANDAMENTO - Q1-Q5 fechadas; Fases 1-2 concluídas
+## Status: CONCLUÍDO - Q1-Q5 fechadas; 3 de 3 fases
 
 ## Progresso
 
-`██░` **67%** - 2 de 3 fases
+`███` **100%** - 3 de 3 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - contrato atômico, in-memory e composições declaradas | Concluida |
 | Fase 2 - backing durável Operational e concorrência | Concluida |
-| Fase 3 - aceites reais e fechamento | Pendente |
+| Fase 3 - aceites reais e fechamento | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -821,22 +821,22 @@ real e fechar o registro normativo.
 
 **Tarefas:**
 
-- [ ] Adicionar guard provando que o Server resolve **a implementação Operational**, e não apenas "algo que não é
+- [x] Adicionar guard provando que o Server resolve **a implementação Operational**, e não apenas "algo que não é
   no-op".
-- [ ] Adicionar guard provando que o Demo resolve **a implementação in-memory**.
-- [ ] Adicionar guard que rejeite reintrodução de qualquer implementação no-op do contrato.
-- [ ] Criar aceite PostgreSQL opt-in que apresenta a mesma assertion duas vezes contra o backing durável real e
+- [x] Adicionar guard provando que o Demo resolve **a implementação in-memory**.
+- [x] Adicionar guard que rejeite reintrodução de qualquer implementação no-op do contrato.
+- [x] Criar aceite PostgreSQL opt-in que apresenta a mesma assertion duas vezes contra o backing durável real e
   exige aceite seguido de recusa.
-- [ ] Estender `scripts/Test-ServerPostgreSql.ps1` para exercitar `private_key_jwt`, ou criar script próprio, e
+- [x] Estender `scripts/Test-ServerPostgreSql.ps1` para exercitar `private_key_jwt`, ou criar script próprio, e
   registrar comando, contagens e ausência de containers residuais.
-- [ ] Atualizar RC-01/RC-02 na matriz: contrato final, remoção da marcação `substituir` e registro da
+- [x] Atualizar RC-01/RC-02 na matriz: contrato final, remoção da marcação `substituir` e registro da
   reclassificação de `Adapter/Infrastructure` para Operational (DF16).
-- [ ] Remover o item de replay do `backlog-001.md` e a menção condicionada no `plan-data-macro.md`.
-- [ ] Atualizar READMEs do Server e do Demo com a extension declarada e, no Demo, a limitação de instância única.
-- [ ] Documentar `ClientAssertionMaxLifetime`: default de 10 minutos, faixa inclusiva de 1 segundo a 1 hora,
+- [x] Remover o item de replay do `backlog-001.md` e a menção condicionada no `plan-data-macro.md`.
+- [x] Atualizar READMEs do Server e do Demo com a extension declarada e, no Demo, a limitação de instância única.
+- [x] Documentar `ClientAssertionMaxLifetime`: default de 10 minutos, faixa inclusiva de 1 segundo a 1 hora,
   sendo o máximo um override para integração legada, e orientação para clientes emitirem assertions de 1 a
   5 minutos.
-- [ ] Executar `dotnet build` e `dotnet test` da solução completa.
+- [x] Executar `dotnet build` e `dotnet test` da solução completa.
 
 **Critérios de aceite:** guards distinguem qual implementação cada composição resolve, e não apenas a ausência de
 no-op; o aceite PostgreSQL apresenta a mesma assertion duas vezes contra o backing real, com aceite e recusa; a
@@ -854,7 +854,80 @@ dotnet test RoyalIdentity.sln
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Entregue.** Os guards distinguem qual implementação cada composição resolve, o aceite ponta-a-ponta roda contra
+PostgreSQL real e o registro normativo está fechado.
+
+**Guards por composição (`Tests.Architecture/ReplayProtectionCompositionTests.cs`)**
+
+- **Server resolve a Operational.** O guard roda o próprio `ReplayProtectionStartupValidator` sobre o grafo do
+  Server — é ele que impõe a igualdade entre declaração e instância resolvida — e depois assere o marker e o tipo
+  concreto. Não é "algo que não é no-op": a in-memory declarada ali passaria em qualquer teste desse tipo, e é
+  exatamente o erro que faria a proteção sumir em deployment replicado.
+- **Demo resolve a in-memory**, coerente com ser processo único e efêmero.
+- **O produto embarca exatamente duas implementações.** Um no-op não é detectável por inspeção — "responde sempre
+  `true`" é comportamento, não forma —, então o guard fixa o *conjunto* de implementações nas assemblies do
+  produto. É o que pode ser garantido estaticamente: uma terceira não aparece sem alguém editar essa lista e ter
+  de justificá-la. As duas listadas já são provadas a recusar replay pelas suítes próprias.
+
+**Aceite PostgreSQL ponta-a-ponta**
+
+`Tests.Integration/Endpoints/PostgreSqlPrivateKeyJwtReplayTests.cs` apresenta a mesma client assertion duas vezes
+ao token endpoint real, sobre `PostgreSqlReplayProtectionAppFactory` — Configuration e Operational em PostgreSQL
+17 e `AddOperationalReplayProtection()` declarado, que é a forma que o Server de produção roda. Aceita, depois
+recusada com `invalid_client`, e a contagem de `operation.replay_handles` prova que a recusa veio de uma linha que
+existe, não de a requisição ter falhado antes de alcançar a store. O segundo cenário apresenta um `jti` novo do
+mesmo client e exige aceite — sem ele, um backing que simplesmente recusasse tudo após a primeira chamada
+satisfaria o primeiro.
+
+UserAccounts permanece em SQLite nessa fixture: nenhum cenário aqui faz do backing de contas o sujeito, e a
+propriedade sob teste vive inteira na família Operational.
+
+**Refactor necessário, e o que ele revelou**
+
+`PersistentStorageAppFactory` era SQLite por construção. Extraí três seams — `ProvisionIdpStorage`,
+`RegisterIdpStorage` e `RegisterReplayProtection` — mantendo o comportamento default idêntico; as 293 cenários
+existentes seguiram verdes em cada passo. No caminho, `PersistentClientSetup`, `PersistentOperationalSetup` e
+`PersistentOperationalProbe` estavam tipados nos contextos **SQLite** embora usem apenas `DbSet`s da base; passaram
+a depender de `ConfigurationDbContext`/`OperationalDbContext`, registrados como alias. São seams de teste
+provider-neutros que estavam presos a um provider sem precisar.
+
+O guard de allowlist de referências reprovou ao adicionar `RoyalIdentity.Storage.EntityFramework.PostgreSql` a
+`Tests.Integration` — ele fazendo o trabalho dele. Atualizado deliberadamente, com o motivo escrito na própria
+lista.
+
+**Script**
+
+`scripts/Test-ReplayProtectionPostgreSql.ps1`: provisiona PostgreSQL 17 efêmero em porta dinâmica não-default,
+roda o aceite e remove o container no `finally`. A fixture cria seu próprio database isolado e o descarta, então
+execuções repetidas nunca compartilham estado.
+
+**Registro normativo fechado**
+
+- **Matriz:** a seção `IReplayCache` virou `IReplayProtectionStore`; RC-01/RC-02 fundiram-se numa linha com o
+  contrato final e a marcação `substituir` deu lugar a **substituído**. A reclassificação de DF16 está registrada
+  em três lugares: no cabeçalho da seção, na tabela de ownership (RC saiu de `Adapter/Infrastructure`) e na
+  linha de aceites futuros. As duas linhas do inventário de baseline foram anotadas em vez de reescritas —
+  são registro histórico, mas "default efetivo continua sendo o no-cache" não podia ficar lido como estado atual.
+- **Backlog:** o item virou CONCLUÍDO com o resultado, no formato dos outros itens fechados do arquivo.
+- **Macro-plano:** a menção condicionada saiu; o item é registrado como entregue por si, sem backing distribuído
+  no grafo.
+- **READMEs:** o do Server ganhou a seção de replay protection — a extension declarada, por que não trocar para a
+  in-memory, e `ClientAssertionMaxLifetime` com default, faixa, o porquê dos 10 minutos e a orientação de 1 a 5
+  minutos para clients. O do Demo registra a in-memory e a limitação de instância única.
+
+**Verificação**
+
+```
+dotnet build RoyalIdentity.sln                  → 0 erros
+dotnet test RoyalIdentity.sln                   → 1213 aprovados, 0 falhas, 50 ignorados
+./scripts/Test-ReplayProtectionPostgreSql.ps1   → 2 aprovados, 0 falhas (PostgreSQL 17 real)
+./scripts/Test-OperationalPostgreSql.ps1        → 47 aprovados, 0 falhas (PostgreSQL 17 real)
+podman ps -a                                    → nenhum container residual
+```
+
+Por suíte: Tests.Security 116; Tests.Identity 47; Tests.Pipelines 3; Tests.UserAccounts 187 (+1 opt-in);
+Tests.Storage 501 (+47 opt-in); Tests.Architecture 66; Tests.Integration 293 (+2 opt-in); Aspire.Tests 0
+(+1 opt-in).
 
 ---
 

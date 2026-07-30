@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Contracts.Defaults.ReplayProtection;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Demo;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Server;
+using RoyalIdentity.Storage.EntityFramework.Extensions;
 
 namespace Tests.Architecture;
 
@@ -50,4 +54,131 @@ public class ReplayProtectionCompositionTests
         Assert.Contains("AddInMemoryReplayProtection()", error.Message, StringComparison.Ordinal);
         Assert.Contains("AddOperationalReplayProtection()", error.Message, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The Server must resolve the <b>durable</b> backing, not merely something that is not a no-op. Registering
+    /// the in-memory one here would still refuse a replay — but only the one its own process saw, which in a
+    /// replicated deployment is most of them getting through.
+    /// </summary>
+    [Fact]
+    public async Task ServerComposition_ResolvesTheOperationalBacking()
+    {
+        var services = ServerServices();
+
+        await using var provider = services.BuildServiceProvider();
+
+        // StartAsync is what enforces that the declaration and the resolved store agree, so asserting the
+        // declaration after it has passed is an assertion about the instance too.
+        await new ReplayProtectionStartupValidator(provider).StartAsync(default);
+
+        var registration = Assert.Single(provider.GetServices<ReplayProtectionRegistration>());
+        Assert.Equal("operational", registration.StrategyName);
+        Assert.Equal(
+            "RoyalIdentity.Storage.EntityFramework.Operational.Stores.EntityFrameworkReplayProtectionStore",
+            registration.StoreType.FullName);
+
+        using var scope = provider.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IReplayProtectionStore>();
+        Assert.IsNotType<InMemoryReplayProtectionStore>(store);
+        Assert.Same(registration.StoreType, store.GetType());
+    }
+
+    /// <summary>
+    /// The Demo resolves the in-memory backing, which is coherent with what it is: one ephemeral process whose
+    /// whole database dies with it.
+    /// </summary>
+    [Fact]
+    public async Task DemoComposition_ResolvesTheInMemoryBacking()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            ApplicationName = typeof(DemoProgram).Assembly.GetName().Name,
+            EnvironmentName = "Development",
+        });
+        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        builder.Services.AddRoyalIdentityDemo();
+
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        await new ReplayProtectionStartupValidator(provider).StartAsync(default);
+
+        var registration = Assert.Single(provider.GetServices<ReplayProtectionRegistration>());
+        Assert.Equal("in-memory", registration.StrategyName);
+
+        using var scope = provider.CreateScope();
+        Assert.IsType<InMemoryReplayProtectionStore>(
+            scope.ServiceProvider.GetRequiredService<IReplayProtectionStore>());
+    }
+
+    /// <summary>
+    /// <para>
+    ///     Pins the set of implementations the product ships. A no-op cannot be detected by inspection — "always
+    ///     answers true" is a behavior, not a shape — so what this guards is the only thing that can be guarded
+    ///     statically: that a third implementation cannot appear without someone changing this list and having
+    ///     to justify it.
+    /// </para>
+    /// <para>
+    ///     That is the regression that matters. The two listed here are proven to refuse a replay by their own
+    ///     suites; a no-op would have to arrive as a new type, and it would land right here.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheProduct_ShipsExactlyTheTwoKnownImplementations()
+    {
+        Type[] productAssemblies =
+        [
+            typeof(IReplayProtectionStore),                        // RoyalIdentity
+            typeof(OperationalServiceCollectionExtensions),        // RoyalIdentity.Storage.EntityFramework
+            typeof(RoyalIdentity.Server.HostServices),             // RoyalIdentity.Server
+            typeof(RoyalIdentity.Demo.DemoServiceCollectionExtensions), // RoyalIdentity.Demo
+        ];
+
+        var implementations = productAssemblies
+            .Select(marker => marker.Assembly)
+            .Distinct()
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .Where(typeof(IReplayProtectionStore).IsAssignableFrom)
+            .Select(type => type.FullName!)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "RoyalIdentity.Contracts.Defaults.ReplayProtection.InMemoryReplayProtectionStore",
+                "RoyalIdentity.Storage.EntityFramework.Operational.Stores.EntityFrameworkReplayProtectionStore",
+            ],
+            implementations);
+    }
+
+    private static IServiceCollection ServerServices()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            ApplicationName = typeof(ServerProgram).Assembly.GetName().Name,
+            EnvironmentName = "Production",
+        });
+        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RoyalIdentity:Connections:Configuration:ConnectionString"] = PostgreSqlConnection,
+            ["RoyalIdentity:Connections:Operational:ConnectionString"] = PostgreSqlConnection,
+            ["RoyalIdentity:Connections:UserAccounts:ConnectionString"] = PostgreSqlConnection,
+            ["RoyalIdentity:Snapshot:RefreshInterval"] = "00:05:00",
+            ["RoyalIdentity:Cleanup:Mode"] = "External",
+            ["RoyalIdentity:Cleanup:Interval"] = "00:15:00",
+            ["RoyalIdentity:Cleanup:BatchSize"] = "500",
+            ["RoyalIdentity:DataProtection:KeyRingPath"] =
+                Path.Combine(Path.GetTempPath(), $"royalidentity-replay-guard-{Guid.NewGuid():N}"),
+            ["RoyalIdentity:DataProtection:ApplicationName"] = "RoyalIdentity.Server.Tests",
+            ["RoyalIdentity:DataProtection:OperationalPayloadProfileId"] = "default",
+        });
+
+        builder.Services.AddHostServices(builder.Configuration, builder.Environment);
+
+        return builder.Services;
+    }
+
+    private const string PostgreSqlConnection =
+        "Host=127.0.0.1;Port=5432;Database=royalidentity;Username=royalidentity;Password=not-used";
 }

@@ -70,7 +70,8 @@ definida em `../analisys/`.
 ## Em andamento
 
 [plan-replay-protection.md](plan-replay-protection.md) está EM ANDAMENTO, com as Fases 1-2 concluídas e a Fase 3
-de aceites/fechamento pendente. Depois desse fechamento, o próximo plano de segurança executável é
+de aceites/fechamento pendente. Depois desse fechamento, a próxima baseline protocolar executável é
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md); em seguida vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md).
 
@@ -102,7 +103,31 @@ que nenhum deles fique grande demais:
 da ADR-013). Critério para avançar de 0 para 1: `UserAccounts` com schema versionado, seed único e concorrência
 real testada.
 
-### 2. Aderência e hardening OAuth 2.0 conforme RFC 9700
+### 2. Conformidade das respostas de erro do token endpoint com OAuth 2.1
+
+**Plano criado:** [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md)
+(RASCUNHO — 0/4 fases)
+
+Corrige a baseline já exigida pelo RFC 6749 e incorpora a classificação adicional do OAuth 2.1 para PKCE antes
+do hardening RFC 9700. O contrato é o valor exato de `error`, o status HTTP e os headers normativos; encontrar o
+nome esperado apenas em `error_description` deixa de satisfazer os testes.
+
+Escopo principal:
+
+- Contrato explícito de resposta para separar código, descrição, status e headers.
+- HTTP 401 e `WWW-Authenticate` para `invalid_client` após tentativa via `Authorization`.
+- Rejeição antecipada de parâmetros não repetíveis, credenciais e mecanismos de autenticação múltiplos.
+- Taxonomia exata para `invalid_request`, `invalid_client`, `invalid_grant`, `unauthorized_client`,
+  `unsupported_grant_type` e `invalid_scope`.
+- Preservação de erros de extensão, inclusive `invalid_target` do RFC 8707 e extension grants.
+- PKCE: verifier/challenge com presença divergente usa `invalid_request`; verifier incorreto usa
+  `invalid_grant`.
+- Testes que desserializam JSON e comparam `error`, status e headers, sem assertions por substring.
+
+Este plano não altera storage e deve ser executado antes da Fase 3 do plano RFC 9700. A auditoria completa dos
+erros de authorize, revocation, UserInfo e protected resources permanece fora deste corte.
+
+### 3. Aderência e hardening OAuth 2.0 conforme RFC 9700
 
 **Plano criado:** [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md)
 (RASCUNHO — 0/6 fases)
@@ -124,10 +149,11 @@ Escopo principal:
 - Clickjacking, referrer, metadata/mTLS, issuer identification e redação de logs.
 - Contrato/handoff para o futuro Admin calcular e apresentar findings em tempo real, sem snapshot.
 
-O plano depende do fechamento de `plan-replay-protection.md`. A apresentação administrativa depende também do
-item 4 deste roadmap; a implementação do core não depende da existência do Admin.
+O plano depende do fechamento de `plan-replay-protection.md`; sua Fase 3 depende também da conclusão de
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md). A apresentação administrativa
+depende do item 5 deste roadmap; a implementação do core não depende da existência do Admin.
 
-### 3. Administração de Sessões por Dispositivo
+### 4. Administração de Sessões por Dispositivo
 
 **Plano sugerido:** `plan-session-administration.md`
 
@@ -143,7 +169,7 @@ Escopo principal:
 A sessão básica já é coberta pelo `plan-users-edge-session.md` (concluído). Este plano trata a camada
 administrativa e operacional mais rica.
 
-### 4. API e UI Administrativa
+### 5. API e UI Administrativa
 
 **Plano sugerido:** `plan-admin-api-ui.md`
 
@@ -167,7 +193,7 @@ Escopo principal:
 Este plano depende das decisões de API/UI administrativa e deve respeitar a regra da ADR-013: módulos contêm
 domínio + persistência; API e UI ficam separados.
 
-### 5. Federation / Identity Brokering
+### 6. Federation / Identity Brokering
 
 **Plano sugerido:** `plan-federation-identity-brokering.md`
 
@@ -184,7 +210,7 @@ Escopo principal:
 
 O `plan-users-edge-session.md` preparou a costura para métodos externos, mas não implementa federação.
 
-### 6. MFA e Passwordless
+### 7. MFA e Passwordless
 
 **Plano sugerido:** `plan-auth-methods-mfa-passwordless.md`
 
@@ -200,7 +226,7 @@ Escopo principal:
 
 Este plano depende do módulo de contas e do ciclo de credenciais já concluídos (ambos estão — ver "Concluído").
 
-### 7. Key Management Service
+### 8. Key Management Service
 
 **Plano sugerido:** `plan-kms.md`
 
@@ -225,7 +251,8 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
    os sub-planos 2-4 (configuration-storage → operational-storage → test-migration); avaliar caching e
    audit-outbox (5-6) depois, só se ainda fizerem sentido no momento.
 3. Concluir `plan-replay-protection.md` (Fase 3).
-4. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
-5. Evoluir administração de sessões por dispositivo.
-6. Criar API/UI administrativa, consumindo `ClientSecurityAssessment`.
-7. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.
+4. Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
+5. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
+6. Evoluir administração de sessões por dispositivo.
+7. Criar API/UI administrativa, consumindo `ClientSecurityAssessment`.
+8. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.

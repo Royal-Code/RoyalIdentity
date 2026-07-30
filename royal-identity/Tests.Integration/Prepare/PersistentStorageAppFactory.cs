@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Configuration;
+using RoyalIdentity.Data.Configuration;
+using RoyalIdentity.Data.Operational;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Migrations;
@@ -66,14 +68,8 @@ public class PersistentStorageAppFactory : AppFactoryBase
 
         builder.ConfigureServices(services =>
         {
-            services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(
-                lifetime.IdpConnectionString,
-                sqlite => sqlite.UseConfigurationMigrationsHistory()));
-            services.AddDbContext<OperationalSqliteDbContext>(options => options.UseSqlite(
-                lifetime.IdpConnectionString,
-                sqlite => sqlite.UseOperationalMigrationsHistory()));
+            RegisterIdpStorage(services);
 
-            services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
             services.AddEntityFrameworkConfigurationSnapshotSource();
             services.AddSingleton(new ConfigurationSnapshotRefreshOptions
             {
@@ -81,7 +77,6 @@ public class PersistentStorageAppFactory : AppFactoryBase
             });
             services.Replace(ServiceDescriptor.Singleton<IConfigurationResourceSource>(resourceSource));
 
-            services.AddEntityFrameworkOperationalStorage<OperationalSqliteDbContext>();
             services.AddOperationalDataProtectionPayloadProtection(
                 OperationalStorageOptions.DefaultPayloadProtectionProfile);
             services.AddEntityFrameworkOperationalCleanup(
@@ -89,8 +84,7 @@ public class PersistentStorageAppFactory : AppFactoryBase
             services.AddAspNetDataProtectionKeyMaterialProtector();
             services.AddEntityFrameworkStorage();
 
-            // plan-replay-protection DF12: the fixture declares its backing like any other composition root.
-            services.AddInMemoryReplayProtection();
+            RegisterReplayProtection(services);
 
             var accountOptions = CreateAccountOptions();
             services.AddSingleton<IUserAccountsRealmOptionsResolver>(
@@ -295,6 +289,73 @@ public class PersistentStorageAppFactory : AppFactoryBase
             .SetRefreshTokenConsumedTimeAsync(realm.Id, refreshToken, consumedAtUtc, ct);
     }
 
+    /// <summary>
+    /// Registers the IdP storage graph — the two contexts and the EF families over them. A provider variant
+    /// overrides this together with <see cref="ProvisionIdpStorage"/>; everything else in this composition is
+    /// provider-neutral.
+    /// </summary>
+    protected virtual void RegisterIdpStorage(IServiceCollection services)
+    {
+        services.AddDbContext<ConfigurationSqliteDbContext>(options => options.UseSqlite(
+            lifetime.IdpConnectionString,
+            sqlite => sqlite.UseConfigurationMigrationsHistory()));
+        services.AddDbContext<OperationalSqliteDbContext>(options => options.UseSqlite(
+            lifetime.IdpConnectionString,
+            sqlite => sqlite.UseOperationalMigrationsHistory()));
+
+        services.AddEntityFrameworkConfigurationStorage<ConfigurationSqliteDbContext>();
+        services.AddEntityFrameworkOperationalStorage<OperationalSqliteDbContext>();
+
+        RegisterContextAliases<ConfigurationSqliteDbContext, OperationalSqliteDbContext>(services);
+    }
+
+    /// <summary>
+    /// The test-only write and probe seams are provider-neutral and reach each family through these aliases, so
+    /// a provider variant does not need seams of its own.
+    /// </summary>
+    protected static void RegisterContextAliases<TConfiguration, TOperational>(IServiceCollection services)
+        where TConfiguration : ConfigurationDbContext
+        where TOperational : OperationalDbContext
+    {
+        services.AddScoped<ConfigurationDbContext>(
+            provider => provider.GetRequiredService<TConfiguration>());
+        services.AddScoped<OperationalDbContext>(
+            provider => provider.GetRequiredService<TOperational>());
+    }
+
+    /// <summary>
+    /// Declares the replay-protection backing (plan-replay-protection DF12): the fixture declares it like any
+    /// other composition root. A provider variant overrides this to exercise the durable backing instead.
+    /// </summary>
+    protected virtual void RegisterReplayProtection(IServiceCollection services)
+        => services.AddInMemoryReplayProtection();
+
+    /// <summary>
+    /// Applies Configuration and Operational plus the product seed. A provider variant overrides it; the
+    /// UserAccounts family is applied by the caller and stays on SQLite either way, because no scenario of this
+    /// fixture makes the account backing its subject.
+    /// </summary>
+    protected virtual void ProvisionIdpStorage()
+        => EnsureSucceeded(StorageMigrationRunner.RunAsync(new MigrationRunnerOptions
+        {
+            ConfigurationProvider = ConfigurationDatabaseProvider.Sqlite,
+            Families = StorageFamilySelection.Configuration | StorageFamilySelection.Operational,
+            ConfigurationConnection = lifetime.IdpConnectionString,
+            OperationalConnection = lifetime.IdpConnectionString,
+            DatabaseTopology = StorageDatabaseTopology.Shared,
+            Seed = ConfigurationSeedMode.All,
+            ProductSeed = ProductSeedOptions,
+            KeyProtector = ConfigurationKeyProtector.DataProtection,
+            DataProtectionKeyRing = KeyRingPath,
+            DataProtectionApplicationName = DataProtectionApplicationName,
+        }).GetAwaiter().GetResult());
+
+    /// <summary>The product seed every variant applies, so the seeded realms and client stay identical.</summary>
+    protected static ConfigurationProductSeedOptions ProductSeedOptions => new()
+    {
+        ServerAdminRedirectUris = ["http://localhost/server-admin/callback"],
+    };
+
     private void Provision()
     {
         if (provisioned)
@@ -305,22 +366,7 @@ public class PersistentStorageAppFactory : AppFactoryBase
 
         try
         {
-            EnsureSucceeded(StorageMigrationRunner.RunAsync(new MigrationRunnerOptions
-            {
-                ConfigurationProvider = ConfigurationDatabaseProvider.Sqlite,
-                Families = StorageFamilySelection.Configuration | StorageFamilySelection.Operational,
-                ConfigurationConnection = lifetime.IdpConnectionString,
-                OperationalConnection = lifetime.IdpConnectionString,
-                DatabaseTopology = StorageDatabaseTopology.Shared,
-                Seed = ConfigurationSeedMode.All,
-                ProductSeed = new ConfigurationProductSeedOptions
-                {
-                    ServerAdminRedirectUris = ["http://localhost/server-admin/callback"],
-                },
-                KeyProtector = ConfigurationKeyProtector.DataProtection,
-                DataProtectionKeyRing = KeyRingPath,
-                DataProtectionApplicationName = DataProtectionApplicationName,
-            }).GetAwaiter().GetResult());
+            ProvisionIdpStorage();
 
             EnsureSucceeded(StorageMigrationRunner.RunAsync(new MigrationRunnerOptions
             {
@@ -364,7 +410,7 @@ public class PersistentStorageAppFactory : AppFactoryBase
         return options;
     }
 
-    private static void EnsureSucceeded(StorageMigrationReport report)
+    protected static void EnsureSucceeded(StorageMigrationReport report)
     {
         var failure = report.Families.FirstOrDefault(result =>
             result.Status is StorageMigrationStatus.Failed);

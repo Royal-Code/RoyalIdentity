@@ -19,6 +19,7 @@ normativa ou decisão fechada.
 | Configuração | `IRealmStore`, `IClientStore`, `IResourceStore`, `ResourceStoreExtensions`, `IKeyStore` | 19 |
 | Operacional | `IAccessTokenStore`, `IRefreshTokenStore`, `IAuthorizationCodeStore`, `IUserConsentStore`, `IUserSessionStore`, `IAuthorizeParametersStore` | 24 |
 | Infraestrutura adjacente | `IMessageStore`, `IReplayCache`, `IStorageProvider`, `IStorageSession` e `IDisposable.Dispose` herdado | 8 |
+| | *(inventário do baseline; `IReplayCache` virou `IReplayProtectionStore`, com uma operação em vez de duas, e saiu de adjacente para Operational — plan-replay-protection)* | |
 | **Total de operações/propriedades** | **15 contratos + 1 extensão** | **62** |
 | Tipo público de resultado | `ResourceResolution` | 7 membros de suporte |
 
@@ -205,14 +206,21 @@ serializado e protegido por ASP.NET Data Protection.
 | MS-02 | `ReadAsync<T>(id, ct)` | Adapter/Infrastructure / n/a / Data Protection | Base64Url decode→unprotect→deserialize; qualquer falha é logada e retorna `null`; leitura repetível. | sign-out e page services | fluxo: end-session/logout; sem teste direto de tamper | fail-closed como ausência `avaliar`; adjacente/baseline |
 | MS-03 | `DeleteAsync(id, ct)` | Adapter/Infrastructure / n/a / sem backing | No-op incondicional. | page/flow cleanup quando aplicável | lacuna direta | no-op é específico da implementação e `avaliar`; adjacente/baseline |
 
-### `IReplayCache`
+### `IReplayProtectionStore`
 
-Implementações: `DefaultReplayNoCache` (default DI) e `DefaultReplayDistributedCache` (opcional).
+> **Fechado por [plan-replay-protection.md](plan-replay-protection.md).** `IReplayCache` não existe mais, nem
+> `DefaultReplayNoCache`/`DefaultReplayDistributedCache`. As duas operações viraram **uma**, e a linha deixou de
+> ser `Adapter/Infrastructure`: replay é dado **Operational** realm-scoped e efêmero, com entidade própria em
+> `RoyalIdentity.Data.Operational` (reclassificação consciente, DF16 daquele plano).
 
-| ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
+Implementações: `InMemoryReplayProtectionStore` (instância única, declarada por `AddInMemoryReplayProtection()`)
+e `EntityFrameworkReplayProtectionStore` sobre `replay_handles` (declarada por
+`AddOperationalReplayProtection()`). **Não há registro default:** uma composição que não declare backing, ou que
+declare mais de um, falha no startup em qualquer ambiente.
+
+| ID | Operação | Owner / binding / backing | Comportamento | Consumidores | Cobertura | Estado |
 |---|---|---|---|---|---|---|
-| RC-01 | `AddAsync(purpose, handle, expiration)` | Adapter/Infrastructure / global / no-op ou `IDistributedCache` | Default não grava. Distribuído grava bytes vazios em `Prefix + purpose + handle`, sem delimitador, com expiração absoluta; API não recebe CT. | `PrivateKeyJwtSecretEvaluator` | lacuna relevante | proteção contra replay é regra de segurança; API/backing/atomicidade `avaliar`; adjacente/baseline |
-| RC-02 | `ExistsAsync(purpose, handle)` | Adapter/Infrastructure / global / constante false ou cache | Default sempre `false`; distribuído faz `GetAsync`. Check+add do caller não é atômico. | `PrivateKeyJwtSecretEvaluator` | lacuna relevante | implementação default não oferece proteção; `substituir`/decidir operação atômica em plano próprio; adjacente |
+| RC-01/RC-02 | `TryAddAsync(realmId, issuer, purpose, handle, expiration, ct)` | Operational / realm + issuer + purpose / in-memory ou EF (`replay_handles`) | Add-if-absent atômico: `true` registrou, `false` já existia. Sem leitura prévia, sem upsert e **sem consultar a expiração do registro existente** — enquanto o registro estiver retido, conflito é replay. Falha de infraestrutura propaga; nunca vira `true` nem `false`. O handle é persistido como digest, nunca em claro. | `PrivateKeyJwtSecretEvaluator` | contrato, isolamento nas quatro dimensões, concorrência com vencedor único (SQLite sempre, PostgreSQL opt-in), limpeza estrita, purge, fluxo real no token endpoint e aceite PostgreSQL ponta-a-ponta | fechado |
 
 ### `IStorageProvider` e `IStorageSession`
 
@@ -255,7 +263,7 @@ Esses membros não persistem dados, mas fazem parte da superfície pública intr
 | `RealmMemoryStore.UserConsents` | `IUserConsentStore` | realm | Operacional. |
 | `RealmMemoryStore.UserSessions` | `IUserSessionStore` | realm | Operacional. |
 | ASP.NET Data Protection | `IMessageStore` | infraestrutura | Ciphertext é o próprio handle; não há registro server-side. |
-| `IDistributedCache` opcional | `IReplayCache` | infraestrutura | Default efetivo continua sendo o no-cache. |
+| ~~`IDistributedCache` opcional~~ | ~~`IReplayCache`~~ | ~~infraestrutura~~ | Era o backing opcional, com o no-cache como default efetivo. **Substituído** por `replay_handles` na família Operational, sem backing distribuído no grafo (plan-replay-protection). |
 | Persistência de `UserAccounts` | nenhuma superfície deste catálogo | família separada | RL-07 não a alcança; integração futura deve respeitar ADR-013/015 e DF20. |
 
 ## Classificação de ownership e lifecycle — Fase 2
@@ -268,7 +276,7 @@ adapter implementa o gateway, mas não se torna owner dos registros.
 |---|---|---|---|
 | Configuration | ST-01, ST-02, ST-08..ST-10; RL-01..RL-07; CL-01..CL-02; RS-01..RS-05; KY-01..KY-05 | Durável, baixa rotatividade; tombstones configuracionais sobrevivem à exclusão lógica. Keys ficam aqui temporariamente até existir KMS. | `RoyalIdentity.Data.Configuration`, adaptado somente por `RoyalIdentity.Storage.EntityFramework`; resources permanecem bloqueados por DF22. |
 | Operational | ST-03..ST-07, ST-11; AT-01..AT-04; RT-01..RT-05; AC-01..AC-03; CN-01..CN-03; SS-01..SS-06; AP-01..AP-03 | Transitório/alta rotatividade; possui consumo, revogação, expiração, retenção e purge próprios por tipo. | `RoyalIdentity.Data.Operational`, adaptado somente por `RoyalIdentity.Storage.EntityFramework`. |
-| Adapter/Infrastructure | MS-01..MS-03; RC-01..RC-02; SP-01..SP-03 | Lifetime técnico, criptográfico, cache ou de acesso ao adapter; não constitui registro de `Data.*`. | Implementações/decorators de infraestrutura adjacente e lifecycle do `Storage.EntityFramework`. |
+| Adapter/Infrastructure | MS-01..MS-03; SP-01..SP-03 | Lifetime técnico, criptográfico, cache ou de acesso ao adapter; não constitui registro de `Data.*`. | Implementações/decorators de infraestrutura adjacente e lifecycle do `Storage.EntityFramework`. RC-01/RC-02 saíram desta classificação e são Operational (plan-replay-protection DF16). |
 | Configuration (resultado não persistido) | RR-01..RR-07 | Objetos transitórios de resposta da resolução de configuração; não são entidades. | Construídos pelo adapter/core a partir do resource store; bloqueados com RS-05 pelo redesign. |
 | fora do storage | `IUserDirectory`, `ISubjectStore`, `ILocalUserAuthenticator`, `IUserClaimsProvider`, `IUserSecurityStateProvider` e tipos de conta | Lifecycle próprio do módulo de contas. Nenhuma linha contratual incluída na contagem 62 pertence aqui. | `RoyalIdentity.UserAccounts` e sua `.Integration`; nunca `Data.Configuration`/`Data.Operational`. |
 
@@ -440,9 +448,10 @@ Regras aplicadas na suíte:
 - Comportamentos `avaliar` exercitados por serem load-bearing para consumidores atuais (lookups ausentes →
   `null`, remoções idempotentes, upsert de consent, no-ops de sessão ausente) estão anotados nos cenários com
   a linha da matriz e a decisão pendente (DF16/DF19/DF25); a Fase 5 pode ajustá-los sem quebrar o desenho.
-- `IReplayCache` (RC-01/RC-02) não recebeu contract test: o default `DefaultReplayNoCache` não oferece
-  proteção e um teste cristalizaria o no-op; a operação atômica check+add permanece requisito de plano
-  próprio, como já registrado.
+- `IReplayCache` (RC-01/RC-02) não recebeu contract test nesta fase porque o default `DefaultReplayNoCache` não
+  oferecia proteção e um teste cristalizaria o no-op. **Fechado desde então:** o contrato é
+  `IReplayProtectionStore`, o no-op não existe e a cobertura é a listada na seção de RC acima
+  (plan-replay-protection).
 
 ### Testes de aceite futuros registrados (sem parity no fake — ADR-018)
 
@@ -454,7 +463,7 @@ Regras aplicadas na suíte:
 | Persistência do update e transição condicional/atômica de refresh token | RT-03 / DF15, DF17 | Plano 3 | O backing por live reference do fake não falsifica persistência explícita (a mutação fica visível antes do update e o CAS por referência rejeita instância rematerializada); RT-03 fica sem cenário na suíte e vira aceite do provider EF. |
 | Propagação de `CancellationToken` em todo I/O real | DF23 | Planos 2/3 | O fake não simula cancelamento de I/O inexistente; os providers EF devem encaminhar `ct` a queries, enumerações e `SaveChangesAsync`, com cenário de aceite próprio. |
 | Disposal real de `IStorageSession` (context/conexão) | SP-03 / DF21 | Plano 2 | Nada é assertado pós-dispose contra o fake no-op. |
-| Check+add atômico de replay | RC-01/RC-02 | plano próprio | Sem teste contra o default no-cache. |
+| ~~Check+add atômico de replay~~ | RC-01/RC-02 | ~~plano próprio~~ — **entregue** por plan-replay-protection | Operação única `TryAddAsync`, provada sob concorrência real nos dois providers. |
 | Reject de duplicidade nas escritas create-only (índice único; falha visível, nunca overwrite ou sucesso silencioso) | KY-01 / AT-01, RT-01, AC-01, SS-01 / DF16 | Plano 2 (keys) / Plano 3 (operacionais) | O fake sobrescreve ou ignora silenciosamente (`descartar`); sem cenário na suíte. |
 | Regeneração interna do handle de authorize parameters em colisão | AP-01 / DF16 | Plano 3 | Handle é gerado pelo store; nunca sobrescrever nem falhar por azar de geração. |
 | Authorize parameters realm-bound + TTL absoluto + leitura fail-closed de expirado + purge de abandonados | ST-03, AP-01..AP-03 / DF6, DF19 (MP-5) | Plano 3 | Fake permanece global e sem TTL (ADR-018); semânticas fechadas na seção de fechamento de AP. |
@@ -694,7 +703,7 @@ cita a decisão DF e a fonte normativa ou a regra protocolar/negocial que o sust
 | AP-03 | preservar (cleanup idempotente do callback) / substituir (TTL + purge de abandonados — MP-5/MP-6) | DF19 | teste existente + aceite P3 |
 | MS-01/MS-02 | preservar (roundtrip; fail-closed → `null` em id ilegível — regra de segurança) / descartar (formato do id como contrato) | DF14/DF25 | roundtrip + `Read_UnreadableId_ReturnsNull` (novo) |
 | MS-03 | descartar (como critério de paridade) | efeito do delete é da implementação; semântica definitiva acompanha o futuro store persistente (backlog PAR) | delete de id escrito apenas completa |
-| RC-01/RC-02 | substituir | check+add atômico com proteção real — plano próprio; default no-cache documentado como sem proteção | aceite registrado |
+| RC-01/RC-02 | **substituído** (plan-replay-protection) | operação única atômica add-if-absent, realm- e issuer-bound, com CT; conflito responde replay sem consultar expiração; sem registro default e sem no-op | contrato + concorrência (SQLite e PostgreSQL) + fluxo real |
 | SP-01..SP-03 | preservar (seam DF21) / substituir (implementação no adapter EF) / descartar (dispose no-op) | DF21 | `StorageSessionContractTests` + aceite P2 |
 
 Não resta nenhuma semântica de storage marcada `avaliar` ou `a definir`: os fechamentos derivam de

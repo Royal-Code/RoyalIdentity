@@ -223,10 +223,10 @@ Não iniciar antes de:
 - configuração EF estar estável;
 - APIs administrativas ou mecanismo claro de update existirem — sem caminho de escrita não há invalidação a testar.
 
-**Item que não deve herdar esta condicionalidade:** o replay cache com proteção real (RC-01/RC-02 da matriz,
-marcados `substituir`). O default `DefaultReplayNoCache` não oferece proteção contra replay de `jti` em
-`private_key_jwt`, e o check+add do caller não é atômico. Está parado aqui só porque este plano introduziria
-backing distribuído, mas é requisito de segurança, independente de performance, e deve ser tratado por si.
+**Item que não herdou esta condicionalidade — já entregue:** a proteção real contra replay (RC-01/RC-02 da
+matriz) saiu daqui e foi tratada por si, como requisito de segurança independente de performance, em
+[plan-replay-protection.md](plan-replay-protection.md). Nenhum backing distribuído entrou no grafo: a
+implementação durável vive na família Operational.
 
 ---
 
