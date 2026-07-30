@@ -98,27 +98,27 @@ public class PostgreSqlReplayProtectionAppFactory : PersistentStorageAppFactory
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing && !dropped && connectionString is not null)
-        {
-            dropped = true;
-            NpgsqlConnection.ClearAllPools();
-
-            try
-            {
-                using var connection = new NpgsqlConnection(
-                    PostgreSqlIntegrationTestEnvironment.ConnectionString);
-                connection.Open();
-                using var command = new NpgsqlCommand(
-                    $"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE);", connection);
-                command.ExecuteNonQuery();
-            }
-            catch (NpgsqlException)
-            {
-                // A database left behind on an ephemeral container is not worth failing a suite over.
-            }
-        }
-
         base.Dispose(disposing);
+
+        if (!disposing || dropped || connectionString is null)
+            return;
+
+        dropped = true;
+        NpgsqlConnection.ClearAllPools();
+
+        try
+        {
+            using var connection = new NpgsqlConnection(
+                PostgreSqlIntegrationTestEnvironment.ConnectionString);
+            connection.Open();
+            using var command = new NpgsqlCommand(
+                $"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE);", connection);
+            command.ExecuteNonQuery();
+        }
+        catch (NpgsqlException)
+        {
+            // A database left behind on an ephemeral container is not worth failing a suite over.
+        }
     }
 }
 

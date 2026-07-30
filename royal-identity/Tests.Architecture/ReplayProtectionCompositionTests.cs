@@ -2,12 +2,13 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Reflection;
+using System.Xml.Linq;
 using RoyalIdentity.Contracts.Defaults.ReplayProtection;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Demo;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Server;
-using RoyalIdentity.Storage.EntityFramework.Extensions;
 
 namespace Tests.Architecture;
 
@@ -114,28 +115,20 @@ public class ReplayProtectionCompositionTests
     /// <para>
     ///     Pins the set of implementations the product ships. A no-op cannot be detected by inspection — "always
     ///     answers true" is a behavior, not a shape — so what this guards is the only thing that can be guarded
-    ///     statically: that a third implementation cannot appear without someone changing this list and having
-    ///     to justify it.
+    ///     statically: that a third implementation cannot appear in any productive project capable of referencing
+    ///     the contract without failing this test.
     /// </para>
     /// <para>
-    ///     That is the regression that matters. The two listed here are proven to refuse a replay by their own
-    ///     suites; a no-op would have to arrive as a new type, and it would land right here.
+    ///     The project graph is read from source instead of maintained as an assembly allowlist. A new productive
+    ///     project that reaches the core must also be referenced by <c>Tests.Architecture</c>, or the missing
+    ///     assembly makes the guard fail. The two known implementations are proven to refuse a replay by their
+    ///     own suites.
     /// </para>
     /// </summary>
     [Fact]
     public void TheProduct_ShipsExactlyTheTwoKnownImplementations()
     {
-        Type[] productAssemblies =
-        [
-            typeof(IReplayProtectionStore),                        // RoyalIdentity
-            typeof(OperationalServiceCollectionExtensions),        // RoyalIdentity.Storage.EntityFramework
-            typeof(RoyalIdentity.Server.HostServices),             // RoyalIdentity.Server
-            typeof(RoyalIdentity.Demo.DemoServiceCollectionExtensions), // RoyalIdentity.Demo
-        ];
-
-        var implementations = productAssemblies
-            .Select(marker => marker.Assembly)
-            .Distinct()
+        var implementations = LoadProductAssembliesThatReachTheCore()
             .SelectMany(assembly => assembly.GetTypes())
             .Where(type => type is { IsClass: true, IsAbstract: false })
             .Where(typeof(IReplayProtectionStore).IsAssignableFrom)
@@ -177,6 +170,67 @@ public class ReplayProtectionCompositionTests
         builder.Services.AddHostServices(builder.Configuration, builder.Environment);
 
         return builder.Services;
+    }
+
+    private static IReadOnlyList<Assembly> LoadProductAssembliesThatReachTheCore()
+    {
+        var root = ProjectReferenceReader.FindRepositoryRoot();
+        var coreProject = Path.GetFullPath(
+            Path.Combine(root, "RoyalIdentity", "RoyalIdentity.csproj"));
+        var productProjects = Directory
+            .EnumerateDirectories(root, "RoyalIdentity*", SearchOption.TopDirectoryOnly)
+            .SelectMany(directory =>
+                Directory.EnumerateFiles(directory, "*.csproj", SearchOption.TopDirectoryOnly))
+            .Select(Path.GetFullPath)
+            .Where(project => ReferencesProject(
+                project,
+                coreProject,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase)))
+            .OrderBy(project => project, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(productProjects);
+
+        return productProjects
+            .Select(project =>
+            {
+                var document = XDocument.Load(project);
+                var assemblyName = document
+                    .Descendants("AssemblyName")
+                    .Select(element => element.Value)
+                    .FirstOrDefault()
+                    ?? Path.GetFileNameWithoutExtension(project);
+                var assemblyPath = Path.Combine(AppContext.BaseDirectory, $"{assemblyName}.dll");
+
+                Assert.True(
+                    File.Exists(assemblyPath),
+                    $"Product assembly '{assemblyName}' is not available to Tests.Architecture. " +
+                    "Add its project reference so replay-protection implementations cannot escape this guard.");
+
+                return Assembly.LoadFrom(assemblyPath);
+            })
+            .ToArray();
+    }
+
+    private static bool ReferencesProject(
+        string project,
+        string targetProject,
+        HashSet<string> visited)
+    {
+        if (string.Equals(project, targetProject, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!visited.Add(project))
+            return false;
+
+        var projectDirectory = Path.GetDirectoryName(project)!;
+        return XDocument
+            .Load(project)
+            .Descendants("ProjectReference")
+            .Select(reference => reference.Attribute("Include")?.Value)
+            .Where(reference => !string.IsNullOrWhiteSpace(reference))
+            .Select(reference => Path.GetFullPath(Path.Combine(projectDirectory, reference!)))
+            .Any(reference => ReferencesProject(reference, targetProject, visited));
     }
 
     private const string PostgreSqlConnection =

@@ -831,7 +831,8 @@ real e fechar o registro normativo.
   registrar comando, contagens e ausência de containers residuais.
 - [x] Atualizar RC-01/RC-02 na matriz: contrato final, remoção da marcação `substituir` e registro da
   reclassificação de `Adapter/Infrastructure` para Operational (DF16).
-- [x] Remover o item de replay do `backlog-001.md` e a menção condicionada no `plan-data-macro.md`.
+- [x] Encerrar o item de replay como concluído no `backlog-001.md` e remover a menção condicionada no
+  `plan-data-macro.md`.
 - [x] Atualizar READMEs do Server e do Demo com a extension declarada e, no Demo, a limitação de instância única.
 - [x] Documentar `ClientAssertionMaxLifetime`: default de 10 minutos, faixa inclusiva de 1 segundo a 1 hora,
   sendo o máximo um override para integração legada, e orientação para clientes emitirem assertions de 1 a
@@ -865,9 +866,11 @@ PostgreSQL real e o registro normativo está fechado.
   exatamente o erro que faria a proteção sumir em deployment replicado.
 - **Demo resolve a in-memory**, coerente com ser processo único e efêmero.
 - **O produto embarca exatamente duas implementações.** Um no-op não é detectável por inspeção — "responde sempre
-  `true`" é comportamento, não forma —, então o guard fixa o *conjunto* de implementações nas assemblies do
-  produto. É o que pode ser garantido estaticamente: uma terceira não aparece sem alguém editar essa lista e ter
-  de justificá-la. As duas listadas já são provadas a recusar replay pelas suítes próprias.
+  `true`" é comportamento, não forma —, então o guard fixa o *conjunto* de implementações em todos os projetos
+  produtivos `RoyalIdentity*` que alcançam o core. O grafo é descoberto dos `ProjectReference` reais; se um novo
+  projeto capaz de implementar o contrato não estiver referenciado por `Tests.Architecture`, a ausência do
+  assembly também reprova o guard. As duas implementações conhecidas já são provadas a recusar replay pelas
+  suítes próprias.
 
 **Aceite PostgreSQL ponta-a-ponta**
 
@@ -875,9 +878,10 @@ PostgreSQL real e o registro normativo está fechado.
 ao token endpoint real, sobre `PostgreSqlReplayProtectionAppFactory` — Configuration e Operational em PostgreSQL
 17 e `AddOperationalReplayProtection()` declarado, que é a forma que o Server de produção roda. Aceita, depois
 recusada com `invalid_client`, e a contagem de `operation.replay_handles` prova que a recusa veio de uma linha que
-existe, não de a requisição ter falhado antes de alcançar a store. O segundo cenário apresenta um `jti` novo do
-mesmo client e exige aceite — sem ele, um backing que simplesmente recusasse tudo após a primeira chamada
-satisfaria o primeiro.
+o próprio cenário inseriu — a prova compara a contagem antes/depois e exige incremento exato de um, independente
+da ordem dos testes na fixture —, não de a requisição ter falhado antes de alcançar a store. O segundo cenário
+apresenta um `jti` novo do mesmo client e exige aceite — sem ele, um backing que simplesmente recusasse tudo após
+a primeira chamada satisfaria o primeiro.
 
 UserAccounts permanece em SQLite nessa fixture: nenhum cenário aqui faz do backing de contas o sujeito, e a
 propriedade sob teste vive inteira na família Operational.
@@ -899,7 +903,8 @@ lista.
 
 `scripts/Test-ReplayProtectionPostgreSql.ps1`: provisiona PostgreSQL 17 efêmero em porta dinâmica não-default,
 roda o aceite e remove o container no `finally`. A fixture cria seu próprio database isolado e o descarta, então
-execuções repetidas nunca compartilham estado.
+execuções repetidas nunca compartilham estado. No teardown, o host e seu provider raiz são descartados antes da
+limpeza dos pools e do `DROP DATABASE`, evitando encerrar à força conexões ainda pertencentes ao host.
 
 **Registro normativo fechado**
 
@@ -919,7 +924,7 @@ execuções repetidas nunca compartilham estado.
 
 ```
 dotnet build RoyalIdentity.sln                  → 0 erros
-dotnet test RoyalIdentity.sln                   → 1213 aprovados, 0 falhas, 50 ignorados
+dotnet test RoyalIdentity.sln                   → 1213 aprovados, 0 falhas, 51 ignorados
 ./scripts/Test-ReplayProtectionPostgreSql.ps1   → 2 aprovados, 0 falhas (PostgreSQL 17 real)
 ./scripts/Test-OperationalPostgreSql.ps1        → 47 aprovados, 0 falhas (PostgreSQL 17 real)
 podman ps -a                                    → nenhum container residual
@@ -980,7 +985,8 @@ Tests.Storage 501 (+47 opt-in); Tests.Architecture 66; Tests.Integration 293 (+2
 - `TokenValidationParameters`, o teto de duração e os backings usam o mesmo `TimeProvider`.
 - Aceite PostgreSQL apresenta a mesma assertion duas vezes contra o backing real.
 - Guards provam a implementação específica resolvida por Server e por Demo.
-- RC-01/RC-02 atualizados e reclassificados; item removido do backlog e da órbita do plano de caching.
+- RC-01/RC-02 atualizados e reclassificados; item encerrado como concluído no backlog e removido da órbita do
+  plano de caching.
 - `dotnet build RoyalIdentity.sln` verde.
 - `dotnet test RoyalIdentity.sln` verde.
 

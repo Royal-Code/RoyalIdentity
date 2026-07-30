@@ -36,6 +36,7 @@ public class PostgreSqlPrivateKeyJwtReplayTests
         var clientId = await SaveClientAsync("pkj_pg_replay_client");
         var tokenEndpoint = await GetTokenEndpointAsync(http);
         var assertion = CreateAssertion(clientId, tokenEndpoint, "pkj-pg-replay-jti");
+        var countBefore = await factory.CountReplayHandlesAsync();
 
         var first = await PresentAsync(http, tokenEndpoint, assertion);
         var second = await PresentAsync(http, tokenEndpoint, assertion);
@@ -47,8 +48,8 @@ public class PostgreSqlPrivateKeyJwtReplayTests
             "invalid_client", await second.Content.ReadAsStringAsync(), StringComparison.Ordinal);
 
         // The refusal came from a row that is actually there — not from the request failing for some other
-        // reason before the store was ever reached.
-        Assert.True(await factory.CountReplayHandlesAsync() > 0);
+        // reason before the store was ever reached. The delta makes this independent of fixture test order.
+        Assert.Equal(countBefore + 1, await factory.CountReplayHandlesAsync());
     }
 
     /// <summary>

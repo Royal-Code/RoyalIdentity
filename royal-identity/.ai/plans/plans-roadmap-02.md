@@ -66,12 +66,18 @@ definida em `../analisys/`.
   `Tests.Integration` integralmente sobre EF/SQLite + `UserAccounts`; contratos atômicos definitivos; fallback,
   consumers transitórios e `RoyalIdentity.Storage.InMemory` removidos. O aceite local cobriu PostgreSQL 17,
   migrations/histories das três famílias, gateway, concorrência, startup e authorization challenge OIDC.
+- [plan-replay-protection.md](plan-replay-protection.md) — CONCLUÍDO (2026-07-30), 3/3 fases. Proteção real
+  contra replay de `private_key_jwt`: contrato atômico realm/issuer-bound, backings in-memory e Operational,
+  declaração obrigatória por composition root, guard global das implementações produtivas e aceite PostgreSQL
+  ponta a ponta.
 
-## Em andamento
+## Próxima execução
 
-[plan-replay-protection.md](plan-replay-protection.md) está EM ANDAMENTO, com as Fases 1-2 concluídas e a Fase 3
-de aceites/fechamento pendente. Depois desse fechamento, a próxima baseline protocolar executável é
-[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md); em seguida vem
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) é a próxima baseline protocolar
+executável. Depois dela, executar
+[plan-oidc-session-management.md](plan-oidc-session-management.md) e
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), nessa ordem, para que os payloads
+Configuration sejam promovidos deterministicamente para v2 e depois v3. Em seguida vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md).
 
@@ -126,6 +132,54 @@ Escopo principal:
 
 Este plano não altera storage e deve ser executado antes da Fase 3 do plano RFC 9700. A auditoria completa dos
 erros de authorize, revocation, UserInfo e protected resources permanece fora deste corte.
+
+### 2.1. OpenID Connect Session Management e Check Session
+
+**Plano criado:** [plan-oidc-session-management.md](plan-oidc-session-management.md)
+(RASCUNHO — 0/7 fases)
+
+Implementa o OP side do OpenID Connect Session Management 1.0 sem portar a infraestrutura de sessão legada do
+IS4. O plano cria um OP User Agent State opaco e realm-scoped, corrige `prompt=none`, move `session_state` para
+as Authentication Responses, mapeia e protege o OP iframe e fecha as atribuições Apache-2.0 do código derivado.
+
+Escopo principal:
+
+- Estado opaco distinto de `sid`, protegido no ticket e espelhado em cookie JavaScript-readable realm-scoped.
+- `session_state` origin-bound em sucessos e erros OIDC aplicáveis, sem persistência no authorization code.
+- `prompt=none` sem UI, com `login_required` e `consent_required` corretos.
+- Rota/discovery somente sob HTTPS e feature gate efetivo por realm.
+- OP iframe com Web Crypto, validação de parent/origin, CSP por nonce e headers sem bloquear framing.
+- Aceite Playwright opt-in com OP/RP em origins diferentes e dois realms.
+- Licença Apache-2.0 e notices preservados dentro da distribuição AGPLv3.
+
+O plano deve executar depois de
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md), para não disputar os contratos de
+erro, e antes de `plan-refactoring-debt-closure.md`, que depende de seus payloads de options v2. O hardening RFC
+9700 executa depois e preserva a exceção de framing exclusiva do OP iframe.
+
+### 2.2. Fechamento de dívidas de refatoração e superfícies inativas
+
+**Plano criado:** [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md)
+(RASCUNHO — 0/5 fases)
+
+Fecha marcadores antigos, decisões que deixaram de ser refatorações ativas e superfícies protocolares anunciadas
+sem implementação. Também corrige a documentação do redesign concluído de resources, sem antecipar sua
+persistência.
+
+Escopo principal:
+
+- Tornar finais as decisões de manter a herança de `IWith*` e o wrapper obfuscado dos eventos.
+- Remover markers já atendidos e símbolos `[Obsolete]` sem callers.
+- Retirar discovery/options de introspection e Device Authorization enquanto não houver endpoints reais.
+- Remover branches vazios que impedem `IExtensionsGrantsProvider` de tratar grants registrados.
+- Remover `UseLogService` e blocos TODO sem criar auditoria antecipada.
+- Fixar `acr_values` como lista de preferência sem catálogo/claim/metadata fictícia.
+- Promover options Configuration de v2 para v3 e validar realms/providers.
+- Atualizar foundations/matriz para registrar que somente a persistência do catálogo de resources está diferida.
+
+Este plano depende da conclusão do plano OAuth 2.1 e de
+[plan-oidc-session-management.md](plan-oidc-session-management.md). A persistência EF do catálogo de
+resources/scopes continuará reservada para um futuro `plan-data-resource-catalog-storage.md`, ainda não criado.
 
 ### 3. Aderência e hardening OAuth 2.0 conforme RFC 9700
 
@@ -247,12 +301,14 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 ## Ordem recomendada
 
 1. ~~Concluir `plan-users-accounts-sqlite-hardening.md` (Fases 1-3).~~ CONCLUÍDO.
-2. ~~Criar e executar o sub-plano 1 do `plan-data-macro.md` (storage-baseline).~~ CONCLUÍDO. Criar e executar
-   os sub-planos 2-4 (configuration-storage → operational-storage → test-migration); avaliar caching e
-   audit-outbox (5-6) depois, só se ainda fizerem sentido no momento.
-3. Concluir `plan-replay-protection.md` (Fase 3).
+2. ~~Executar os sub-planos 1-4 do `plan-data-macro.md` (storage-baseline → configuration-storage →
+   operational-storage → test-migration).~~ CONCLUÍDO. Avaliar caching e audit-outbox (5-6) depois, só se ainda
+   fizerem sentido no momento.
+3. ~~Concluir `plan-replay-protection.md` (Fase 3).~~ CONCLUÍDO.
 4. Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
-5. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
-6. Evoluir administração de sessões por dispositivo.
-7. Criar API/UI administrativa, consumindo `ClientSecurityAssessment`.
-8. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.
+5. Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).
+6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
+7. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
+8. Evoluir administração de sessões por dispositivo.
+9. Criar API/UI administrativa, consumindo `ClientSecurityAssessment`.
+10. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.

@@ -88,6 +88,6 @@ Todos os textos e labels estão fixos no código em inglês.
 
 Deverá ser possível adicionar arquivos de localização para cada idioma.
 
-## RFC 9700
+## RFC 9700 (PLANEJADO)
 
 Avaliar se a implementação atual está de acordo com **rfc9700**.
