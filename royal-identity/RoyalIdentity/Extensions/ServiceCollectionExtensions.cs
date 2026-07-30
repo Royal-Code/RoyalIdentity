@@ -8,6 +8,7 @@ using RoyalIdentity.Contexts.Decorators;
 using RoyalIdentity.Contexts.Validators;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
+using RoyalIdentity.Contracts.Defaults.ReplayProtection;
 using RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints;
@@ -41,6 +42,7 @@ public static class ServiceCollectionExtensions
         // jobs
         services.AddTransient<IHostedService, DefaultServerJobsStartup>();
         services.AddTransient<IHostedService, SigningKeyStartupValidator>();
+        services.AddTransient<IHostedService, ReplayProtectionStartupValidator>();
 
         // Default contract implementations
         services.AddTransient<IAuthorizeRequestValidator, DefaultAuthorizeRequestValidator>();
@@ -60,7 +62,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IKeyManager, DefaultKeyManager>();
         services.AddTransient<IProfileService, DefaultProfileService>();
         services.AddTransient<IRedirectUriValidator, DefaultRedirectUriValidator>();
-        services.AddTransient<IReplayCache, DefaultReplayNoCache>();
+        // IReplayProtectionStore is deliberately absent here: the composition root declares the backing by
+        // calling AddInMemoryReplayProtection() or AddOperationalReplayProtection(), and
+        // ReplayProtectionStartupValidator refuses to start a host that declared none, two, or one that does not
+        // match the store actually resolved. A default here is what previously let a no-op pass for protection.
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();

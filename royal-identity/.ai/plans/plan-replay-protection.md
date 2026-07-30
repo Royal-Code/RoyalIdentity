@@ -1,14 +1,14 @@
 # Plan: Proteção real contra replay de `jti` (`plan-replay-protection`)
 
-## Status: RASCUNHO - Q1-Q5 fechadas; implementação não iniciada
+## Status: EM ANDAMENTO - Q1-Q5 fechadas; Fase 1 concluída
 
 ## Progresso
 
-`░░░` **0%** - 0 de 3 fases
+`█░░` **33%** - 1 de 3 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - contrato atômico, in-memory e composições declaradas | Pendente |
+| Fase 1 - contrato atômico, in-memory e composições declaradas | Concluida |
 | Fase 2 - backing durável Operational e concorrência | Pendente |
 | Fase 3 - aceites reais e fechamento | Pendente |
 
@@ -417,33 +417,35 @@ em todas as composition roots e instalar o startup validator — tudo no mesmo c
 
 **Tarefas:**
 
-- [ ] Criar `IReplayProtectionStore` com a operação atômica realm/issuer-bound e `CancellationToken`
+- [x] Criar `IReplayProtectionStore` com a operação atômica realm/issuer-bound e `CancellationToken`
   (DF1/DF2/DF13/DF18); remover `IReplayCache`.
-- [ ] Implementar a in-memory por instância com **uma** operação atômica de dicionário, sem remove-then-add e
+- [x] Implementar a in-memory por instância com **uma** operação atômica de dicionário, sem remove-then-add e
   sem consultar expiração na decisão, com `TimeProvider` injetado.
-- [ ] Implementar a poda periódica do in-memory conforme DF20: remoção em `ExpiresAtUtc <= now`, timer criado por
+- [x] Implementar a poda periódica do in-memory conforme DF20: remoção em `ExpiresAtUtc <= now`, timer criado por
   `TimeProvider`, timer encerrado no descarte da store e sem execuções sobrepostas; documentar no tipo que ela é
   higiene de memória, não condição de proteção.
-- [ ] Criar `AddInMemoryReplayProtection()` com warning explícito de validade em instância única (DF10).
-- [ ] Registrar o marker de estratégia nas extensions e implementar o startup validator de DF14, cobrindo os
+- [x] Criar `AddInMemoryReplayProtection()` com warning explícito de validade em instância única (DF10).
+- [x] Registrar o marker de estratégia nas extensions e implementar o startup validator de DF14, cobrindo os
   cinco casos de recusa — nenhuma estratégia, mais de uma, marker sem store, store sem marker e par
   incompatível — com mensagem nomeando as duas extensions.
-- [ ] Remover `DefaultReplayNoCache`, `DefaultReplayDistributedCache` e o registro em
+- [x] Remover `DefaultReplayNoCache`, `DefaultReplayDistributedCache` e o registro em
   `ServiceCollectionExtensions.cs:63`, sem substituí-los por outro default (DF12).
-- [ ] Reduzir o par das linhas 154/160 do evaluator a uma única chamada, passando `context.Realm.Id` e o
+- [x] Reduzir o par das linhas 154/160 do evaluator a uma única chamada, passando `context.Realm.Id` e o
   `client_id` validado; preservar DF5.
-- [ ] Acrescentar `RealmOptions.Authentication.ClientAssertionMaxLifetime` a `AuthenticationOptions`, com default
+- [x] Acrescentar `RealmOptions.Authentication.ClientAssertionMaxLifetime` a `AuthenticationOptions`, com default
   de **10 minutos** e faixa inclusiva de **1 segundo** a **1 hora** (DF21); copiar o valor no construtor de cópia,
   validá-lo em `AuthenticationOptions.Validate()` e proteger `now + lifetime` contra overflow.
-- [ ] Recusar no evaluator assertion cujo `exp` ultrapasse `now + ClientAssertionMaxLifetime`, com `now` de
+- [x] Recusar no evaluator assertion cujo `exp` ultrapasse `now + ClientAssertionMaxLifetime`, com `now` de
   `TimeProvider`, antes de tocar o replay store (DF19).
-- [ ] Atribuir o mesmo `TimeProvider` injetado a `TokenValidationParameters.TimeProvider`, para que a validação
+- [x] Atribuir o mesmo `TimeProvider` injetado a `TokenValidationParameters.TimeProvider`, para que a validação
   de `exp`/`nbf`, o teto de DF19 e os testes com relógio controlado usem a mesma autoridade temporal.
-- [ ] Declarar a escolha em `RoyalIdentity.Server`, `RoyalIdentity.Demo` e na factory persistente de
+  **Desvio:** a propriedade não é pública em `Microsoft.IdentityModel` 8.21.0; o clock injetado entra por
+  `LifetimeValidator` (ver `Resultado da Fase 1`).
+- [x] Declarar a escolha em `RoyalIdentity.Server`, `RoyalIdentity.Demo` e na factory persistente de
   `Tests.Integration` (Fase 1 usa in-memory em todas; o Server troca para a durável na Fase 2).
-- [ ] Criar a infraestrutura de teste de `private_key_jwt`: client com chave assimétrica, assertion assinada com
+- [x] Criar a infraestrutura de teste de `private_key_jwt`: client com chave assimétrica, assertion assinada com
   `iss`/`sub`/`aud`/`exp`/`jti` corretos, reutilizável pelas Fases 2 e 3.
-- [ ] Cobrir com teste: primeira apresentação aceita; segunda recusada; mesmo `jti` em clients distintos do mesmo
+- [x] Cobrir com teste: primeira apresentação aceita; segunda recusada; mesmo `jti` em clients distintos do mesmo
   realm não interfere; mesmo `jti` em realms distintos não interfere; assertion com `exp` além do teto é recusada
   e **não** registra handle; assertion dentro do teto é aceita; assertion de 5 minutos emitida com relógio 5
   minutos adiantado continua aceita sob o default de 10 minutos; a option recusa zero, negativo, valor abaixo de
@@ -472,7 +474,89 @@ dotnet test RoyalIdentity.sln
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Entregue.** O contrato foi substituído, a in-memory entregue, o consumidor trocado, as três composition roots
+declaram a escolha e o startup validator recusa qualquer outra forma. Build e todas as suítes verdes (DF15).
+
+**Superfície pública alterada**
+
+- Criado `RoyalIdentity/Contracts/Storage/IReplayProtectionStore.cs` — só `TryAddAsync(realmId, issuer, purpose,
+  handle, expiration, ct)` (DF1/DF2/DF13/DF18).
+- Removidos `IReplayCache`, `DefaultReplayNoCache` e `DefaultReplayDistributedCache`. O registro em
+  `ServiceCollectionExtensions.cs:63` saiu sem substituto; no lugar ficou um comentário explicando por que não há
+  default (DF12).
+- Criados em `RoyalIdentity/Contracts/Defaults/ReplayProtection/`: `InMemoryReplayProtectionStore`,
+  `ReplayProtectionRegistration` (marker) e `ReplayProtectionStartupValidator`.
+- Criado `RoyalIdentity/Extensions/ReplayProtectionServiceCollectionExtensions.cs` com
+  `AddInMemoryReplayProtection()` — e uma sobrecarga com intervalo de poda explícito.
+- `AuthenticationOptions.ClientAssertionMaxLifetime` acrescentado, com `Server.DefaultClientAssertionMaxLifetime`
+  (10 min), `Server.MinClientAssertionMaxLifetime` (1 s) e `Server.MaxClientAssertionMaxLifetime` (1 h). Não houve
+  bump de `RealmOptionsPayloadSerializer.CurrentVersion`: payloads existentes não trazem a propriedade e o
+  inicializador entrega o default — a versão 1 continua válida.
+
+**Dois defeitos de produto que a ausência de cobertura escondia**
+
+1. **`client_credentials` com `private_key_jwt` respondia 500.** `ClientParameters.AssertHasClientSecret()` exigia
+   `EvaluatedCredential.Credential` — um `ClientSecret` armazenado. `private_key_jwt` autentica por assinatura
+   sobre a chave registrada, portanto tem credencial avaliada e nenhum secret casado, e a asserção derrubava a
+   requisição. Verificado que a propriedade **não é lida em lugar nenhum** além desse próprio null check; a
+   condição foi removida. O grant continua exigindo client e método — este último vira o claim `amr`. Sem o teste
+   ponta-a-ponta, o caminho de sucesso do `private_key_jwt` nunca havia sido executado.
+2. **Falha de infraestrutura do replay store viria disfarçada de `invalid_client`.** O `try/catch` do evaluator
+   envolvia validação do JWT *e* a chamada de replay. Ele foi estreitado a `handler.ValidateToken` apenas: uma
+   exceção do backing agora propaga, em vez de virar erro de credencial por request — que é o sentido de
+   fail-closed do invariante 4, e o que torna a Fase 2 diagnosticável.
+
+**Desvio: `TokenValidationParameters.TimeProvider`**
+
+A tarefa previa atribuir o clock injetado a essa propriedade. Ela está documentada no XML do pacote 8.21.0 mas
+**não é acessível** (`CS0117` na compilação — verificado no build, não inferido). Como a autoridade temporal única
+é a exigência real (invariante 9), o clock entra por `LifetimeValidator`, que substitui a validação default de
+lifetime mantendo o mesmo `ClockSkew` e as mesmas recusas: `exp` obrigatório, `nbf` futuro além da tolerância e
+`exp` passado além da tolerância. O `ClockSkew` deixou de ser literal e virou campo, usado tanto na validação
+quanto na retenção do registro — que é o invariante 6 escrito em um lugar só.
+
+**Composições**
+
+- `RoyalIdentity.Server` e `RoyalIdentity.Demo` declaram `AddInMemoryReplayProtection()`; no Server o comentário
+  registra que é estado intermediário e que não se publica deployment replicado entre as Fases 1 e 2.
+- `Tests.Integration/Prepare/PersistentStorageAppFactory` declara a mesma, como qualquer composition root.
+- `Tests.Host` não declara: ele não registra storage e nunca sobe sozinho; quem sobe o host é a factory.
+
+**Cobertura nova (antes: zero arquivos casavam `ReplayCache|PrivateKeyJwt` em `Tests.*`)**
+
+- `Tests.Identity/ReplayProtection/InMemoryReplayProtectionStoreTests.cs` — registro atômico; as quatro dimensões
+  de isolamento (realm, issuer, purpose, handle); **registro vencido e não podado ainda responde replay**; poda com
+  limite inclusivo em `ExpiresAtUtc <= now`; timer criado pelo `TimeProvider` e encerrado no descarte (provado por
+  um `TimeProvider` de teste que devolve um `ITimer` gravador); não sobreposição provada por reentrância
+  determinística através do relógio; 16 chamadores simultâneos com exatamente um vencedor; identidade incompleta
+  recusada.
+- `Tests.Identity/ReplayProtection/ReplayProtectionCompositionTests.cs` — os cinco casos de recusa de DF14 mais o
+  caso feliz, cada mensagem citando as duas extensions.
+- `Tests.Identity/ReplayProtection/ClientAssertionMaxLifetimeOptionTests.cs` — default de 10 min; faixa inclusiva
+  provada nos extremos exatos (1 s e 1 h) e recusando zero, negativo, sub-segundo e acima de 1 h; valor abaixo do
+  `ClockSkew` aceito como endurecimento; cópia no construtor de cópia e em `RealmOptions` copy-on-create.
+- `Tests.Architecture/ReplayProtectionCompositionTests.cs` — o core não registra default; host em
+  **Production** sem declaração recusa a subida com mensagem citando as duas extensions.
+- `Tests.Integration/Endpoints/PrivateKeyJwtReplayProtectionTests.cs` — fluxo real no token endpoint: primeira
+  apresentação aceita e a mesma recusada; `jti` reusado em assertion nova recusado; mesmo `jti` em dois clients do
+  mesmo realm sem interferência; mesmo `jti` em dois realms sem interferência; `exp` além do teto recusado **e sem
+  registrar handle** (provado apresentando depois o mesmo `jti` dentro do teto e obtendo 200); assertion de 5 min
+  com relógio 5 min adiantado aceita sob o default; teto configurável por realm; e a asserção negativa de que nem
+  a assertion nem o `jti` aparecem no log.
+- Infraestrutura reutilizável pelas Fases 2 e 3: `Tests.Integration/Prepare/PrivateKeyJwtTestKey.cs` (JWK pública
+  como client secret + assinatura de assertions) e `Tests.Integration/Prepare/LogCapturingAppFactory.cs` (captura
+  de log, necessária porque vazamento em log é invisível a qualquer asserção sobre a resposta HTTP).
+
+**Verificação**
+
+```
+dotnet build RoyalIdentity.sln   → 0 erros
+dotnet test RoyalIdentity.sln    → 1186 aprovados, 0 falhas, 46 ignorados
+```
+
+Por suíte: Tests.Security 116; Tests.Pipelines 3; Tests.Identity 47; Tests.UserAccounts 187 (+1 opt-in);
+Tests.Storage 482 (+44 opt-in); Tests.Architecture 63; Tests.Integration 289; Aspire.Tests 0 (+1 opt-in).
+Os ignorados são os aceites opt-in de PostgreSQL/Aspire já existentes, inalterados por esta fase (DF7).
 
 ---
 

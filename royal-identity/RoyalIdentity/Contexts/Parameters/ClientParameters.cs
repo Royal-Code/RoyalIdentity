@@ -60,7 +60,18 @@ public class ClientParameters
     }
 
     /// <summary>
-    /// Ensures that a client, evaluated credential, and authentication method have been loaded.
+    /// <para>
+    ///     Ensures that a client, an evaluated credential and an authentication method have been loaded.
+    /// </para>
+    /// <para>
+    ///     It deliberately does not require <see cref="EvaluatedCredential.Credential"/>: not every
+    ///     authentication method matches a stored <see cref="RoyalIdentity.Models.ClientSecret"/> row.
+    ///     <c>private_key_jwt</c> authenticates by signature over the client's registered key, so it has an
+    ///     evaluated credential and no matched secret — and requiring one turned every
+    ///     <c>client_credentials</c> request authenticated that way into a server error. Nothing downstream
+    ///     reads that property; what the grant needs is the client and the method, which becomes the
+    ///     <c>amr</c> claim.
+    /// </para>
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the client secret data is incomplete.
@@ -70,9 +81,7 @@ public class ClientParameters
     {
         AssertHasClient();
 
-        if (ClientSecret is null ||
-            ClientSecret.Credential is null ||
-            AuthenticationMethod is null)
+        if (ClientSecret is null || AuthenticationMethod is null)
         {
             throw new InvalidOperationException("ClientSecret was required, but is missing");
         }

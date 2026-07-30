@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using RoyalIdentity.Configuration;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Migrations;
 using RoyalIdentity.Options;
 using RoyalIdentity.Storage.EntityFramework.Configuration.Resources;
@@ -87,6 +88,9 @@ public class PersistentStorageAppFactory : AppFactoryBase
                 options => options.Mode = CleanupExecutionMode.External);
             services.AddAspNetDataProtectionKeyMaterialProtector();
             services.AddEntityFrameworkStorage();
+
+            // plan-replay-protection DF12: the fixture declares its backing like any other composition root.
+            services.AddInMemoryReplayProtection();
 
             var accountOptions = CreateAccountOptions();
             services.AddSingleton<IUserAccountsRealmOptionsResolver>(

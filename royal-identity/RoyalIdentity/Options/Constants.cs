@@ -61,6 +61,34 @@ public static partial class Constants
         /// </summary>
         public const int DefaultAuthorizationInteractionLifetime = 600;
 
+        /// <summary>
+        /// <para>
+        ///     Default of <see cref="AuthenticationOptions.ClientAssertionMaxLifetime"/>
+        ///     (plan-replay-protection DF21): ten minutes.
+        /// </para>
+        /// <para>
+        ///     It is the smallest ceiling coherent with the five-minute clock skew the assertion validation
+        ///     already tolerates. A client emitting a five-minute assertion from a clock five minutes ahead
+        ///     produces <c>exp = now + 10min</c> on the server's clock and stays accepted; a five-minute ceiling
+        ///     compared against the server's clock would contradict the tolerance the server grants.
+        /// </para>
+        /// </summary>
+        public static readonly TimeSpan DefaultClientAssertionMaxLifetime = TimeSpan.FromMinutes(10);
+
+        /// <summary>
+        /// Smallest accepted value of <see cref="AuthenticationOptions.ClientAssertionMaxLifetime"/>. Values
+        /// below the tolerated clock skew are deliberate hardening, at the cost of interoperability with clients
+        /// whose clock runs ahead.
+        /// </summary>
+        public static readonly TimeSpan MinClientAssertionMaxLifetime = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// Largest accepted value of <see cref="AuthenticationOptions.ClientAssertionMaxLifetime"/>, reserved as
+        /// an override for legacy integrations. It widens the window in which a leaked assertion can be used, so
+        /// it is a maximum and never the default.
+        /// </summary>
+        public static readonly TimeSpan MaxClientAssertionMaxLifetime = TimeSpan.FromHours(1);
+
         public static class StandardScopes
         {
             public const string OpenId = "openid";

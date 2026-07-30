@@ -45,6 +45,9 @@ public static class DemoServiceCollectionExtensions
         services.AddAspNetDataProtectionKeyMaterialProtector();
         services.AddEntityFrameworkStorage();
 
+        // Coherent with what the Demo is: a single ephemeral process whose whole database dies with it.
+        services.AddInMemoryReplayProtection();
+
         services.AddUserAccountsSqliteConnection(lifetime.UserAccountsConnectionString);
         services.AddUserAccountsForRoyalIdentity();
 

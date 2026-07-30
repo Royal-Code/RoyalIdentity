@@ -33,7 +33,18 @@ Completed refactoring plans (useful as historical record and for understanding d
 
 Active plans (check status before modifying affected areas):
 
-No implementation plan is currently active. `Tests.Host` is storage-agnostic and `Tests.Integration` uses
+- [.ai/plans/plan-replay-protection.md](.ai/plans/plan-replay-protection.md) — **ACTIVE (1/3 fases)**. Fase 1 done:
+  `IReplayCache` replaced by `IReplayProtectionStore` (single atomic `TryAddAsync`, realm- and issuer-bound, with
+  `CancellationToken`); no default registration — every composition root declares its backing via
+  `AddInMemoryReplayProtection()` and `ReplayProtectionStartupValidator` refuses a host that declared none, two, or
+  one inconsistent with the store resolved (DF12/DF14); `Authentication.ClientAssertionMaxLifetime` (default 10 min,
+  range 1 s–1 h) bounds the retention (DF19/DF21). Fase 1 also fixed two product defects the missing coverage hid:
+  `client_credentials` with `private_key_jwt` returned 500 (`AssertHasClientSecret` demanded a stored
+  `ClientSecret` nothing reads), and a replay-store infrastructure failure came disguised as `invalid_client`.
+  **Fases 1 and 2 are a non-releasable sequence** — the Server holds per-process protection until Fase 2 delivers
+  the Operational backing, so do not publish a replicated Server between them.
+
+`Tests.Host` is storage-agnostic and `Tests.Integration` uses
 `PersistentStorageAppFactory` by default: Configuration + Operational share one isolated SQLite in-memory
 database and UserAccounts owns another. PostgreSQL storage/Aspire acceptances remain local opt-in. The production
 Server is PostgreSQL-only and must be provisioned by `RoyalIdentity.Migrations`; `RoyalIdentity.Demo` is the

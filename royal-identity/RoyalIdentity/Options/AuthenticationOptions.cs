@@ -29,6 +29,7 @@ public class AuthenticationOptions
         CheckSessionCookieSameSiteMode = other.CheckSessionCookieSameSiteMode;
         RequireCspFrameSrcForSignOut = other.RequireCspFrameSrcForSignOut;
         AuthorizationInteractionLifetime = other.AuthorizationInteractionLifetime;
+        ClientAssertionMaxLifetime = other.ClientAssertionMaxLifetime;
     }
 
     /// <summary>
@@ -88,6 +89,25 @@ public class AuthenticationOptions
     public int AuthorizationInteractionLifetime { get; set; } = Server.DefaultAuthorizationInteractionLifetime;
 
     /// <summary>
+    /// <para>
+    ///     Gets or sets how far ahead of the server's own clock a <c>private_key_jwt</c> client assertion may
+    ///     claim to expire (plan-replay-protection DF19/DF21). An assertion whose <c>exp</c> goes beyond
+    ///     <c>now + ClientAssertionMaxLifetime</c> is refused as an invalid credential.
+    /// </para>
+    /// <para>
+    ///     The ceiling is compared against the server's instant, not against <c>exp - iat</c>: <c>iat</c> is
+    ///     optional and may arrive ahead, while what has to be bounded is the retention of the replay record —
+    ///     a function of <c>exp</c> and the server's clock. Without it, a client would choose how long the
+    ///     server retains its handles and how long a leaked assertion stays usable.
+    /// </para>
+    /// <para>
+    ///     Accepted range: <see cref="Server.MinClientAssertionMaxLifetime"/> to
+    ///     <see cref="Server.MaxClientAssertionMaxLifetime"/>, inclusive.
+    /// </para>
+    /// </summary>
+    public TimeSpan ClientAssertionMaxLifetime { get; set; } = Server.DefaultClientAssertionMaxLifetime;
+
+    /// <summary>
     /// Validates internal consistency of the authentication options.
     /// </summary>
     /// <returns>A list of configuration errors. Empty means valid.</returns>
@@ -98,6 +118,14 @@ public class AuthenticationOptions
         if (AuthorizationInteractionLifetime <= 0)
         {
             errors.Add("Authentication.AuthorizationInteractionLifetime must be greater than zero (seconds).");
+        }
+
+        if (ClientAssertionMaxLifetime < Server.MinClientAssertionMaxLifetime
+            || ClientAssertionMaxLifetime > Server.MaxClientAssertionMaxLifetime)
+        {
+            errors.Add(
+                "Authentication.ClientAssertionMaxLifetime must be between " +
+                $"{Server.MinClientAssertionMaxLifetime} and {Server.MaxClientAssertionMaxLifetime}, inclusive.");
         }
 
         return errors;

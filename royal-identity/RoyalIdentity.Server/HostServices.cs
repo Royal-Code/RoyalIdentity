@@ -96,6 +96,11 @@ public static class HostServices
         services.AddAspNetDataProtectionKeyMaterialProtector();
         services.AddEntityFrameworkStorage();
 
+        // plan-replay-protection Fase 1. Protection is per process until Fase 2 delivers the Operational
+        // backing, so do not publish a replicated deployment of the Server between the two phases: replicas
+        // would each protect only what they saw themselves.
+        services.AddInMemoryReplayProtection();
+
         services.AddUserAccountsPostgreSqlConnection(userAccountsConnection);
         services.AddUserAccountsForRoyalIdentity();
 

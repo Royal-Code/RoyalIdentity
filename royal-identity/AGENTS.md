@@ -46,7 +46,15 @@ PostgreSQL composition, zero-configuration SQLite Demo, default integration fixt
 `UserAccounts`, definitive atomic contracts and removal of `RoyalIdentity.Storage.InMemory`). Treat each as the
 implemented target architecture before changing the area it covers.
 
-No implementation plan is currently active. Resources/scopes remain volatile per baseline DF22. The production
+`.ai/plans/plan-replay-protection.md` is **active (1/3 phases)**. Fase 1 replaced `IReplayCache` with
+`IReplayProtectionStore` — one atomic `TryAddAsync`, keyed by realm and issuer, taking a `CancellationToken`. There
+is **no default registration**: every composition root declares its backing (`AddInMemoryReplayProtection()` today,
+`AddOperationalReplayProtection()` in Fase 2), and `ReplayProtectionStartupValidator` fails startup in any
+environment when none, two, or an inconsistent strategy is declared. `Authentication.ClientAssertionMaxLifetime`
+(default 10 minutes, range 1 second–1 hour) caps how far ahead a client assertion may expire, so retention is a
+server value. Fases 1 and 2 form a non-releasable sequence: do not publish a replicated Server between them.
+
+Resources/scopes remain volatile per baseline DF22. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
 migrates or seeds. `RoyalIdentity.Demo` is a self-provisioned, ephemeral SQLite in-memory executable.
 `Tests.Host` is storage-agnostic, and the default `Tests.Integration` composition uses
