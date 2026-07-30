@@ -5,9 +5,10 @@ namespace RoyalIdentity.Data.Operational.Entities;
 /// presented once and must never be accepted again while the record is retained — today the <c>jti</c> of a
 /// <c>private_key_jwt</c> client assertion.
 /// <para>
-/// The row <b>is</b> the record: there is no payload, nothing is ever read back from it and no column exists that
-/// something else has to interpret. Its whole identity is the key, and the key is the uniqueness that decides
-/// replay: the second insert of the same identity violates it, and that violation is the answer.
+/// The row <b>is</b> the record: there is no payload and no column something else has to interpret. Its whole
+/// identity is the key, and the key is the uniqueness that decides replay — the second insert of the same
+/// identity violates it, and that violation is the answer. Nothing is ever materialized back into a model; the
+/// only reads are by identity (confirming a conflict) and by expiration or realm (cleanup and purge).
 /// </para>
 /// <para>
 /// It carries no <c>created_at_utc</c>. Every other table in this family has one because something reads it —

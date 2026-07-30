@@ -16,8 +16,13 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 ///     guarantee claimed here is narrower: the digest is pseudonymisation and domain separation, not
 ///     confidentiality (DF17). It is not assumed to resist a dictionary attack over predictable <c>jti</c>
 ///     values by someone who can already read the table. If that enters the threat model, swapping in a keyed
-///     digest is a change confined to this type — with a version bump below, which simply retires the old rows
-///     as unmatched.
+///     digest is a change confined to this type — but see the version note below: it is not free.
+/// </para>
+/// <para>
+///     The digest covers <b>version, domain and handle only</b>. Realm, issuer and purpose are columns of the
+///     primary key, so they already separate rows; folding them in would add nothing to uniqueness while making
+///     the persisted format depend on values that are meant to stay queryable for cleanup and purge. The digest
+///     stands for the handle and nothing else.
 /// </para>
 /// <para>
 ///     Fields are length-prefixed rather than joined by a separator, so no combination of inputs can produce the
@@ -28,28 +33,34 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 public sealed class ReplayHandleDigest
 {
     /// <summary>
-    /// Version of the digest construction, mixed in as a field of its own. Changing it changes every digest, so
-    /// existing rows stop matching and simply expire — which is the correct outcome: they protect artifacts that
-    /// are themselves short-lived.
+    /// <para>
+    ///     Version of the digest construction, mixed in as a field of its own.
+    /// </para>
+    /// <para>
+    ///     <b>Changing it is not a free operation.</b> Every digest changes, so rows written by the old version
+    ///     stop matching. Cleanup will remove them in time, which is harmless on its own — but during a rolling
+    ///     deployment the two versions run side by side, and a handle registered by an old instance does not
+    ///     collide with the same handle presented to a new one. That reopens replay for as long as the artifacts
+    ///     in flight stay valid, bounded by <c>Authentication.ClientAssertionMaxLifetime</c>. A version change
+    ///     therefore needs either a deployment window longer than that ceiling with no old instance still
+    ///     serving, or a transition that writes both digests until the old ones have expired.
+    /// </para>
     /// </summary>
     public const int CurrentVersion = 1;
 
     /// <summary>Domain of this digest, keeping it disjoint from every other digest of the family.</summary>
     private const string Domain = OperationalRecordTypes.ReplayHandle;
 
-    /// <summary>The digest of <paramref name="handle"/> within <paramref name="purpose"/>, as lowercase hex.</summary>
-    /// <param name="purpose">The kind of artifact being protected.</param>
+    /// <summary>The digest of <paramref name="handle"/>, as lowercase hex.</summary>
     /// <param name="handle">The raw handle. Never persisted, never logged.</param>
-    public string Compute(string purpose, string handle)
+    public string Compute(string handle)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
         ArgumentException.ThrowIfNullOrEmpty(handle);
 
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
         AppendField(hash, CurrentVersion);
         AppendField(hash, Domain);
-        AppendField(hash, purpose);
         AppendField(hash, handle);
 
         return Convert.ToHexStringLower(hash.GetHashAndReset());

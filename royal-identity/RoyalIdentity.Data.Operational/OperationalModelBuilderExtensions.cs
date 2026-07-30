@@ -145,8 +145,9 @@ public static class OperationalModelBuilderExtensions
             entity.Property(e => e.HandleDigest).HasColumnName("handle_digest");
             entity.Property(e => e.ExpiresAtUtc).HasColumnName("expires_at_utc");
 
-            // The only query this table ever serves besides the insert: the cleanup sweep, which filters on
-            // expiration alone. Everything realm-bound is already served by the primary key.
+            // The cleanup sweep is the only access path the primary key does not already serve: it filters on
+            // expiration alone. Confirming a conflict goes by the full key, and the realm purge by its leading
+            // column.
             entity.HasIndex(e => e.ExpiresAtUtc).HasDatabaseName("ix_replay_handles_expiration");
         });
 

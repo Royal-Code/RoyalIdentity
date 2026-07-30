@@ -338,13 +338,13 @@ services.AddOperationalReplayProtection();  // durável sobre a família Operati
 ### Modelo, dados e persistência
 
 ```text
-operation.replay_handles          (nome final a definir na Fase 2)
+operation.replay_handles                  (entregue na Fase 2)
   RealmId            text      not null
   Issuer             text      not null
   Purpose            text      not null
   HandleDigest       text      not null   -- digest de (versão + domínio + jti); realm/issuer/purpose ficam fora
   ExpiresAtUtc       timestamp not null
-  unique (RealmId, Issuer, Purpose, HandleDigest)
+  primary key (RealmId, Issuer, Purpose, HandleDigest)   -- a unicidade exigida; é a própria decisão
   index (ExpiresAtUtc)                    -- limpeza por TTL
 ```
 
@@ -749,17 +749,45 @@ revisável passaram a aplicar a **sequência** de scripts em ordem, que é o que
 de entity types (`OperationalModelTests`, migration tests dos dois providers,
 `Tests.Architecture/OperationalModelExtensibilityTests`) passaram de cinco para seis.
 
+**Correções aplicadas após revisão externa (2026-07-30)**
+
+1. **O digest divergia da decisão do plano.** A tarefa desta fase diz `versão + domínio + handle` **apenas**, com
+   `RealmId`/`Issuer`/`Purpose` permanecendo colunas e fora do digest; a implementação incluía `purpose`. Sem
+   impacto na proteção — `purpose` também está na primary key —, mas era um **formato persistido diferente do
+   documentado**, numa tarefa marcada como concluída. `Compute` perdeu o parâmetro; a separação por purpose é a
+   coluna da chave, como o plano decidiu.
+2. **Faltava prova de falha de infraestrutura.** Os cenários cobriam conflito de unicidade, não uma falha de
+   banco alheia ao conflito — justamente a que a store precisa distinguir. Criado
+   `Tests.Storage/Operational/Support/FailingInsertInterceptor.cs`, que derruba só o `INSERT` em
+   `replay_handles` e deixa as leituras funcionando: é o ramo em que a consulta de confirmação **sucede e não
+   encontra nada**, e a exceção precisa propagar. Provado por mutação: trocando o ramo por `return false`, o
+   teste falha.
+3. **Vetor conhecido do digest.** `Digest_HasNotChangedShape` fixa o hexadecimal de um handle de referência. O
+   valor foi produzido por uma **implementação independente** da construção documentada (SHA-256 sobre, por
+   campo, comprimento `int32` little-endian seguido dos bytes), que bateu exatamente com o C# — então o teste
+   verifica a construção, e não apenas que o código concorda consigo mesmo. Junto dele, um teste de que o digest
+   depende só do handle e outro de que o length-prefix separa handles que uma concatenação ingênua fundiria.
+4. **Premissas falsas na documentação.** `ReplayHandleEntity` dizia que nada é lido da tabela — a confirmação de
+   conflito, a limpeza e o purge leem; o comentário do índice chamava a limpeza de "única consulta". Ambos
+   reescritos. O bloco de modelo do plano deixou de dizer "nome final a definir" e passou a registrar que a
+   unicidade exigida é a própria **primary key**. `tech.md` deixou de anunciar o backing durável como futuro.
+5. **Risco novo registrado: mudança de versão do digest.** Elevar `CurrentVersion` não é operação livre. Num
+   rolling deployment as duas versões servem ao mesmo tempo, e um handle registrado por instância antiga não
+   colide na nova — replay reaberto enquanto as assertions em voo valerem, limitado por
+   `ClientAssertionMaxLifetime`. O XML doc do tipo passou a exigir janela de deploy maior que o teto sem
+   instância antiga servindo, ou transição escrevendo os dois digests. Linha correspondente na tabela de riscos.
+
 **Verificação**
 
 ```
 dotnet build RoyalIdentity.sln            → 0 erros
-dotnet test RoyalIdentity.sln             → 1207 aprovados, 0 falhas, 49 ignorados
-./scripts/Test-OperationalPostgreSql.ps1  → 47 aprovados, 0 falhas (PostgreSQL 17 real, porta dinâmica 43641)
+dotnet test RoyalIdentity.sln             → 1211 aprovados, 0 falhas, 49 ignorados
+./scripts/Test-OperationalPostgreSql.ps1  → 47 aprovados, 0 falhas (PostgreSQL 17 real, porta dinâmica)
 podman ps -a                              → nenhum container residual
 ```
 
 Por suíte: Tests.Security 116; Tests.Identity 47; Tests.Pipelines 3; Tests.UserAccounts 187 (+1 opt-in);
-Tests.Storage 498 (+47 opt-in); Tests.Architecture 63; Tests.Integration 293; Aspire.Tests 0 (+1 opt-in).
+Tests.Storage 502 (+47 opt-in); Tests.Architecture 63; Tests.Integration 293; Aspire.Tests 0 (+1 opt-in).
 
 ---
 
@@ -879,6 +907,7 @@ dotnet test RoyalIdentity.sln
 | Server publicado entre as Fases 1 e 2 | deploy multi-instância com a in-memory declarada | proteção por processo, não compartilhada entre réplicas | sequência declarada não liberável; Fase 2 troca o Server para a durável | Fechado na Fase 2 |
 | In-memory cresce indefinidamente | host longevo com a in-memory declarada e sem poda | consumo de memória proporcional ao volume de autenticações | DF20: poda periódica por `TimeProvider`, fora do caminho de decisão | Mitigado |
 | Digest tratado como confidencialidade | `jti` previsível e acesso ao banco no threat model | enumeração por dicionário sobre os digests | DF17 declara o escopo; troca por digest autenticado é alteração isolada | Aceito |
+| Mudança de versão do digest reabre replay | `ReplayHandleDigest.CurrentVersion` alterado e rolling deployment com as duas versões servindo | um handle registrado por instância antiga não colide na nova; replay aceito enquanto as assertions em voo valerem, limitado por `ClientAssertionMaxLifetime` | documentado no próprio tipo: mudar a versão exige janela de deploy maior que o teto sem instância antiga servindo, ou transição que escreva os dois digests até os antigos expirarem | Aberto (nenhuma mudança de versão planejada) |
 | Guard aceita implementação errada | guard só rejeita no-op | in-memory registrada no Server passa despercebida | Fase 3 exige guard por implementação específica | Mitigado |
 | Teste de concorrência passa por acaso | duas chamadas serializadas pelo harness | corrida não é exercitada | reusar o formato dos testes de MP-2, que já provam paralelismo real | Mitigado — confirmado real na Fase 2: com 2 chamadores o mutante fiel passa, com 8 falha; a teoria roda os dois |
 | `jti` aparece em log ou exceção | mensagem de erro inclui o handle | vazamento de valor de credencial em texto | asserção negativa nos testes de mensagem (DF5) | Aberto |

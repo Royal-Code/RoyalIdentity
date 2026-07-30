@@ -41,7 +41,8 @@ internal sealed class EntityFrameworkReplayProtectionStore(
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
         ArgumentException.ThrowIfNullOrWhiteSpace(handle);
 
-        var handleDigest = digest.Compute(purpose, handle);
+        // The digest covers the handle alone; realm, issuer and purpose separate rows as columns of the key.
+        var handleDigest = digest.Compute(handle);
         var row = new ReplayHandleEntity
         {
             RealmId = realmId,

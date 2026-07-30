@@ -219,8 +219,7 @@ instant.
 
 How far ahead an assertion may claim to expire is capped by `Authentication.ClientAssertionMaxLifetime` (default
 10 minutes; accepted range 1 second to 1 hour), so the record's retention is a server value and not the client's
-choice. See [plan-replay-protection.md](../plans/plan-replay-protection.md); a durable backing shared across
-instances arrives in its Fase 2.
+choice. See [plan-replay-protection.md](../plans/plan-replay-protection.md).
 
 ---
 
