@@ -77,7 +77,9 @@ definida em `../analisys/`.
 executável. Depois dela, executar
 [plan-oidc-session-management.md](plan-oidc-session-management.md) e
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), nessa ordem, para que os payloads
-Configuration sejam promovidos deterministicamente para v2 e depois v3. Em seguida vem
+Configuration sejam promovidos deterministicamente para v2 e depois v3. Em seguida, executar
+[plan-localization.md](plan-localization.md), que consome a baseline v3, promove as options de realm para v4 e
+fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md).
 
@@ -181,6 +183,38 @@ Este plano depende da conclusão do plano OAuth 2.1 e de
 [plan-oidc-session-management.md](plan-oidc-session-management.md). A persistência EF do catálogo de
 resources/scopes continuará reservada para um futuro `plan-data-resource-catalog-storage.md`, ainda não criado.
 
+### 2.3. Localization realm-scoped da UI
+
+**Plano criado:** [plan-localization.md](plan-localization.md)
+(RASCUNHO — decisões fechadas; 0/7 fases)
+
+Fecha a última pendência antiga de `redesign-todo.md`: transforma o scaffold órfão
+`InternationalizationOptions` em configuração persistida por realm, seleciona cultura por request e localiza
+integralmente a UI de conta com catálogos `.resx` neutro/inglês, `pt-BR` e espanhol latino-americano `es-419`.
+O [inventário de recursos](../analisys/an-localization-resource-inventory.md) fixa a baseline em 62 chaves por
+cultura, distribuídas em dois catálogos lógicos e seis arquivos físicos `.resx` (186 entradas).
+Novos realms nascerão com localization ativa, default `en` e suporte a `en`, `pt-BR` e `es-419`; cada realm
+continua podendo desabilitar a negociação explicitamente.
+
+Escopo principal:
+
+- `RealmOptions.Internationalization` com validação BCP 47, cópia profunda e payload Configuration v4.
+- `IStringLocalizer<T>` sobre `.resx`, catálogos com 62 chaves semânticas por cultura e paridade de
+  chaves/placeholders.
+- Precedência cookie realm-scoped → `ui_locales` validado → `Accept-Language` → default do realm → neutro.
+- `RequestLocalization` depois de realm discovery e antes de autenticação/renderização.
+- Códigos estáveis entre core/page services e UI, removendo as três mensagens configuráveis de `AccountOptions`
+  sem reduzir a proteção contra enumeração de contas.
+- Login, consentimento, logout, erro, perfil, validações, acessibilidade e `html lang`/`dir` localizados.
+- `ui_locales_supported` fiel à interseção entre configuração do realm e catálogos realmente entregues.
+- Validação de cada snapshot antes da publicação, com last-known-good preservado em refresh inválido.
+
+O plano depende da conclusão de
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), para não disputar a remoção de options e a
+sequência do payload v3. Não depende do RFC 9700, mas executa antes dele na ordem recomendada para deixar a
+infraestrutura que o futuro Admin reutilizará ao localizar findings por `RuleId`. Overrides de tradução por
+realm, claims localizados e conteúdo multilíngue cadastrado pelo tenant permanecem fora deste corte.
+
 ### 3. Aderência e hardening OAuth 2.0 conforme RFC 9700
 
 **Plano criado:** [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md)
@@ -233,6 +267,10 @@ administrativa e operacional mais rica.
 **Dependência de segurança:** consumir o contrato entregue por
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), calcular o assessment em leitura/após
 edição, localizar mensagens por `RuleId` e nunca persistir status/findings derivados.
+
+**Dependência de localização:** reutilizar a infraestrutura de `IStringLocalizer<T>` entregue por
+[plan-localization.md](plan-localization.md), criando catálogos próprios do Admin em vez de armazenar traduções
+ou textos de findings em `Client`, `Realm` ou `ClientSecurityAssessment`.
 
 Criação das APIs e telas administrativas, em projetos separados dos módulos de domínio.
 
@@ -308,7 +346,8 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 4. Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
 5. Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).
 6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
-7. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
-8. Evoluir administração de sessões por dispositivo.
-9. Criar API/UI administrativa, consumindo `ClientSecurityAssessment`.
-10. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.
+7. Executar [plan-localization.md](plan-localization.md).
+8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
+9. Evoluir administração de sessões por dispositivo.
+10. Criar API/UI administrativa, consumindo `ClientSecurityAssessment` e a infraestrutura de localização.
+11. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.

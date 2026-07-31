@@ -146,34 +146,84 @@ como inseguras/não aderentes. Não criar tabela, snapshot ou campo persistido p
 ## Reference Token (AccessTokenType.Reference) no DefaultTokenFactory
 
 **Área:** Tokens / DefaultTokenFactory
-**Deferral:** `DefaultTokenFactory.CreateAccessTokenAsync` hardcoda `AccessTokenType.Jwt` (linha 71). Não há suporte a emissão de reference tokens (token opaco, armazenado no store com lookup por string opaca, não por JTI extraído do JWT). O modelo `AccessToken` já tem a propriedade `AccessTokenType`, e a infraestrutura de store já existe — falta apenas a lógica de derivação do tipo a partir de `Client.AccessTokenType` e a geração do token opaco no lugar do JWT assinado.
+
+**Status:** PENDENTE. Reavaliado em 2026-07-30.
+
+**Estado verificado:** a infraestrutura de persistência e validação já entende `AccessTokenType.Reference`:
+o store EF usa digest realm-scoped do handle, preserva o tipo, remove somente reference tokens e possui testes de
+isolamento/paridade; o bearer pipeline valida tokens opacos e a integração prova esse caminho com um reference token
+semeado diretamente no store. A emissão, entretanto, continua ausente:
+
+- `DefaultTokenFactory.CreateAccessTokenAsync` ainda cria `AccessTokenType.Jwt` de forma fixa;
+- a emissão a partir de refresh token em `RefreshTokenHandler.IssueFromSnapshotAsync` também fixa JWT;
+- `Client` ainda não possui `AccessTokenType`, portanto faltam modelo, persistência Configuration, materialização e
+  defaults;
+- o teste de integração de bearer declara explicitamente que precisa semear o reference token porque a emissão só
+  produz JWT;
+- não existe endpoint de introspection implementado.
+
+**Deferral:** implementar a configuração por client, gerar handle opaco criptograficamente aleatório, aplicar o
+mesmo tipo na emissão inicial e por refresh, nunca assinar o reference token, devolver o handle como `access_token`
+e ampliar os testes de emissão/renovação/revogação. A introspection deve entrar no mesmo plano ou em predecessor
+explícito, pois é o mecanismo natural para resource servers validarem esses tokens.
+
 **Quando revisitar:** Quando houver demanda de clientes que não podem validar JWTs localmente, ou quando a introspection endpoint for implementada (que é o mecanismo de validação natural de reference tokens).
+
 **Nota de design:**
-- Derivar tipo: `var tokenType = request.Client.AccessTokenType;` em vez do valor fixo `AccessTokenType.Jwt`.
+- Adicionar e persistir `Client.AccessTokenType`, com JWT como default seguro/compatível com o comportamento atual.
+- Derivar o tipo de `request.Client.AccessTokenType` na emissão inicial e na renovação por refresh token.
 - Para `AccessTokenType.Reference`: gerar string opaca aleatória como `token.Token`, não assinar via `jwtFactory`. O token é armazenado no store e o `access_token` retornado ao cliente é a string opaca.
 - Introspection endpoint (`/{realm}/connect/introspect`) é o mecanismo de validação para resource servers que recebem reference tokens.
-- O teste `AccessTokenStoreIsolation_JtiFromRealmA_NotFoundInRealmB` testa isolamento do store por JTI; quando reference tokens forem implementados, adicionar teste específico com token opaco.
+- Reaproveitar a cobertura já existente de store/bearer e adicionar emissão ponta a ponta, renovação, revogação,
+  expiração, concorrência e isolamento por realm/client com handles opacos.
 
 ---
 
-## Persistência de Dados (EFCore: Postgres/Sqlite) e Caching
+## Persistência EFCore do primeiro corte (PostgreSQL/SQLite) — ✅ CONCLUÍDO
 
 **Área:** Storage / Persistência
-**Deferral:** O primeiro corte foi concluído pelos Planos 2-4 do
+
+**Status:** CONCLUÍDO em 2026-07-29 pelos Planos 0-4 do
 [plan-data-macro.md](../plans/plan-data-macro.md): Configuration e Operational usam EFCore
 SQLite/PostgreSQL, o gateway é completo, o runner provisiona também UserAccounts, o Server usa PostgreSQL e os
-testes default usam EF/SQLite + módulo real. O fake foi removido. Continuam diferidos caching e a persistência do
-catálogo de resources/scopes.
-**Quando revisitar:** Caching somente depois de existir mecanismo claro de invalidação administrativa;
-resources/scopes no plano específico de redesign.
-**Nota de design:**
+testes default usam EF/SQLite + módulo real. O fake foi removido.
+
+**Entregue:**
+
 - Entregues: `RoyalIdentity.Data.Configuration`, `RoyalIdentity.Storage.EntityFramework`, providers
   `.PostgreSql`/`.Sqlite` e `RoyalIdentity.Migrations`. Resources/scopes permanecem voláteis por DF22; não são
   entidades de `Data.Configuration`.
 - Entregues também: `RoyalIdentity.Data.Operational`, gateway completo, migração dos testes e remoção do fake.
-- Pendente: `RoyalIdentity.Storage.Caching`, caso medições e invalidação administrativa justifiquem.
-- Só `Storage.EntityFramework` implementa as facades do IdP; `Data.*` contêm DbContext/entidades/queries. Divisão config × operacional por ciclo de vida/volume (TTL/cache no operacional).
-- Esboço de fases: entidades/DbContext → mapeamentos por provedor → impl. das facades → cache → migração in-memory→Sqlite nos testes.
+- `RoyalIdentity.Server` é PostgreSQL-only e externamente provisionado; `RoyalIdentity.Demo` usa SQLite in-memory;
+  a suíte provider-neutral usa SQLite por default e mantém aceites PostgreSQL opt-in.
+- Só `Storage.EntityFramework` implementa as facades do IdP; `Data.*` contêm DbContext/entidades/queries.
+
+**Limite do corte:** a persistência do catálogo de resources/scopes continua diferida por DF22 e deve ser tratada
+no plano específico de redesign/persistência desse catálogo. Isso não reabre o primeiro corte concluído.
+
+---
+
+## Caching sobre os stores EF
+
+**Área:** Storage / Performance
+
+**Status:** DIFERIDO — não necessário no momento.
+
+**Estado verificado:** não existem `RoyalIdentity.Storage.Caching` nem
+`.ai/plans/plan-data-caching.md`. O snapshot assíncrono de Configuration resolve consumidores síncronos e
+invalidação de options, mas foi deliberadamente definido como projeção técnica, não como cache geral dos stores.
+
+**Quando revisitar:** somente se medições demonstrarem benefício e depois de existir um mecanismo administrativo
+claro de invalidação/versão para os dados de Configuration. Stores Operational exigem análise própria por causa de
+TTL, consumo atômico, revogação e concorrência; um cache não pode alterar essas semânticas.
+
+**Nota de design:**
+
+- Criar plano próprio antes de implementar o projeto/adapters de caching.
+- Cache deve envolver stores EF já corretos, manter isolamento por realm e nunca substituir decisões atômicas do
+  banco.
+- Invalidação administrativa, comportamento multi-instância, observabilidade e testes de stale reads são gates,
+  não detalhes deixados para a implementação.
 
 ---
 
@@ -308,14 +358,21 @@ concretos e o projeto `RoyalIdentity.Storage.InMemory` foram removidos.
 ## Pushed Authorization Requests (PAR / RFC 9126)
 
 **Área:** OAuth2/OIDC / Authorization endpoint / Storage operacional
+
+**Status:** ANÁLISE EXISTENTE; PLANO DE IMPLEMENTAÇÃO NÃO CRIADO.
+
+**Análise:** [an-par-rfc-9126.md](../analisys/an-par-rfc-9126.md) inventaria os requisitos do RFC 9126, o estado
+dos contratos atuais e as alternativas de store, mas declara explicitamente que não é plano nem decisão
+arquitetural. Os planos de OAuth 2.1, RFC 9700, Operational Storage e replay protection mantêm PAR fora de escopo
+ou remetem a esta análise/backlog; nenhum deles implementa a feature.
+
 **Deferral:** PAR é uma feature de protocolo completa, não apenas uma decisão de persistência. Exige endpoint direto
 autenticado, validação antecipada da authorization request, emissão de `request_uri` opaco e imprevisível, vínculo ao
 client, expiração, consumo concorrente seguro, metadata e política global/por client. Incorporar essas decisões ao
 baseline de storage ampliaria o plano e misturaria inventário dos contratos atuais com redesign futuro.
 **Quando revisitar:** Após o baseline dos contratos de storage e antes de planejar PAR ou evoluir o armazenamento de
 authorization requests/mensagens transitórias.
-**Nota de design:** A análise [an-par-rfc-9126.md](../analisys/an-par-rfc-9126.md) registra os requisitos e as
-alternativas ainda não decididas: `IPushedAuthorizationRequestStore` específico ou evolução para
+**Nota de design:** permanecem por decidir `IPushedAuthorizationRequestStore` específico ou evolução para
 `IAuthorizationRequestStore` com operações distintas para continuação interna e PAR. Uma futura
 `PersistentDataMessageStore` continua válida para mensagens transitórias, mas o `IMessageStore` atual não expressa
 realm, client, TTL nem consumo atômico e não deve ser assumido como store de PAR sem redesign.
