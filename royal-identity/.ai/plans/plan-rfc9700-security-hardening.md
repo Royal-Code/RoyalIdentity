@@ -454,7 +454,9 @@ emissão/anúncio de tokens no front-channel sem opção legada.
 
 **Tarefas:**
 
-- [ ] Rejeitar token request com `code_verifier` quando o code não contém `code_challenge`.
+- [ ] Consumir a regressão entregue por `plan-oauth21-token-error-responses.md` para token request com
+  `code_verifier` e code sem `code_challenge`; não reimplementar a classificação nem os helpers de erro nesta
+  fase.
 - [ ] Consumir a taxonomia e o writer entregues pelo plano OAuth 2.1 sem reintroduzir helpers paralelos.
 - [ ] Preservar rejeição de verifier ausente/incorreto e comparação em tempo constante.
 - [ ] Manter S256 como default/suporte anunciado; plain continua somente como setting inseguro do client e gera

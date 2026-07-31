@@ -1,6 +1,6 @@
 # Plan: Conformidade das respostas de erro do token endpoint com OAuth 2.1 (`plan-oauth21-token-error-responses`)
 
-## Status: RASCUNHO - baseline normativa e fases definidas; implementação não iniciada
+## Status: RASCUNHO - Q1/Q3 pendentes antes da Fase 1 e Q2 antes da Fase 3; implementação não iniciada
 
 ## Progresso
 
@@ -8,10 +8,10 @@
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Contrato explícito de erro e asserções exatas | Pendente |
-| Fase 2 - Forma da requisição e autenticação do client | Pendente |
-| Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Pendente |
-| Fase 4 - Auditoria transversal, regressão e fechamento | Pendente |
+| Fase 1 - Contrato explícito de erro e asserções exatas | Bloqueada por Q1/Q3 |
+| Fase 2 - Forma da requisição e autenticação do client | Bloqueada pela Fase 1 |
+| Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Bloqueada pela Fase 2/Q2 |
+| Fase 4 - Auditoria transversal, regressão e fechamento | Bloqueada pela Fase 3 |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -28,12 +28,14 @@
   do token endpoint OAuth 2.0, os seis códigos base, HTTP 401 para autenticação via `Authorization` e
   `WWW-Authenticate`.
 - [OAuth 2.1 draft-15 §3.2.4](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15#section-3.2.4)
-  — baseline OAuth 2.1 vigente em 2026-07-30; preserva a taxonomia do RFC 6749 e classifica
+  — baseline OAuth 2.1 vigente em 2026-07-31; preserva a taxonomia do RFC 6749 e classifica
   `code_verifier` enviado sem `code_challenge` como `invalid_request`.
 - [OAuth 2.1 draft-15 §4.1.3](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15#section-4.1.3)
   — exige presença de `code_verifier` se, e somente se, houve `code_challenge` e rejeição do downgrade.
 - [RFC 7636 §4.6](https://www.rfc-editor.org/rfc/rfc7636.html#section-4.6) — falha na verificação do
   `code_verifier` contra o challenge resulta em `invalid_grant`.
+- [RFC 7523 §3.2](https://www.rfc-editor.org/rfc/rfc7523.html#section-3.2) — JWT usado para autenticação de
+  client que não é válido retorna `invalid_client`, não `invalid_request`.
 - [RFC 8707 §§2.1/2.2](https://www.rfc-editor.org/rfc/rfc8707.html#section-2) — permite múltiplas ocorrências
   de `resource` e define a extensão `invalid_target`.
 - [product.md](../foundation/product.md), [tech.md](../foundation/tech.md) e
@@ -46,7 +48,7 @@
   a depender da baseline de erros deste plano antes da sua Fase 3.
 - [plans-roadmap-02.md](plans-roadmap-02.md) — posiciona este plano antes do hardening RFC 9700.
 
-### Estado atual do código (verificado em 2026-07-30)
+### Estado atual do código (verificado em 2026-07-31)
 
 - **Payload base existente:** `ErrorResponseParameters` serializa `error`, `error_description` e `error_uri`;
   `ErrorResponseResult` responde JSON, usa status configurável e adiciona headers contra cache.
@@ -54,8 +56,11 @@
   headers específicos; `invalid_client` usa sempre o default 400 e nunca escreve `WWW-Authenticate`.
 - **Overload ambíguo:** `ResponseHandlerExtensions.InvalidRequest(string, string?)` trata o primeiro argumento
   como descrição e sempre escreve `error=invalid_request`.
-- **Código correto perdido:** `ClientResourceDecorator` e `ResourcesValidator` chamam esse overload com
-  `invalid_scope`/`invalid_target`; o valor aparece em `error_description`, não necessariamente em `error`.
+- **Código correto perdido em dois formatos:** `ClientResourceDecorator`, `ResourcesDecorator`,
+  `ResourcesValidator`, `AuthorizeMainValidator`, `AuthorizationResourcesValidator`, `LoadClient` e
+  `RedirectUriValidator` passam constantes `Oidc.*.Errors.*` ao helper `InvalidRequest`. Há chamadas com um
+  argumento, nas quais o código vira descrição, e chamadas com dois argumentos, nas quais o primeiro código
+  também é tratado como descrição e `error` permanece `invalid_request`.
 - **Testes permissivos:** vários testes de client credentials, refresh, code e `private_key_jwt` usam
   `Assert.Contains("<error>", body)` e podem passar quando somente a descrição contém o texto esperado.
 - **Taxonomia parcial:** grant ausente e grant não suportado já retornam, respectivamente, `invalid_request` e
@@ -64,19 +69,43 @@
   está autorizado para o grant; o código normativo é `unauthorized_client`.
 - **Parâmetro obrigatório incorreto:** `LoadCode` usa `invalid_grant` quando `code` está ausente; ausência de
   parâmetro obrigatório pertence a `invalid_request`.
-- **PKCE incompleto:** `PkceMatchValidator` aceita code sem challenge e o plano RFC 9700 ainda atribuía
-  `invalid_grant` ao cenário `code_verifier` sem `code_challenge`.
-- **Duplicidade não preservada semanticamente:** `IFormCollection` é convertido para `NameValueCollection`;
-  valores repetidos permanecem agregados, mas não existe validação explícita de parâmetros não repetíveis antes
-  da criação do contexto.
+- **PKCE incompleto:** `PkceMatchValidator` aceita code sem challenge mesmo quando o request envia
+  `code_verifier`; quando o code possui challenge e o verifier está ausente usa `invalid_grant`. O plano RFC
+  9700 já possui DF18 com a classificação correta e dependência deste plano; a tarefa executável que ainda
+  duplicava o primeiro cenário foi convertida nesta revisão em consumo da regressão entregue por este plano.
+- **Método PKCE persistido desconhecido:** o branch `default` de `PkceMatchValidator` transforma um
+  `code_challenge_method` desconhecido já armazenado no authorization code em `invalid_grant`; esse estado não é
+  input novo do token request e sua classificação ainda não foi decidida (Q2).
+- **Duplicidade preservada, mas não validada:** `AsNameValueCollection` chama `Add` para cada `StringValues`, e
+  `NameValueCollection.GetValues` ainda distingue ocorrências. O problema é que `TryGet`/indexers e `Load` tratam
+  parâmetros como escalares sem impor cardinalidade; a validação precisa ocorrer antes dessas leituras e antes
+  da criação/dispatch do context, não necessariamente antes da conversão.
 - **Mecanismos múltiplos podem ser aceitos:** `DefaultClientSecretChecker` percorre evaluators e interrompe no
   primeiro segredo encontrado; Basic válido pode vencer mesmo quando o body também contém outra credencial.
+- **Precedência já duplicada no evaluator TLS:** `TlsClientAuthSecretEvaluator` deixa de avaliar certificado
+  quando encontra assertion, secret ou header `Authorization`; o preflight precisa substituir essa decisão
+  espalhada, não coexistir com uma segunda regra divergente.
 - **Evaluators com efeito observável:** `private_key_jwt` registra o `jti` no replay store durante a avaliação;
   uma requisição malformada com mecanismos múltiplos precisa ser rejeitada antes desse efeito.
+- **Assertion JWT mistura forma e autenticação:** par assertion/type incompleto cai hoje em `invalid_client`,
+  embora seja `invalid_request`; após o par selecionar `private_key_jwt`, JWT não parseável, `sub` ausente,
+  client desconhecido e validação criptográfica falha também convergem em `invalid_client`. Para estes últimos,
+  RFC 7523 §3.2 confirma `invalid_client`; diferenciá-los criaria uma classificação incorreta e potencial oracle.
 - **Extensões suportadas:** o projeto usa `invalid_target` para RFC 8707 e admite extension grants por
   `IExtensionGrant`/`IExtensionsGrantsProvider`; a solução não pode restringir `error` a um enum fechado.
 - **HTTP pré-protocolo:** método diferente de POST e media type incompatível retornam 405/415 por
   `EndpointErrorResults`; esses casos ocorrem antes da criação de um token context.
+- **405 sem `Allow`:** `EndpointErrorResults.MethodNotAllowed` define status 405, mas
+  `ErrorResponseResult` não escreve `Allow`; adicionar `Allow: POST` será mudança corretiva, não preservação.
+- **Semântica protocolar no projeto neutro:** `RoyalIdentity.Pipelines/Abstractions/EndpointErrorResults.cs`
+  hardcoda `invalid_request`, `method_not_allowed`, `not_found` e `Invalid_content_type` no payload genérico. Isso
+  já viola a intenção de DF5 e exige a decisão Q3 antes de alterar a borda.
+- **Infraestrutura de testes ausente:** `Tests.Identity` não possui fixtures dos contexts/validators deste plano;
+  os filtros `ClientSecret`, `TokenEndpoint`, `GrantType` e `Resources` não selecionam testes, enquanto `Pkce`
+  seleciona somente `PkceHelperTests`. Também não existem ainda `TokenErrorTests` em `Tests.Integration` nem
+  `ErrorResponseResultTests` em `Tests.Pipelines`.
+- **Helper parcial existente:** `CodeSingleUseTests.ReadErrorAsync` já desserializa `error` e descrição, mas é
+  privado e não verifica status/headers; deve ser extraído, não duplicado.
 
 ### Lacunas, conflitos e restrições
 
@@ -87,8 +116,13 @@
   versão posterior exige diff normativo documentado antes de alterar implementação ou aceite.
 - **Core extensível:** erros definidos por RFCs de extensão e extension grants continuam strings válidas; não
   criar enum que impeça `invalid_target` ou códigos futuros.
-- **Borda compartilhada:** `ResponseHandler`/`ErrorResponseResult` também atendem outros endpoints; alterações
-  precisam de regressão, mas a auditoria normativa completa de authorize/revocation/userinfo está fora do escopo.
+- **Borda compartilhada:** `ResponseHandler`/`ErrorResponseResult` atendem também revocation, UserInfo,
+  End Session e Protected Resource Metadata. `ResourcesValidator` é ainda mais sensível: a mesma instância
+  genérica valida `AuthorizeContext` e `ClientCredentialsContext`, portanto a correção do campo `error` no token
+  endpoint inevitavelmente toca authorize ou exige separar o validator (Q1).
+- **Transporte de erro do authorize já incorreto:** validators do authorize produzem hoje o mesmo JSON direto de
+  `ErrorResponseResult`; depois de validar um `redirect_uri`, RFC 6749 §4.1.2.1 normalmente exige redirecionar o
+  erro ao client. Esta dívida é real, mas não precisa ser absorvida pela correção do token endpoint.
 - **Anti-oracle vigente:** corrigir a categoria de um parâmetro ausente não autoriza diferenciar code
   inexistente, consumido, expirado ou com binding divergente quando um valor foi apresentado.
 - **Sem compatibilidade externa:** não há clients de produção; corrigir respostas e testes diretamente, sem
@@ -96,12 +130,15 @@
 
 ### Superfícies impactadas a mapear
 
-- `RoyalIdentity.Pipelines/Abstractions` e `Defaults` — payload, status e headers de respostas genéricas.
+- `RoyalIdentity.Pipelines/Abstractions` e `Defaults` — payload, `EndpointErrorResults`, status e headers de
+  respostas genéricas, conforme Q3.
 - `RoyalIdentity/Endpoints/TokenEndpoint.cs` — método/media type, leitura do form, duplicidade e dispatch de grant.
 - `RoyalIdentity/Extensions/ResponseHandlerExtensions.cs` — construção explícita dos erros OAuth.
-- `RoyalIdentity/Contexts/Decorators` e `Validators` — classificação por condição do request/grant.
+- `RoyalIdentity/Contexts/Decorators` e `Validators` — classificação por condição do request/grant, inclusive a
+  borda compartilhada `ResourcesValidator` conforme Q1.
 - `RoyalIdentity/Contracts/Defaults/SecretsEvaluators` — detecção e avaliação de autenticação de client.
-- `Tests.Pipelines`, `Tests.Identity` e `Tests.Integration` — contratos do writer, validators e fluxos HTTP.
+- `Tests.Pipelines`, `Tests.Integration` e `Tests.Architecture` — writer genérico, matriz HTTP e guard de
+  boundaries; `Tests.Identity` só recebe testes se surgir unidade pura que não replique a composição HTTP.
 - Extension grants e RFC 8707 — preservação da extensibilidade e de parâmetros explicitamente repetíveis.
 
 ---
@@ -121,8 +158,9 @@
 
 ## Fora de escopo
 
-- Auditar integralmente a taxonomia do authorization endpoint, revocation, introspection, UserInfo ou protected
-  resources; executar somente regressões provocadas por helpers compartilhados.
+- Auditar integralmente a taxonomia e o transporte de erro do authorization endpoint, revocation,
+  introspection, UserInfo ou protected resources; a correção mínima do campo `error` no authorize depende de Q1,
+  e as demais superfícies recebem somente regressões provocadas por helpers compartilhados.
 - Alterar a semântica atômica ou persistência de authorization codes, refresh tokens ou replay handles.
 - Implementar novos grants, DPoP, PAR, JAR/JARM, Device Authorization ou Token Exchange.
 - Remover extension grants ou o erro `invalid_target` do RFC 8707.
@@ -133,11 +171,44 @@
 
 ---
 
+## Perguntas ao humano
+
+- **Q1 — `ResourcesValidator` compartilhado:** como tratar a correção de `invalid_scope`/`invalid_target` que
+  atravessa token e authorize?
+  - **Opções:**
+    - **A) Recomendada:** corrigir o validator compartilhado para escrever o código exato nos dois contexts e
+      assumir esse ajuste mínimo do authorize neste plano; o transporte redirect versus JSON continua diferido.
+    - **B)** separar validators de authorization e token, corrigindo somente o novo validator do token neste
+      plano e deixando taxonomia/transporte do authorize para plano próprio.
+  - **Impacto se não decidir:** bloqueia o contrato dos helpers, a fronteira de escopo e as Fases 1/3.
+  - **Status:** Aberta.
+
+- **Q2 — `code_challenge_method` desconhecido no code persistido:** como classificar esse estado impossível no
+  fluxo normal?
+  - **Opções:**
+    - **A) Recomendada:** tratar como violação de invariante/dado corrompido e propagar resposta 5xx sem mascarar
+      como erro OAuth do client.
+    - **B)** responder `invalid_grant` genérico, tratando o authorization code inteiro como inválido e mantendo
+      o detalhe fora da resposta.
+  - **Impacto se não decidir:** bloqueia o branch `default`, sua observabilidade e os testes da Fase 3.
+  - **Status:** Aberta.
+
+- **Q3 — `EndpointErrorResults` no projeto Pipelines:** onde deve ficar a seleção semântica dos erros?
+  - **Opções:**
+    - **A) Recomendada:** deixar em `RoyalIdentity.Pipelines` somente writers/resultados HTTP neutros e mover
+      factories que escolhem códigos OAuth para `RoyalIdentity`.
+    - **B)** manter uma factory genérica em Pipelines, mas exigir que o caller do core forneça explicitamente
+      código, status e headers; remover todos os códigos hardcoded de `EndpointErrorResults`.
+  - **Impacto se não decidir:** bloqueia DF5, o desenho do 405/415 e o guard arquitetural da Fase 1.
+  - **Status:** Aberta.
+
+---
+
 ## Decisões fechadas
 
 - **DF1 — Baseline normativa versionada:** implementar RFC 6749 §5.2 com as alterações presentes no OAuth 2.1
   `draft-15` §3.2.4; antes do primeiro edit, se existir draft posterior, registrar o diff e atualizar este plano
-  somente quando a nova versão mudar o requisito. Fonte: pedido humano + documento vigente em 2026-07-30.
+  somente quando a nova versão mudar o requisito. Fonte: pedido humano + documento vigente em 2026-07-31.
 - **DF2 — Contrato pelo campo `error`:** conformidade é determinada pelo valor JSON exato de `error`, status e
   headers normativos; encontrar um texto dentro de `error_description` não satisfaz o contrato. Fonte:
   RFC 6749 §5.2 + OAuth 2.1 draft-15 §3.2.4.
@@ -145,11 +216,12 @@
   erros definidos por extensões, incluindo `invalid_target`, continuam permitidos. Fonte: RFC 6749 §8.5,
   RFC 8707 e extension grants existentes.
 - **DF4 — Construção explícita:** toda chamada que escolhe um erro informa separadamente `error`,
-  `error_description`, status e headers necessários; remover overloads cuja posição possa ser interpretada como
-  código ou descrição. Fonte: review do código atual.
+  `error_description`, status e headers necessários; remover tanto o overload de dois `string` quanto helpers de
+  descrição com um único `string` capazes de aceitar silenciosamente uma constante `Oidc.*.Errors.*`. Fonte:
+  callers verificados no código atual.
 - **DF5 — Pipelines neutro ao protocolo:** suporte genérico a status/headers pode permanecer em
-  `RoyalIdentity.Pipelines`, mas regras OAuth e seleção dos códigos ficam em `RoyalIdentity`. Fonte:
-  dependency rules do repositório.
+  `RoyalIdentity.Pipelines`, mas regras OAuth e seleção dos códigos ficam em `RoyalIdentity`; Q3 decide a forma
+  exata dessa fronteira. Fonte: dependency rules do repositório.
 - **DF6 — Basic inválido:** tentativa de autenticação por `Authorization: Basic` que falha retorna
   `invalid_client`, HTTP 401 e `WWW-Authenticate` com scheme `Basic`; falhas de mecanismos no body usam 400,
   salvo requisito mais específico do mecanismo. Fonte: RFC 6749 §5.2 / draft-15 §3.2.4.
@@ -168,14 +240,27 @@
 - **DF11 — PKCE por condição:** presença divergente entre verifier e challenge retorna `invalid_request`;
   verifier presente que não corresponde ao challenge retorna `invalid_grant`. Fonte: draft-15 §§3.2.4/4.1.3
   + RFC 7636 §4.6.
-- **DF12 — HTTP antes do protocolo:** método inválido continua HTTP 405 com `Allow: POST` e media type inválido
-  continua HTTP 415; são falhas HTTP anteriores a um token request válido e não usam códigos OAuth inventados
-  para aparentar §3.2.4. Fonte: semântica HTTP + posição atual no endpoint.
+- **DF12 — HTTP antes do protocolo:** método inválido permanece HTTP 405, mas passa a incluir `Allow: POST`, hoje
+  ausente; media type inválido permanece HTTP 415. São falhas HTTP anteriores a um token request válido e não
+  usam códigos OAuth inventados para aparentar §3.2.4. Fonte: semântica HTTP + código atual verificado.
 - **DF13 — Descrição não é discriminador:** `error_description` permanece genérica, sem client secrets, codes,
   assertions ou tokens, e as equivalências anti-oracle de code continuam preservadas. Fonte:
   `plan-data-operational-storage.md` + segurança do produto.
 - **DF14 — Breaking change direto:** atualizar helpers, callers e testes sem switches ou compatibilidade com os
   códigos incorretos atuais. Fonte: `AGENTS.md` + decisão humana de aceitar breaking changes.
+- **DF15 — Assertion JWT inválida:** presença incompleta ou repetida do par
+  `client_assertion`/`client_assertion_type` é forma inválida e retorna `invalid_request`; par completo com tipo
+  de autenticação não suportado, JWT não parseável, claims obrigatórias ausentes, client desconhecido ou
+  validação criptográfica falha retorna `invalid_client` com descrição genérica e sem distinguir a causa. Fonte:
+  OAuth 2.1 draft-15 §3.2.4 + RFC 7523 §3.2.
+- **DF16 — Topologia dos testes:** criar `ErrorResponseResultTests` em `Tests.Pipelines`, um único
+  `Tests.Integration/Endpoints/TokenErrorTests.cs` para a matriz HTTP e extrair o `ReadErrorAsync` existente para
+  um helper compartilhado que também valide status/headers. Não criar fixture de contexts em `Tests.Identity`
+  apenas para satisfazer filtros; esse projeto recebe somente unidades puras que surgirem do design. Fonte:
+  infraestrutura de testes verificada.
+- **DF17 — Ownership do downgrade PKCE:** este plano implementa e testa a classificação do token endpoint; o
+  plano RFC 9700 apenas consome a baseline concluída e mantém seus aceites de hardening, sem segunda tarefa de
+  implementação. Fonte: `plan-rfc9700-security-hardening.md` DF18 + ordem do roadmap.
 
 ---
 
@@ -188,9 +273,28 @@
   - **Resposta humana:** criar plano para corrigir o problema e alinhar as respostas ao draft do OAuth 2.1.
   - **Conclusão:** DF1-DF2 e plano próprio anterior ao hardening RFC 9700.
 - **Diferença de PKCE:** o draft adiciona explicitamente verifier sem challenge a `invalid_request`.
-  - **Conclusão:** DF11 substitui a expectativa anterior de `invalid_grant` no plano RFC 9700.
+  - **Conclusão:** DF11 é a baseline implementável; o plano RFC 9700 já referencia essa classificação por DF18
+    e deve remover somente a tarefa executável duplicada (DF17).
 - **Compatibilidade:** o projeto está em desenvolvimento sem clients externos que exijam os códigos atuais.
   - **Conclusão:** DF14.
+
+**Revisão externa de 2026-07-31:**
+
+- **Estado factual e fronteiras:** foram corrigidos o estado do plano RFC 9700, o alcance dos helpers ambíguos,
+  a ausência atual de `Allow: POST`, a semântica protocolar hardcoded em `EndpointErrorResults` e o uso
+  compartilhado de `ResourcesValidator`.
+  - **Conclusão:** Q1/Q3, DF4-DF5, DF12 e DF17.
+- **Assertion malformada:** a proposta de responder `invalid_request` para JWT não parseável foi rejeitada. Uma
+  vez selecionado o método de client authentication por assertion, RFC 7523 §3.2 exige `invalid_client`; somente
+  forma incompleta/repetida do par de parâmetros permanece `invalid_request`.
+  - **Conclusão:** DF15; não foi aberta pergunta para escolher contra um requisito normativo.
+- **Testes:** os filtros antigos realmente não exercitam os validators pretendidos. Neste SDK, porém, filtro sem
+  correspondência encerra com sucesso, não com exit code 1; por isso o problema é falso verde, não falha do
+  comando. A localização dos testes foi fechada pela infraestrutura existente, sem criar uma fixture artificial.
+  - **Conclusão:** DF16.
+- **Cardinalidade do form:** a conversão atual preserva ocorrências via `Add`/`GetValues`; a exigência correta é
+  validar cardinalidade antes de leitura escalar e efeitos, não necessariamente antes da conversão.
+  - **Conclusão:** DF7-DF8.
 
 ---
 
@@ -201,11 +305,12 @@
 - `ErrorResponseParameters`: continua sendo o payload genérico `error`/`error_description`/`error_uri`.
 - `ErrorResponseResult`/`ResponseHandler`: aceitam status e headers HTTP explícitos sem importar constantes
   OAuth para `RoyalIdentity.Pipelines`.
-- `ResponseHandlerExtensions`: expõe construção inequívoca de erro protocolar; wrappers como
-  `InvalidRequest`, `InvalidGrant` e `InvalidClient` não possuem overload código/descrição ambíguo.
-- Validação estrutural dos parâmetros core do token request ocorre sobre os valores originais de
-  `IFormCollection` antes de `NameValueCollection` perder a distinção útil entre uma ocorrência e múltiplas
-  ocorrências.
+- `EndpointErrorResults`: deixa de selecionar/hardcodar semântica OAuth dentro de Pipelines conforme Q3.
+- `ResponseHandlerExtensions`: expõe construção inequívoca de erro protocolar; não existe helper de um ou dois
+  `string` em que uma constante de código possa ocupar silenciosamente a posição de descrição.
+- Validação estrutural dos parâmetros core do token request ocorre sobre `IFormCollection` ou
+  `NameValueCollection.GetValues` antes de qualquer leitura escalar/`Load`; a conversão atual preserva as
+  ocorrências e não precisa ser substituída apenas por esse motivo.
 - Detecção de mecanismos de autenticação ocorre antes de `IClientSecretChecker`; avaliação criptográfica,
   storage e replay só começam depois que a forma da requisição é válida.
 - `IExtensionGrant` continua podendo produzir códigos próprios documentados, usando o mesmo writer.
@@ -218,6 +323,8 @@
 | Parâmetro core obrigatório ausente ou não repetível repetido | `invalid_request` | 400 |
 | Credenciais múltiplas ou mais de um mecanismo de autenticação | `invalid_request` | 400 |
 | `client_assertion`/`client_assertion_type` com forma incompleta | `invalid_request` | 400 |
+| Par de assertion completo com tipo/método não suportado | `invalid_client` | 400, sem distinguir causa |
+| Par de assertion seleciona `private_key_jwt`, mas JWT/client/claims/assinatura são inválidos | `invalid_client` | 400, sem distinguir causa |
 | Autenticação do client ausente/inválida fora de header | `invalid_client` | 400 |
 | Autenticação tentada via `Authorization` e inválida | `invalid_client` | 401 + `WWW-Authenticate` correspondente |
 | Client autenticado não autorizado para o grant | `unauthorized_client` | 400 |
@@ -228,6 +335,7 @@
 | Resource indicator inválido ou não autorizado | `invalid_target` | 400; extensão RFC 8707 |
 | `code_verifier` presente sem challenge ou challenge presente sem verifier | `invalid_request` | 400 |
 | `code_verifier` presente e diferente do challenge | `invalid_grant` | 400 |
+| `code_challenge_method` desconhecido já persistido no code | definido por Q2 | 5xx ou 400 |
 
 Regras adicionais:
 
@@ -273,8 +381,11 @@ RoyalIdentity/
 Tests.Pipelines/
   contrato do writer genérico
 
-Tests.Identity + Tests.Integration/
-  matriz de erro por validator e fluxo HTTP
+Tests.Integration/Endpoints/TokenErrorTests.cs
+  matriz HTTP exata do token endpoint
+
+Tests.Architecture/
+  guard da neutralidade de Pipelines e das assinaturas ambíguas
 ```
 
 ### Segurança, concorrência e confiabilidade
@@ -283,6 +394,8 @@ Tests.Identity + Tests.Integration/
 - Comparações PKCE continuam em tempo constante quando há verifier e challenge.
 - Code apresentado e recusado não revela existência, consumo, client, redirect ou expiração por descrições
   diferentes onde o plano Operational exige equivalência.
+- Assertion JWT inválida, client desconhecido e falha criptográfica convergem em `invalid_client` genérico;
+  somente a forma do par de parâmetros é recusada antes como `invalid_request`.
 - Falha de infraestrutura não é convertida em erro OAuth de credencial; continua propagando para a borda 5xx.
 - Headers de autenticação nunca ecoam credenciais; `WWW-Authenticate` contém somente o scheme e parâmetros
   públicos necessários.
@@ -318,11 +431,12 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Contrato explícito de erro e asserções exatas
 
-**Depende de:** DF2-DF5, DF13-DF14.
+**Depende de:** Q1, Q3, DF2-DF5, DF13-DF17.
 
 **Escopo:** `RoyalIdentity.Pipelines/Abstractions`, `RoyalIdentity.Pipelines/Defaults`,
-`RoyalIdentity/Extensions/ResponseHandlerExtensions.cs`, callers de `InvalidRequest`, `Tests.Pipelines`,
-helper de assertions em `Tests.Integration`.
+`EndpointErrorResults`, `RoyalIdentity/Extensions/ResponseHandlerExtensions.cs`, todos os callers de
+`ResponseHandler.Error`/`context.Error`/`InvalidRequest`/`InvalidGrant`/`InvalidClient`, `Tests.Pipelines`,
+`Tests.Integration` e `Tests.Architecture`.
 
 **O que/como:** tornar status/headers parte explícita do resultado genérico, remover o overload ambíguo e migrar
 callers para separar código e descrição. Criar uma única assertion de integração que desserialize o JSON e
@@ -331,27 +445,39 @@ verifique `error`, status, content type, cache e headers opcionais.
 **Tarefas:**
 
 - [ ] Inventariar todos os callers de `ResponseHandler.Error`, `context.Error`, `InvalidRequest`,
-  `InvalidGrant` e `InvalidClient`.
+  `InvalidGrant` e `InvalidClient`, registrando endpoint/context e efeito esperado.
+- [ ] Registrar as respostas Q1/Q3 no histórico e promover as decisões correspondentes antes de editar código.
 - [ ] Estender o resultado genérico com headers explícitos sem introduzir referência OAuth em
   `RoyalIdentity.Pipelines`.
-- [ ] Remover o overload `InvalidRequest(string, string?)` ou substituí-lo por assinatura não ambígua.
-- [ ] Migrar callers de `invalid_scope`/`invalid_target` para definir o campo `error` corretamente.
+- [ ] Remover a seleção de códigos hardcoded de Pipelines conforme Q3, inclusive o typo
+  `Invalid_content_type`.
+- [ ] Remover os overloads de um e dois `string` de `InvalidRequest` que aceitam uma constante de erro como
+  descrição, substituindo-os por construção inequívoca.
+- [ ] Migrar todos os callers afetados, inclusive `ResourcesDecorator`, `ResourcesValidator`,
+  `AuthorizeMainValidator`, `AuthorizationResourcesValidator`, `LoadClient` e `RedirectUriValidator`, conforme
+  a fronteira escolhida em Q1.
 - [ ] Preservar `error_uri` e serialização source-generated.
-- [ ] Criar testes unitários para payload, status, headers, content type e cache.
-- [ ] Criar `AssertTokenErrorAsync` equivalente que compare o valor JSON exato e aceite expectativa opcional de
-  `WWW-Authenticate`.
+- [ ] Criar `Tests.Pipelines/Defaults/ErrorResponseResultTests.cs` para payload, status, headers, content type e
+  cache.
+- [ ] Extrair `CodeSingleUseTests.ReadErrorAsync` para um helper compartilhado de integração e estendê-lo com
+  status, content type, cache e headers opcionais.
+- [ ] Criar `Tests.Integration/Endpoints/TokenErrorTests.cs` e mover para ele a baseline table-driven da matriz.
 - [ ] Substituir assertions por substring nos casos tocados pela fase.
+- [ ] Criar `Tests.Architecture/ProtocolErrorBoundaryTests.cs` para impedir semântica OAuth hardcoded em
+  Pipelines e a reintrodução das assinaturas ambíguas.
 - [ ] Executar regressão dos endpoints que compartilham o writer.
 
-**Critérios de aceite:** nenhum método público/interno aceita dois `string` posicionais que possam significar
-indistintamente código e descrição; `invalid_scope` e `invalid_target` aparecem no campo JSON `error`; status e
-headers configurados chegam à resposta; testes falham se o código existir somente em `error_description`.
+**Critérios de aceite:** nenhum helper aceita um `string` livre na posição em que uma constante de erro possa ser
+tratada como descrição; guard impede constantes `Oidc.*.Errors.*` em parâmetros de descrição; `invalid_scope` e
+`invalid_target` aparecem no campo JSON `error` conforme Q1; status e headers chegam à resposta; testes falham se
+o código existir somente em `error_description`; Pipelines não seleciona códigos OAuth.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Pipelines --filter "FullyQualifiedName~ErrorResponse"
-dotnet test Tests.Integration --filter "FullyQualifiedName~ClientToken|FullyQualifiedName~RefreshToken|FullyQualifiedName~CodeToken"
+dotnet test Tests.Pipelines --filter "FullyQualifiedName~ErrorResponseResultTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~ClientToken|FullyQualifiedName~RefreshToken|FullyQualifiedName~CodeToken"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~ProtocolErrorBoundaryTests"
 ```
 
 ### Resultado da Fase 1
@@ -362,24 +488,31 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~ClientToken|FullyQual
 
 ## Fase 2 - Forma da requisição e autenticação do client
 
-**Depende de:** Fase 1, DF6-DF8, DF12-DF13.
+**Depende de:** Fase 1, DF6-DF8, DF12-DF13, DF15-DF16.
 
 **Escopo:** `TokenEndpoint`, conversão de form, `EvaluateClient`, `DefaultClientSecretChecker`,
-secret evaluators, resultado HTTP genérico, `Tests.Identity`, `Tests.Integration`.
+secret evaluators, em especial `TlsClientAuthSecretEvaluator`/`PrivateKeyJwtSecretEvaluator`, resultado HTTP
+genérico e `Tests.Integration/Endpoints/TokenErrorTests.cs`.
 
-**O que/como:** validar cardinalidade e combinação de credenciais a partir do form original, antes da criação ou
-avaliação com efeitos. Preservar parâmetros multivalorados declarados e produzir o status/header correto quando a
-autenticação via `Authorization` falhar.
+**O que/como:** validar cardinalidade e combinação de credenciais no form original ou por `GetValues`, antes de
+leituras escalares, criação do context ou avaliação com efeitos. Preservar parâmetros multivalorados declarados e
+produzir o status/header correto quando a autenticação via `Authorization` falhar.
 
 **Tarefas:**
 
 - [ ] Definir a lista de parâmetros core não repetíveis e a exceção multivalorada `resource`.
-- [ ] Validar repetição antes de achatar o form em `NameValueCollection`.
+- [ ] Validar repetição antes de `TryGet`/indexers/`Load`, reutilizando a cardinalidade que
+  `AsNameValueCollection` já preserva ou operando diretamente no form.
 - [ ] Preservar todos os valores de `resource` e deixar parâmetros desconhecidos para validação pelo extension
   grant proprietário.
 - [ ] Detectar Basic, post secret, client assertion e demais mecanismos suportados sem validar credenciais.
 - [ ] Rejeitar múltiplas credenciais/mecanismos com `invalid_request` antes de chamar evaluators.
-- [ ] Tratar pares incompletos de client assertion como request malformado.
+- [ ] Centralizar no preflight a precedência hoje duplicada em `TlsClientAuthSecretEvaluator`, removendo ou
+  tornando inalcançável a regra local divergente.
+- [ ] Tratar pares incompletos de client assertion como `invalid_request` e tipo/método completo não suportado
+  como `invalid_client`.
+- [ ] Tratar assertion selecionada, mas não parseável, sem `sub`, de client desconhecido ou criptograficamente
+  inválida como `invalid_client`, com descrição indistinguível conforme DF15.
 - [ ] Garantir que request rejeitado não consulta client store, não valida JWT e não grava replay handle.
 - [ ] Produzir `invalid_client` 401 e `WWW-Authenticate: Basic...` para tentativa Basic inválida/malformada.
 - [ ] Manter `invalid_client` 400 para falha de autenticação no body, salvo requisito específico.
@@ -387,15 +520,16 @@ autenticação via `Authorization` falhar.
 - [ ] Adicionar testes de parâmetros repetidos, resource repetido, Basic+post, Basic+assertion,
   post+assertion, assertion incompleta e ausência de autenticação obrigatória.
 
-**Critérios de aceite:** nenhum request com dois mecanismos chega a um evaluator; `resource` repetido continua
-funcional; parâmetros core repetidos retornam `invalid_request`; Basic inválido retorna exatamente 401 com
-`WWW-Authenticate` Basic; requests rejeitados por forma não consomem `jti`; método/media type mantêm 405/415.
+**Critérios de aceite:** nenhum request com dois mecanismos chega a um evaluator; a regra de precedência não
+permanece duplicada no TLS evaluator; `resource` repetido continua funcional; parâmetros core repetidos e par de
+assertion incompleto retornam `invalid_request`; assertion JWT/client inválido converge em `invalid_client` sem
+oracle; Basic inválido retorna exatamente 401 com `WWW-Authenticate` Basic; requests rejeitados por forma não
+consomem `jti`; método/media type retornam 405 com `Allow: POST`/415.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~ClientSecret|FullyQualifiedName~TokenEndpoint"
-dotnet test Tests.Integration --filter "FullyQualifiedName~TokenError|FullyQualifiedName~PrivateKeyJwt|FullyQualifiedName~ClientToken"
+dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~PrivateKeyJwt|FullyQualifiedName~ClientToken"
 ```
 
 ### Resultado da Fase 2
@@ -406,13 +540,13 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~TokenError|FullyQuali
 
 ## Fase 3 - Taxonomia dos grants, scopes, resources e PKCE
 
-**Depende de:** Fases 1-2, DF9-DF11, conclusão de
+**Depende de:** Fases 1-2, Q2, DF9-DF11, DF16-DF17, conclusão de
 [plan-replay-protection.md](plan-replay-protection.md) quando os testes de `private_key_jwt` exigirem o backing
 final.
 
 **Escopo:** `TokenEndpoint`, `GrantTypeValidator`, `LoadCode`, `LoadRefreshToken`, `PkceMatchValidator`,
-resource decorators/validators, handlers de extension grant, `Tests.Identity`, `Tests.Integration`,
-[plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
+resource decorators/validators conforme Q1, handlers de extension grant e
+`Tests.Integration/Endpoints/TokenErrorTests.cs`.
 
 **O que/como:** aplicar a matriz normativa a cada grant suportado, distinguindo ausência/má-formação de valor
 apresentado e inválido. Corrigir PKCE sem enfraquecer consumo single-use ou comparação em tempo constante.
@@ -421,28 +555,30 @@ apresentado e inválido. Corrigir PKCE sem enfraquecer consumo single-use ou com
 
 - [ ] Retornar `unauthorized_client` quando o client autenticado não permite o grant.
 - [ ] Preservar `unsupported_grant_type` para grant não implementado.
-- [ ] Retornar `invalid_request` quando `code` ou `refresh_token` obrigatório estiver ausente/malformado.
+- [ ] Corrigir `LoadCode` para `invalid_request` quando `code` estiver ausente ou acima do limite e preservar a
+  classificação já correta de `LoadRefreshToken` para refresh ausente/acima do limite.
 - [ ] Preservar `invalid_grant` para code/refresh apresentado, mas inválido, expirado, revogado ou com binding
   divergente.
 - [ ] Preservar equivalência anti-oracle dos cenários recusados de authorization code.
-- [ ] Retornar `invalid_scope` no campo correto em client credentials e refresh/downscope.
-- [ ] Preservar `invalid_target` no campo correto para RFC 8707.
+- [ ] Verificar que `invalid_scope` permanece no campo correto em client credentials e refresh/downscope depois
+  da migração única da Fase 1.
+- [ ] Verificar que `invalid_target` permanece no campo correto para RFC 8707 depois da migração única da Fase 1.
 - [ ] Rejeitar verifier sem challenge e challenge sem verifier com `invalid_request`.
 - [ ] Preservar `invalid_grant` para verifier incorreto contra challenge existente.
+- [ ] Tratar `code_challenge_method` persistido desconhecido exatamente conforme Q2.
 - [ ] Confirmar que falha PKCE após consumo não torna authorization code reutilizável.
 - [ ] Auditar extension grants para que usem código core ou de extensão documentado.
-- [ ] Atualizar a Fase 3 do plano RFC 9700 para consumir esta baseline, sem duplicar o redesign de erros.
 - [ ] Adicionar testes table-driven para cada linha da matriz normativa alvo nos três grants suportados.
 
-**Critérios de aceite:** cada condição da matriz tem ao menos um teste que verifica `error` exato; ausência e
-valor inválido não são confundidos; client sem autorização usa `unauthorized_client`; PKCE presence mismatch usa
-`invalid_request`, mismatch criptográfico usa `invalid_grant`; single-use e anti-oracle permanecem verdes.
+**Critérios de aceite:** cada condição da matriz, inclusive Q2, tem ao menos um teste que verifica `error`/status
+exato; ausência e valor inválido não são confundidos; client sem autorização usa `unauthorized_client`; PKCE
+presence mismatch usa `invalid_request`, mismatch criptográfico usa `invalid_grant`; single-use e anti-oracle
+permanecem verdes; nenhuma segunda implementação do downgrade existe no plano RFC 9700.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~GrantType|FullyQualifiedName~Pkce|FullyQualifiedName~Resources"
-dotnet test Tests.Integration --filter "FullyQualifiedName~TokenError|FullyQualifiedName~CodeToken|FullyQualifiedName~RefreshToken|FullyQualifiedName~ClientToken"
+dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~CodeToken|FullyQualifiedName~CodeSingleUse|FullyQualifiedName~RefreshToken|FullyQualifiedName~ClientToken"
 ```
 
 ### Resultado da Fase 3
@@ -453,10 +589,10 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~TokenError|FullyQuali
 
 ## Fase 4 - Auditoria transversal, regressão e fechamento
 
-**Depende de:** Fases 1-3, DF1-DF14.
+**Depende de:** Fases 1-3, Q1/Q2/Q3 fechadas, DF1-DF17 e decisões originadas das perguntas.
 
 **Escopo:** todos os callers de resposta de erro, discovery quando anunciar auth methods, extension grants,
-testes amplos, documentação, roadmap e plano RFC 9700.
+`Tests.Architecture`, testes amplos, documentação, roadmap e plano RFC 9700.
 
 **O que/como:** reexecutar o inventário semântico, remover assertions permissivas restantes nas respostas do token
 endpoint, validar extensibilidade e registrar a versão do draft efetivamente implementada.
@@ -471,7 +607,9 @@ endpoint, validar extensibilidade e registrar a versão do draft efetivamente im
 - [ ] Confirmar que discovery anuncia somente métodos de autenticação realmente testados.
 - [ ] Validar extension grant de teste com código de erro próprio para provar que o contrato não foi fechado.
 - [ ] Comparar o draft OAuth 2.1 vigente no início da fase com `draft-15` e registrar qualquer delta.
-- [ ] Atualizar roadmap e o plano RFC 9700 com o status final e remover sobreposição executável.
+- [ ] Atualizar roadmap e o status do plano RFC 9700, confirmando que a sobreposição executável já foi removida
+  por DF17.
+- [ ] Executar o guard arquitetural de neutralidade de Pipelines e assinaturas de erro.
 - [ ] Executar build, suíte completa e `git diff --check`.
 
 **Critérios de aceite:** não resta assertion por substring para validar `error` do token endpoint; os seis códigos
@@ -482,6 +620,7 @@ infraestrutura é mascarada; documentação identifica a versão normativa; solu
 
 ```powershell
 dotnet build RoyalIdentity.sln
+dotnet test Tests.Architecture --filter "FullyQualifiedName~ProtocolErrorBoundaryTests"
 dotnet test RoyalIdentity.sln
 git diff --check
 ```
@@ -496,13 +635,14 @@ git diff --check
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Código JSON exato | 1, 3, 4 | DF2-DF4 | `error` nunca depende da descrição | ErrorResponse + TokenError |
-| HTTP 401/header | 1-2 | DF5-DF7 | Basic inválido retorna 401 + `WWW-Authenticate` | ClientSecret + TokenError |
-| Forma validada antes de efeitos | 2 | DF7-DF8 | duplicidade/mecanismos múltiplos não chegam aos evaluators | TokenError + PrivateKeyJwt |
-| Taxonomia dos grants | 3 | DF9-DF10 | ausência, autorização, suporte e grant inválido distintos | Code/Refresh/ClientToken |
-| PKCE OAuth 2.1 | 3 | DF11 | presence mismatch e verifier incorreto têm códigos distintos | Pkce + CodeToken |
-| Extensibilidade | 1, 3-4 | DF3, DF8 | `invalid_target` e erro custom continuam válidos | Resources + extension grant |
-| Anti-oracle e sigilo | 3-4 | DF13 | respostas equivalentes e nenhum valor sensível | CodeSingleUse + logs |
+| Objetivo 1 — código JSON exato | 1, 3, 4 | DF2-DF5, Q1, Q3 | `error` nunca depende da descrição; Pipelines neutro | ErrorResponseResultTests + TokenErrorTests + architecture |
+| Objetivo 2 — taxonomia completa | 2-3 | DF3, DF9-DF10, DF15, Q2 | forma, auth, autorização, grant, scope e target distintos | TokenErrorTests + Code/Refresh/ClientToken |
+| Objetivo 3 — HTTP 401/header | 1-2 | DF6, DF12 | Basic inválido retorna 401 + `WWW-Authenticate`; 405 inclui Allow | TokenErrorTests |
+| Objetivo 4 — forma antes de efeitos | 2 | DF7-DF8, DF15 | duplicidade/mecanismos múltiplos não chegam aos evaluators | TokenErrorTests + PrivateKeyJwt |
+| Objetivo 5 — PKCE OAuth 2.1 | 3 | DF11, DF17, Q2 | presence mismatch, mismatch criptográfico e método persistido têm destino definido | TokenErrorTests + CodeSingleUse |
+| Objetivo 6 — testes exatos | 1-4 | DF2, DF16 | helper único; sem assertions por substring/filtros vazios | ErrorResponseResultTests + TokenErrorTests + solution |
+| Extensibilidade transversal | 1, 3-4 | DF3, DF8, Q1 | `invalid_target` e erro custom continuam válidos | TokenErrorTests + extension grant |
+| Anti-oracle e sigilo | 2-4 | DF13, DF15 | code/client auth indistinguíveis e nenhum valor sensível | CodeSingleUse + PrivateKeyJwt + logs |
 
 ---
 
@@ -513,24 +653,35 @@ git diff --check
 3. `RoyalIdentity.Pipelines` permanece sem dependência do core ou de semântica OAuth.
 4. Authorization codes permanecem single-use e a rejeição não cria oracle de existência/binding.
 5. `private_key_jwt` continua fail-closed e não consome replay handle em request estruturalmente inválido.
-6. `resource` continua multivalorado conforme RFC 8707.
-7. Extension grants e códigos de erro de extensões continuam possíveis.
-8. `error_description`, headers e logs nunca expõem credenciais ou artifacts.
-9. Falhas de infraestrutura não são traduzidas em falhas de credencial/grant.
-10. Não criar flag de compatibilidade, enum fechado de erros ou opção por client/realm.
-11. Não alterar storage, migrations ou semânticas atômicas fechadas neste plano.
-12. Não reintroduzir password grant.
+6. Assertion JWT/client inválido converge em `invalid_client` sem revelar parse, existência, claim, chave,
+   assinatura, lifetime ou replay como causa.
+7. `resource` continua multivalorado conforme RFC 8707.
+8. Extension grants e códigos de erro de extensões continuam possíveis.
+9. `error_description`, headers e logs nunca expõem credenciais ou artifacts.
+10. Falhas de infraestrutura ou violações de invariante não são traduzidas em falhas de credencial/grant, salvo
+    a decisão explícita Q2-B.
+11. O impacto mínimo em authorize segue Q1; o transporte redirect versus JSON não é corrigido incidentalmente.
+12. Não criar flag de compatibilidade, enum fechado de erros ou opção por client/realm.
+13. Não alterar storage, migrations ou semânticas atômicas fechadas neste plano.
+14. Não reintroduzir password grant.
 
 ---
 
 ## Critérios globais de conclusão
 
+- Q1/Q2/Q3 foram respondidas, registradas no histórico e promovidas a decisões fechadas.
 - Todas as linhas da matriz normativa alvo possuem teste HTTP ou unitário com `error` exato.
 - Basic inválido possui cobertura de HTTP 401 e `WWW-Authenticate`.
+- Método inválido possui cobertura de HTTP 405 e `Allow: POST`.
 - Duplicidade e múltiplos mecanismos são recusados antes de I/O/efeitos.
+- Assertion malformada após selecionar `private_key_jwt` usa `invalid_client` conforme RFC 7523 e não cria
+  oracle de client.
 - OAuth 2.1 PKCE presence mismatch retorna `invalid_request`; verifier incorreto retorna `invalid_grant`.
+- Método PKCE persistido desconhecido segue exatamente Q2.
 - `invalid_target` e um erro de extension grant provam que o writer permanece extensível.
 - Não restam assertions por substring para o contrato `error` do token endpoint.
+- Não restam comandos obrigatórios cujo filtro selecione zero testes no baseline da fase correspondente.
+- Guard de arquitetura prova que Pipelines não seleciona códigos OAuth e que helpers ambíguos não retornaram.
 - Plano RFC 9700 depende desta baseline e não contradiz sua classificação de PKCE.
 - `dotnet build RoyalIdentity.sln`, `dotnet test RoyalIdentity.sln` e `git diff --check` estão verdes.
 
@@ -542,12 +693,17 @@ git diff --check
 |---|---|---|---|---|
 | Draft muda durante execução | nova versão altera §3.2.4/PKCE | implementação nasce desatualizada | gate DF1 no início da Fase 4 | Aberto |
 | Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Aberto |
+| `EndpointErrorResults` preserva códigos hardcoded | Q3 é ignorada e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | Q3 + guard da Fase 1 | Aberto |
 | Detecção múltipla ocorre após evaluator | `jti` é registrado antes do `invalid_request` | retry legítimo parece replay | preflight DF7 + teste negativo do store | Aberto |
 | Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Aberto |
 | Validação de duplicidade bloqueia RFC 8707 | regra genérica rejeita `resource` repetido | quebra de resource indicators | allowlist DF8 + regressão multiresource | Aberto |
 | Enum fecha erros | tipo aceita somente seis valores | extension grants/RFC 8707 quebram | strings + teste de extensão DF3 | Aberto |
 | Correção revela detalhes de code | descrições divergem por causa | oracle de existência/binding | preservar igualdade Operational + DF13 | Aberto |
+| Correção revela existência do client | assertion inválida e client desconhecido recebem códigos/descrições distintos | oracle de client e violação RFC 7523 | DF15 + matriz indistinguível | Aberto |
+| Validator compartilhado amplia escopo sem decisão | `ResourcesValidator` é alterado sem fechar Q1 | authorize muda incidentalmente ou token fica incorreto | Q1 antes da Fase 1 | Aberto |
+| PKCE desconhecido mascara corrupção | branch default continua `invalid_grant` sem Q2 | problema de estado parece erro do client | Q2 + teste de invariante | Aberto |
 | Testes continuam falsos positivos | assertion busca texto no body | regressão passa sem conformidade | helper único e auditoria Fase 4 | Aberto |
+| Filtro obrigatório executa zero testes | arquivo/classe planejado não foi criado ou nome divergiu | comando verde sem verificar critério | DF16 + nomes de classe explícitos | Aberto |
 | Falha de backing vira erro OAuth | catch amplo em evaluator/handler | indisponibilidade mascarada como credencial inválida | teste 5xx e invariant 9 | Aberto |
 | Alteração compartilhada afeta authorize | helper comum muda payload/redirect | regressão OIDC fora do token endpoint | suíte ampla na Fase 1/4 | Aberto |
 
@@ -555,8 +711,9 @@ git diff --check
 
 ## Diferidos e backlog
 
-- **Taxonomia completa do authorization endpoint** — destino: fase própria futura se a regressão compartilhada
-  revelar lacunas fora do escopo.
+- **Taxonomia e transporte completos do authorization endpoint** — destino: plano próprio. Em particular,
+  depois de `redirect_uri` válido, erros hoje saem como JSON direto em vez de redirect com `error`/`state`
+  conforme RFC 6749 §4.1.2.1; Q1 cobre somente o campo `error` mínimo ou a separação do validator.
 - **Erros de revocation/UserInfo/protected resources** — destino: planos dos respectivos endpoints; não ampliar
   este plano sem decisão explícita.
 - **Demais requisitos OAuth 2.1/RFC 9700** — destino:
@@ -571,6 +728,7 @@ git diff --check
 - [RFC 6749 — The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749.html).
 - [OAuth 2.1 draft-15](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15).
 - [RFC 7636 — Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636.html).
+- [RFC 7523 — JWT Profile for OAuth 2.0 Client Authentication](https://www.rfc-editor.org/rfc/rfc7523.html).
 - [RFC 8707 — Resource Indicators for OAuth 2.0](https://www.rfc-editor.org/rfc/rfc8707.html).
 - [plan-data-operational-storage.md](plan-data-operational-storage.md).
 - [plan-replay-protection.md](plan-replay-protection.md).
@@ -579,10 +737,14 @@ git diff --check
 - `RoyalIdentity/Endpoints/TokenEndpoint.cs`.
 - `RoyalIdentity/Extensions/ResponseHandlerExtensions.cs`.
 - `RoyalIdentity.Pipelines/Defaults/ErrorResponseResult.cs`.
+- `RoyalIdentity.Pipelines/Abstractions/EndpointErrorResults.cs`.
 - `RoyalIdentity/Contexts/Decorators/EvaluateClient.cs`.
 - `RoyalIdentity/Contracts/Defaults/DefaultClientSecretChecker.cs`.
 - `RoyalIdentity/Contexts/Validators/GrantTypeValidator.cs`.
 - `RoyalIdentity/Contexts/Validators/PkceMatchValidator.cs`.
+- `RoyalIdentity/Contexts/Validators/ResourcesValidator.cs`.
+- `Tests.Architecture/ModuleBoundaryTests.cs`.
+- `Tests.Integration/Endpoints/CodeSingleUseTests.cs`.
 - `Tests.Integration/Endpoints/ClientTokenTests.cs`.
 - `Tests.Integration/Endpoints/CodeTokenTests.cs`.
 - `Tests.Integration/Endpoints/RefreshTokenTests.cs`.

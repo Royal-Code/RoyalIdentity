@@ -74,7 +74,7 @@ definida em `../analisys/`.
 ## Próxima execução
 
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) é a próxima baseline protocolar
-executável. Depois dela, executar
+planejada e se torna executável após fechar Q1/Q3. Depois dela, executar
 [plan-oidc-session-management.md](plan-oidc-session-management.md) e
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), nessa ordem, para que os payloads
 Configuration sejam promovidos deterministicamente para v2 e depois v3. Em seguida, executar
@@ -119,7 +119,7 @@ real testada.
 ### 2. Conformidade das respostas de erro do token endpoint com OAuth 2.1
 
 **Plano criado:** [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md)
-(RASCUNHO — 0/4 fases)
+(RASCUNHO — 0/4 fases; Q1/Q3 pendentes antes da Fase 1 e Q2 antes da Fase 3)
 
 Corrige a baseline já exigida pelo RFC 6749 e incorpora a classificação adicional do OAuth 2.1 para PKCE antes
 do hardening RFC 9700. O contrato é o valor exato de `error`, o status HTTP e os headers normativos; encontrar o
@@ -138,7 +138,9 @@ Escopo principal:
 - Testes que desserializam JSON e comparam `error`, status e headers, sem assertions por substring.
 
 Este plano não altera storage e deve ser executado antes da Fase 3 do plano RFC 9700. A auditoria completa dos
-erros de authorize, revocation, UserInfo e protected resources permanece fora deste corte.
+erros de authorize, revocation, UserInfo e protected resources permanece fora deste corte. Q1 decide o impacto
+mínimo do `ResourcesValidator` compartilhado no authorize; Q2 classifica `code_challenge_method` desconhecido já
+persistido; Q3 fecha a localização da factory semântica hoje alojada em `RoyalIdentity.Pipelines`.
 
 ### 2.1. OpenID Connect Session Management e Check Session
 
