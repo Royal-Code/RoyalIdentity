@@ -1,6 +1,6 @@
 # Plan: Pushed Authorization Requests RFC 9126 (`plan-pushed-authorization-requests`)
 
-## Status: RASCUNHO - Q1/Q2/Q3 pendentes antes da Fase 1; 0 de 7 fases executadas
+## Status: RASCUNHO - decisões fechadas em DF1-DF22; Q1/Q2/Q3 pendentes antes da Fase 1; 0 de 7 fases executadas
 
 ## Progresso
 
@@ -9,12 +9,12 @@
 | Fase | Estado |
 |---|---|
 | Fase 1 - Decisões, contratos e configuração | Bloqueada por Q1/Q2/Q3 |
-| Fase 2 - Persistência Operational e consumo atômico | Bloqueada pela Fase 1 |
-| Fase 3 - Endpoint PAR e validação antecipada | Bloqueada pela Fase 2 |
-| Fase 4 - Resolução no authorization endpoint | Bloqueada pela Fase 3 |
-| Fase 5 - Política, discovery e separação de JAR | Bloqueada pela Fase 4 |
-| Fase 6 - Aceites multi-realm e paridade dos providers | Bloqueada pela Fase 5 |
-| Fase 7 - Documentação e fechamento do backlog | Bloqueada pela Fase 6 |
+| Fase 2 - Persistência Operational e consumo atômico | Pendente |
+| Fase 3 - Endpoint PAR e validação antecipada | Pendente |
+| Fase 4 - Resolução no authorization endpoint | Pendente |
+| Fase 5 - Política, discovery e separação de JAR | Pendente |
+| Fase 6 - Aceites multi-realm e paridade dos providers | Pendente |
+| Fase 7 - Documentação e fechamento do backlog | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -40,7 +40,8 @@
 - [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — baseline de redirect URI, PKCE,
   remoção de front-channel token e política de segurança executada antes de PAR.
 - [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md) — predecessor imediato na
-  ordem do roadmap; também altera `Client`, Configuration, endpoints e discovery.
+  ordem do roadmap; deixa `ServerOptionsPayload` em v5 e `RealmOptionsPayload` em v6, além de alterar `Client`,
+  endpoints e discovery.
 - `RoyalIdentity/Contracts/Storage/IAuthorizeParametersStore.cs` e
   `RoyalIdentity.Storage.EntityFramework/Operational/Stores/EntityFrameworkAuthorizeParametersStore.cs` —
   continuação interna realm-bound, com TTL absoluto, leitura repetível e delete separado.
@@ -63,7 +64,7 @@
 - [RFC 9101](https://www.rfc-editor.org/rfc/rfc9101.html) — semântica e erros de `request`/`request_uri`.
 - [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html) — metadata do authorization server.
 
-### Estado atual do código (verificado em 2026-07-30)
+### Estado atual do código (verificado em 2026-07-31)
 
 - **PAR inexistente:** não há endpoint, context, pipeline, response, facade de storage, entidade ou tabela para
   Pushed Authorization Requests.
@@ -87,6 +88,13 @@
   atual afirma capacidade inexistente.
 - **Configuration relacional:** novo scalar público em `Client` exige coluna, materializer, migrations
   SQLite/PostgreSQL, seeds e teste de cobertura; options de realm usam payload JSON versionado.
+- **Audience fixa no token endpoint:** `PrivateKeyJwtSecretEvaluator` calcula somente a URL do token endpoint;
+  torná-lo globalmente permissivo para PAR faria o token endpoint aceitar indevidamente a URL exclusiva de PAR.
+- **Replay compartilhado hoje:** o evaluator usa `nameof(PrivateKeyJwtSecretEvaluator)` como `purpose`, de modo
+  que o mesmo `jti` não pode ser reapresentado em outro endpoint do mesmo realm/client.
+- **Filtros sem cobertura PAR:** as Fases 3-5 apontam endpoint HTTP, authorize e discovery para
+  `Tests.Identity`; um filtro da Fase 3 fica verde por `ClientAssertionMaxLifetimeOptionTests` incidental e os
+  demais não possuem fixtures correspondentes.
 - **Sem compatibilidade obrigatória:** não existem consumidores de produção; contratos, migrations e defaults
   podem adotar diretamente o desenho correto.
 
@@ -105,6 +113,8 @@
   resolução incorretas.
 - **Ordem de execução:** implementar depois de Reference Tokens/Introspection evita migrations e edições
   concorrentes em `Client`, endpoints, autenticação direta e discovery.
+- **Audience normativa assimétrica:** o endpoint PAR deve aceitar issuer, URL do token ou URL de PAR; isso não
+  autoriza ampliar o conjunto do token endpoint com a URL de PAR. A política precisa conhecer o endpoint atual.
 
 ### Superfícies impactadas a mapear
 
@@ -117,8 +127,8 @@
 - `RoyalIdentity.Data.Operational` e adapter EF — artefato transitório, payload, digest e consumo.
 - Providers `.Sqlite`/`.PostgreSql` e `RoyalIdentity.Migrations` — migrations, snapshots e SQL revisável.
 - `DiscoveryHandler` e `Constants.Oidc` — metadata e separação de JAR.
-- `Tests.Identity`, `Tests.Pipelines`, `Tests.Storage`, `Tests.Integration` e `Tests.Architecture` — contratos,
-  HTTP, concorrência, providers e boundaries.
+- `Tests.Pipelines`, `Tests.Storage`, `Tests.Integration` e `Tests.Architecture` — writers neutros, contratos,
+  HTTP, concorrência, providers e boundaries; PAR não cria fixtures de composição em `Tests.Identity`.
 
 ---
 
@@ -190,9 +200,13 @@
 - **DF2 — Endpoint direto:** mapear endpoint realm-scoped `/{realm}/connect/par`, somente HTTPS efetivo, método
   POST e `application/x-www-form-urlencoded`; sucesso retorna HTTP 201 JSON, `request_uri`, `expires_in` e
   `Cache-Control: no-store`. Fonte: RFC 9126 §§2, 2.2.
-- **DF3 — Autenticação compartilhada:** aplicar as mesmas regras e métodos de autenticação aceitos pelo token
-  endpoint, reutilizando `IClientSecretChecker`/evaluators; `private_key_jwt` aceita issuer, token endpoint ou
-  PAR endpoint como audience. Fonte: RFC 9126 §2.1.
+- **DF3 — Autenticação compartilhada, audience contextual e replay único:** aplicar as mesmas regras e métodos
+  de autenticação aceitos pelo token endpoint, reutilizando `IClientSecretChecker`/evaluators, mas fazer a policy
+  de audience de `private_key_jwt` derivar do endpoint avaliador. No PAR, aceitar obrigatoriamente issuer, URL do
+  token endpoint ou URL do PAR; no token endpoint, preservar sua baseline própria e rejeitar a URL exclusiva de
+  PAR. Não somar as três audiences a uma lista global compartilhada. Preservar o `purpose` único
+  `nameof(PrivateKeyJwtSecretEvaluator)` no replay store entre endpoints, para que um `jti` aceito em um deles não
+  possa ser reapresentado no outro. Fonte: RFC 9126 §2 + RFC 7523 §§3/5 + baseline de replay vigente.
 - **DF4 — Identidade do client:** `client_id` é obrigatório no payload PAR e deve coincidir com o client
   autenticado; public clients continuam sujeitos à identificação e à policy vigente de segredo. Fonte:
   RFC 9126 §§2.1, 3.
@@ -239,6 +253,28 @@
   exato e cleanup periódico remove abandonados sem ser condição de segurança. Fonte: baseline Operational.
 - **DF19 — Breaking change direto:** atualizar contexts, pipelines, options, serializers, migrations, seeds e
   testes sem shim; não há consumidor de produção a preservar. Fonte: AGENTS.md.
+- **DF20 — Cadeia Configuration fechada:** a Fase 1 falha antes de editar se
+  `ServerOptionsPayloadSerializer.CurrentVersion != 5` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 6`. `PushedAuthorizationRequestOptions` e
+  `EnablePushedAuthorizationRequestEndpoint` entram nos dois grafos e promovem respectivamente Server v5 → v6
+  e Realm v6 → v7. Serializers rejeitam versões anteriores, seeds/fixtures são reprovisionados e não há fallback
+  de leitura nem migration relacional para os payloads. Fonte: DF21 de Reference Tokens/Introspection + padrão
+  fail-closed da cadeia Configuration.
+- **DF21 — Topologia verificável de testes:** algoritmo/contratos Operational ficam em classes nomeadas de
+  `Tests.Storage`; options/snapshot, endpoint HTTP, autenticação, resolução no authorize, policy, discovery e
+  fluxos externos ficam em `Tests.Integration`; boundaries ficam em
+  `Tests.Architecture/PushedAuthorizationRequestBoundaryTests.cs`. As classes novas são
+  `PushedAuthorizationRequestOptionsTests`, `PushedAuthorizationRequestStoreContractTests`,
+  `PushedAuthorizationRequestEndpointTests`, `PushedAuthorizationRequestAuthenticationTests`,
+  `PrivateKeyJwtEndpointAudienceTests`, `PushedAuthorizationRequestAuthorizeTests`,
+  `PushedAuthorizationRequestConcurrencyTests`, `PushedAuthorizationRequestPolicyTests`,
+  `PushedAuthorizationRequestDiscoveryTests`, `RequestObjectSeparationTests` e
+  `PushedAuthorizationRequestEndToEndTests`. Cada comando obrigatório usa uma fixture explícita, sem filtro OR,
+  e nenhuma fase fecha se um filtro selecionar zero testes. Fonte: topologia real + regra do Debt Closure.
+- **DF22 — Metadata falsa é omitida:** quando a policy global do realm está desativada, omitir
+  `require_pushed_authorization_requests`; ausência já significa `false` pelo RFC 9126. Exigência somente por
+  client também não publica `true` na metadata global. Fonte: RFC 9126 §§5-6 + convenção atual de discovery para
+  capabilities booleanas opcionais.
 
 ---
 
@@ -268,6 +304,19 @@
     claims ou URI remota, apesar da metadata.
   - **Conclusão:** DF10 mantém JAR fora e exige metadata honesta.
 
+**Revisão externa de segurança, versões e verificabilidade (2026-07-31):**
+
+- **Parcialmente confirmado:** ampliar globalmente `ValidAudiences` enfraqueceria o token endpoint, mas a
+  sugestão de aceitar somente issuer+PAR no endpoint PAR contraria o RFC 9126, que exige issuer, token endpoint
+  ou PAR endpoint. Conclusão: DF3 usa policy contextual, preserva a baseline do token e o `purpose` único de
+  replay entre endpoints.
+- **Confirmado:** os filtros das Fases 3-5 em `Tests.Identity` são vazios ou verdes por teste incidental e o
+  projeto não possui composição HTTP. Conclusão: DF21.
+- **Confirmado:** Reference Tokens/Introspection deixa Server v5/Realm v6 e PAR altera ambos os grafos.
+  Conclusão: gate e promoção concreta em DF20.
+- **Confirmado:** ausência de `require_pushed_authorization_requests` equivale a `false` e segue a convenção do
+  discovery atual. Conclusão: omissão explícita em DF22.
+
 ---
 
 ## Design alvo
@@ -290,6 +339,9 @@
   camada HTTP.
 - `PushedAuthorizationRequestContext`: context do POST, implementa a borda necessária para `EvaluateClient` e
   mantém parâmetros de autenticação separados dos parâmetros que serão armazenados.
+- A borda compartilhada de autenticação informa explicitamente qual endpoint está avaliando a credencial;
+  `PrivateKeyJwtSecretEvaluator` obtém desse contexto a policy de audiences, sem registrar audiences PAR numa
+  lista global do evaluator.
 - `AuthorizationRequestSource`: estado interno `Direct|Pushed`, definido somente pelo resolver antes da carga
   dos parâmetros; não é derivado de input mutável depois do consumo.
 - `ResolvePushedAuthorizationRequest`: primeiro decorator das pipelines `AuthorizeContext` e
@@ -336,6 +388,8 @@ operational.pushed_authorization_requests
 - O payload protegido não contém o `request_uri`, credenciais de autenticação, client secret/assertion ou
   headers.
 - Registrar novas operações PAR-01 (create), PAR-02 (consume) e PAR-03 (cleanup) na matriz antes do adapter.
+- Payloads Configuration partem de Server v5/Realm v6 e terminam em Server v6/Realm v7; versões anteriores são
+  rejeitadas e reprovisionadas.
 
 ### Arquitetura alvo
 
@@ -402,6 +456,8 @@ GET|POST /{realm}/connect/authorize?client_id=...&request_uri=...
 - Client/realm mismatch nunca descriptografa nem retorna o payload.
 - `request_uri` inválido não fornece redirect confiável e não gera oracle de existência/estado.
 - Client assertion, secret, Authorization header e demais credenciais nunca entram no payload armazenado.
+- Audience de `private_key_jwt` é calculada por endpoint: PAR aceita as três identificações exigidas pelo RFC;
+  token não passa a aceitar a URL de PAR. O replay store conserva um único `purpose` para todos esses usos.
 - Policy e configuração são reavaliadas depois do consumo; alteração administrativa pode invalidar uma request
   ainda não usada.
 - PKCE, state e nonce permanecem responsabilidade do client e das pipelines vigentes; PAR não os gera.
@@ -409,9 +465,8 @@ GET|POST /{realm}/connect/authorize?client_id=...&request_uri=...
 ### Compatibilidade, migração e rollout
 
 - Executar somente depois de todos os predecessores de DF1 estarem concluídos e de Q1/Q2/Q3 fechadas.
-- Antes da Fase 1, reler versões correntes dos payloads Configuration; fazer exatamente um bump sequencial
-  quando o novo grupo de options exigir e adicionar leitura explícita das versões suportadas, sem presumir um
-  número antigo do momento de criação deste plano.
+- Antes da Fase 1, exigir `ServerOptionsPayload` v5 e `RealmOptionsPayload` v6; promover uma única vez para
+  Server v6/Realm v7, atualizar seeds/fixtures e reprovisionar sem fallback de versões antigas.
 - Gerar migrations Configuration e Operational separadas para SQLite/PostgreSQL e atualizar scripts SQL.
 - `RoyalIdentity.Server` continua PostgreSQL e externamente provisionado; `RoyalIdentity.Demo` continua SQLite
   in-memory self-provisioned.
@@ -442,7 +497,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Decisões, contratos e configuração
 
-**Depende de:** Q1, Q2, Q3, DF1-DF5, DF14-DF16 e conclusão de
+**Depende de:** Q1, Q2, Q3, DF1-DF5, DF14-DF16, DF20-DF21 e conclusão de
 [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md).
 
 **Escopo:** perguntas/histórico deste plano, contratos core, `Client`, options, Configuration data/adapter,
@@ -456,6 +511,8 @@ versionado vigente.
 
 - [ ] Registrar as respostas Q1/Q2/Q3 no histórico e criar DFs correspondentes.
 - [ ] Remover os trechos condicionais do design, fases e critérios depois das respostas.
+- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 5` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 6`.
 - [ ] Criar o contrato de storage escolhido em Q1 com `CancellationToken` obrigatório.
 - [ ] Definir create/consume e seus resultados sem expor motivo de falha à camada HTTP.
 - [ ] Adicionar `Client.RequirePushedAuthorizationRequests=false`.
@@ -464,21 +521,30 @@ versionado vigente.
 - [ ] Adicionar `EnablePushedAuthorizationRequestEndpoint=true` e seu copy constructor.
 - [ ] Validar lifetime e incompatibilidade entre `Required=true` e endpoint desabilitado.
 - [ ] Adicionar o scalar a `ClientEntity`, model builder e `ClientMaterializer`.
-- [ ] Fazer bump sequencial e compatibilidade explícita do payload de realm vigente.
+- [ ] Promover `ServerOptionsPayload` v5 → v6 e `RealmOptionsPayload` v6 → v7, sem leitor legado ou fallback.
 - [ ] Gerar migrations Configuration SQLite/PostgreSQL e SQL revisável.
 - [ ] Atualizar seeds/fixtures e coverage tests de scalars do client.
+- [ ] Estender `ConfigurationModelClientCoverageTests`, `ConfigurationMaterializationClientTests`,
+  `ConfigurationModelPayloadTests`, `SqliteConfigurationMigrationTests` e
+  `PostgreSqlConfigurationMigrationTests`; criar
+  `Tests.Integration/Options/PushedAuthorizationRequestOptionsTests.cs`.
 - [ ] Provar snapshot last-known-good para configuração PAR inválida.
 - [ ] Executar o aceite PostgreSQL Configuration.
 
 **Critérios de aceite:** Q1/Q2/Q3 estão fechadas; contrato não conflita com
-`IAuthorizeParametersStore`; client anterior materializa `false`; options anteriores materializam defaults
-decididos; configuração inválida não é publicada; providers não possuem pending model changes.
+`IAuthorizeParametersStore`; client anterior materializa `false`; payload legado falha fechado e os seeds são
+reprovisionados em Server v6/Realm v7; configuração inválida não é publicada; providers não possuem pending
+model changes; cada filtro obrigatório seleciona testes.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelClientCoverageTests|FullyQualifiedName~ConfigurationMaterializationClientTests|FullyQualifiedName~ConfigurationModelPayloadTests|FullyQualifiedName~ConfigurationMigration"
-dotnet test Tests.Integration --filter "FullyQualifiedName~RealmOptions"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelClientCoverageTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationMaterializationClientTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteConfigurationMigrationTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~PostgreSqlConfigurationMigrationTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestOptionsTests"
 ./scripts/Test-ConfigurationPostgreSql.ps1
 ```
 
@@ -490,7 +556,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RealmOptions"
 
 ## Fase 2 - Persistência Operational e consumo atômico
 
-**Depende de:** Fase 1, decisões originadas por Q1/Q2/Q3, DF5, DF6, DF16 e DF18.
+**Depende de:** Fase 1, decisões originadas por Q1/Q2/Q3, DF5, DF6, DF16, DF18 e DF21.
 
 **Escopo:** matriz, `IStorage`, Data.Operational, adapter Operational, serializer/protection, cleanup, migrations
 SQLite/PostgreSQL e `Tests.Storage`.
@@ -514,18 +580,24 @@ authorize-parameters store.
 - [ ] Aplicar expiração fail-closed no limite exato sem depender de cleanup.
 - [ ] Integrar purge/worker por expiração e purge de realm.
 - [ ] Gerar migrations Operational e SQL para SQLite/PostgreSQL.
-- [ ] Adicionar contracts provider-neutral de roundtrip, duplicidade, expiração, client/realm e concorrência.
+- [ ] Criar `PushedAuthorizationRequestStoreContractTests` provider-neutral para roundtrip, duplicidade,
+  expiração, client/realm e concorrência; estender explicitamente `OperationalPayloadTests`,
+  `OperationalCleanupTests`, `SqliteOperationalMigrationTests` e `PostgreSqlOperationalMigrationTests`.
 - [ ] Provar que a referência bruta não aparece na entidade nem no payload desprotegido.
 - [ ] Executar os contratos no PostgreSQL real.
 
 **Critérios de aceite:** somente um consumidor concorrente obtém o payload conforme Q2; mismatch/expiração são
 falhas opacas; handle nunca é persistido bruto; colisão não sobrescreve; cleanup remove abandonados; SQLite e
-PostgreSQL satisfazem os mesmos contratos.
+PostgreSQL satisfazem os mesmos contratos; cada filtro obrigatório seleciona testes.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Storage --filter "FullyQualifiedName~PushedAuthorizationRequest|FullyQualifiedName~OperationalPayload|FullyQualifiedName~OperationalCleanup|FullyQualifiedName~OperationalMigration"
+dotnet test Tests.Storage --filter "FullyQualifiedName~PushedAuthorizationRequestStoreContractTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalPayloadTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalCleanupTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteOperationalMigrationTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~PostgreSqlOperationalMigrationTests"
 ./scripts/Test-OperationalPostgreSql.ps1
 ```
 
@@ -537,11 +609,11 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~PushedAuthorizationReques
 
 ## Fase 3 - Endpoint PAR e validação antecipada
 
-**Depende de:** Fase 2, DF2-DF10 e baseline concluída de
+**Depende de:** Fase 2, DF2-DF10, DF21 e baseline concluída de
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
 
 **Escopo:** endpoint, context, parsing, pipeline, autenticação do client, handler, responses, constants, DI,
-routes, `IAuthorizeRequestValidator`, limits e testes unitários/pipeline.
+routes, `IAuthorizeRequestValidator`, limits, `Tests.Integration` e regressão neutra em `Tests.Pipelines`.
 
 **O que/como:** criar um endpoint direto que separe credenciais de autenticação dos parâmetros armazenáveis,
 reutilize os evaluators do token endpoint e valide a authorization request completa antes de criar a referência.
@@ -553,7 +625,10 @@ reutilize os evaluators do token endpoint e valide a authorization request compl
 - [ ] Responder 405 para método incorreto, 415 para media type incorreto e respeitar limite de body.
 - [ ] Criar context/pipeline no padrão `IEndpointHandler` → decorators/validators → handler.
 - [ ] Reutilizar `EvaluateClient`/`IClientSecretChecker`, inclusive client público conforme sua configuração.
-- [ ] Aceitar issuer, token endpoint e PAR endpoint como audiences de `private_key_jwt`.
+- [ ] Tornar a policy de audience do `PrivateKeyJwtSecretEvaluator` consciente do endpoint sem criar lista
+  global: PAR aceita issuer, token endpoint e PAR endpoint; token preserva sua baseline e rejeita a URL de PAR.
+- [ ] Preservar o `purpose` único do replay store e provar que o mesmo `jti` aceito primeiro em PAR ou token é
+  recusado quando reapresentado no outro endpoint.
 - [ ] Rejeitar mecanismos/credenciais múltiplos conforme a baseline OAuth 2.1.
 - [ ] Exigir `client_id` singular e igualdade com o client autenticado.
 - [ ] Separar e descartar todos os parâmetros usados apenas na autenticação do client.
@@ -563,17 +638,22 @@ reutilize os evaluators do token endpoint e valide a authorization request compl
 - [ ] Mapear falhas para JSON/status/header conforme DF9, sem redirect.
 - [ ] Persistir somente depois de toda validação e responder 201 com lifetime restante positivo.
 - [ ] Aplicar `Cache-Control: no-store`, `Pragma: no-cache` e redaction de body/credentials.
-- [ ] Adicionar testes de request, autenticação, erros, resposta e falha do store.
+- [ ] Criar `Tests.Integration/Endpoints/PushedAuthorizationRequestEndpointTests.cs` para request, erros,
+  resposta e falha do store; criar `PushedAuthorizationRequestAuthenticationTests.cs` para mecanismos e
+  precedência; criar `PrivateKeyJwtEndpointAudienceTests.cs` para a matriz de audience/replay entre endpoints.
 
 **Critérios de aceite:** endpoint HTTP/anônimo/form inválido não cria registro; client e request inválidos falham
 antes da persistência; sucesso retorna 201 com URN e `expires_in`; payload não contém credenciais; erro segue a
-taxonomia do protocolo e nunca redireciona.
+taxonomia do protocolo e nunca redireciona; URL de PAR nunca autentica no token endpoint; as três audiences
+exigidas pelo RFC autenticam no PAR; replay cross-endpoint é recusado; cada filtro obrigatório seleciona testes.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~PushedAuthorizationRequest|FullyQualifiedName~ClientSecret|FullyQualifiedName~ClientAssertion"
-dotnet test Tests.Pipelines
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestEndpointTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestAuthenticationTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PrivateKeyJwtEndpointAudienceTests"
+dotnet test Tests.Pipelines --filter "FullyQualifiedName~ErrorResponseResultTests"
 ```
 
 ### Resultado da Fase 3
@@ -584,7 +664,7 @@ dotnet test Tests.Pipelines
 
 ## Fase 4 - Resolução no authorization endpoint
 
-**Depende de:** Fase 3, DF7, DF11-DF13 e decisão originada por Q2.
+**Depende de:** Fase 3, DF7, DF11-DF13, DF21 e decisão originada por Q2.
 
 **Escopo:** `AuthorizeEndpoint`, `AuthorizeContext`, `AuthorizeValidateContext`,
 `DefaultAuthorizeRequestValidator`, decorators/validators, pipelines, responses de erro e fluxos de
@@ -609,17 +689,19 @@ deixar todo o restante do fluxo percorrer as mesmas validações e handlers da r
 - [ ] Confirmar que policy/client alterados depois do POST invalidam a autorização quando aplicável.
 - [ ] Preservar o uso posterior de `IAuthorizeParametersStore` para login/consentimento.
 - [ ] Provar authorization code, login, consent, `prompt=none`, state e nonce pelo caminho PAR.
-- [ ] Provar concorrência e reload conforme Q2 no nível HTTP.
+- [ ] Criar `Tests.Integration/Endpoints/PushedAuthorizationRequestAuthorizeTests.cs` para resolução, ausência de
+  merge, revalidação, code/login/consent/`prompt=none`, state e nonce.
+- [ ] Criar `PushedAuthorizationRequestConcurrencyTests.cs` para concorrência e reload conforme Q2 no nível HTTP.
 
 **Critérios de aceite:** payload só entra na pipeline depois de consumo válido; não há merge com front channel;
 client/realm mismatch não vaza dados; policy vigente é revalidada; interação continua funcionando pelo store
-interno; concorrência observa exatamente Q2.
+interno; concorrência observa exatamente Q2; cada filtro obrigatório seleciona testes.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~Authorize|FullyQualifiedName~PushedAuthorizationRequest"
-dotnet test Tests.Integration --filter "FullyQualifiedName~Authorize|FullyQualifiedName~Login|FullyQualifiedName~Consent|FullyQualifiedName~PushedAuthorizationRequest"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestAuthorizeTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestConcurrencyTests"
 ```
 
 ### Resultado da Fase 4
@@ -630,7 +712,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~Authorize|FullyQualif
 
 ## Fase 5 - Política, discovery e separação de JAR
 
-**Depende de:** Fase 4, DF10, DF14, DF15 e DF17.
+**Depende de:** Fase 4, DF10, DF14, DF15, DF17 e DF21-DF22.
 
 **Escopo:** policy validators, options/snapshot, discovery, constants, `ProcessRequestObject`,
 `EnableJwtRequestUri`, tests de metadata e integração.
@@ -646,23 +728,28 @@ executáveis. Distinguir a URN de PAR de Request Object por valor/URI e retirar 
 - [ ] Falhar snapshot/startup para policy obrigatória com endpoint desabilitado.
 - [ ] Publicar `pushed_authorization_request_endpoint` somente com endpoint ativo e URL HTTPS realm-scoped.
 - [ ] Publicar `require_pushed_authorization_requests=true` somente para policy global.
-- [ ] Omitir ou publicar `false` conforme convenção vigente quando policy global está desativada.
+- [ ] Omitir `require_pushed_authorization_requests` quando policy global está desativada, inclusive quando apenas
+  algum client exige PAR; não publicar `false` nem projetar policy de client como metadata global.
 - [ ] Não condicionar PAR a `EnableJwtRequestUri`, `request_uri_parameter_supported` ou registro de URI JAR.
 - [ ] Corrigir `request_parameter_supported` para não anunciar Request Object enquanto o stub existir.
 - [ ] Corrigir `request_uri_parameter_supported`/`EnableJwtRequestUri` para não prometer fetch JAR inexistente.
 - [ ] Responder `request_not_supported` para JAR por valor e `request_uri_not_supported` para URI não PAR.
-- [ ] Adicionar testes exatos de discovery para endpoint ativo/inativo e policy realm/client.
+- [ ] Criar `Tests.Integration/Endpoints/PushedAuthorizationRequestPolicyTests.cs` para policy realm/client e
+  `PushedAuthorizationRequestDiscoveryTests.cs` para metadata ativa/inativa/omitida.
+- [ ] Criar `RequestObjectSeparationTests.cs` para separar URN PAR de JAR por valor/URI.
 - [ ] Adicionar guard que falha se metadata de JAR voltar sem implementação real.
 
 **Critérios de aceite:** policy global/client aceita apenas origem PAR quando exigida; discovery anuncia endpoint
 real e policy global correta; metadata de JAR não é usada para PAR nem afirma suporte inexistente; desligar PAR
-não deixa configuração obrigatória silenciosamente inválida.
+não deixa configuração obrigatória silenciosamente inválida; policy global `false` omite a metadata; cada filtro
+obrigatório seleciona testes.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~Discovery|FullyQualifiedName~PushedAuthorizationRequest|FullyQualifiedName~RequestObject"
-dotnet test Tests.Integration --filter "FullyQualifiedName~Discovery|FullyQualifiedName~PushedAuthorizationRequest"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestPolicyTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestDiscoveryTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~RequestObjectSeparationTests"
 ```
 
 ### Resultado da Fase 5
@@ -673,7 +760,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~Discovery|FullyQualif
 
 ## Fase 6 - Aceites multi-realm e paridade dos providers
 
-**Depende de:** Fase 5, DF1-DF19 e Q1/Q2/Q3 fechadas.
+**Depende de:** Fase 5, DF1-DF22 e Q1/Q2/Q3 fechadas.
 
 **Escopo:** `Tests.Integration`, `Tests.Storage`, `Tests.Architecture`, hosts, migrations/scripts e PostgreSQL
 real.
@@ -685,7 +772,8 @@ real e os dois providers. Testes de protocolo devem criar o handle pelo endpoint
 
 - [ ] Executar code flow completo usando PAR com client confidencial e `client_secret_basic`.
 - [ ] Executar code flow completo usando PAR com client público + PKCE S256.
-- [ ] Executar PAR com `private_key_jwt` e cada audience normativa aceita.
+- [ ] Executar PAR com `private_key_jwt` para issuer, URL do token e URL de PAR; provar separadamente que a URL
+  de PAR não é aceita no token endpoint e que o replay `jti` é global entre ambos.
 - [ ] Provar que audience/client assertion inválidos não criam registro.
 - [ ] Provar que a mesma string não atravessa realm nem client.
 - [ ] Provar expiração nos instantes anterior, exato e posterior ao limite.
@@ -695,19 +783,24 @@ real e os dois providers. Testes de protocolo devem criar o handle pelo endpoint
 - [ ] Provar ausência de handle/credenciais em banco, payload, logs e eventos.
 - [ ] Validar cleanup/purge e migrations desde o schema predecessor.
 - [ ] Validar Configuration e Operational no PostgreSQL 17 real.
-- [ ] Atualizar guards de arquitetura para boundaries Data/core/adapter.
+- [ ] Criar `PushedAuthorizationRequestEndToEndTests` para fluxos externos/multi-realm sem depender de fixtures
+  incidentais.
+- [ ] Criar `Tests.Architecture/PushedAuthorizationRequestBoundaryTests.cs` para boundaries Data/core/adapter e
+  ownership do evaluator/store.
 - [ ] Executar todos os composition roots e a solution inteira.
 
 **Critérios de aceite:** fluxo PAR funciona nos clients suportados; concorrência, expiração, client e realm são
 fail-closed; PostgreSQL/SQLite têm paridade; discovery é fiel; nenhum secret/handle bruto é persistido; solution
-verde.
+verde; cada filtro obrigatório seleciona testes.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequest|FullyQualifiedName~Discovery|FullyQualifiedName~AuthorizationCode"
-dotnet test Tests.Storage --filter "FullyQualifiedName~PushedAuthorizationRequest|FullyQualifiedName~OperationalCleanup|FullyQualifiedName~Configuration"
-dotnet test Tests.Architecture
+dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestEndToEndTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~PushedAuthorizationRequestStoreContractTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalCleanupTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~PushedAuthorizationRequestBoundaryTests"
 ./scripts/Test-ConfigurationPostgreSql.ps1
 ./scripts/Test-OperationalPostgreSql.ps1
 ./scripts/Test-ServerPostgreSql.ps1
@@ -722,7 +815,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 7 - Documentação e fechamento do backlog
 
-**Depende de:** Fases 1-6, DF1-DF19 e Q1/Q2/Q3 fechadas.
+**Depende de:** Fases 1-6, DF1-DF22 e Q1/Q2/Q3 fechadas.
 
 **Escopo:** backlog, roadmap, plano, foundations, matriz, AGENTS e READMEs de hosts/migrations.
 
@@ -767,13 +860,13 @@ dotnet test RoyalIdentity.sln
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Endpoint PAR autenticado | 1, 3 | DF2-DF4, DF9, Q3 | POST/HTTPS/form; 201; erros diretos | PushedAuthorizationRequest; ClientAssertion |
+| Endpoint PAR autenticado | 1, 3 | DF2-DF4, DF9, DF21, Q3 | POST/HTTPS/form; 201; audience contextual; replay único; erros diretos | PushedAuthorizationRequestEndpoint; Authentication; PrivateKeyJwtEndpointAudience |
 | Handle seguro e consumível | 2, 4 | DF5, DF6, DF11-DF13, Q1, Q2 | digest-only; binding; decisão atômica | storage contracts; concorrência HTTP |
 | Validação vigente | 3, 4 | DF7, DF8 | valida no push e no authorize | Authorize; PKCE; resources; redirect |
-| Policy realm/client | 1, 5 | DF14, DF15 | direct rejeitada apenas quando exigida | policy integration; snapshot |
-| Metadata fiel e JAR separado | 5 | DF10, DF17 | endpoint/policy reais; sem capability falsa | Discovery; RequestObject guard |
-| Providers e isolamento | 2, 6 | DF16, DF18, DF19 | SQLite/PostgreSQL; realm/client fail-closed | storage; provider scripts; integration |
-| Fechamento documental | 7 | DF1-DF19 | backlog/roadmap/matriz alinhados | `rg`; build; solution test |
+| Policy realm/client | 1, 5 | DF14, DF15, DF20-DF22 | direct rejeitada apenas quando exigida; Server v6/Realm v7 | PushedAuthorizationRequestPolicy; options; snapshot |
+| Metadata fiel e JAR separado | 5 | DF10, DF17, DF22 | endpoint/policy reais; `false` omitido; sem capability falsa | PushedAuthorizationRequestDiscovery; RequestObjectSeparation |
+| Providers e isolamento | 2, 6 | DF16, DF18-DF21 | SQLite/PostgreSQL; realm/client fail-closed | storage; provider scripts; end-to-end |
+| Fechamento documental | 7 | DF1-DF22 | backlog/roadmap/matriz alinhados | `rg`; build; solution test |
 
 ---
 
@@ -786,7 +879,8 @@ dotnet test RoyalIdentity.sln
 5. Consume é atômico; `read` seguido de `delete` não implementa a decisão.
 6. Expiração é absoluta e fail-closed no instante exato.
 7. `IAuthorizeParametersStore` continua sendo a continuação interna repetível de login/consentimento.
-8. PAR não depende de `IMessageStore`, `IReplayProtectionStore`, JAR ou cache.
+8. O artefato/lifecycle PAR não depende de `IMessageStore`, `IReplayProtectionStore`, JAR ou cache;
+   `private_key_jwt` continua usando o replay store compartilhado como parte da autenticação do client.
 9. A authorization request é validada no POST e revalidada contra policy vigente no authorize.
 10. Redirect URI segue a policy do RFC 9700 sem relaxamento implícito.
 11. PKCE permanece default-on e S256 continua o caminho seguro.
@@ -796,6 +890,11 @@ dotnet test RoyalIdentity.sln
 15. `Data.Configuration`/`Data.Operational` não referenciam o core; somente o adapter conhece ambos.
 16. Server não migra/seed; Demo continua SQLite self-provisioned.
 17. Resources/scopes permanecem no owner vigente; PAR não cria persistência incidental do catálogo.
+18. Audience de `private_key_jwt` é contextual: PAR aceita issuer/token/PAR; token não aceita URL de PAR.
+19. O `purpose` de replay de `private_key_jwt` permanece único entre endpoints.
+20. A Fase 1 parte somente de Server v5/Realm v6 e termina em Server v6/Realm v7, sem fallback.
+21. Policy global `false` é omitida do discovery; policy somente por client nunca aparece como global.
+22. Nenhum comando obrigatório com filtro pode concluir selecionando zero testes ou teste incidental.
 
 ---
 
@@ -808,9 +907,13 @@ dotnet test RoyalIdentity.sln
 - Consumo observa atomicamente a semântica escolhida em Q2.
 - Authorization endpoint não mescla parâmetros e revalida o estado vigente.
 - Policy global/client e feature gate possuem defaults/validação/documentação coerentes.
-- Discovery anuncia PAR real e não anuncia JAR inexistente.
+- Discovery anuncia PAR real, omite policy global `false` e não anuncia JAR inexistente.
+- `private_key_jwt` aceita no PAR as três audiences do RFC, não amplia o token endpoint com a URL de PAR e
+  preserva replay cross-endpoint.
+- Payloads Configuration partem de Server v5/Realm v6 e terminam em Server v6/Realm v7, sem fallback.
 - Migrations Configuration/Operational e SQL dos dois providers estão atualizados.
 - SQLite/PostgreSQL, clients público/confidencial e dois realms estão cobertos.
+- Todas as classes nomeadas na DF21 existem e nenhum filtro obrigatório seleciona zero testes.
 - Backlog, roadmap, foundations, matriz e READMEs refletem o resultado.
 - `dotnet build RoyalIdentity.sln` e `dotnet test RoyalIdentity.sln` passam.
 
@@ -831,7 +934,10 @@ dotnet test RoyalIdentity.sln
 | Lifetime reaproveita interação | usa `AuthorizationInteractionLifetime` | referência fica válida além da policy esperada | Q3 + option própria | Aberto |
 | Tolerância de reload cria replay | Q2-B sem binding server-side | múltiplos fluxos válidos | exigir binding atômico ou escolher Q2-A | Aberto |
 | Migration diverge por provider | tabela/índice/default diferem | comportamento distinto em produção | contracts + scripts PostgreSQL | Aberto |
-| Client assertion rejeita audience PAR | evaluator aceita apenas token endpoint | clients `private_key_jwt` não interoperam | DF3 + matriz de três audiences | Aberto |
+| Audience PAR vaza para o token endpoint | evaluator ganha lista global com issuer/token/PAR | assertion destinada apenas a PAR autentica no token | DF3 + policy contextual + matriz cross-endpoint | Aberto |
+| Replay é particionado por endpoint | implementação troca o `purpose` conforme rota | mesmo `jti` é aceito uma vez em PAR e outra no token | purpose único + teste nas duas ordens | Aberto |
+| Cadeia Configuration parte da versão errada | executor ignora predecessor de introspection | options perdidas ou payload incompatível | DF20 + gate Server v5/Realm v6 | Aberto |
+| Filtro amplo fica verde por teste incidental | nome como `ClientAssertion` seleciona option alheia a PAR | fase fecha sem provar endpoint | DF21 + classes/comandos explícitos | Aberto |
 | Metadata afirma JAR | stub continua com flag true | clientes enviam formato não processado | correção/guard da Fase 5 | Aberto |
 
 ---

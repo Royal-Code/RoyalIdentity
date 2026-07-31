@@ -1,6 +1,6 @@
 # Plan: Reference Tokens e Token Introspection RFC 7662 (`plan-reference-tokens-introspection`)
 
-## Status: RASCUNHO - Q1/Q2 pendentes antes da Fase 5; 0 de 7 fases executadas
+## Status: RASCUNHO - decisões fechadas em DF1-DF23; Q1/Q2 pendentes antes da Fase 5; 0 de 7 fases executadas
 
 ## Progresso
 
@@ -13,8 +13,8 @@
 | Fase 3 - Emissão por authorization code, client credentials e refresh | Pendente |
 | Fase 4 - Ciclo de vida, bearer, revogação e contratos Operational | Pendente |
 | Fase 5 - Endpoint RFC 7662 e autenticação do ResourceServer | Bloqueada por Q1/Q2 |
-| Fase 6 - Discovery, aceites multi-realm e paridade de providers | Bloqueada pela Fase 5 |
-| Fase 7 - Documentação e fechamento do backlog | Bloqueada pela Fase 6 |
+| Fase 6 - Discovery, aceites multi-realm e paridade de providers | Pendente |
+| Fase 7 - Documentação e fechamento do backlog | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -29,11 +29,17 @@
 
 - [backlog-001.md](../backlogs/backlog-001.md) — emissão de reference token continua pendente; store e bearer
   já possuem suporte parcial.
+- [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — entrega a baseline de
+  cardinalidade, precedência dos mecanismos de autenticação e transporte de erros HTTP (`401` e
+  `WWW-Authenticate`) que o endpoint direto de introspection deve consumir sem reutilizar a identidade
+  `EvaluatedClient`.
 - [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — remove metadata falsa de introspection
-  e `EnableIntrospectionEndpoint` nos payloads v3; este plano reintroduz o gate somente junto do endpoint real e
-  não pode assumir que v3 ainda seja a baseline Configuration.
-- [plan-localization.md](plan-localization.md) — executa antes deste plano e promove ao menos o payload de realm
-  para v4; qualquer mudança posterior em `EndpointsOptions` parte das versões efetivamente vigentes.
+  e `EnableIntrospectionEndpoint` nos payloads v3; este plano reintroduz o gate somente junto do endpoint real.
+- [plan-localization.md](plan-localization.md) — executa antes deste plano e deixa
+  `ServerOptionsPayload` em v3 e `RealmOptionsPayload` em v4.
+- [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — predecessor imediato; promove
+  `ServerOptionsPayload` de v3 para v4 e `RealmOptionsPayload` de v4 para v5. A reintrodução de
+  `EndpointsOptions.EnableIntrospectionEndpoint` parte obrigatoriamente dessa baseline.
 - [plan-data-operational-storage.md](plan-data-operational-storage.md) e
   [plan-data-storage-matrix.md](plan-data-storage-matrix.md) — semânticas AT-01..AT-04, digest de lookup,
   proteção do payload e ciclo de vida já fechados.
@@ -63,7 +69,7 @@
 - [RFC 7009](https://www.rfc-editor.org/rfc/rfc7009.html) — revogação e `token_type_hint`.
 - [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) — baseline de segurança executada antes deste plano.
 
-### Estado atual do código (verificado em 2026-07-30)
+### Estado atual do código (verificado em 2026-07-31)
 
 - **Emissão somente JWT:** `DefaultTokenFactory.CreateAccessTokenAsync` e
   `RefreshTokenHandler.IssueFromSnapshotAsync` passam `AccessTokenType.Jwt`.
@@ -77,8 +83,8 @@
 - **Introspection inexistente:** há constantes protocolares e metadata legada, mas nenhum endpoint, context,
   pipeline ou response RFC 7662. O plano predecessor remove a option/metadata falsa antes desta execução.
 - **Gate removido pelo predecessor:** `EnableIntrospectionEndpoint` deixa de existir no payload v3 e deve voltar
-  somente quando rota/pipeline estiverem reais; os serializers precisam ser versionados a partir da baseline
-  vigente depois de Localization/RFC 9700.
+  somente quando rota/pipeline estiverem reais; após Localization e RFC 9700, a baseline obrigatória deste plano
+  é `ServerOptionsPayload` v4 e `RealmOptionsPayload` v5.
 - **ResourceServer já modela credenciais:** `ResourceServer.Secrets` existe, mas `IResourceStore` não oferece
   lookup direto por nome e os evaluators atuais autenticam `Client`, não `ResourceServer`.
 - **Configuration relacional:** cada scalar público de `Client` deve possuir coluna e decisão no
@@ -92,6 +98,8 @@
   adicionar indiscriminadamente claim `jti` faria o handle secreto entrar no payload protegido.
 - **Emissão duplicada no refresh:** o caminho `Snapshot` replica a construção do token e pode divergir do
   `DefaultTokenFactory`.
+- **Construtor órfão fora do factory:** `AccessToken.Renew` também instancia `AccessToken`, mas não possui caller;
+  deve sair junto da centralização para que a DF6 seja verificável sem exceções artificiais.
 - **Introspection anunciado sem rota:** o predecessor precisa remover a superfície morta antes de este plano
   introduzir endpoint e metadata reais.
 - **ResourceServer volátil:** o catálogo de resources/scopes ainda usa a bridge Configuration; este plano pode
@@ -100,6 +108,11 @@
   `JwtAccessTokenPersistenceMode.None`; Q2 precisa fechar se JWT entra no primeiro corte.
 - **Refresh possui semântica própria:** introspection de refresh token exigiria considerar consumo, tolerância,
   família/replay e autorização do caller; Q2 precisa fechar o escopo antes da Fase 5.
+- **Autenticação direta compartilha contrato HTTP, não identidade:** o plano OAuth 2.1 fecha cardinalidade,
+  precedência, `401` e `WWW-Authenticate` para endpoints diretos; introspection precisa consumir essa baseline,
+  mas autentica `ResourceServer`, não `Client`.
+- **Filtros obrigatórios sem alvo:** não existem hoje testes `TokenFactory`, `ReferenceToken`, `AccessToken`,
+  `AtHash` ou `Introspection` em `Tests.Identity`; comandos com esses filtros terminam sem provar os aceites.
 - **Sem compatibilidade obrigatória:** não existem clientes de produção; migrations, defaults e APIs públicas
   podem seguir diretamente o desenho correto.
 
@@ -224,9 +237,25 @@
   JWT default para clientes não alterados. Fonte: AGENTS.md.
 - **DF21 — Gate restaurado com runtime:** reintroduzir `EnableIntrospectionEndpoint` em `EndpointsOptions` com
   default `true` somente no mesmo corte em que rota/pipeline RFC 7662 existirem. O gate controla runtime e
-  discovery por realm; desabilitado significa 404 e metadata/aliases ausentes. Incrementar separadamente
-  `ServerOptionsPayload` e `RealmOptionsPayload` a partir das versões vigentes ao iniciar esta fase, sem assumir
-  v3 comum nem criar migration relacional. Fonte: handoff de `plan-refactoring-debt-closure` + padrão dos endpoints.
+  discovery por realm; desabilitado significa 404 e metadata/aliases ausentes. A Fase 5 falha antes de editar se
+  `ServerOptionsPayloadSerializer.CurrentVersion != 4` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 5`, e então promove respectivamente v4 → v5 e v5 → v6.
+  Serializers rejeitam versões anteriores, seeds/fixtures são reprovisionados e não há migration relacional.
+  Fonte: handoff sequencial Debt Closure → Localization → RFC 9700 + padrão fail-closed dos payloads.
+- **DF22 — Topologia verificável de testes:** algoritmo puro de geração/formato do handle fica em
+  `Tests.Identity/Tokens/ReferenceTokenHandleTests.cs`; factory e fluxos que exigem composição ficam em
+  `Tests.Integration` nas classes `ReferenceTokenFactoryTests`, `ReferenceTokenGrantIssuanceTests`,
+  `IntrospectionEndpointTests`, `IntrospectionAuthenticationTests`, `ReferenceTokenIntrospectionTests` e
+  `IntrospectionDiscoveryTests`; persistência/payload/migrations estendem classes nomeadas de `Tests.Storage`; e
+  boundaries ficam em `Tests.Architecture/ReferenceTokenIntrospectionBoundaryTests.cs`. Cada comando obrigatório
+  usa uma classe/fixture explícita e deve falhar se selecionar zero testes; filtros OR amplos não podem mascarar
+  uma fixture ausente. Fonte: topologia real dos projetos + regra promovida pelo Debt Closure.
+- **DF23 — Baseline HTTP do endpoint direto:** introspection consome do plano OAuth 2.1 o parsing antes do
+  achatamento, a rejeição antecipada de parâmetros core repetidos e de mecanismos de autenticação múltiplos, e a
+  convenção `401`/`WWW-Authenticate` para autenticação tentada e inválida. Reutilizam-se writers/primitives
+  neutros quando aplicáveis, mas o preflight e o authenticator são próprios de `ResourceServer` e nunca produzem
+  nem aceitam `EvaluatedClient`; o challenge reflete somente o método efetivamente selecionado em Q1. Fonte:
+  RFC 7662 §§2.1/2.3 + `plan-oauth21-token-error-responses.md` DF6-DF8.
 
 ---
 
@@ -247,6 +276,18 @@
     somente o digest é persistido.
   - **Conclusão:** preservar a identidade única, mas aplicar DF4/DF9 para o bearer não reaparecer como claim ou
     payload.
+
+**Revisão externa de verificabilidade e predecessores (2026-07-31):**
+
+- **Fato verificado:** o guard `AccessTokenType\\.Jwt` não encontra o hardcode atual; com regex corrigido ele
+  também encontraria a checagem legítima de tipo que deve permanecer. Conclusão: vigiar os sítios de construção
+  fora do factory, não a ocorrência do enum.
+- **Fato verificado:** os filtros propostos em `Tests.Identity` selecionam zero testes e o factory exige
+  composição. Conclusão: DF22.
+- **Fato verificado:** RFC 7662 exige autenticação/autorização do endpoint e remete falhas de credenciais OAuth ao
+  `401` aplicável; a identidade do caller continua sendo `ResourceServer`. Conclusão: DF23.
+- **Fato verificado:** o predecessor RFC 9700 deixa Server v4/Realm v5. Conclusão: versões concretas e gate
+  incorporados à DF21.
 
 ---
 
@@ -289,8 +330,8 @@ operation.protocol_artifacts [existente]
 - Não duplicar o handle opaco em `Client`, refresh token ou outra entidade.
 - `AccessTokenPayloadSerializer` só muda de versão se a remoção do claim/novo dado realmente alterar seu
   contrato; não fazer bump mecânico.
-- Os payloads Configuration de server/realm que serializam `EndpointsOptions` são incrementados separadamente a
-  partir de suas versões vigentes; não reutilizar a v3 removida pelo predecessor como baseline fixa.
+- Os payloads Configuration que serializam `EndpointsOptions` partem da baseline comprovada Server v4/Realm v5
+  e são promovidos para Server v5/Realm v6, sem fallback de leitura.
 
 ### Arquitetura alvo
 
@@ -320,6 +361,9 @@ RoyalIdentity.Storage.EntityFramework.Sqlite|PostgreSql/
 - A escrita Operational termina antes da resposta; falha/colisão não devolve credencial sem backing.
 - Comparação de shared secret usa hash e tempo constante; credencial ausente/inválida retorna HTTP 401 sem
   distinguir ResourceServer inexistente.
+- Parsing, cardinalidade e precedência de mecanismos ocorrem antes de evaluator, lookup, replay store ou outra
+  operação com efeito; a baseline neutra do plano OAuth 2.1 é preservada por um preflight específico de
+  `ResourceServer`.
 - Introspection não é endpoint público anônimo e não aceita HTTP.
 - `active=false` é a única resposta para token desconhecido, inválido ou não autorizado.
 - Token introspection nunca atravessa realm e nunca revela scopes/audiences de outro ResourceServer.
@@ -331,8 +375,8 @@ RoyalIdentity.Storage.EntityFramework.Sqlite|PostgreSql/
 - Executar depois de `plan-rfc9700-security-hardening.md` para não disputar remoção do front-channel ou rotação
   de refresh.
 - Confirmar antes da Fase 1 que `plan-refactoring-debt-closure.md` removeu a metadata/option falsa.
-- Ao reintroduzir a option na Fase 5, partir das versões Configuration deixadas por Localization e pelos demais
-  predecessores; atualizar seeds/fixtures e reprovisionar sem fallback de versões antigas.
+- Ao reintroduzir a option na Fase 5, exigir Server v4/Realm v5, promover para Server v5/Realm v6, atualizar
+  seeds/fixtures e reprovisionar sem fallback de versões antigas.
 - Migration de Configuration converte clientes existentes para `Jwt`; não alterar tokens já emitidos.
 - Server continua externamente migrado; Demo continua self-provisioned SQLite.
 - Ativar `Reference` somente nos seeds/testes específicos; não trocar silenciosamente todos os clients.
@@ -361,7 +405,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Tipo de access token no Client e persistência Configuration
 
-**Depende de:** DF1, DF2, DF19, DF20 e conclusão de
+**Depende de:** DF1, DF2, DF19, DF20, DF22 e conclusão de
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 
 **Escopo:** `Client`, `ClientEntity`, model builder, `ClientMaterializer`, seeds, fixtures, migrations
@@ -379,6 +423,9 @@ desconhecido fail-closed e gerar migrations incrementais nos dois providers.
 - [ ] Atualizar o property-coverage test de `Client`.
 - [ ] Gerar migrations Configuration SQLite/PostgreSQL com default `0` para linhas existentes.
 - [ ] Atualizar snapshots, SQL revisável, seeds e fixtures.
+- [ ] Estender explicitamente `ConfigurationMaterializationClientTests`,
+  `ConfigurationModelClientCoverageTests`, `SqliteConfigurationMigrationTests` e
+  `PostgreSqlConfigurationMigrationTests`; nenhum filtro obrigatório pode selecionar zero testes.
 - [ ] Provar roundtrip independente de `Jwt` e `Reference` em SQLite.
 - [ ] Validar migration desde schema anterior e segunda execução idempotente.
 - [ ] Executar aceite PostgreSQL real opt-in antes de concluir a fase.
@@ -390,7 +437,10 @@ hosts não migram.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationMaterializationClientTests|FullyQualifiedName~ConfigurationModelClientCoverageTests|FullyQualifiedName~ConfigurationMigration"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationMaterializationClientTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelClientCoverageTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteConfigurationMigrationTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~PostgreSqlConfigurationMigrationTests"
 ./scripts/Test-ConfigurationPostgreSql.ps1
 ```
 
@@ -402,10 +452,10 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationMaterializat
 
 ## Fase 2 - Emissão opaca centralizada e segura
 
-**Depende de:** Fase 1, DF3-DF9.
+**Depende de:** Fase 1, DF3-DF9 e DF22.
 
 **Escopo:** `AccessTokenRequest`, `ITokenFactory`, `DefaultTokenFactory`, `AccessToken`,
-`AccessTokenPayloadSerializer`, logs/eventos e testes unitários.
+`AccessTokenPayloadSerializer`, logs/eventos, `Tests.Identity`, `Tests.Integration` e `Tests.Storage`.
 
 **O que/como:** fazer o factory escolher o tipo do client, gerar identidade adequada, construir claims uma vez e
 assinar somente JWT. Oferecer entrada explícita para claims preexistentes sem permitir que callers reconstruam
@@ -415,6 +465,8 @@ manual e divergentemente o token.
 
 - [ ] Separar aquisição de claims da construção comum sem criar segundo token factory.
 - [ ] Permitir que o caminho `Snapshot` forneça claims já resolvidas ao factory.
+- [ ] Remover o método órfão `AccessToken.Renew`; renovação continua sendo uma emissão pelo factory, não uma cópia
+  mutável do modelo.
 - [ ] Gerar JWT id conforme comportamento atual para JWT.
 - [ ] Gerar handle reference com 32 bytes Base64Url e usá-lo como `Id`/`Token`.
 - [ ] Aplicar `IncludeJwtId` somente a JWT; remover qualquer claim que replique o handle reference.
@@ -423,7 +475,9 @@ manual e divergentemente o token.
 - [ ] Chamar `IJwtFactory` somente para JWT.
 - [ ] Armazenar o token antes de retorná-lo e propagar falha do store.
 - [ ] Garantir que logs e `AccessTokenIssuedEvent` continuem obfuscados.
-- [ ] Adicionar testes determinísticos para tipo, assinatura, entropia/formato, claims e falha de store.
+- [ ] Criar `ReferenceTokenHandleTests` em `Tests.Identity` somente para entropia/formato do algoritmo puro.
+- [ ] Criar `ReferenceTokenFactoryTests` em `Tests.Integration` para tipo, assinatura, claims, persistência e
+  falha de store usando a composição real.
 - [ ] Provar estruturalmente que payload reference não contém handle nem claim `jti`.
 
 **Critérios de aceite:** factory emite JWT assinado ou handle opaco de 43 caracteres conforme client; reference
@@ -433,8 +487,10 @@ metadados são equivalentes para o mesmo request.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~TokenFactory|FullyQualifiedName~ReferenceToken"
-dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalPayloadTests|FullyQualifiedName~SqliteOperationalAccessTokenTests"
+dotnet test Tests.Identity --filter "FullyQualifiedName~ReferenceTokenHandleTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~ReferenceTokenFactoryTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalPayloadTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteOperationalAccessTokenTests"
 ```
 
 ### Resultado da Fase 2
@@ -445,7 +501,7 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalPayloadTests|F
 
 ## Fase 3 - Emissão por authorization code, client credentials e refresh
 
-**Depende de:** Fase 2, DF2, DF6, DF7 e refresh rotation concluída pelo plano RFC 9700.
+**Depende de:** Fase 2, DF2, DF6, DF7, DF22 e refresh rotation concluída pelo plano RFC 9700.
 
 **Escopo:** `AuthorizationCodeHandler`, `ClientCredentialsHandler`, `RefreshTokenHandler`, token responses,
 `at_hash`, eventos e `Tests.Integration`.
@@ -463,7 +519,8 @@ que o access token retornado/eventado é exatamente o bearer persistido.
 - [ ] Preservar `at_hash` do valor efetivamente devolvido, inclusive handle opaco.
 - [ ] Preservar eventos obfuscados e resposta `Bearer`/`expires_in`/`scope`.
 - [ ] Confirmar que nenhum access token é emitido no authorization endpoint após RFC 9700.
-- [ ] Adicionar testes ponta a ponta para os três grants e os dois modos de claims do refresh.
+- [ ] Criar `Tests.Integration/Endpoints/ReferenceTokenGrantIssuanceTests.cs` com testes ponta a ponta para os
+  três grants, os dois modos de claims do refresh e `at_hash` calculado sobre o bearer efetivamente devolvido.
 - [ ] Adicionar regressão de mudança do tipo entre emissão do refresh e renovação.
 
 **Critérios de aceite:** todos os caminhos suportados devolvem o tipo atual do client; nenhum helper constrói
@@ -473,8 +530,7 @@ atômica; `at_hash` continua válido.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~ClientToken|FullyQualifiedName~CodeToken|FullyQualifiedName~RefreshToken|FullyQualifiedName~ReferenceToken"
-dotnet test Tests.Identity --filter "FullyQualifiedName~AccessToken|FullyQualifiedName~AtHash"
+dotnet test Tests.Integration --filter "FullyQualifiedName~ReferenceTokenGrantIssuanceTests"
 ```
 
 ### Resultado da Fase 3
@@ -485,7 +541,7 @@ dotnet test Tests.Identity --filter "FullyQualifiedName~AccessToken|FullyQualifi
 
 ## Fase 4 - Ciclo de vida, bearer, revogação e contratos Operational
 
-**Depende de:** Fase 3, DF8-DF11 e AT-01..AT-04.
+**Depende de:** Fase 3, DF8-DF11, DF22 e AT-01..AT-04.
 
 **Escopo:** `IAccessTokenStore`, `DefaultTokenValidator`, `EvaluateBearerToken`, `RevocationHandler`,
 `Tests.Storage`, `Tests.Integration` e matriz de storage.
@@ -515,8 +571,11 @@ continuam verdes.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~ReferenceTokenBearerTests|FullyQualifiedName~RevocationTests"
-dotnet test Tests.Storage --filter "FullyQualifiedName~AccessTokenStoreContractTests|FullyQualifiedName~SqliteOperationalAccessTokenTests|FullyQualifiedName~OperationalCleanup"
+dotnet test Tests.Integration --filter "FullyQualifiedName~ReferenceTokenBearerTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~RevocationTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~AccessTokenStoreContractTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteOperationalAccessTokenTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalCleanupTests"
 ./scripts/Test-OperationalPostgreSql.ps1
 ```
 
@@ -528,8 +587,10 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~AccessTokenStoreContractT
 
 ## Fase 5 - Endpoint RFC 7662 e autenticação do ResourceServer
 
-**Depende de:** Fase 4, Q1, Q2, DF12-DF18, DF21 e conclusão de
-[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
+**Depende de:** Fase 4, Q1, Q2, DF12-DF18, DF21-DF23 e conclusão de
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md),
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) e
+[plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 
 **Escopo:** `IResourceStore`, matriz de storage, authenticator/evaluators de ResourceServer,
 `IntrospectionEndpoint`, context, decorators, validators, handler, responses, `EndpointsOptions`, serializers
@@ -543,11 +604,13 @@ decididos em Q2 e retornar `active=false` como resposta indistinguível para qua
 - [ ] Registrar na matriz o lookup realm-bound de ResourceServer por nome.
 - [ ] Adicionar `FindEnabledResourceServerByNameAsync` e implementar na bridge/store vigente.
 - [ ] Criar identidade/result de autenticação próprios de ResourceServer.
-- [ ] Implementar os métodos decididos em Q1 reutilizando primitives de hash/chave/replay, não
-  `EvaluatedClient`.
-- [ ] Rejeitar credenciais múltiplas, malformadas, ausentes ou inválidas com HTTP 401 e challenge coerente.
+- [ ] Implementar os métodos decididos em Q1 reutilizando primitives neutras de hash/chave/replay e o writer
+  HTTP da baseline OAuth 2.1 quando aplicável, sem reutilizar evaluator, preflight ou `EvaluatedClient` de client.
+- [ ] Criar preflight específico de ResourceServer conforme DF23 e rejeitar credenciais múltiplas, malformadas,
+  ausentes ou inválidas antes de lookup/replay, com HTTP 401 e challenge coerente com Q1.
 - [ ] Criar endpoint somente POST, `application/x-www-form-urlencoded` e HTTPS efetivo.
-- [ ] Rejeitar `token` ausente, vazio, repetido ou acima de `TokenHandle`/`Jwt` conforme tipo possível.
+- [ ] Validar o form bruto antes do achatamento e rejeitar `token` ausente, vazio, repetido ou acima de
+  `TokenHandle`/`Jwt` conforme tipo possível.
 - [ ] Tratar `token_type_hint` como otimização e ampliar busca quando o hint estiver errado.
 - [ ] Implementar resolvers somente para as categorias fechadas em Q2.
 - [ ] Aplicar expiração, revogação, client ativo, realm e autorização por audience/resource.
@@ -555,22 +618,28 @@ decididos em Q2 e retornar `active=false` como resposta indistinguível para qua
 - [ ] Produzir resposta ativa mínima conforme DF15, sem `jti`, username ou custom claims.
 - [ ] Aplicar no-cache e redaction integral de token/credencial.
 - [ ] Registrar endpoint/context/handler/pipeline/DI seguindo o padrão do repositório.
+- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 4` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 5`.
 - [ ] Reintroduzir `EnableIntrospectionEndpoint` conforme DF21 e aplicar o gate à rota/runtime.
-- [ ] Incrementar cada payload Configuration afetado a partir de sua versão vigente, atualizando seeds, fixtures e
+- [ ] Promover `ServerOptionsPayload` v4 → v5 e `RealmOptionsPayload` v5 → v6, atualizando seeds, fixtures e
   testes de versão sem migration relacional ou fallback.
-- [ ] Adicionar testes unitários da matriz request × auth × token × audience × realm.
+- [ ] Criar `Tests.Integration/Endpoints/IntrospectionEndpointTests.cs` para a matriz
+  request × token × audience × realm e `IntrospectionAuthenticationTests.cs` para cardinalidade, precedência,
+  `401` e `WWW-Authenticate`; estender `ResourceStoreTests` e `ConfigurationModelPayloadTests` para o lookup/gate.
 
 **Critérios de aceite:** endpoint anônimo/HTTP não processa tokens; auth inválida é 401; token inválido ou fora da
 audiência é `active=false`; token reference ativo e autorizado retorna somente campos permitidos; nenhum erro
 revela existência, motivo ou outro realm; gate desabilitado produz 404; payloads Configuration registram a nova
-option a partir das versões predecessoras corretas.
+option em Server v5/Realm v6 a partir da baseline exata v4/v5.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~Introspection"
-dotnet test Tests.Storage --filter "FullyQualifiedName~ResourceStore"
-dotnet test Tests.Pipelines
+dotnet test Tests.Integration --filter "FullyQualifiedName~IntrospectionEndpointTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~IntrospectionAuthenticationTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~ResourceStoreTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
+dotnet test Tests.Pipelines --filter "FullyQualifiedName~ErrorResponseResultTests"
 ```
 
 ### Resultado da Fase 5
@@ -581,7 +650,7 @@ dotnet test Tests.Pipelines
 
 ## Fase 6 - Discovery, aceites multi-realm e paridade de providers
 
-**Depende de:** Fase 5, DF17-DF21.
+**Depende de:** Fase 5, DF17-DF23.
 
 **Escopo:** `DiscoveryHandler`, routes/constants, aliases conforme Q1, hosts, seeds, `Tests.Integration`,
 `Tests.Storage`, `Tests.Architecture` e scripts PostgreSQL.
@@ -603,7 +672,10 @@ Reference e as migrations funcionam nos dois providers.
 - [ ] Provar que mudar client para JWT altera apenas emissões futuras.
 - [ ] Provar que JWT default permanece funcional e validável localmente.
 - [ ] Validar migrations/seeds em SQLite e PostgreSQL 17 real.
-- [ ] Adicionar guards de arquitetura para endpoint/persistência e ausência de handle bruto.
+- [ ] Criar `ReferenceTokenIntrospectionTests` e `IntrospectionDiscoveryTests` em `Tests.Integration` para os
+  aceites externos/multi-realm e metadata, sem depender de filtros OR amplos.
+- [ ] Criar `ReferenceTokenIntrospectionBoundaryTests` em `Tests.Architecture` para endpoint/persistência,
+  identidade distinta de ResourceServer e ausência de handle bruto.
 - [ ] Executar a solution inteira.
 
 **Critérios de aceite:** discovery é fiel; reference funciona ponta a ponta em dois realms; disclosure segue
@@ -612,9 +684,11 @@ audience; JWT não regrediu; SQLite/PostgreSQL têm schema equivalente; todos os
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~ReferenceToken|FullyQualifiedName~Introspection|FullyQualifiedName~Discovery"
-dotnet test Tests.Storage --filter "FullyQualifiedName~Configuration|FullyQualifiedName~AccessToken|FullyQualifiedName~ResourceStore"
-dotnet test Tests.Architecture
+dotnet test Tests.Integration --filter "FullyQualifiedName~ReferenceTokenIntrospectionTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~IntrospectionDiscoveryTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationMaterializationClientTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteOperationalAccessTokenTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~ReferenceTokenIntrospectionBoundaryTests"
 ./scripts/Test-ServerPostgreSql.ps1
 dotnet test RoyalIdentity.sln
 ```
@@ -627,7 +701,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 7 - Documentação e fechamento do backlog
 
-**Depende de:** Fases 1-6, DF1-DF21 e Q1/Q2 fechadas.
+**Depende de:** Fases 1-6, DF1-DF23 e Q1/Q2 fechadas.
 
 **Escopo:** backlog, roadmap, foundations, AGENTS, READMEs, matriz e plano.
 
@@ -656,7 +730,9 @@ finais verdes.
 
 ```powershell
 rg -n "Reference Token|Introspection|AccessTokenType" AGENTS.md .ai README.md RoyalIdentity.Server
-if (rg -n "AccessTokenType\\.Jwt" RoyalIdentity/Handlers/RefreshTokenHandler.cs) { throw "Refresh ainda fixa JWT." }
+if (rg -n 'IssueFromSnapshotAsync' RoyalIdentity/Handlers/RefreshTokenHandler.cs) { throw "Refresh ainda duplica a emissão." }
+$unexpectedConstructors = @(rg -n 'new AccessToken\(' RoyalIdentity -g '*.cs' -g '!**/Contracts/Defaults/DefaultTokenFactory.cs')
+if ($unexpectedConstructors.Count -ne 0) { throw "AccessToken ainda é construído fora do DefaultTokenFactory." }
 dotnet build RoyalIdentity.sln
 dotnet test RoyalIdentity.sln
 ```
@@ -672,12 +748,12 @@ dotnet test RoyalIdentity.sln
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
 | Tipo persistido por client | 1 | DF1, DF2, DF19, DF20 | roundtrip; default JWT; enum inválido falha | Configuration materialization/migrations |
-| Handle opaco seguro | 2, 4 | DF3-DF5, DF8-DF10 | 256 bits; sem signer/raw handle/jti | TokenFactory; OperationalPayload; AccessTokenStore |
-| Todos os grants respeitam o tipo | 3 | DF2, DF6, DF7 | code/client_credentials/refresh usam factory | ClientToken; CodeToken; RefreshToken |
+| Handle opaco seguro | 2, 4 | DF3-DF5, DF8-DF10, DF22 | 256 bits; sem signer/raw handle/jti | ReferenceTokenHandle; ReferenceTokenFactory; OperationalPayload; AccessTokenStore |
+| Todos os grants respeitam o tipo | 3 | DF2, DF6, DF7, DF22 | code/client_credentials/refresh usam factory | ReferenceTokenGrantIssuanceTests |
 | Lifecycle e revogação | 4 | DF8-DF11 | expiração/revogação/realm/client fail-closed | ReferenceTokenBearer; Revocation; cleanup |
-| Introspection autenticado | 5 | DF12-DF18, DF21, Q1, Q2 | 401 para auth; false indistinguível; resposta mínima; gate 404 | Introspection unit/pipeline |
-| Metadata e providers fiéis | 6 | DF17-DF21 | discovery exato; gate; dois realms; SQLite/PostgreSQL | Discovery; integration; provider scripts |
-| Fechar dívida/documentação | 7 | DF1-DF21 | backlog/roadmap/foundations alinhados | `rg`; build; solution test |
+| Introspection autenticado | 5 | DF12-DF18, DF21-DF23, Q1, Q2 | 401/challenge para auth; false indistinguível; resposta mínima; gate 404; Server v5/Realm v6 | IntrospectionEndpoint; IntrospectionAuthentication; payload |
+| Metadata e providers fiéis | 6 | DF17-DF23 | discovery exato; gate; dois realms; SQLite/PostgreSQL | IntrospectionDiscovery; ReferenceTokenIntrospection; provider scripts |
+| Fechar dívida/documentação | 7 | DF1-DF23 | backlog/roadmap/foundations alinhados | guards de construção; build; solution test |
 
 ---
 
@@ -700,6 +776,10 @@ dotnet test RoyalIdentity.sln
 15. Cache não participa de validação, revogação ou introspection.
 16. Catálogo de resources permanece volátil até plano próprio; este plano não cria persistência incidental.
 17. Introspection desabilitado por realm responde 404 e não aparece em discovery/aliases.
+18. Autenticação de introspection preserva a baseline HTTP do OAuth 2.1, mas sua identidade e seu preflight são
+    próprios de `ResourceServer`; nenhum caminho aceita `EvaluatedClient`.
+19. A Fase 5 só parte de Server v4/Realm v5 e termina com Server v5/Realm v6; versões anteriores falham fechadas.
+20. Nenhum comando obrigatório com filtro pode concluir tendo selecionado zero testes.
 
 ---
 
@@ -713,8 +793,10 @@ dotnet test RoyalIdentity.sln
 - Introspection cumpre Q1/Q2, RFC 7662 e minimização por ResourceServer.
 - Discovery anuncia endpoint/métodos reais e URLs HTTPS realm-scoped.
 - Gate realm-scoped desabilitado produz 404 e omite toda metadata/alias de introspection.
+- Payloads Configuration partem de Server v4/Realm v5 e terminam em Server v5/Realm v6, sem fallback.
 - Dois realms e dois ResourceServers permanecem isolados.
 - Migrations incrementais e SQL dos providers estão atualizados.
+- Todas as fixtures nomeadas na DF22 existem e nenhum comando obrigatório seleciona zero testes.
 - Backlog, roadmap, foundations, matriz e READMEs refletem o resultado.
 - `dotnet build RoyalIdentity.sln` e `dotnet test RoyalIdentity.sln` passam.
 
@@ -733,7 +815,10 @@ dotnet test RoyalIdentity.sln
 | Migration perde default | coluna non-null sem default | upgrade falha/client inválido | DF19 + teste upgrade | Aberto |
 | Metadata mente | métodos/aliases publicados sem evaluator | integração quebrada/falsa capacidade | derivar de Q1 + testes exatos | Aberto |
 | HTTP aceita secrets/tokens | endpoint ignora scheme efetivo | interceptação de credenciais | DF18 + testes ForwardedHeaders | Aberto |
+| Introspection diverge da baseline HTTP | autenticação de ResourceServer reimplementa ordem/status/header ad hoc | credenciais múltiplas geram efeito ou challenge incorreto | DF23 + IntrospectionAuthenticationTests | Aberto |
 | Hint restringe busca | implementação confia em hint errado | token ativo responde false incorretamente | fallback entre tipos Q2 | Aberto |
+| Cadeia Configuration parte da versão errada | executor ignora predecessores | option perdida ou payload incompatível | DF21 + gate Server v4/Realm v5 | Aberto |
+| Filtro obrigatório seleciona zero testes | classe planejada não existe ou filtro amplo mascara ausência | fase fecha sem provar o aceite | DF22 + classes/comandos explícitos | Aberto |
 | Resource catalog volátil limita produção | secrets só em bridge | restart/configuração externa necessária | documentar limite; persistência em plano próprio | Aceito |
 | Mudança de tipo no refresh surpreende | admin altera Client durante grant | novo formato após renovação | DF2 + documentação/teste | Aberto |
 
@@ -758,6 +843,8 @@ dotnet test RoyalIdentity.sln
 - [backlog-001.md](../backlogs/backlog-001.md).
 - [plans-roadmap-02.md](plans-roadmap-02.md).
 - [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
+- [plan-localization.md](plan-localization.md).
+- [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
 - [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 - [plan-data-operational-storage.md](plan-data-operational-storage.md).
 - [plan-data-storage-matrix.md](plan-data-storage-matrix.md).
