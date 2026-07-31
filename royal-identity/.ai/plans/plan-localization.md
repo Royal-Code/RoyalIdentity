@@ -80,11 +80,15 @@
   `AuthenticationFailureReason`.
 - **Page services ainda devolvem frases:** `ConsentPageService`, `EndSessionPageService` e
   `LoginPageService` criam mensagens inglesas para validação/erro.
-- **Persistência vigente:** `RealmOptionsPayloadSerializer.CurrentVersion` ainda é 1 no código verificado; os
-  planos predecessores reservam v2 para Session Management e v3 para o fechamento das refatorações.
+- **Persistência vigente:** `ServerOptionsPayloadSerializer.CurrentVersion` e
+  `RealmOptionsPayloadSerializer.CurrentVersion` ainda são 1 no código verificado; os planos predecessores
+  reservam v2 para Session Management e v3 para o fechamento das refatorações.
 - **Testes reutilizáveis:** `Tests.Integration/UI` já cobre login e consentimento sobre
   `PersistentStorageAppFactory`; `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs` cobre
   roundtrip, versão, defaults ausentes e cópia das options.
+- **Projeto de teste órfão:** `Tests.Endpoints` não pertence a `RoyalIdentity.sln` e contém somente uma cópia de
+  `EndpointHandler_Must_CreateResponse`, já coberto por `Tests.Pipelines/ServerEndpointTests.cs`; discovery é
+  exercitado por `Tests.Integration/Endpoints/DiscoveryTests.cs`.
 - **Inventário de tradução:** a superfície atual foi deduplicada em 57 chaves de `AccountResources` e cinco de
   `ValidationResources`; com as três culturas do primeiro corte são 186 entradas em seis arquivos físicos.
 
@@ -114,8 +118,8 @@
 - `RoyalIdentity.Storage.EntityFramework` e providers Configuration — payload v4, materialização, seeds e
   contracts sem migration relacional.
 - `RoyalIdentity.Server`, `RoyalIdentity.Demo` e `Tests.Host` — registro, middleware e atributos `lang`/`dir`.
-- `Tests.Identity`, `Tests.Integration`, `Tests.Storage` e `Tests.Architecture` — contrato, fluxos, persistência
-  e boundaries.
+- `Tests.Integration`, `Tests.Storage`, `Tests.Architecture` e `Tests.UserAccounts` — options, fluxos,
+  persistência, boundaries e anti-enumeration.
 - Futuro `plan-admin-api-ui.md` — reutiliza `IStringLocalizer<T>` e catálogos próprios para apresentar
   `ClientSecurityAssessment` por `RuleId`; não é implementado aqui.
 
@@ -196,9 +200,11 @@
 - **DF13 — Sem redesign de eventos:** remover mensagens configuráveis não cria novo pipeline, auditoria ou store;
   eventos existentes preservam o motivo interno e recebem texto diagnóstico invariável quando seu contrato ainda
   exigir texto. Fonte: decisão humana registrada em `plan-refactoring-debt-closure.md`.
-- **DF14 — Metadata fiel:** `ui_locales_supported` é omitido quando localization/UI não está ativa; quando
-  publicado, contém exatamente os locales configurados e presentes no catálogo, com default primeiro e os demais
-  em ordem determinística. `claims_locales_supported` permanece ausente. Fonte: OIDC Discovery + análise aprovada.
+- **DF14 — Metadata fiel:** `ui_locales_supported` é omitido quando localization está desabilitada ou o host não
+  compõe um catálogo da UI OIDC; quando publicado, contém exatamente os locales configurados e presentes no
+  catálogo, com default primeiro e os demais na ordem configurada normalizada. A ausência de páginas da futura UI
+  administrativa de um realm não torna indisponível a UI OIDC genérica de login/consentimento registrada pelos
+  hosts atuais. `claims_locales_supported` permanece ausente. Fonte: OIDC Discovery + composição real dos hosts.
 - **DF15 — Texto, não HTML:** recursos contêm texto e placeholders; markup, URLs e decisões de encoding ficam
   nos components. Fonte: guidance ASP.NET Core.
 - **DF16 — Documento cultural:** shells do OP derivam `lang` da cultura efetiva e `dir` de
@@ -220,6 +226,16 @@
   `DefaultLocale="en"` e `SupportedLocales={"en","pt-BR","es-419"}`. A negociação respeita imediatamente a
   preferência explícita, `ui_locales` e `Accept-Language`; realms ainda podem desabilitá-la explicitamente.
   Fonte: resposta humana à Q1 nesta discussão.
+- **DF22 — Coleção ordenada de locales:** trocar `SupportedLocales` de `HashSet<string>` para `List<string>`
+  get-only. Normalização converte cada tag para `CultureInfo.Name`, elimina duplicatas por primeira ocorrência com
+  `StringComparer.OrdinalIgnoreCase` e preserva a ordem configurada; cópia, payload e metadata mantêm essa ordem,
+  exceto por mover o default para a primeira posição na resposta discovery. Fonte: revisão externa validada +
+  contrato mutável/get-only vigente das options Configuration.
+- **DF23 — Topologia verificável de testes:** cada comportamento novo possui classe/arquivo nomeado no projeto
+  que já contém sua infraestrutura: options e HTTP em `Tests.Integration`, snapshot/payload em `Tests.Storage`,
+  boundaries em `Tests.Architecture` e anti-enumeration em `Tests.UserAccounts`. `Tests.Endpoints` e filtros sem
+  fixture correspondente não são gates; nenhum comando filtrado pode fechar fase selecionando zero testes. Fonte:
+  inventário da solution + regra promovida pelo plano predecessor.
 
 ---
 
@@ -254,6 +270,18 @@
   - **Resposta humana:** opção A, ativa por padrão.
   - **Conclusão:** aplicar DF21 nos defaults, seeds, payload esperado e testes de discovery/negociação.
 
+**Revisão externa de executabilidade (2026-07-31):**
+
+- **Confirmados:** `Tests.Endpoints` está fora da solution e não cobre discovery; `HashSet<string>` não satisfaz
+  ordem/casing; os filtros de options, snapshot e middleware não possuíam fixtures; o gate precisava verificar os
+  dois serializers predecessores; o guard PowerShell tinha escaping frágil. Aplicar DF22/DF23 e as correções nas
+  Fases 1-7.
+- **Confirmado adicional:** `Tests.Identity --filter FullyQualifiedName~LoginFlow` também selecionaria zero testes;
+  a regressão de anti-enumeration existente está em `Tests.UserAccounts/UserAccountsIntegrationTests.cs`.
+- **Não acatado como descrito:** o backlog diz que o realm `admin` não tem páginas **administrativas**; Server,
+  Demo e Tests.Host compõem `RoyalIdentity.Razor` como UI OIDC genérica. Aplicar DF14: disponibilidade é provada
+  pelo catálogo da UI OIDC no host, não pela existência de um painel administrativo específico do realm.
+
 ---
 
 ## Design alvo
@@ -262,8 +290,9 @@
 
 - `RealmOptions.Internationalization: InternationalizationOptions`: política realm-scoped com cópia profunda,
   normalização/validação e persistência Configuration.
-- `InternationalizationOptions.Validate()`: valida `DefaultLocale`, conjunto não vazio, unicidade
-  case-insensitive, tags reconhecidas/canônicas e pertencimento do default; não depende de Razor.
+- `InternationalizationOptions.Normalize()` + `Validate()`: a primeira operação canonicaliza `DefaultLocale` e
+  `SupportedLocales` e remove duplicatas posteriores case-insensitive preservando a primeira ocorrência; a segunda
+  valida conjunto não vazio, tags reconhecidas e pertencimento do default. Nenhuma depende de Razor.
 - `IUiLocaleCatalog`: contrato estreito no core para `NeutralLocale`, locales disponíveis e teste de
   disponibilidade; implementação RESX em `RoyalIdentity.Razor`, default vazio quando a UI não está composta.
 - `IConfigurationSnapshotValidator.ValidateAsync(ConfigurationSnapshotData, CancellationToken)`: validators
@@ -284,7 +313,7 @@ RealmOptionsPayload v4 (JSON Configuration)
   Internationalization
     Enabled bool
     DefaultLocale string
-    SupportedLocales string[] case-insensitive/canônico
+    SupportedLocales string[] canônico, ordenado e distinto case-insensitive
 
   Account
     remove InvalidCredentialsErrorMessage
@@ -300,8 +329,9 @@ configuration_realms
 - O serializer continua omitindo `ServerOptions` e recebe o grafo autoritativo na materialização.
 - Payload ausente ou versão diferente da v4 falha fechada após os planos predecessores; seeds/fixtures são
   regravados.
-- `SupportedLocales` serializa em ordem determinística; comparação em runtime é ordinal case-insensitive e os
-  valores materializados são nomes canônicos de `CultureInfo`.
+- `SupportedLocales` é `List<string>` get-only nas options, serializa na ordem configurada normalizada e usa
+  comparação ordinal case-insensitive para deduplicação/lookup; valores materializados são nomes canônicos de
+  `CultureInfo`. Discovery move o default para a frente e preserva a ordem relativa dos demais.
 - Traduções não entram em `Data.Configuration`, `RealmOptions`, tabelas ou snapshots.
 
 ### Arquitetura alvo
@@ -417,39 +447,45 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Contrato realm-scoped e payload Configuration v4
 
-**Depende de:** DF1, DF17, DF21,
+**Depende de:** DF1, DF17, DF21-DF23,
 [plan-oidc-session-management.md](plan-oidc-session-management.md) concluído e
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) concluído com
+`ServerOptionsPayloadSerializer.CurrentVersion == 3` e
 `RealmOptionsPayloadSerializer.CurrentVersion == 3`.
 
 **Escopo:** `InternationalizationOptions`, `RealmOptions`, materializador/payload Configuration, seeds,
-fixtures, `Tests.Identity`, `Tests.Storage`, `Tests.Integration`.
+fixtures, `Tests.Storage`, `Tests.Integration`.
 
 **O que/como:** transformar o scaffold em option realm-scoped válida e independente; promover o payload JSON
 para v4 sem migration relacional; falhar antes de editar se a sequência v2/v3 não estiver implementada.
 
 **Tarefas:**
 
-- [ ] Verificar que os planos predecessores terminaram e que o serializer de realm escreve v3.
+- [ ] Falhar antes de editar se os planos predecessores não terminaram ou se os serializers de server e realm
+  não escreverem v3.
 - [ ] Incorporar `InternationalizationOptions` a todos os construtores/cópias de `RealmOptions`.
-- [ ] Implementar normalização e `Validate()` para tags, default, conjunto e comparação case-insensitive.
+- [ ] Trocar `SupportedLocales` para `List<string>` get-only e implementar a normalização, deduplicação, ordem e
+  comparação fechadas em DF22.
+- [ ] Implementar validação de tags, default, conjunto não vazio e pertencimento do default.
 - [ ] Aplicar os defaults decididos a novos realms e aos seeds de Server/Demo/testes.
 - [ ] Promover `RealmOptionsPayloadSerializer` de v3 para v4 e preservar a exclusão de `ServerOptions`.
 - [ ] Atualizar fixtures/scripts que gravam payload e remover artefatos v1/v2/v3 de desenvolvimento.
 - [ ] Provar roundtrip estável, ordem determinística, cópia profunda, defaults e falha fechada.
 - [ ] Confirmar que nenhuma migration relacional SQLite/PostgreSQL foi criada.
+- [ ] Criar `Tests.Integration/Options/InternationalizationOptionsTests.cs` e estender
+  `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs`.
 
 **Critérios de aceite:** todo realm materializado contém options válidas e independentes; novos realms e seeds
 nascem com `Enabled=true`, default `en` e suporte a `en`/`pt-BR`/`es-419`; tags duplicadas apenas por casing são
-rejeitadas/normalizadas conforme um único contrato; default pertence ao conjunto; payload v4 é determinístico e
-v1-v3/versão futura falham; nenhuma coluna/tabela mudou.
+deduplicadas pela primeira ocorrência; ordem configurada e casing canônico sobrevivem a cópia/roundtrip; default
+pertence ao conjunto; Server permanece em v3, Realm passa a v4, v1-v3/versão futura de Realm falham e nenhuma
+coluna/tabela mudou; cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~InternationalizationOptions"
+dotnet test Tests.Integration --filter "FullyQualifiedName~InternationalizationOptionsTests"
 dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
-dotnet test Tests.Integration --filter "FullyQualifiedName~RealmOptions"
 ```
 
 ### Resultado da Fase 1
@@ -460,10 +496,10 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RealmOptions"
 
 ## Fase 2 - Catálogos RESX e infraestrutura de localização
 
-**Depende de:** Fase 1, DF2-DF4, DF7-DF8, DF15, DF18, DF20.
+**Depende de:** Fase 1, DF2-DF4, DF7-DF8, DF15, DF18, DF20, DF23.
 
 **Escopo:** `RoyalIdentity`, `RoyalIdentity.Razor/Resources`, registrations, snapshot refresher,
-`Tests.Identity`, `Tests.Integration`, `Tests.Architecture`.
+`Tests.Integration`, `Tests.Storage`, `Tests.Architecture`.
 
 **O que/como:** registrar localization do framework, criar catálogos neutro/`pt-BR`/`es-419`, expor
 disponibilidade sem dependência core→Razor e validar options/catálogos antes da publicação do snapshot.
@@ -482,18 +518,21 @@ disponibilidade sem dependência core→Razor e validar options/catálogos antes
 - [ ] Preservar startup fail-closed e last-known-good em refresh inválido.
 - [ ] Adicionar guards contra HTML em recursos e contra uso direto de `ResourceManager`/designer nos consumers.
 - [ ] Adicionar teste arquitetural garantindo que `RoyalIdentity` não referencia `RoyalIdentity.Razor`.
+- [ ] Criar `Tests.Integration/Localization/LocalizationCatalogTests.cs` e
+  `Tests.Architecture/LocalizationBoundaryTests.cs`; estender
+  `Tests.Storage/Configuration/ConfigurationSnapshotTests.cs` para startup/refresh inválidos.
 
 **Critérios de aceite:** os dois catálogos e suas três culturas resolvem as 62 chaves; nenhuma chave retorna o
 próprio nome em cultura suportada; chaves/placeholders são equivalentes; os seis arquivos somam 186 entradas;
 snapshot inválido nunca é publicado; Razor pode substituir o catálogo vazio sem dependência reversa; validação
-SSR usa a API estável do .NET 10.
+SSR usa a API estável do .NET 10; cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~ConfigurationSnapshot"
-dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizationCatalog"
-dotnet test Tests.Architecture
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationSnapshotTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizationCatalogTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundaryTests"
 ```
 
 ### Resultado da Fase 2
@@ -504,7 +543,7 @@ dotnet test Tests.Architecture
 
 ## Fase 3 - Seleção de cultura por request e preferência do usuário
 
-**Depende de:** Fases 1-2, DF5-DF10, DF20.
+**Depende de:** Fases 1-2, DF5-DF10, DF20, DF23.
 
 **Escopo:** request culture provider, `UseRoyalIdentityProtocol`, authorization/logout context resolvers,
 cookie/seletor Razor, Server/Demo/Tests.Host, testes HTTP.
@@ -525,18 +564,21 @@ fontes validadas; oferecer preferência persistida realm-scoped sem abrir redire
 - [ ] Ignorar cookie/hints que deixaram de ser suportados após refresh.
 - [ ] Definir comportamento de `Enabled=false` como ausência de negociação, usando default/neutro sem metadata.
 - [ ] Cobrir cancelamento, realm ausente, recurso neutro e cultures pai sem lançar erro protocolar.
+- [ ] Criar `Tests.Integration/Localization/RequestCultureTests.cs` e
+  `Tests.Integration/Localization/CulturePreferenceTests.cs`; estender
+  `Tests.Architecture/LocalizationBoundaryTests.cs` com a ordem do middleware nos três hosts.
 
 **Critérios de aceite:** cada request seleciona uma única cultura permitida; cookie vence `ui_locales`,
 `ui_locales` vence header; locale desconhecido cai para o próximo nível; dois realms no mesmo client HTTP não
 compartilham preferência; middleware executa antes de qualquer UI/auth que leia a cultura; retorno externo é
-rejeitado.
+rejeitado; cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~RequestCulture"
-dotnet test Tests.Integration --filter "FullyQualifiedName~CulturePreference"
-dotnet test Tests.Architecture --filter "FullyQualifiedName~Middleware"
+dotnet test Tests.Integration --filter "FullyQualifiedName~RequestCultureTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CulturePreferenceTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundaryTests"
 ```
 
 ### Resultado da Fase 3
@@ -547,7 +589,7 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~Middleware"
 
 ## Fase 4 - Códigos de apresentação e remoção de textos do core
 
-**Depende de:** Fases 1-3, DF11-DF13, DF17.
+**Depende de:** Fases 1-3, DF11-DF13, DF17, DF23.
 
 **Escopo:** `AccountOptions`, `LoginFlowResult`, `LoginFlowService`, eventos existentes, page services,
 view models/mensagens protegidas, testes de login/consent/logout.
@@ -567,16 +609,20 @@ view models/mensagens protegidas, testes de login/consent/logout.
 - [ ] Mapear todos os códigos para chaves de `AccountResources` e falhar teste quando um código não tiver recurso
   em inglês, `pt-BR` ou `es-419`.
 - [ ] Garantir que descrição OAuth/OIDC e `error` normativo não sejam convertidos em códigos de recurso.
+- [ ] Estender `Tests.UserAccounts/UserAccountsIntegrationTests.cs`,
+  `Tests.Integration/UI/LoginPageTests.cs` e
+  `Tests.Integration/Characterization/LoginEventCharacterizationTests.cs` sem criar fixture concorrente em
+  `Tests.Identity`.
 
 **Critérios de aceite:** não existe texto apresentável em `AccountOptions`/`LoginFlowResult`; as três classes de
 falha de login renderizam texto idêntico em cada cultura; evento ainda distingue o motivo interno; todo código
-tem recurso neutro, `pt-BR` e `es-419`; nenhum código OAuth/OIDC foi traduzido.
+tem recurso neutro, `pt-BR` e `es-419`; nenhum código OAuth/OIDC foi traduzido; cada filtro obrigatório seleciona
+ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~LoginFlow"
-dotnet test Tests.UserAccounts --filter "FullyQualifiedName~Login"
+dotnet test Tests.UserAccounts --filter "FullyQualifiedName~LoginFlow_KeepsGenericExternalMessage_AndPreservesInternalReason"
 dotnet test Tests.Integration --filter "FullyQualifiedName~LoginPageTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~LoginEventCharacterizationTests"
 ```
@@ -589,7 +635,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~LoginEventCharacteriz
 
 ## Fase 5 - Localização integral da UI de conta
 
-**Depende de:** Fases 2-4, DF3-DF4, DF15-DF16, DF18.
+**Depende de:** Fases 2-4, DF3-DF4, DF15-DF16, DF18, DF23.
 
 **Escopo:** todos os components/page services/view models de `RoyalIdentity.Razor`, resources, shells App dos
 três hosts e testes de UI.
@@ -610,17 +656,19 @@ atributos não visuais; derivar semântica cultural do documento.
 - [ ] Substituir `lang="en"` por cultura efetiva em Server, Demo e Tests.Host.
 - [ ] Derivar `dir="ltr|rtl"` de `TextInfo.IsRightToLeft`.
 - [ ] Criar teste/allowlist que falha para nova string apresentável fixa em inglês na UI do produto.
+- [ ] Criar `Tests.Integration/UI/LocalizedAccountUiTests.cs` para a matriz completa das três culturas.
 
 **Critérios de aceite:** cada superfície listada renderiza inglês, `pt-BR` e `es-419`; validação client/server
 SSR tem a mesma cultura; `html lang`/`dir` correspondem à cultura efetiva; nenhum recurso contém markup; não há
-string apresentável fixa fora de uma allowlist técnica revisada.
+string apresentável fixa fora de uma allowlist técnica revisada; cada filtro obrigatório seleciona ao menos um
+teste.
 
 **Testes:**
 
 ```powershell
 dotnet test Tests.Integration --filter "FullyQualifiedName~LoginPageTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~LoginConsentUIFlowTests"
-dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizedAccountUi"
+dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizedAccountUiTests"
 ```
 
 ### Resultado da Fase 5
@@ -631,9 +679,9 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizedAccountUi"
 
 ## Fase 6 - Discovery e aceites multi-realm ponta a ponta
 
-**Depende de:** Fases 1-5, DF6-DF9, DF14.
+**Depende de:** Fases 1-5, DF6-DF9, DF14, DF22-DF23.
 
-**Escopo:** `DiscoveryHandler`, catálogo efetivo, `Tests.Endpoints`, `Tests.Integration`, `Tests.Storage`,
+**Escopo:** `DiscoveryHandler`, catálogo efetivo, `Tests.Integration`, `Tests.Storage`, `Tests.Architecture`,
 composition roots.
 
 **O que/como:** publicar metadata somente após a capacidade real existir e validar a matriz completa de seleção,
@@ -643,8 +691,10 @@ fallback, isolamento, persistência e UI.
 
 - [ ] Injetar o catálogo efetivo em discovery sem tornar o core dependente de Razor.
 - [ ] Publicar `ui_locales_supported` apenas quando options e catálogo da UI estiverem ativos.
-- [ ] Ordenar metadata com default primeiro e demais locales deterministicamente.
+- [ ] Ordenar metadata com default primeiro e preservar a ordem configurada normalizada dos demais locales.
 - [ ] Omitir `claims_locales_supported`.
+- [ ] Cobrir o realm `admin`: publicar locales quando o host compõe a UI OIDC genérica e omitir quando o catálogo
+  default/vazio prova que o host não possui essa UI; não usar a existência de páginas administrativas como gate.
 - [ ] Cobrir `ui_locales` ordenado, inválido, desconhecido e culture pai.
 - [ ] Cobrir `es-419` exato, `es-MX` com variante espanhola única e ausência de inferência quando houver
   variantes espanholas ambíguas.
@@ -655,18 +705,25 @@ fallback, isolamento, persistência e UI.
 - [ ] Cobrir refresh inválido preservando snapshot/metadata anterior.
 - [ ] Validar payload v4 e paridade Configuration em SQLite e PostgreSQL opt-in.
 - [ ] Verificar Server, Demo e Tests.Host com a mesma ordem de middleware/registro.
+- [ ] Criar `Tests.Integration/Endpoints/LocalizationDiscoveryTests.cs` e concentrar nele os casos de metadata;
+  não adicionar dependência a `Tests.Endpoints`.
 
 **Critérios de aceite:** metadata é exatamente verdadeira para cada realm; locale não suportado não gera erro
-OIDC; todos os caminhos de authorize/logout selecionam a mesma cultura esperada; realm B não observa cookie,
-options ou metadata do realm A; SQLite e PostgreSQL materializam a mesma configuração.
+OIDC; o realm `admin` anuncia a UI OIDC quando ela está realmente composta, independentemente da futura UI
+administrativa; todos os caminhos de authorize/logout selecionam a mesma cultura esperada; realm B não observa
+cookie, options ou metadata do realm A; SQLite e PostgreSQL materializam a mesma configuração; cada filtro
+obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Endpoints --filter "FullyQualifiedName~Discovery"
-dotnet test Tests.Integration --filter "FullyQualifiedName~Localization"
-dotnet test Tests.Storage --filter "FullyQualifiedName~Configuration"
-dotnet test Tests.Architecture
+dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizationDiscoveryTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~RequestCultureTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CulturePreferenceTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizedAccountUiTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationSnapshotTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundaryTests"
 ./scripts/Test-ServerPostgreSql.ps1
 ```
 
@@ -706,7 +763,7 @@ registrados e verdes.
 **Testes:**
 
 ```powershell
-if (rg -n "InvalidCredentialsErrorMessage|InactiveUserErrorMessage|BlockedUserErrorMessage|Redesign\\(\"Usar Resource\"\\)" RoyalIdentity Tests.Identity Tests.Integration Tests.Storage Tests.UserAccounts Tests.Endpoints) { throw "Dívida de Localization removida reapareceu." }
+if (rg -n 'InvalidCredentialsErrorMessage|InactiveUserErrorMessage|BlockedUserErrorMessage|Usar Resource' RoyalIdentity Tests.Identity Tests.Integration Tests.Storage Tests.UserAccounts) { throw "Dívida de Localization removida reapareceu." }
 rg -n "IStringLocalizer|Internationalization|ui_locales_supported|RequestLocalization" RoyalIdentity RoyalIdentity.Razor .ai AGENTS.md
 dotnet build RoyalIdentity.sln
 dotnet test RoyalIdentity.sln
@@ -722,12 +779,12 @@ dotnet test RoyalIdentity.sln
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Options validadas/persistidas por realm | 1-2 | DF1, DF8, DF17 | v4 determinística; cópia/validação; snapshot pré-validado | `Tests.Identity`; `Tests.Storage`; `RealmOptions` |
+| Options validadas/persistidas por realm | 1-2 | DF1, DF8, DF17, DF21-DF23 | Server v3/Realm v4; ordem/cópia/validação; snapshot pré-validado | `InternationalizationOptionsTests`; `ConfigurationModelPayloadTests`; `ConfigurationSnapshotTests` |
 | Seleção determinística por request | 3, 6 | DF5, DF6, DF9, DF10, DF20 | precedência exata; fallback espanhol não ambíguo; hints ignoráveis; cookies isolados | `RequestCulture`; `CulturePreference`; `Localization` |
 | Catálogos RESX íntegros | 2, 5 | DF2-DF4, DF15, DF18, DF20 | 62 chaves por cultura; 6 arquivos; paridade de chaves/placeholders; nenhum missing resource | `LocalizationCatalog`; `LocalizedAccountUi` |
 | Remover textos do core e preservar segurança | 4 | DF11-DF13 | códigos estáveis; falha genérica; motivo interno preservado | `LoginFlow`; `LoginEventCharacterizationTests` |
 | Localizar UI completa/documento | 5 | DF3, DF4, DF15, DF16, DF18, DF20 | inglês/pt-BR/es-419; validação; `lang`/`dir`; sem hardcode | `LoginPageTests`; `LoginConsentUIFlowTests`; `LocalizedAccountUi` |
-| Metadata fiel | 6 | DF7, DF14 | `ui_locales_supported` exato/omitido; sem claims locales | `Discovery`; `Localization` |
+| Metadata fiel | 6 | DF7, DF14, DF22-DF23 | `ui_locales_supported` exato/omitido; admin com UI OIDC; sem claims locales | `LocalizationDiscoveryTests` |
 | Fechar dívida/documentação | 7 | DF19 | redesign/foundations/roadmap alinhados; guards verdes | `rg`; build; solution test |
 
 ---
@@ -748,12 +805,15 @@ dotnet test RoyalIdentity.sln
 12. Payload v4 só nasce depois de v2/v3; nenhuma migration relacional é criada para a troca do JSON.
 13. Authorization codes continuam single-use, PKCE default-on e sessões/consents continuam realm-scoped.
 14. SSR estático mantém GET/POST independentes e validação correta em ambas as requisições.
+15. `SupportedLocales` preserva ordem configurada e elimina duplicatas case-insensitive pela primeira ocorrência.
+16. Nenhum comando filtrado obrigatório pode fechar fase selecionando zero testes.
 
 ---
 
 ## Critérios globais de conclusão
 
 - `InternationalizationOptions` está integrada, copiada, validada e persistida por realm no payload v4.
+- `ServerOptionsPayload` permanece em v3; `RealmOptionsPayload` parte de v3 e passa a v4 sem saltar predecessor.
 - Os seis catálogos físicos — 62 chaves por cultura em neutro/inglês, `pt-BR` e `es-419` — têm paridade
   completa de chaves/placeholders.
 - Precedência cookie > `ui_locales` > `Accept-Language` > default > neutro está provada.
@@ -761,9 +821,12 @@ dotnet test RoyalIdentity.sln
 - Toda UI de conta, validação, acessibilidade e documento HTML está localizada.
 - As três mensagens configuráveis e seus `[Redesign]` foram removidos; anti-enumeration permanece.
 - `ui_locales_supported` reflete exatamente configuração + catálogo e `claims_locales_supported` não é inventado.
+- O realm `admin` publica os locales da UI OIDC genérica quando essa UI está composta; a ausência do painel
+  administrativo não é tratada como ausência da UI do OP.
 - Dois realms permanecem isolados em options, cookie, UI e discovery.
 - Snapshot inválido falha startup/refresh sem publicar estado parcial.
 - `redesign-todo.md`, foundations, AGENTS e roadmap refletem a implementação concluída.
+- Todas as classes de teste nomeadas existem e nenhum filtro obrigatório seleciona zero testes.
 - `dotnet build RoyalIdentity.sln` e `dotnet test RoyalIdentity.sln` passam.
 
 ---
@@ -781,7 +844,9 @@ dotnet test RoyalIdentity.sln
 | Texto do core reaparece | service retorna frase por conveniência | boundary volta a misturar domínio/UI | códigos tipados + guards de source | Aberto |
 | Tradução revela estado da conta | chaves diferentes por motivo | enumeração de usuário | um código/recurso para três motivos + testes | Aberto |
 | Culture afeta protocolo | formatter/comparer usa cultura corrente | interoperabilidade ou vulnerabilidade | comparações ordinais/invariant + regressão protocolar | Aberto |
-| Payload executado fora de ordem | base ainda é v1/v2 | salto de schema e planos inconsistentes | gate explícito `CurrentVersion == 3` na Fase 1 | Aberto |
+| Payload executado fora de ordem | Server ou Realm ainda é v1/v2 | salto de schema e planos inconsistentes | gate explícito de ambos em `CurrentVersion == 3` na Fase 1 | Aberto |
+| Coleção perde ordem/canonicalização | `HashSet` ou sort implícito reaparece | metadata e preferência ficam instáveis | DF22 + roundtrip/ordem/duplicata por casing | Aberto |
+| Filtro executa zero testes | classe planejada não existe ou projeto está fora da solution | fase fecha em falso verde | DF23 + classes/arquivos nomeados | Aberto |
 | Validação SSR fica em inglês | apenas component text usa localizer | experiência parcialmente localizada | API .NET 10 + testes client/server | Aberto |
 | Scan de hardcodes tem falsos positivos | nomes técnicos/test data em inglês | guard frágil | allowlist pequena, revisada e restrita ao produto UI | Aberto |
 
@@ -798,6 +863,9 @@ dotnet test RoyalIdentity.sln
 - Localização da futura API/UI administrativa e findings de segurança — destino: `plan-admin-api-ui.md`;
   reutilizar infraestrutura e localizar por `RuleId`.
 - Localização da RP de testes `Tests.WebApp` — fora do produto OP; revisar somente se virar aplicação distribuída.
+- `Tests.Endpoints` órfão e duplicado — destino: limpeza geral de
+  [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md); não é infraestrutura de discovery nem gate
+  deste plano.
 
 ---
 

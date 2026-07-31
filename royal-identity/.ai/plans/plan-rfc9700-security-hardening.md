@@ -41,16 +41,21 @@
   `ServerOptions`/`RealmOptions` são Configuration; `Data.Configuration` permanece puro e o adapter materializa.
 - [plan-data-operational-storage.md](plan-data-operational-storage.md) — consumo de refresh token já possui
   transição condicional/atômica e a tolerância é aplicada pelo caller sobre estado rematerializado.
-- [plan-replay-protection.md](plan-replay-protection.md) — proteção de replay de `private_key_jwt` está na Fase 3;
-  o Server já usa backing Operational durável.
+- [plan-replay-protection.md](plan-replay-protection.md) — concluído (3/3); proteção de replay de
+  `private_key_jwt` usa `IReplayProtectionStore` e o Server já possui backing Operational durável.
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — baseline anterior para
   taxonomia, status e headers do token endpoint; a Fase 3 deste plano consome sua classificação de PKCE.
 - [plan-oidc-session-management.md](plan-oidc-session-management.md) — predecessor que implementa o OP iframe e
   fixa a exceção protocolar de framing; a Fase 5 deve preservar seus testes de ausência de headers bloqueadores.
+- [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — predecessor que remove
+  `LoggingOptions.UseLogService`, fixa os payloads Configuration v3 e corrige o alias mTLS de revocation; este
+  plano consome essa superfície simplificada sem reintroduzir option/branch ou a rota incorreta.
+- [plan-localization.md](plan-localization.md) — predecessor que mantém Server Options em v3 e promove Realm
+  Options para v4; é a baseline imediata para adicionar `RedirectUriValidation` aos dois grafos.
 - [plans-roadmap-02.md](plans-roadmap-02.md) e [backlog-001.md](../backlogs/backlog-001.md) — API/UI
   administrativa ainda não existem; este plano deve entregar um contrato puro que o futuro Admin consuma.
 
-### Estado atual do código (verificado em 2026-07-30)
+### Estado atual do código (verificado em 2026-07-31)
 
 - **Defaults do client parcialmente seguros:** `Client.RequirePkce = true`,
   `AllowPlainTextPkce = false`, `AllowedResponseTypes = code` e `AllowedGrantTypes = authorization_code`.
@@ -81,6 +86,8 @@
   administrativas continuam no roadmap/backlog.
 - **Persistência vigente:** clients têm projeção relacional e property-coverage test; opções de server/realm são
   payloads JSON versionados; Operational tem migrations SQLite/PostgreSQL e contracts provider-neutral.
+- **Cadeia reservada de payloads:** após os predecessores, Server Options estará em v3 e Realm Options em v4;
+  adicionar `RedirectUriValidation` a ambos exige Server v4 e Realm v5, com leitura fail-closed das versões antigas.
 
 ### Lacunas, conflitos e restrições
 
@@ -94,17 +101,22 @@
   falha de persistência no cliente; o retry não pode criar ramos na família.
 - **Admin é outro plano:** este plano não pode adicionar lógica administrativa a `RoyalIdentity.Razor`; apenas
   entrega tipos e regras consumíveis e registra o handoff.
-- **Plano de replay ativo:** não modificar nem duplicar `IReplayProtectionStore`; concluir
-  `plan-replay-protection.md` antes dos aceites finais deste plano.
+- **Replay protection já concluída:** não modificar, duplicar nem contornar `IReplayProtectionStore`; este plano
+  consome a baseline implementada por `plan-replay-protection.md`.
 - **OP iframe precisa ser enquadrável:** `check_session_iframe` é deliberadamente carregado por RPs em outra
   origem. O hardening browser-facing não pode tratá-lo como login/consent/error nem injetar
   `X-Frame-Options: DENY` ou `frame-ancestors 'none'` nessa rota.
+- **Predecessores compartilham superfícies:** `LoggingOptions`, `DiscoveryHandler`, aliases mTLS e os payloads
+  Configuration chegam a este plano já alterados por Debt Closure e Localization; não reabrir essas decisões.
+- **Filtros amplos mascaram cobertura:** `FullyQualifiedName~Pkce` seleciona apenas `PkceHelperTests` hoje;
+  `~RedirectUri` seleciona métodos incidentais sem provar a nova policy; `~Cors` seleciona testes existentes, mas
+  o filtro composto da Fase 5 poderia permanecer verde sem nenhum teste novo de logging/headers.
 
 ### Superfícies impactadas a mapear
 
 - `RoyalIdentity/Models`, `Options`, `Contracts`, `Contexts/Validators`, `Handlers`, `Responses` — regras e runtime.
 - `RoyalIdentity.Data.Configuration` e `RoyalIdentity.Storage.EntityFramework/Configuration` — novas opções e
-  roundtrip de configuração.
+  roundtrip de configuração, default/projeção de client, seeds e property coverage.
 - `RoyalIdentity.Data.Operational` e `RoyalIdentity.Storage.EntityFramework/Operational` — família/rotação de
   refresh token e migrations.
 - `RoyalIdentity.Server`, `RoyalIdentity.Demo`, `Tests.Host`, `RoyalIdentity.Razor` — headers, proxy/TLS e
@@ -201,16 +213,31 @@
   diretamente, atualizando todos os consumidores e sem compatibility shims. Fonte: `AGENTS.md` + decisão humana.
 - **DF16 — Handoff administrativo:** o futuro Admin calcula o assessment em leitura e após edição, exibe findings
   por `RuleId` e não grava status derivado. Fonte: decisão humana nesta discussão.
-- **DF17 — Sequenciamento:** os aceites finais dependem da conclusão da Fase 3 de
-  `plan-replay-protection.md`; não duplicar a solução de replay. Fonte: plano ativo e `AGENTS.md`.
+- **DF17 — Baseline de replay preservada:** `plan-replay-protection.md` está concluído; este plano preserva
+  `IReplayProtectionStore`, o backing Operational declarado por host e seus guards, sem duplicar a solução.
+  Fonte: plano concluído + `AGENTS.md`.
 - **DF18 — Baseline de erros do token endpoint:** a Fase 3 depende da conclusão de
-  `plan-oauth21-token-error-responses.md`; verifier sem challenge retorna `invalid_request`, enquanto verifier
-  incorreto contra challenge existente permanece `invalid_grant`. Não duplicar neste plano o redesign de
-  respostas. Fonte: OAuth 2.1 draft-15 §§3.2.4/4.1.3 + RFC 7636 §4.6.
+  `plan-oauth21-token-error-responses.md`; a Fase 4 também consome seus writers/status para erros de refresh.
+  Verifier sem challenge retorna `invalid_request`, enquanto verifier incorreto contra challenge existente e
+  replay/família revogada retornam `invalid_grant` sem recriar o transporte. Fonte: OAuth 2.1 draft-15
+  §§3.2.4/4.1.3 + RFC 7636 §4.6.
 - **DF19 — Exceção nominal de framing:** aplicar proteção contra framing a páginas sensíveis, mas excluir
   exclusivamente a rota `check_session_iframe`; preservar por teste a ausência de `X-Frame-Options: DENY` e de
   `frame-ancestors 'none'` nessa resposta, sem relaxar login/consent/logout/error. Fonte:
   `plan-oidc-session-management.md` DF16 + requisito funcional do OP iframe.
+- **DF20 — Payloads sequenciais e fail-closed:** executar após Debt Closure e Localization. A nova option em ambos
+  os grafos promove `ServerOptionsPayload` de v3 para v4 e `RealmOptionsPayload` de v4 para v5; serializers aceitam
+  somente a versão corrente, seeds/fixtures são reprovisionados e não há migration relacional para os JSONs.
+  Fonte: ordem do roadmap + comportamento real dos serializers.
+- **DF21 — Topologia verificável de testes:** factory/validators puros ficam em classes nomeadas de
+  `Tests.Identity`; HTTP/metadata/logging/headers ficam em classes nomeadas de `Tests.Integration`; payload/client
+  Configuration e família Operational ficam em classes nomeadas de `Tests.Storage`; boundaries ficam em
+  `Tests.Architecture`. Cada comando filtrado é separado e deve selecionar ao menos um teste; não usar OR para que
+  outra fixture esconda uma classe ausente. Fonte: infraestrutura atual + regra dos planos predecessores.
+- **DF22 — Metadata PKCE fiel:** enquanto `AllowPlainTextPkce` e seu caminho runtime permanecerem suportados,
+  `code_challenge_methods_supported` anuncia `S256` e `plain`; a lista expressa capacidade, não preferência.
+  `S256` continua obrigatório e clientes com `AllowPlainTextPkce=true` recebem finding não aderente. Remover
+  `plain` da metadata exige remover no mesmo corte a option e o caminho runtime. Fonte: RFC 9700 §2.1.1 + RFC 8414.
 
 ---
 
@@ -231,6 +258,24 @@
   - **Resposta humana:** o projeto está em desenvolvimento, sem clients de produção; breaking changes são
     aceitáveis.
   - **Conclusão:** DF15 e registro persistente em `AGENTS.md`.
+
+**Revisão externa de posicionamento e execução (2026-07-31):**
+
+- **Confirmados:** faltavam os predecessores Debt Closure/Localization, a cadeia de payloads estava aberta e a
+  compatibilidade descrita contradizia a leitura fail-closed dos serializers. Conclusão: DF20.
+- **Confirmados:** a Fase 4 também altera default/projeção Configuration do `Client` e os dois branches de
+  `TimeSpan.MaxValue`; seus erros devem consumir a baseline OAuth 2.1. Conclusão: ampliar escopo e DF18.
+- **Parcialmente confirmado:** `~Pkce` seleciona apenas o helper e não prova downgrade. `~RedirectUri` e `~Cors`
+  não estão vazios — `FullyQualifiedName` também casa nomes de métodos —, mas selecionam cobertura incidental ou
+  permitem que o filtro composto esconda a ausência de logging/headers. Conclusão: classes e comandos separados
+  em DF21.
+- **Decisão fechada:** o RFC 9700 recomenda S256, mas não proíbe suporte server-side a `plain`; RFC 8414 define
+  `code_challenge_methods_supported` como a lista dos métodos suportados, e o RFC 9700 recomenda publicá-la. Como
+  o plano preserva o opt-in de client, manter anúncio fiel conforme DF22, sem tratá-lo como preferência.
+- **Dependência da Fase 4:** não forçar dependência funcional da Fase 3; ambas podem consumir diretamente o plano
+  OAuth 2.1 já concluído. Conclusão: dependência explícita pela mesma baseline.
+- **Correção adicional ao relatório:** Replay Protection não está mais ativo/pendente; já foi concluído e deve ser
+  tratado como baseline preservada. Conclusão: atualizar estado e DF17.
 
 ---
 
@@ -265,6 +310,10 @@ RedirectUriValidationOptions
   Comparison RedirectUriComparison = Ordinal
   AllowWildcards bool = false
 
+Configuration payloads após os predecessores
+  ServerOptionsPayload v3 -> v4
+  RealmOptionsPayload  v4 -> v5
+
 RefreshToken
   FamilyId string                  obrigatório, opaco e realm-bound
   Generation int                   >= 0
@@ -279,8 +328,8 @@ refresh_token_families (ou representação relacional equivalente decidida na Fa
   primary/unique (realm_id, family_id/digest)
 ```
 
-- Options continuam no payload JSON versionado de Configuration; provar roundtrip, defaults ausentes e cópia
-  independente.
+- Options continuam no payload JSON versionado de Configuration; provar roundtrip, versões exatas e cópia
+  independente. Payload anterior não materializa defaults: falha fechado e exige reprovisionamento.
 - Família/rotação pertencem a Operational; criar migrations novas SQLite/PostgreSQL e atualizar contratos/matriz.
 - Não persistir assessment, findings, texto de UI ou status de aderência.
 - Nunca persistir/logar handles de refresh em claro quando o backing puder usar digest.
@@ -334,9 +383,10 @@ Futuro Admin/
 - Não preservar implicit/hybrid, password grant configurado, wildcard default, comparação ignore-case default ou
   refresh reutilizável.
 - Atualizar seeds e fixtures diretamente para o novo estado válido.
-- Criar migrations incrementais dos providers; não executar migrations nos hosts.
-- Payloads antigos sem `RedirectUriValidation` materializam os defaults seguros; como não há produção, não criar
-  modos de compatibilidade.
+- Criar migrations incrementais Operational dos providers para famílias de refresh; não criar migration
+  relacional para os payloads Configuration nem executar migrations nos hosts.
+- Promover Server v3→v4 e Realm v4→v5; payloads anteriores/futuros falham fechados, seeds/fixtures são
+  reprovisionados e não se criam modos de compatibilidade nem migration relacional para o JSON.
 - Configurações relaxadas de redirect permanecem possíveis por decisão explícita e aparecem como
   `NonCompliant`.
 - Findings/RuleIds são contrato para o futuro Admin; renomeá-los depois exige atualização coordenada de UI,
@@ -345,6 +395,9 @@ Futuro Admin/
 ---
 
 ## Ordem de execução
+
+**Pré-condição do plano:** concluir Debt Closure e Localization; iniciar sobre Logging/mTLS simplificados e
+payloads Server v3/Realm v4.
 
 1. **Fase 1 (assessment)** — fixa o vocabulário e torna cada correção observável.
 2. **Fase 2 (redirect)** — introduz a única compatibilidade configurável decidida.
@@ -365,7 +418,9 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Assessment determinístico e catálogo de regras
 
-**Depende de:** DF1-DF6, DF10-DF12, DF14-DF16.
+**Depende de:** DF1-DF6, DF10-DF12, DF14-DF16, DF20-DF22 e conclusão de
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) e
+[plan-localization.md](plan-localization.md).
 
 **Escopo:** `RoyalIdentity/Models` (local exato decidido pela estrutura existente), `Tests.Identity`,
 `Tests.Architecture`, documentação XML pública.
@@ -385,16 +440,19 @@ inexequíveis, para manter diagnóstico de dados manualmente construídos.
 - [ ] Documentar que `Compliant` significa “sem findings de configuração aplicáveis”, não certificação de deploy.
 - [ ] Adicionar testes table-driven para cada regra, precedência de status, nulidade e determinismo.
 - [ ] Adicionar guard arquitetural para impedir dependência de UI/Data/provider.
+- [ ] Criar `Tests.Identity/Security/ClientSecurityAssessmentTests.cs` e
+  `Tests.Architecture/Rfc9700BoundaryTests.cs`.
 
 **Critérios de aceite:** duas chamadas com os mesmos objetos produzem valores equivalentes; não há interface,
 registro DI, relógio, I/O ou entidade persistente; todo `RuleId` é único; cada relaxamento de redirect resulta em
-`NonCompliant`; recomendações assimétricas/sender-constrained resultam em `Warning`, não falso `Compliant`.
+`NonCompliant`; recomendações assimétricas/sender-constrained resultam em `Warning`, não falso `Compliant`; cada
+filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~ClientSecurityAssessment"
-dotnet test Tests.Architecture
+dotnet test Tests.Identity --filter "FullyQualifiedName~ClientSecurityAssessmentTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~Rfc9700BoundaryTests"
 ```
 
 ### Resultado da Fase 1
@@ -405,7 +463,9 @@ dotnet test Tests.Architecture
 
 ## Fase 2 - Validação configurável e segura de redirect URIs
 
-**Depende de:** Fase 1, DF7-DF9, DF15.
+**Depende de:** Fase 1, DF7-DF9, DF15, DF20-DF21 e conclusão de
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) e
+[plan-localization.md](plan-localization.md), com Server Options v3 e Realm Options v4.
 
 **Escopo:** `ServerOptions`, `RealmOptions`, nova option, `IRedirectUriValidator`,
 `DefaultRedirectUriValidator`, validators authorize/code/end-session, serializers/materializers Configuration,
@@ -420,8 +480,10 @@ diagnosticados.
 - [ ] Criar `RedirectUriComparison` fechado em `Ordinal` e `OrdinalIgnoreCase`.
 - [ ] Criar `RedirectUriValidationOptions`, copy constructor e `Validate()`.
 - [ ] Adicionar a option a `ServerOptions` e `RealmOptions`, incluindo todos os copy constructors.
-- [ ] Atualizar payloads/roundtrips Configuration e decidir explicitamente o bump de versão conforme a política
-  já usada pelos serializers.
+- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 3` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 4`.
+- [ ] Promover Server Options v3→v4 e Realm Options v4→v5, mantendo leitura fail-closed e reprovisionando
+  seeds/fixtures sem migration relacional.
 - [ ] Evoluir `IRedirectUriValidator` para receber options efetivas e `CancellationToken`.
 - [ ] Reescrever o default validator para não inspecionar wildcard quando a flag estiver desligada.
 - [ ] Aplicar a mesma política a authorize, code redemption e post-logout redirect.
@@ -430,17 +492,21 @@ diagnosticados.
   equivalentes a open redirect.
 - [ ] Atualizar seeds/fixtures para URIs HTTPS e defaults seguros; localhost HTTP deixa de ser aceito neste corte.
 - [ ] Adicionar testes de case, wildcard, fragment, esquema, open redirect, cópia e isolamento entre realms.
+- [ ] Criar `Tests.Identity/Validators/RedirectUriValidationTests.cs` e
+  `Tests.Integration/Endpoints/RedirectUriPolicyTests.cs`; estender
+  `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs` para Server v4/Realm v5.
 
 **Critérios de aceite:** o default só aceita string idêntica em comparação ordinal; alterar case falha; wildcard
 só funciona quando explicitamente habilitado; nenhum fragment/HTTP é aceito; dois realms podem ter políticas
-distintas sem compartilhar instâncias; roundtrip EF preserva a opção.
+distintas sem compartilhar instâncias; Server v4/Realm v5 preservam a option e outras versões falham fechadas;
+cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~RedirectUri"
-dotnet test Tests.Storage --filter "FullyQualifiedName~Configuration"
-dotnet test Tests.Integration --filter "FullyQualifiedName~RedirectUri"
+dotnet test Tests.Identity --filter "FullyQualifiedName~RedirectUriValidationTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~RedirectUriPolicyTests"
 ```
 
 ### Resultado da Fase 2
@@ -451,12 +517,12 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RedirectUri"
 
 ## Fase 3 - Authorization Code, PKCE e remoção do front-channel legado
 
-**Depende de:** Fases 1-2, DF10-DF12, DF15, DF18 e conclusão de
+**Depende de:** Fases 1-2, DF10-DF12, DF15, DF18, DF21-DF22 e conclusão de
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
 
 **Escopo:** `PkceValidator`, `PkceMatchValidator`, `AuthorizeMainValidator`, `AuthorizeHandler`,
 `DiscoveryOptions`, `DiscoveryHandler`, response modes/results, constants apenas se ficarem sem consumidores,
-seeds, `Tests.Identity`, `Tests.Integration`.
+seeds, `Tests.Integration`.
 
 **O que/como:** tornar authorization code + PKCE o único fluxo interativo suportado, fechar downgrade e remover
 emissão/anúncio de tokens no front-channel sem opção legada.
@@ -468,8 +534,8 @@ emissão/anúncio de tokens no front-channel sem opção legada.
   fase.
 - [ ] Consumir a taxonomia e o writer entregues pelo plano OAuth 2.1 sem reintroduzir helpers paralelos.
 - [ ] Preservar rejeição de verifier ausente/incorreto e comparação em tempo constante.
-- [ ] Manter S256 como default/suporte anunciado; plain continua somente como setting inseguro do client e gera
-  finding enquanto existir no modelo.
+- [ ] Manter `S256` obrigatório e `plain` anunciado enquanto a option/path runtime existirem; tratar a metadata
+  como capacidade, não preferência, e gerar finding para client com `AllowPlainTextPkce=true` conforme DF22.
 - [ ] Remover `token`, `id_token` e combinações implicit/hybrid do discovery e da validação global.
 - [ ] Remover branches de emissão de access/identity token da authorization response.
 - [ ] Remover response modes/resultados exclusivos do fluxo legado quando não houver consumidor remanescente.
@@ -477,16 +543,21 @@ emissão/anúncio de tokens no front-channel sem opção legada.
 - [ ] Adicionar regression test que prova a ausência do password grant.
 - [ ] Emitir e anunciar `iss` na authorization response conforme RFC 9207, com testes realm-aware.
 - [ ] Atualizar assessment para refletir comportamento removido e dados de configuração residuais.
+- [ ] Reutilizar `Tests.Integration/Endpoints/TokenErrorTests.cs` para downgrade e criar
+  `Tests.Integration/Endpoints/AuthorizationCodeOnlyTests.cs` para runtime, metadata, password grant e `iss`;
+  manter `Tests.Integration/Endpoints/CodeSingleUseTests.cs` como regressão do consumo.
 
 **Critérios de aceite:** discovery anuncia somente response types realmente executáveis; nenhuma authorization
-response contém access token/ID token; downgrade de PKCE retorna `invalid_request`; authorization code continua
-single-use e bound a client/redirect; password grant retorna grant não suportado.
+response contém access token/ID token; downgrade de PKCE retorna `invalid_request`; metadata PKCE anuncia
+exatamente `S256` e `plain` enquanto ambos forem suportados; authorization code continua single-use e bound a
+client/redirect; password grant retorna grant não suportado; cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~Pkce"
-dotnet test Tests.Integration --filter "FullyQualifiedName~Authorize|FullyQualifiedName~CodeToken|FullyQualifiedName~Discovery"
+dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCodeOnlyTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CodeSingleUseTests"
 ```
 
 ### Resultado da Fase 3
@@ -497,12 +568,14 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~Authorize|FullyQualif
 
 ## Fase 4 - Rotação e detecção de replay de refresh tokens
 
-**Depende de:** Fase 1, Q1, DF13, DF15 e semânticas vigentes de
+**Depende de:** Fase 1, Q1, DF13, DF15, DF18, DF21, conclusão de
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) e semânticas vigentes de
 `plan-data-operational-storage.md`/`plan-data-storage-matrix.md`.
 
-**Escopo:** `RefreshToken`, factory/handler, `IRefreshTokenStore` e resultados de transição,
-`Data.Operational`, adapter Operational, payload serializers, migrations SQLite/PostgreSQL,
-`Tests.Storage`, `Tests.Integration`, matriz de storage.
+**Escopo:** `Client.RefreshTokenPostConsumedTimeTolerance`, `RefreshToken`, factory/handler,
+`IRefreshTokenStore` e resultados de transição, `Data.Configuration`, adapter Configuration, seeds/fixtures de
+client e property coverage, `Data.Operational`, adapter Operational, payload serializers, migrations
+SQLite/PostgreSQL, `Tests.Storage`, `Tests.Integration`, matriz de storage.
 
 **O que/como:** substituir reutilização/consumo isolado por rotação atômica realm-bound com família. Separar
 construção de tokens de persistência quando necessário para que nenhuma credencial seja emitida antes da decisão
@@ -518,22 +591,32 @@ atômica.
 - [ ] Retornar o mesmo sucessor ainda ativo em retry dentro da tolerância, sem criar ramo.
 - [ ] Revogar a família quando houver reutilização fora da tolerância ou de ancestral após avanço.
 - [ ] Impedir uso de qualquer membro de família revogada.
-- [ ] Remover o caminho `TimeSpan.MaxValue` e o reuso do mesmo handle.
+- [ ] Aplicar a resposta de Q1 como novo default de `Client.RefreshTokenPostConsumedTimeTolerance` e atualizar
+  materialização Configuration, seeds, fixtures e property-coverage sem migration relacional de Configuration.
+- [ ] Remover os dois caminhos de `TimeSpan.MaxValue` em `RefreshTokenHandler`: aceitação ilimitada em
+  `IsWithinTolerance` e reuso do mesmo handle em `IssueRefreshTokenAsync` para token sliding.
+- [ ] Responder replay e família revogada com `invalid_grant` pela baseline OAuth 2.1, sem recriar writer/helper.
 - [ ] Refatorar criação/persistência para não gravar access/identity/refresh tokens antes de vencer a rotação.
 - [ ] Preservar downscoping, audiences, claims mode, expiração absoluta/sliding e revogação por subject.
 - [ ] Criar migrations incrementais SQLite/PostgreSQL e atualizar cleanup/purge.
 - [ ] Adicionar contratos sequenciais, concorrentes e de crash/retry nos dois providers.
+- [ ] Criar `Tests.Storage/Storage/Contracts/RefreshTokenFamilyStoreContractTests.cs` e
+  `Tests.Integration/Endpoints/RefreshTokenRotationTests.cs`; estender
+  `ConfigurationModelClientCoverageTests` e `ConfigurationMaterializationClientTests` para o novo default.
 
 **Critérios de aceite:** exatamente um sucessor existe por geração; duas rotações concorrentes não retornam
 sucessores distintos; retry tolerado retorna o mesmo refresh handle sucessor; replay real revoga a família;
 tokens de família revogada falham; nenhum caminho aceita reutilização ilimitada; regras atuais de claims/resources
-continuam verdes.
+continuam verdes; o default do client sobrevive à materialização Configuration; erros de replay usam a baseline
+OAuth 2.1; cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Storage --filter "FullyQualifiedName~RefreshToken"
-dotnet test Tests.Integration --filter "FullyQualifiedName~RefreshToken"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelClientCoverageTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationMaterializationClientTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~RefreshTokenFamilyStoreContractTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~RefreshTokenRotationTests"
 ./scripts/Test-OperationalPostgreSql.ps1
 ```
 
@@ -545,12 +628,14 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RefreshToken"
 
 ## Fase 5 - Segurança HTTP, metadata, client authentication e logs
 
-**Depende de:** Fases 1-3, DF6, DF10, DF14, DF17, DF19 e conclusão de
-[plan-oidc-session-management.md](plan-oidc-session-management.md).
+**Depende de:** Fases 1-3, DF6, DF10, DF14, DF17, DF19-DF22 e conclusão de
+[plan-oidc-session-management.md](plan-oidc-session-management.md),
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) e
+[plan-localization.md](plan-localization.md).
 
 **Escopo:** `CspOptions`, middleware/response helpers, `LoggingOptions`/`LoggerExtensions`,
 discovery/mTLS routing, hosts, `RoyalIdentity.Razor`, `Tests.Host`, `Tests.WebApp`,
-`Tests.Integration`, assessment.
+`Tests.Integration`, `Tests.Architecture`, assessment.
 
 **O que/como:** aplicar proteções independentes de client como enforcement de host/runtime; alinhar metadata ao
 suporte real e limitar o assessment ao que os modelos conseguem provar.
@@ -567,24 +652,39 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
 - [ ] Garantir que redirects após requests com credenciais nunca usem 307; preferir 303 onde aplicável.
 - [ ] Confirmar por teste que authorization endpoint não recebe CORS.
 - [ ] Redigir authorization code, `code_verifier`, `state`, `nonce`, assertions e tokens dos logs de erro.
-- [ ] Corrigir/mapejar endpoints mTLS antes de anunciá-los; quando indisponíveis, omitir aliases/métodos.
+- [ ] Consumir `LoggingOptions` sem `UseLogService` e ampliar somente `SensitiveValuesFilter`/redaction; não
+  reintroduzir option ou branch removido pelo plano predecessor.
+- [ ] Preservar o alias mTLS de revocation já corrigido para `BuildMtlsRevocationUrl`; corrigir/mapear somente
+  endpoints restantes antes de anunciá-los e omitir aliases/métodos indisponíveis.
 - [ ] Preservar `private_key_jwt` com backing de replay declarado e incluir seu uso no assessment.
 - [ ] Adicionar validação de startup para issuer/forwarded headers/trusted proxy necessária ao host, sem alegar
   que `ClientSecurityAssessment` prova o deployment.
 - [ ] Atualizar findings de client authentication assimétrica e sender constraint como recomendações.
+- [ ] Criar `Tests.Integration/Security/BrowserSecurityHeadersTests.cs`,
+  `Tests.Integration/Security/SensitiveLoggingTests.cs` e
+  `Tests.Integration/Endpoints/AuthorizationEndpointCorsTests.cs`; estender
+  `Tests.Integration/Endpoints/DiscoveryTests.cs` para aliases/capacidades exatos.
+- [ ] Estender `Tests.Architecture/Rfc9700BoundaryTests.cs` para impedir reintrodução de `UseLogService`, aliases
+  mTLS construídos pela rota errada e dependências proibidas do assessment.
 
 **Critérios de aceite:** nenhuma página sensível pode ser enquadrada por origem não autorizada; a única exceção é
 o OP iframe, cuja resposta não contém `X-Frame-Options: DENY` nem `frame-ancestors 'none'`; referrer não carrega
 parâmetros; logs capturados não contêm segredos/handles; discovery não anuncia rota/método inexistente;
 authorization endpoint continua fora do CORS; startup falha ou alerta de forma explícita para configuração de
-proxy/issuer insegura conforme o contrato fechado na fase.
+proxy/issuer insegura conforme o contrato fechado na fase; `UseLogService` não reaparece, revocation mTLS não
+volta à rota de token e cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
 ```powershell
 dotnet build Tests.Host
 dotnet build Tests.WebApp
-dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests|FullyQualifiedName~Discovery|FullyQualifiedName~Logging|FullyQualifiedName~Cors"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~BrowserSecurityHeadersTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~SensitiveLoggingTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationEndpointCorsTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~DiscoveryTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~Rfc9700BoundaryTests"
 ```
 
 ### Resultado da Fase 5
@@ -595,7 +695,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointT
 
 ## Fase 6 - Handoff administrativo, aceites e fechamento
 
-**Depende de:** Fases 1-5, DF16-DF17 e conclusão de `plan-replay-protection.md`.
+**Depende de:** Fases 1-5, DF1-DF22 e baseline concluída de `plan-replay-protection.md`.
 
 **Escopo:** testes amplos, documentação pública, roadmap/backlog, READMEs de hosts,
 `plan-data-storage-matrix.md`, referências do futuro Admin.
@@ -611,6 +711,9 @@ estável e documentado.
   `Compliant`/`Warning`/`NonCompliant` e nunca persistir o resultado.
 - [ ] Atualizar roadmap e backlog para marcar a entrega do core e manter somente a apresentação UI no plano Admin.
 - [ ] Atualizar a matriz de storage com contratos/migrations finais de refresh.
+- [ ] Confirmar a cadeia final Server Options v4/Realm Options v5 e que nenhum plano posterior assumiu v3/v4
+  antigos como baseline fixa.
+- [ ] Confirmar que todas as classes de teste nomeadas foram criadas e cada filtro obrigatório seleciona testes.
 - [ ] Executar migrations/aceites SQLite e PostgreSQL de Configuration e Operational.
 - [ ] Executar solução completa e registrar warnings/desvios no resultado da fase.
 - [ ] Reauditar os MUST/MUST NOT aplicáveis do RFC 9700 e listar requisitos externos/de deployment sem
@@ -618,7 +721,8 @@ estável e documentado.
 
 **Critérios de aceite:** todas as fases estão concluídas; Q1 está fechada; assessment possui documentação
 consumível pelo Admin; nenhum status derivado é persistido; roadmap/backlog/plano têm links bidirecionais;
-matriz reflete os contratos; suites e aceites obrigatórios estão verdes.
+matriz reflete os contratos; payloads finais são Server v4/Realm v5; nenhuma classe/filtro obrigatório está vazio;
+suites e aceites obrigatórios estão verdes.
 
 **Testes:**
 
@@ -640,13 +744,15 @@ dotnet test RoyalIdentity.sln
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Defaults/runtime RFC 9700 | 2-5 | DF7-DF15 | redirects, PKCE, front-channel, refresh e HTTP seguros | `Tests.Identity`, `Tests.Integration`, `Tests.Host`, `Tests.WebApp` |
-| Assessment puro | 1 | DF1-DF6 | determinístico, sem DI/I/O/persistência | filtro `ClientSecurityAssessment` |
+| Defaults/runtime RFC 9700 | 2-5 | DF7-DF15, DF18-DF22 | redirects, PKCE, front-channel, refresh e HTTP seguros | classes nomeadas Identity/Integration/Storage |
+| Assessment puro | 1 | DF1-DF6, DF21 | determinístico, sem DI/I/O/persistência | `ClientSecurityAssessmentTests` |
 | Findings estáveis | 1, 6 | DF5, DF16 | RuleIds únicos e documentados | unitários + auditoria Fase 6 |
-| Redirect configurável | 2 | DF7-DF9 | Ordinal/sem wildcard default; relaxamento diagnosticado | testes RedirectUri + Configuration |
-| Replay de refresh | 4 | DF13 + resposta Q1 | sucessor único e revogação de família | contracts SQLite/PostgreSQL + integração |
+| Redirect configurável | 2 | DF7-DF9, DF20-DF21 | Ordinal/sem wildcard; Server v4/Realm v5 fail-closed | `RedirectUriValidationTests`; `RedirectUriPolicyTests`; payload |
+| Replay de refresh | 4 | DF13, DF18, DF21 + resposta Q1 | sucessor único; família revogada; default Configuration | `RefreshTokenFamilyStoreContractTests`; `RefreshTokenRotationTests` |
 | Handoff ao Admin | 6 | DF16 | contrato/documentação e links, sem snapshot | revisão documental + solução |
 | Framing com exceção protocolar | 5 | DF10, DF19 | páginas sensíveis bloqueadas; OP iframe frameable | CheckSessionEndpoint + browser/header tests |
+| Metadata PKCE fiel | 1, 3, 5 | DF6, DF14, DF22 | `S256`/`plain` refletem runtime; plain opt-in gera finding | Assessment + AuthorizationCodeOnly + Discovery |
+| Testes sem falso verde | 1-6 | DF21 | classes nomeadas; comandos separados; zero filtros vazios | Identity + Integration + Storage + Architecture |
 
 ---
 
@@ -665,6 +771,10 @@ dotnet test RoyalIdentity.sln
 11. Não reintroduzir password grant ou implicit/hybrid por extension grant acidental.
 12. Não criar `OAuthSecurityProfile`, assessor DI ou snapshot persistido.
 13. O hardening de clickjacking não bloqueia `check_session_iframe` e não amplia essa exceção a outra rota.
+14. Debt Closure não é revertido: `UseLogService` permanece ausente e revocation mTLS usa sua rota própria.
+15. Server Options termina em v4 e Realm Options em v5; serializers continuam aceitando somente a versão corrente.
+16. Enquanto o runtime aceitar PKCE `plain` por opt-in, a metadata o anuncia e o assessment o diagnostica.
+17. Nenhum comando filtrado obrigatório pode fechar fase selecionando zero testes.
 
 ---
 
@@ -676,7 +786,11 @@ dotnet test RoyalIdentity.sln
 - Authorization flow não emite tokens no front-channel e fecha PKCE downgrade.
 - Refresh tokens usam rotação/família com replay detection e retry sem ramificação.
 - Browser/host/logs/metadata passam os critérios da Fase 5.
+- Payloads Configuration terminam em Server v4/Realm v5, falham fechados para outras versões e não ganham
+  migration relacional.
+- `code_challenge_methods_supported` reflete o runtime conforme DF22; `plain` não é apresentado como preferência.
 - Assessment é puro, não persistido e consumível pelo futuro Admin.
+- Todas as classes nomeadas existem e cada filtro obrigatório seleciona ao menos um teste.
 - Roadmap, backlog, plano e matriz têm rastreabilidade consistente.
 - `dotnet test RoyalIdentity.sln` e os três scripts PostgreSQL obrigatórios estão verdes.
 
@@ -693,10 +807,12 @@ dotnet test RoyalIdentity.sln
 | Revogação perde corrida com sucessor | replay e rotação chegam juntos | token da família permanece ativo | estado de família verificado/movido na mesma transação | Aberto |
 | Mudança de factory persiste token antes de vencer | token factory grava durante construção | credencial órfã/emitida ao perdedor | separar construção e persistência; teste de falha | Aberto |
 | RuleId muda após integração Admin | rename sem coordenação | localização/UX quebradas | constantes estáveis + documentação + testes de unicidade | Aberto |
-| Plano conflita com replay ativo | edits simultâneos em auth/options/tests | regressão ou diff sobreposto | DF17; concluir plano de replay antes do aceite final | Aberto |
+| Hardening duplica replay protection concluída | novo cache/check-add contorna `IReplayProtectionStore` | duas semânticas de replay e backing inconsistente | DF17 + guards existentes do plano concluído | Aberto |
 | Fase 3 duplica a taxonomia OAuth 2.1 | helpers/códigos são recriados no hardening | contratos divergentes para o mesmo erro | DF18; consumir o plano de erros concluído | Aberto |
 | Hardening bloqueia o OP iframe | regra global trata todo resultado browser-facing igualmente | Session Management anunciado deixa de funcionar | DF19 + regressão `CheckSessionEndpointTests` | Aberto |
-| Config JSON ausente materializa relaxamento antigo | default de deserialização incorreto | realm não aderente silencioso | roundtrip/legacy payload test com defaults seguros | Aberto |
+| Cadeia Configuration parte da versão errada | executor ignora Debt Closure/Localization | colisão ou perda de options anteriores | DF20 + gate Server v3/Realm v4 antes do bump | Aberto |
+| Filtro amplo mascara teste ausente | OR ou nome incidental seleciona outra fixture | fase fecha sem provar o hardening | DF21 + classes/comandos separados | Aberto |
+| Metadata omite capacidade PKCE ativa | `plain` continua runtime, mas some de discovery | metadata deixa de representar o servidor | DF22 + teste exato de metadata/runtime | Aberto |
 
 ---
 
@@ -717,6 +833,8 @@ dotnet test RoyalIdentity.sln
 ## Referências
 
 - [RFC 9700 — OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700.html).
+- [RFC 8414 — OAuth 2.0 Authorization Server Metadata](https://www.rfc-editor.org/rfc/rfc8414.html).
+- [RFC 7636 — Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636.html).
 - [RFC 9207 — OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207.html).
 - [RFC 8705 — OAuth 2.0 Mutual-TLS Client Authentication](https://www.rfc-editor.org/rfc/rfc8705.html).
 - [RFC 9449 — OAuth 2.0 Demonstrating Proof of Possession](https://www.rfc-editor.org/rfc/rfc9449.html).
@@ -727,5 +845,7 @@ dotnet test RoyalIdentity.sln
 - [plan-replay-protection.md](plan-replay-protection.md).
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
 - [plan-oidc-session-management.md](plan-oidc-session-management.md).
+- [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
+- [plan-localization.md](plan-localization.md).
 - [plans-roadmap-02.md](plans-roadmap-02.md).
 - [backlog-001.md](../backlogs/backlog-001.md).

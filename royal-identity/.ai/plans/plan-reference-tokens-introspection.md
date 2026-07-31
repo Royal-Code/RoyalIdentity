@@ -30,7 +30,10 @@
 - [backlog-001.md](../backlogs/backlog-001.md) — emissão de reference token continua pendente; store e bearer
   já possuem suporte parcial.
 - [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — remove metadata falsa de introspection
-  e reserva “Introspection + reference tokens” para um plano próprio.
+  e `EnableIntrospectionEndpoint` nos payloads v3; este plano reintroduz o gate somente junto do endpoint real e
+  não pode assumir que v3 ainda seja a baseline Configuration.
+- [plan-localization.md](plan-localization.md) — executa antes deste plano e promove ao menos o payload de realm
+  para v4; qualquer mudança posterior em `EndpointsOptions` parte das versões efetivamente vigentes.
 - [plan-data-operational-storage.md](plan-data-operational-storage.md) e
   [plan-data-storage-matrix.md](plan-data-storage-matrix.md) — semânticas AT-01..AT-04, digest de lookup,
   proteção do payload e ciclo de vida já fechados.
@@ -73,6 +76,9 @@
   relacionados ao revogar refresh token; faltam aceites com tokens realmente emitidos.
 - **Introspection inexistente:** há constantes protocolares e metadata legada, mas nenhum endpoint, context,
   pipeline ou response RFC 7662. O plano predecessor remove a option/metadata falsa antes desta execução.
+- **Gate removido pelo predecessor:** `EnableIntrospectionEndpoint` deixa de existir no payload v3 e deve voltar
+  somente quando rota/pipeline estiverem reais; os serializers precisam ser versionados a partir da baseline
+  vigente depois de Localization/RFC 9700.
 - **ResourceServer já modela credenciais:** `ResourceServer.Secrets` existe, mas `IResourceStore` não oferece
   lookup direto por nome e os evaluators atuais autenticam `Client`, não `ResourceServer`.
 - **Configuration relacional:** cada scalar público de `Client` deve possuir coluna e decisão no
@@ -106,7 +112,8 @@
 - `RoyalIdentity/Contracts/Storage/IAccessTokenStore.cs` e `IResourceStore.cs` — semânticas consumidas e lookup
   do ResourceServer autenticador.
 - `RoyalIdentity/Endpoints`, `Contexts`, `Handlers`, `Responses` e `Extensions` — endpoint RFC 7662.
-- `RoyalIdentity/Options/Constants.cs` e `DiscoveryHandler` — parâmetros, erros e metadata normativos.
+- `EndpointsOptions`, serializers Configuration, `RoyalIdentity/Options/Constants.cs` e `DiscoveryHandler` — gate
+  realm-scoped, parâmetros, erros e metadata normativos.
 - `RoyalIdentity.Data.Configuration` e `RoyalIdentity.Storage.EntityFramework` — coluna do client,
   materialização e migrations.
 - `Tests.Identity`, `Tests.Integration`, `Tests.Storage` e `Tests.Architecture` — unidade, HTTP, providers,
@@ -215,6 +222,11 @@
   SQLite/PostgreSQL e SQL versionado são atualizados, sem auto-migrate nos hosts. Fonte: arquitetura de storage.
 - **DF20 — Breaking change direto:** atualizar seeds, fixtures e migrations sem shim de API/configuração; manter
   JWT default para clientes não alterados. Fonte: AGENTS.md.
+- **DF21 — Gate restaurado com runtime:** reintroduzir `EnableIntrospectionEndpoint` em `EndpointsOptions` com
+  default `true` somente no mesmo corte em que rota/pipeline RFC 7662 existirem. O gate controla runtime e
+  discovery por realm; desabilitado significa 404 e metadata/aliases ausentes. Incrementar separadamente
+  `ServerOptionsPayload` e `RealmOptionsPayload` a partir das versões vigentes ao iniciar esta fase, sem assumir
+  v3 comum nem criar migration relacional. Fonte: handoff de `plan-refactoring-debt-closure` + padrão dos endpoints.
 
 ---
 
@@ -256,6 +268,8 @@
   response tipada.
 - `IntrospectionEndpoint`: aceita somente POST form, HTTPS efetivo e limites de input.
 - `IntrospectionHandler`: resolve o token conforme Q2, aplica DF13-DF16 e produz resposta RFC 7662.
+- `EndpointsOptions.EnableIntrospectionEndpoint`: gate realm-scoped restaurado com o runtime; default `true`, 404
+  e metadata ausente quando desabilitado.
 
 ### Modelo, dados e persistência
 
@@ -275,6 +289,8 @@ operation.protocol_artifacts [existente]
 - Não duplicar o handle opaco em `Client`, refresh token ou outra entidade.
 - `AccessTokenPayloadSerializer` só muda de versão se a remoção do claim/novo dado realmente alterar seu
   contrato; não fazer bump mecânico.
+- Os payloads Configuration de server/realm que serializam `EndpointsOptions` são incrementados separadamente a
+  partir de suas versões vigentes; não reutilizar a v3 removida pelo predecessor como baseline fixa.
 
 ### Arquitetura alvo
 
@@ -315,6 +331,8 @@ RoyalIdentity.Storage.EntityFramework.Sqlite|PostgreSql/
 - Executar depois de `plan-rfc9700-security-hardening.md` para não disputar remoção do front-channel ou rotação
   de refresh.
 - Confirmar antes da Fase 1 que `plan-refactoring-debt-closure.md` removeu a metadata/option falsa.
+- Ao reintroduzir a option na Fase 5, partir das versões Configuration deixadas por Localization e pelos demais
+  predecessores; atualizar seeds/fixtures e reprovisionar sem fallback de versões antigas.
 - Migration de Configuration converte clientes existentes para `Jwt`; não alterar tokens já emitidos.
 - Server continua externamente migrado; Demo continua self-provisioned SQLite.
 - Ativar `Reference` somente nos seeds/testes específicos; não trocar silenciosamente todos os clients.
@@ -510,11 +528,12 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~AccessTokenStoreContractT
 
 ## Fase 5 - Endpoint RFC 7662 e autenticação do ResourceServer
 
-**Depende de:** Fase 4, Q1, Q2, DF12-DF18 e conclusão de
+**Depende de:** Fase 4, Q1, Q2, DF12-DF18, DF21 e conclusão de
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
 
 **Escopo:** `IResourceStore`, matriz de storage, authenticator/evaluators de ResourceServer,
-`IntrospectionEndpoint`, context, decorators, validators, handler, responses, constants, DI/routes e testes.
+`IntrospectionEndpoint`, context, decorators, validators, handler, responses, `EndpointsOptions`, serializers
+Configuration, constants, DI/routes e testes.
 
 **O que/como:** implementar POST form sobre HTTPS, autenticar ResourceServer conforme Q1, resolver os tipos
 decididos em Q2 e retornar `active=false` como resposta indistinguível para qualquer token inativo/não autorizado.
@@ -536,11 +555,15 @@ decididos em Q2 e retornar `active=false` como resposta indistinguível para qua
 - [ ] Produzir resposta ativa mínima conforme DF15, sem `jti`, username ou custom claims.
 - [ ] Aplicar no-cache e redaction integral de token/credencial.
 - [ ] Registrar endpoint/context/handler/pipeline/DI seguindo o padrão do repositório.
+- [ ] Reintroduzir `EnableIntrospectionEndpoint` conforme DF21 e aplicar o gate à rota/runtime.
+- [ ] Incrementar cada payload Configuration afetado a partir de sua versão vigente, atualizando seeds, fixtures e
+  testes de versão sem migration relacional ou fallback.
 - [ ] Adicionar testes unitários da matriz request × auth × token × audience × realm.
 
 **Critérios de aceite:** endpoint anônimo/HTTP não processa tokens; auth inválida é 401; token inválido ou fora da
 audiência é `active=false`; token reference ativo e autorizado retorna somente campos permitidos; nenhum erro
-revela existência, motivo ou outro realm.
+revela existência, motivo ou outro realm; gate desabilitado produz 404; payloads Configuration registram a nova
+option a partir das versões predecessoras corretas.
 
 **Testes:**
 
@@ -558,7 +581,7 @@ dotnet test Tests.Pipelines
 
 ## Fase 6 - Discovery, aceites multi-realm e paridade de providers
 
-**Depende de:** Fase 5, DF17-DF20.
+**Depende de:** Fase 5, DF17-DF21.
 
 **Escopo:** `DiscoveryHandler`, routes/constants, aliases conforme Q1, hosts, seeds, `Tests.Integration`,
 `Tests.Storage`, `Tests.Architecture` e scripts PostgreSQL.
@@ -569,6 +592,7 @@ Reference e as migrations funcionam nos dois providers.
 **Tarefas:**
 
 - [ ] Publicar `introspection_endpoint` HTTPS realm-scoped.
+- [ ] Omitir endpoint, métodos e aliases de discovery quando `EnableIntrospectionEndpoint=false`.
 - [ ] Publicar `introspection_endpoint_auth_methods_supported` exatamente conforme Q1.
 - [ ] Publicar signing algorithms/mTLS aliases somente quando exigidos pela resposta Q1.
 - [ ] Confirmar que discovery nunca aponta introspection para token/revocation por engano.
@@ -603,7 +627,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 7 - Documentação e fechamento do backlog
 
-**Depende de:** Fases 1-6, DF1-DF20 e Q1/Q2 fechadas.
+**Depende de:** Fases 1-6, DF1-DF21 e Q1/Q2 fechadas.
 
 **Escopo:** backlog, roadmap, foundations, AGENTS, READMEs, matriz e plano.
 
@@ -617,6 +641,8 @@ dotnet test RoyalIdentity.sln
 - [ ] Atualizar product/tech/structure com endpoint, client option e persistência.
 - [ ] Atualizar matriz AT/ResourceStore com assinaturas e testes finais.
 - [ ] Documentar configuração Jwt/Reference e autenticação de ResourceServer sem segredos reais.
+- [ ] Documentar `EnableIntrospectionEndpoint`, default, comportamento 404/metadata e versões Configuration
+  efetivamente promovidas na Fase 5.
 - [ ] Documentar limitação do catálogo volátil e destino de sua persistência.
 - [ ] Executar guards contra metadata falsa, handle bruto e construção de access token fora do factory.
 - [ ] Preencher o resultado de todas as fases e conferir rastreabilidade.
@@ -649,9 +675,9 @@ dotnet test RoyalIdentity.sln
 | Handle opaco seguro | 2, 4 | DF3-DF5, DF8-DF10 | 256 bits; sem signer/raw handle/jti | TokenFactory; OperationalPayload; AccessTokenStore |
 | Todos os grants respeitam o tipo | 3 | DF2, DF6, DF7 | code/client_credentials/refresh usam factory | ClientToken; CodeToken; RefreshToken |
 | Lifecycle e revogação | 4 | DF8-DF11 | expiração/revogação/realm/client fail-closed | ReferenceTokenBearer; Revocation; cleanup |
-| Introspection autenticado | 5 | DF12-DF18, Q1, Q2 | 401 para auth; false indistinguível; resposta mínima | Introspection unit/pipeline |
-| Metadata e providers fiéis | 6 | DF17-DF20 | discovery exato; dois realms; SQLite/PostgreSQL | Discovery; integration; provider scripts |
-| Fechar dívida/documentação | 7 | DF1-DF20 | backlog/roadmap/foundations alinhados | `rg`; build; solution test |
+| Introspection autenticado | 5 | DF12-DF18, DF21, Q1, Q2 | 401 para auth; false indistinguível; resposta mínima; gate 404 | Introspection unit/pipeline |
+| Metadata e providers fiéis | 6 | DF17-DF21 | discovery exato; gate; dois realms; SQLite/PostgreSQL | Discovery; integration; provider scripts |
+| Fechar dívida/documentação | 7 | DF1-DF21 | backlog/roadmap/foundations alinhados | `rg`; build; solution test |
 
 ---
 
@@ -673,6 +699,7 @@ dotnet test RoyalIdentity.sln
 14. Server nunca migra/seed; Demo continua self-provisioned SQLite.
 15. Cache não participa de validação, revogação ou introspection.
 16. Catálogo de resources permanece volátil até plano próprio; este plano não cria persistência incidental.
+17. Introspection desabilitado por realm responde 404 e não aparece em discovery/aliases.
 
 ---
 
@@ -685,6 +712,7 @@ dotnet test RoyalIdentity.sln
 - Handle bruto não é persistido nem registrado.
 - Introspection cumpre Q1/Q2, RFC 7662 e minimização por ResourceServer.
 - Discovery anuncia endpoint/métodos reais e URLs HTTPS realm-scoped.
+- Gate realm-scoped desabilitado produz 404 e omite toda metadata/alias de introspection.
 - Dois realms e dois ResourceServers permanecem isolados.
 - Migrations incrementais e SQL dos providers estão atualizados.
 - Backlog, roadmap, foundations, matriz e READMEs refletem o resultado.
