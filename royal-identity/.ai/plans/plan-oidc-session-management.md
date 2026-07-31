@@ -1,6 +1,6 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: RASCUNHO - desenho fechado; 0 de 7 fases executadas
+## Status: RASCUNHO - depende da conclusão de `plan-oauth21-token-error-responses.md`; 0 de 7 fases executadas
 
 ## Progresso
 
@@ -8,7 +8,7 @@
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Contrato de estado do User Agent e opções | Pendente |
+| Fase 1 - Contrato de estado do User Agent e opções | Bloqueada pelo plano OAuth 2.1 |
 | Fase 2 - Ciclo de vida do estado no login, cookie e logout | Pendente |
 | Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Pendente |
 | Fase 4 - Rota, discovery HTTPS e isolamento por realm | Pendente |
@@ -51,6 +51,11 @@
   não reintroduzir `IdentitySession`, `IUserStore`, `DefaultUserSession` ou store que leia `HttpContext`.
 - `plan-realm-options-redesign.md` — registrou deliberadamente o `CheckSessionEndpoint` como código
   inalcançável até existir plano próprio; opções efetivas são resolvidas pelo realm atual.
+- [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — predecessor obrigatório que
+  remove os helpers ambíguos usados por `ConsentDecorator`, fixa o writer/contrato de erro e limita sua alteração
+  no authorize ao campo `error` do `ResourcesValidator`; ele não entrega o transporte por redirect do authorize.
+  Este plano consome a baseline de código/writer e assume o redirect somente para a fatia
+  `prompt=none`/Authentication Error Response aqui enumerada.
 - `plan-rfc9700-security-hardening.md` — adicionará proteção geral contra framing; o OP iframe é uma exceção
   protocolar que precisa continuar embutível por RPs e não pode receber `frame-ancestors 'none'` ou
   `X-Frame-Options: DENY`.
@@ -68,7 +73,7 @@
 - `C:/git/RoyalCode/RoyalIdentity/old-is4/LICENSE` — a cópia local do IS4 está sob Apache-2.0 e não contém
   arquivo `NOTICE` na raiz verificada.
 
-### Estado atual do código (verificado em 2026-07-30)
+### Estado atual do código (verificado em 2026-07-31)
 
 - **Endpoint registrado, mas não mapeado:** `CheckSessionEndpoint` está na DI em
   `RoyalIdentity/Extensions/ServiceCollectionExtensions.cs`, mas não aparece em
@@ -86,6 +91,12 @@
 - **Erros sem estado:** `AuthorizeErrorResponse` não possui `session_state`.
 - **`prompt=none` não aderente:** `PromptLoginDecorator` pode produzir página de login quando a requisição contém
   `prompt=none`; `ConsentDecorator` responde `invalid_request` quando deveria responder `consent_required`.
+- **Validação de `prompt` chega tarde:** `PromptLoginDecorator` executa antes de `ConsentDecorator`; portanto
+  `none` combinado com `login`, `consent` ou `select_account` pode produzir UI antes da validação que deveria
+  rejeitar a combinação como `invalid_request`.
+- **Matriz silenciosa incompleta:** existem constantes para `interaction_required`, `login_required`,
+  `account_selection_required` e `consent_required`, mas não há uma classificação única das condições de
+  interação nem garantia de que todo `InteractionResponse` seja bloqueado sob `prompt=none`.
 - **Configuração não realm-aware no resultado:** `CheckSessionResult` lê `ServerOptions` do snapshot e mantém
   cache estático global; realms concorrentes podem compartilhar a superfície de renderização.
 - **Validação de origem incompleta:** o iframe usa `e.origin` no hash, mas não carrega a origem esperada emitida
@@ -96,6 +107,10 @@
 - **Arquitetura de sessão disponível:** `LoginFlowService` cria a sessão e o cookie; o evento
   `CookieAuthenticationOptions.Events.OnValidatePrincipal` chama `IUserSessionService.IsSessionValidAsync`; o
   `DefaultSignOutManager` encerra a sessão e executa `SignOutAsync`.
+- **Callback de cookie cacheado:** `ConfigureRealmCookieAuthenticationOptions` cria `OnValidatePrincipal` ao
+  configurar o named scheme. O delegate é reutilizado; o serviço scoped e a derivação do check-session cookie
+  precisam ser resolvidos dentro da invocação via `HttpContext.RequestServices`/realm corrente, sem captura do
+  configurador, snapshot, realm ou manager.
 - **Configuração persistida:** `ServerOptions` e `RealmOptions` são payloads JSON versionados, ambos atualmente
   na versão 1.
 - **Payload operacional versionado:** `AuthorizationCodePayloadSerializer` e `AuthorizationCodePayload` incluem
@@ -107,6 +122,10 @@
   Apache no `LICENSE` da raiz, mas esse arquivo contém AGPLv3.
 - **Sem consumidores de produção:** breaking changes em contratos, payloads, cookies, defaults e opções são
   aceitos; não criar compatibility shims.
+- **Comandos de teste com falsos verdes:** `Tests.Host` é um host `Microsoft.NET.Sdk.Web`, não um projeto de
+  testes; filtros de Session State/Check Session em `Tests.Identity` não selecionam testes hoje. Há classes
+  existentes como `SessionLifecycleTests` e `PromptInteractionCharacterizationTests`, mas filtros amplos não
+  provam os novos aceites de Check Session e `prompt=none`.
 
 ### Lacunas, conflitos e restrições
 
@@ -125,6 +144,11 @@
   ser invalidada diretamente porque não há produção e o lifetime default é 60 segundos.
 - **Licenças têm escopos distintos:** AGPLv3 rege o RoyalIdentity combinado e suas modificações; atribuições e
   condições Apache-2.0 permanecem para material incorporado.
+- **Sequenciamento protocolar:** este plano só começa após o plano OAuth 2.1, pois ambos alteram
+  `ConsentDecorator` e a resposta de authorize; executar em paralelo recriaria helpers ou produziria conflito
+  de transporte/classificação.
+- **Erro não alcança o handler terminal:** decorators podem construir `AuthorizeErrorResponse` e encerrar o
+  pipeline antes de `AuthorizeHandler`; logo a geração de `session_state` não pode pertencer apenas ao handler.
 
 ### Superfícies impactadas a mapear
 
@@ -169,6 +193,9 @@
 - Concluir os demais itens do RFC 9700 ou do OAuth 2.1; permanecem nos planos próprios.
 - Alterar a escolha entre `AGPL-3.0-only` e `AGPL-3.0-or-later`; este plano preserva a declaração AGPLv3 atual.
 - Realizar parecer jurídico; o plano implementa os requisitos textuais verificados e a rastreabilidade técnica.
+- Corrigir toda a taxonomia/transporte do authorization endpoint; este plano consome o writer do predecessor e
+  implementa e testa o transporte por redirect somente para a fatia OIDC necessária a `prompt=none` e
+  `session_state`, depois que o redirect URI estiver validado.
 
 ---
 
@@ -230,6 +257,43 @@
 - **DF20 — Breaking change direto:** versões anteriores de cookies e payloads de configuração/authorization code
   podem ser invalidadas; atualizar seeds, serializers, testes e documentação sem fallback. Fonte: `AGENTS.md` +
   decisão humana.
+- **DF21 — Predecessor obrigatório:** nenhuma fase começa antes da conclusão de
+  `plan-oauth21-token-error-responses.md`; este plano consome seus helpers/writer finais e não reintroduz
+  overloads. O predecessor não fornece o transporte de erro do authorize: o redirect delimitado em DF24 pertence
+  a este plano. Fonte: ordem do roadmap + arquivos compartilhados verificados.
+- **DF22 — Topologia verificável de testes:** algoritmo/formato puro fica em `Tests.Identity`; lifecycle de
+  cookie, authorize, rota, discovery, headers e realms ficam em `Tests.Integration`; boundaries ficam em
+  `Tests.Architecture`; navegador fica em `Tests.Browser` opt-in. Cada aceite novo possui classe nomeada e nenhum
+  comando obrigatório pode selecionar zero testes. `Tests.Host` não é executado como test project. Fonte:
+  infraestrutura e listagem empírica dos testes atuais.
+- **DF23 — Resolução por request:** `OnValidatePrincipal` resolve `CheckSessionStateManager` scoped por
+  `context.HttpContext.RequestServices` em cada invocação e o manager deriva realm, opções, nome e path do cookie
+  naquele request; o delegate cacheado não captura manager, realm ou opções efetivas. Fonte: lifetime de named
+  options + padrão já usado por `ValidateUserSessionAsync`.
+- **DF24 — Factory delimitada de Authentication Response:** um `AuthorizeResponseFactory` interno/concreto
+  calcula `session_state` via `ISessionStateGenerator` e constrói somente as respostas de sucesso/erro assumidas
+  por este plano: sucesso no `AuthorizeHandler`, `access_denied` já emitido por `ConsentDecorator` e os novos erros
+  da matriz de `prompt=none`, inclusive a combinação inválida de prompts. Esses erros usam
+  `AuthorizeErrorResponse` e redirect somente depois da validação de client/redirect URI, preservando `state` e
+  response mode. `RedirectUriValidator`, `ResourcesDecorator`, `ResourcesValidator`,
+  `AuthorizationResourcesValidator` e os demais terminadores não enumerados não são migrados para a factory; seu
+  transporte permanece diferido. Os response objects apenas transportam o valor imutável. Fonte: decorators
+  encerram antes do handler + OpenID Connect Core §3.1.2.6 + Session Management §2.
+- **DF25 — Taxonomia silenciosa explícita:** validar `none` combinado com qualquer outro prompt antes de qualquer
+  interação e retornar `invalid_request`; sob `none`, autenticação/reauth retorna `login_required`, consentimento
+  retorna `consent_required`, seleção real de sessão retorna `account_selection_required` e outra interação não
+  classificável retorna `interaction_required`. `select_account` sozinho continua um pedido de UI, não um erro
+  silencioso; o modelo atual de principal único não inventa uma condição de seleção apenas para emitir um código
+  inalcançável. Como decisão de produto, quando a autenticação atual usa IdP/método vedado pelas restrições do
+  client, usar `login_required`: a sessão corrente não satisfaz a Authentication Request e seria necessária nova
+  autenticação por um método permitido. Reservar `interaction_required` para interação adicional que não seja
+  autenticação, consentimento ou seleção de conta. Fonte: OpenID Connect Core §§3.1.2.1/3.1.2.6 + comportamento
+  legado do IS4.
+- **DF26 — Proveniência delimitada e reproduzível:** a auditoria compara os roots upstream locais
+  `old-is4/src/IdentityServer4/src` e `old-is4/src/IdentityModel` com arquivos-fonte de produção rastreados da
+  solução, excluindo `bin`, `obj` e assets de dependências. Candidatos, evidência e classificação são registrados
+  em inventário versionado e validados por script; a análise humana inicial continua necessária. Fonte:
+  Apache-2.0 §4 + escopo local verificável.
 
 ---
 
@@ -257,6 +321,41 @@
   - **Resposta humana:** manter AGPLv3 e ajustar a distribuição conforme a análise.
   - **Conclusão:** DF18.
 
+**Revisão externa de 2026-07-31:**
+
+- **Sequenciamento e ownership de resposta:** confirmou-se a sobreposição com o plano OAuth 2.1 e que erros
+  emitidos por decorators não alcançam `AuthorizeHandler`.
+  - **Conclusão:** DF21 e DF24.
+- **Testes:** confirmou-se que `Tests.Host` não executa testes e que filtros vazios retornam sucesso neste SDK.
+  A afirmação de que `SessionLifecycleTests` não existia foi rejeitada: a classe já existe, mas não cobre o novo
+  cookie/protocolo; filtros amplos continuavam insuficientes.
+  - **Conclusão:** DF22 e classes de aceite nomeadas por fase.
+- **Named options:** confirmou-se que `OnValidatePrincipal` é instalado em options cacheadas; capturar serviço
+  scoped ou derivar o cookie no momento da configuração produziria lifetime/realm incorreto.
+  - **Conclusão:** DF23.
+- **`prompt=none`:** a necessidade de uma matriz foi aceita, mas a afirmação “`select_account` pede
+  `account_selection_required`” foi restringida ao fluxo silencioso. `select_account` sozinho solicita UI;
+  `none select_account` é combinação inválida; `account_selection_required` vale quando uma requisição com
+  `none` exige seleção de sessão.
+  - **Conclusão:** DF25.
+- **Proveniência:** aceitou-se tornar o gate delimitado e verificável, mas não limitar a auditoria somente aos
+  arquivos editados neste plano, pois isso poderia omitir material Apache já incorporado e distribuído.
+  - **Conclusão:** DF26.
+
+**Revisão residual de 2026-07-31:**
+
+- **Transporte dos erros silenciosos:** confirmou-se que o predecessor OAuth 2.1 entrega apenas a baseline de
+  código/writer e o ajuste mínimo do campo `error`; o transporte geral redirect versus JSON continua diferido.
+  Este plano passou a possuir e enumerar o redirect somente dos erros de `prompt=none` que introduz.
+  - **Conclusão:** DF21 e DF24.
+- **Estados das fases:** somente a dependência externa da Fase 1 é bloqueio; dependências entre fases representam
+  sequência normal.
+  - **Conclusão:** Fases 2-7 permanecem `Pendente` até ficarem elegíveis.
+- **Seleção de conta e IdP/método:** a ausência atual de seleção multi-account deve ser documentada, não provada
+  por teste vazio. O mapeamento de IdP/método incompatível para `login_required` foi mantido como decisão de
+  produto justificada, e não apresentado como única leitura possível da especificação.
+  - **Conclusão:** DF25.
+
 ---
 
 ## Design alvo
@@ -268,9 +367,13 @@
   em `HttpContext.Items` e deriva o nome/path do realm.
 - `ISessionStateGenerator.GenerateSessionStateValue(AuthorizeContext) -> string?`: mantém o seam existente,
   passa a retornar `null` quando DF2/DF9 não forem satisfeitas e usa o estado canônico da request.
-- `AuthorizeResponse`: recebe o `session_state` calculado pelo handler independentemente do authorization code.
-- `AuthorizeErrorResponse`: recebe `session_state?` quando a requisição já possui client, redirect e OIDC
-  validados; serializa junto com `error`, `error_description` e `state`.
+- `AuthorizeResponseFactory` (nome final pode seguir convenção local, sem interface pública): ponto único que
+  invoca `ISessionStateGenerator` para as Authentication Responses no escopo deste plano. É usada no sucesso do
+  `AuthorizeHandler`, no `access_denied` existente do consentimento e nos erros novos da matriz de `prompt=none`;
+  não captura todos os terminadores do authorize.
+- `AuthorizeResponse`: recebe o `session_state` calculado pela factory independentemente do authorization code.
+- `AuthorizeErrorResponse`: recebe o `session_state?` calculado pela mesma factory quando a requisição já possui
+  client, redirect e OIDC validados; não resolve serviços durante `CreateResponseAsync`.
 - `PromptLoginDecorator`: especializa o contexto de autorização necessário para emitir `login_required` em
   `prompt=none`; não mostra UI nesse modo.
 - `ConsentDecorator`: emite `consent_required` em `prompt=none`; `access_denied` continua sendo a decisão
@@ -278,6 +381,30 @@
 - `CheckSessionEndpoint`: continua GET-only, aplica realm, feature gate e HTTPS antes de produzir a resposta.
 - `CheckSessionResult`: HTML por request, nonce CSP por request, JavaScript Web Crypto e dados dinâmicos
   serializados.
+
+### Matriz normativa de `prompt=none`
+
+| Condição observável | Resultado | Observação |
+|---|---|---|
+| `none` combinado com `login`, `consent`, `select_account` ou outro valor | `invalid_request` | validar antes de qualquer decorator produzir UI |
+| `none` e usuário ausente/inativo | `login_required` | nenhuma página de login |
+| `none` e reautenticação necessária por `max_age` ou `UserSsoLifetime` | `login_required` | sessão atual não satisfaz a Authentication Request |
+| `none` e método/IdP atual não satisfaz restrições do client | `login_required` | não iniciar seleção/login externo |
+| `none` e consentimento prévio insuficiente ou política exige consentimento | `consent_required` | nenhuma página de consentimento |
+| `none` e uma seleção real entre sessões/contas é necessária | `account_selection_required` | normativo, mas o modelo atual de principal único não possui essa condição |
+| `none` e outra interação/custom redirect seria necessária | `interaction_required` | fallback explícito, sem UI |
+| `select_account` sem `none` | fluxo interativo | não retornar `account_selection_required` apenas pela presença do valor |
+| nenhuma interação necessária | resposta OIDC normal | inclui `session_state` conforme DF8-DF9 |
+
+Todo erro alcançável da matriz é transportado por redirect sob responsabilidade deste plano, via
+`AuthorizeErrorResponse`/factory, preserva `state` e recebe `session_state` somente depois de client, redirect URI
+e origem estarem confiáveis. Do predecessor OAuth 2.1 é consumida apenas a baseline de código/writer; os erros de
+validação que não pertencem a esta matriz mantêm o transporte atual até o plano geral do authorization endpoint.
+`account_selection_required` não justifica criar estado multi-account fictício: o plano documenta sua não
+aplicabilidade atual, sem teste de ausência ou branch sintético, e o código só ganha o branch quando existir uma
+condição real de seleção. Já
+`interaction_required` é o fallback fail-closed para qualquer produtor presente/futuro de interação sob `none`
+que não seja autenticação, consentimento ou seleção de sessão.
 
 ### Modelo, dados e persistência
 
@@ -338,13 +465,16 @@ RoyalIdentity/
   Contracts/Defaults/DefaultSessionStateGenerator.cs
     produz session_state versionado
 
+  Responses/AuthorizeResponseFactory.cs
+    único owner da geração nas Authentication Responses
+
   Handlers/AuthorizeHandler.cs
-    gera estado no boundary da resposta
+    solicita resposta de sucesso à factory
 
   Contexts/Decorators/
     PromptLoginDecorator.cs
     ConsentDecorator.cs
-      prompt=none sem UI + session_state no erro
+      classificam prompt=none e solicitam erro à factory
 
   Endpoints/CheckSessionEndpoint.cs
   Responses/CheckSessionResponse.cs
@@ -362,6 +492,17 @@ Tests.Browser/
   Playwright opt-in
 ```
 
+Topologia mínima de testes criada por este plano:
+
+```text
+Tests.Identity/Authentication/SessionStateFormatTests.cs
+Tests.Integration/Users/CheckSessionCookieLifecycleTests.cs
+Tests.Integration/Endpoints/AuthorizeSessionStateTests.cs
+Tests.Integration/Endpoints/CheckSessionEndpointTests.cs
+Tests.Architecture/CheckSessionBoundaryTests.cs
+Tests.Browser/CheckSessionBrowserTests.cs
+```
+
 O projeto de navegador não entra como dependência de runtime. Se for adicionado à solution, seus testes devem
 permanecer ignorados sem opt-in explícito e nunca baixar Chromium durante `dotnet test RoyalIdentity.sln`.
 
@@ -373,6 +514,10 @@ permanecer ignorados sem opt-in explícito e nunca baixar Chromium durante `dotn
 - Não logar OP User Agent State, cookie, `session_state` completo ou salt associado a client/usuário.
 - O cookie recebido nunca substitui o valor protegido do ticket; divergência causa sobrescrita.
 - Rejeição/invalidação da sessão limpa o cookie antes da resposta terminar.
+- `OnValidatePrincipal` resolve o manager scoped dentro da invocação; nenhum delegate de options cacheado captura
+  serviço scoped, realm, snapshot efetivo ou nome de check-session cookie.
+- Nome/path/opções do check-session cookie são derivados no request corrente; publicação inicial de um named
+  scheme não congela configuração de outro realm.
 - Login de outro usuário gera novo OP User Agent State; sliding do mesmo ticket preserva o valor.
 - Logout remove o cookie com exatamente o mesmo nome, path, domínio ausente e flags usados na emissão.
 - O iframe responde somente ao `window.parent`, usa `event.origin` como `targetOrigin` e ignora mensagens de
@@ -392,13 +537,17 @@ permanecer ignorados sem opt-in explícito e nunca baixar Chromium durante `dotn
 - Nenhuma migration relacional é esperada para remover campos JSON; se o executor encontrar projeção/coluna,
   deve atualizar ambos os providers e a matriz antes de concluir a fase.
 - Discovery não anuncia suporte até rota, HTTPS, cookie lifecycle e iframe estarem funcionais no mesmo deploy.
-- Reconciliar o hardening global de framing do plano RFC 9700 com a exceção do iframe antes de fechar este plano.
+- O plano RFC 9700 declara explicitamente a exceção exclusiva do OP iframe e mantém uma regressão de ausência de
+  `X-Frame-Options: DENY`/`frame-ancestors 'none'`; este plano estabelece a baseline que essa regressão consome.
 - A distribuição mantém `LICENSE` AGPLv3 e adiciona Apache-2.0 como licença de terceiro; não substituir o
   copyright original dos autores do IS4/IdentityModel.
 
 ---
 
 ## Ordem de execução
+
+**Gate global:** concluir `plan-oauth21-token-error-responses.md` antes da Fase 1; consumir seus helpers e writer
+finais durante toda a execução.
 
 1. **Fase 1 (contrato/options)** — fixa o valor canônico, formato e configuração antes de tocar login/respostas.
 2. **Fase 2 (ciclo de vida)** — torna o estado real e sincronizado antes de gerar `session_state`.
@@ -419,7 +568,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Contrato de estado do User Agent e opções
 
-**Depende de:** DF1-DF5, DF8-DF10, DF18, DF20.
+**Depende de:** conclusão de `plan-oauth21-token-error-responses.md`, DF1-DF5, DF8-DF10, DF18, DF20-DF22.
 
 **Escopo:** `RoyalIdentity/Authentication`, `RoyalIdentity/Contracts`, `RoyalIdentity/Options`,
 serializers Configuration, `Tests.Identity`, `Tests.Storage`.
@@ -437,6 +586,8 @@ serializers Configuration, `Tests.Identity`, `Tests.Storage`.
 - [ ] Validar nome-base vazio, caracteres de controle, separadores de cookie e colisões previsíveis.
 - [ ] Implementar parser/formatter do `session_state` v1 sem espaço e com origem Base64Url.
 - [ ] Implementar codificação canônica compartilhável com JavaScript e vetores determinísticos.
+- [ ] Criar `Tests.Identity/Authentication/SessionStateFormatTests.cs` para formato, parser, gates e vetores
+  puros; não montar `AuthorizeContext`/HTTP artificial nesse projeto para testar pipeline.
 - [ ] Alterar `ISessionStateGenerator`/default para retorno anulável e gates DF2/DF9.
 - [ ] Incrementar `ServerOptionsPayloadSerializer` e `RealmOptionsPayloadSerializer` para versão 2.
 - [ ] Atualizar copy constructors, materialização, seeds e testes de property coverage das options.
@@ -448,8 +599,8 @@ Base64Url e espaços inválidos; um mesmo vetor produz exatamente o mesmo hash e
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~SessionState|FullyQualifiedName~CheckSession"
-dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayload|FullyQualifiedName~ConfigurationPayload"
+dotnet test Tests.Identity --filter "FullyQualifiedName~SessionStateFormatTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
 ```
 
 ### Resultado da Fase 1
@@ -460,7 +611,7 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayload
 
 ## Fase 2 - Ciclo de vida do estado no login, cookie e logout
 
-**Depende de:** Fase 1, DF3-DF7, DF14, DF19.
+**Depende de:** Fase 1, DF3-DF7, DF14, DF19, DF22-DF23.
 
 **Escopo:** `LoginFlowService`, `ConfigureRealmCookieAuthenticationOptions`, `DefaultSignOutManager`,
 registro DI, testes de sessão/cookie.
@@ -470,16 +621,23 @@ registro DI, testes de sessão/cookie.
 
 **Tarefas:**
 
+- [ ] Registrar `CheckSessionStateManager` como scoped e provar seu lifetime na composição.
 - [ ] Criar OP User Agent State ao preparar `AuthenticationProperties` no login bem-sucedido.
 - [ ] Gravar o check-session cookie com as flags fixas de DF5 no mesmo response do sign-in.
 - [ ] Preservar o estado em sliding/renovação do mesmo ticket.
 - [ ] Gerar estado e marcar `ShouldRenew=true` quando um ticket autenticado válido ainda não possuir a propriedade.
+- [ ] Resolver `CheckSessionStateManager` por `context.HttpContext.RequestServices` dentro de cada invocação de
+  `OnValidatePrincipal`; não injetar/capturar o scoped no configurador de named options.
+- [ ] Derivar realm, opções, nome e path do check-session cookie dentro do manager por request; não fechar esses
+  valores no delegate cacheado.
 - [ ] Publicar o valor canônico do ticket em `HttpContext.Items` durante `OnValidatePrincipal`.
 - [ ] Sobrescrever cookie ausente/divergente a partir do ticket protegido.
 - [ ] Limpar o cookie quando `OnValidatePrincipal` rejeitar sessão expirada, encerrada ou invalidada por estado.
 - [ ] Limpar o cookie no `DefaultSignOutManager` usando exatamente o nome/path de emissão.
 - [ ] Não gravar check-session cookie quando o endpoint estiver desabilitado para o realm; remover valor residual.
 - [ ] Cobrir login repetido do mesmo usuário, troca de usuário, logout e dois realms.
+- [ ] Criar `Tests.Integration/Users/CheckSessionCookieLifecycleTests.cs` cobrindo login, sliding,
+  `OnValidatePrincipal`, rejeição, logout e isolamento entre realms.
 
 **Critérios de aceite:** login válido produz ticket + cookie com o mesmo estado opaco; sliding não produz
 `changed` espúrio; troca de usuário muda o estado; logout/rejeição removem o cookie; cookie de realm A não é
@@ -488,8 +646,7 @@ enviado nem aceito em realm B; nenhum valor aparece em logs.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~CheckSession|FullyQualifiedName~Cookie|FullyQualifiedName~LoginFlow|FullyQualifiedName~SignOut"
-dotnet test Tests.Integration --filter "FullyQualifiedName~SessionLifecycle|FullyQualifiedName~UserSession|FullyQualifiedName~Realm"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionCookieLifecycleTests|FullyQualifiedName~SessionLifecycleTests"
 ```
 
 ### Resultado da Fase 2
@@ -500,14 +657,16 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionLifecycle|Full
 
 ## Fase 3 - Authentication Responses, `prompt=none` e payload operacional
 
-**Depende de:** Fases 1-2, DF1, DF8-DF10, DF20.
+**Depende de:** Fases 1-2, conclusão de `plan-oauth21-token-error-responses.md`, DF1, DF8-DF10, DF20-DF25.
 
 **Escopo:** `AuthorizeHandler`, `DefaultCodeFactory`, `AuthorizationCode`, `AuthorizeResponse`,
-`AuthorizeErrorResponse`, `PromptLoginDecorator`, `ConsentDecorator`, payload/matriz Operational,
-`Tests.Identity`, `Tests.Integration`, `Tests.Storage`.
+`AuthorizeErrorResponse`, `AuthorizeMainValidator` somente no branch de combinação de prompts (ou validator
+dedicado equivalente), `PromptLoginDecorator`, `ConsentDecorator`, payload/matriz Operational, `Tests.Identity`,
+`Tests.Integration`, `Tests.Storage`.
 
-**O que/como:** calcular `session_state` no boundary da resposta OIDC; implementar erros silenciosos; remover o
-estado do authorization code e versionar seu payload sem alterar consumo atômico.
+**O que/como:** calcular `session_state` na factory delimitada de Authentication Responses OIDC; implementar a
+matriz de erros silenciosos antes de qualquer UI e transportar esses erros por redirect depois da validação do
+redirect URI; remover o estado do authorization code e versionar seu payload sem alterar consumo atômico.
 
 **Tarefas:**
 
@@ -516,27 +675,45 @@ estado do authorization code e versionar seu payload sem alterar consumo atômic
 - [ ] Remover `SessionState` de `AuthorizationCodePayload` e incrementar o serializer para versão 2.
 - [ ] Atualizar `.ai/plans/plan-data-storage-matrix.md` para declarar que `session_state` não pertence ao code.
 - [ ] Atualizar contratos SQLite/PostgreSQL, payload tests, parity e fixtures sem alterar binding/single-use.
-- [ ] Gerar `session_state` no `AuthorizeHandler` para toda Authentication Response OIDC bem-sucedida suportada.
+- [ ] Criar `AuthorizeResponseFactory` interna/concreta e registrá-la com lifetime compatível com
+  `ISessionStateGenerator`; ela é o único ponto de cálculo para as Authentication Responses enumeradas em DF24.
+- [ ] Fazer o sucesso do `AuthorizeHandler`, o `access_denied` atual de `ConsentDecorator` e os novos erros de
+  `prompt=none` de `PromptLoginDecorator`/`ConsentDecorator` construir respostas pela factory.
+- [ ] Encaminhar `none` combinado com outro prompt, hoje encerrado por `AuthorizeMainValidator`, à mesma factory
+  (diretamente ou por validator dedicado), somente após client e redirect URI válidos.
+- [ ] Não migrar `RedirectUriValidator`, `ResourcesDecorator`, `ResourcesValidator`,
+  `AuthorizationResourcesValidator` ou outros terminadores fora de DF24 para essa factory.
+- [ ] Gerar `session_state` pela factory para toda Authentication Response OIDC bem-sucedida suportada.
 - [ ] Garantir que OAuth authorization sem `openid` não receba o parâmetro.
 - [ ] Estender `AuthorizeErrorResponse` com `session_state?`.
-- [ ] Retornar `login_required` sem página quando `prompt=none` exigir login, reautenticação, troca de IdP ou
-  interação equivalente.
-- [ ] Retornar `consent_required` sem página quando `prompt=none` exigir consentimento.
-- [ ] Preservar `state`, response mode e redirect URI validado nos erros.
+- [ ] Rejeitar `none` combinado com qualquer outro prompt como `invalid_request` antes de
+  `PromptLoginDecorator`/`ConsentDecorator` produzirem UI.
+- [ ] Validar a lista bruta de valores de `prompt` antes que valores desconhecidos sejam ignorados por `Load`,
+  pois `none` combinado com qualquer outro valor deve falhar mesmo quando esse valor não é suportado.
+- [ ] Implementar todas as linhas atualmente alcançáveis da matriz de `prompt=none`; manter
+  `interaction_required` como fallback para interação não classificada e documentar a não aplicabilidade atual de
+  `account_selection_required` sem inventar estado multi-account ou teste de ausência.
+- [ ] Preservar `select_account` sem `none` como fluxo interativo; não convertê-lo automaticamente em
+  `account_selection_required`.
+- [ ] Preservar `state`, response mode e redirect URI validado nos erros; assumir nesta fase o transporte por
+  redirect de todas as condições alcançáveis da matriz, sem depender do predecessor para entregá-lo.
 - [ ] Incluir `session_state` nos erros OIDC quando client/origem/redirect já forem confiáveis.
 - [ ] Cobrir usuário anônimo, sessão ativa, sessão trocada e novo `prompt=none` após `changed`.
+- [ ] Criar `Tests.Integration/Endpoints/AuthorizeSessionStateTests.cs` com tabela condição → erro, ausência de
+  UI, `state`, response mode, redirect e `session_state` em sucesso/erro aplicável.
 
-**Critérios de aceite:** authorization code não contém/persiste `session_state`; toda resposta OIDC de sucesso
-suportada contém valor sem espaços; resposta OAuth pura não contém; `prompt=none` nunca renderiza login/consent;
-erros corretos chegam ao redirect com `state` e, quando possível, `session_state`; consumo atômico do code
-permanece verde.
+**Critérios de aceite:** authorization code não contém/persiste `session_state`; somente a factory calcula o
+valor das respostas enumeradas em DF24; toda resposta OIDC de sucesso suportada contém valor sem espaços;
+resposta OAuth pura não contém; cada linha alcançável da matriz silenciosa possui teste, a não aplicabilidade de
+seleção de conta está explícita sem teste vazio e `prompt=none` nunca renderiza UI; erros corretos chegam ao
+redirect com `state` e, quando possível, `session_state`; terminadores fora de DF24 não são migrados; consumo
+atômico do code permanece verde.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~Authorize|FullyQualifiedName~Prompt|FullyQualifiedName~SessionState"
-dotnet test Tests.Storage --filter "FullyQualifiedName~AuthorizationCode|FullyQualifiedName~OperationalPayload"
-dotnet test Tests.Integration --filter "FullyQualifiedName~CodeAuthorize|FullyQualifiedName~PromptInteraction|FullyQualifiedName~LoginConsent"
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalPayloadTests|FullyQualifiedName~SqliteOperationalAuthorizationCodeTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizeSessionStateTests|FullyQualifiedName~CodeAuthorizeTests|FullyQualifiedName~PromptInteractionCharacterizationTests"
 ```
 
 ### Resultado da Fase 3
@@ -547,7 +724,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CodeAuthorize|FullyQu
 
 ## Fase 4 - Rota, discovery HTTPS e isolamento por realm
 
-**Depende de:** Fases 1-3, DF2, DF9, DF15, ADR-009.
+**Depende de:** Fases 1-3, DF2, DF9, DF15, DF22, ADR-009.
 
 **Escopo:** `CheckSessionEndpoint`, `EndpointRouteBuilderExtensions`, `DiscoveryHandler`, options efetivas,
 forwarded scheme, testes HTTP/realm.
@@ -567,6 +744,8 @@ usar apenas opções do realm corrente.
 - [ ] Remover cache estático cross-realm do resultado.
 - [ ] Adicionar testes com dois realms: habilitado/desabilitado e nomes de cookie diferentes.
 - [ ] Adicionar regressão garantindo que discovery nunca anuncie URL HTTP ou morta.
+- [ ] Criar `Tests.Integration/Endpoints/CheckSessionEndpointTests.cs` para rota, métodos, feature gate, HTTPS,
+  metadata, headers e isolamento de realm.
 
 **Critérios de aceite:** discovery HTTPS aponta para GET 200 no mesmo realm; desabilitado produz ausência de
 metadata + 404; HTTP não produz página nem metadata; realm A não usa opções/HTML/cookie de B; POST produz 405
@@ -575,9 +754,7 @@ somente quando a rota está efetivamente disponível.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~Discovery|FullyQualifiedName~CheckSession"
-dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSession|FullyQualifiedName~Discovery|FullyQualifiedName~Realm"
-dotnet test Tests.Host
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests|FullyQualifiedName~DiscoveryTests"
 ```
 
 ### Resultado da Fase 4
@@ -588,7 +765,7 @@ dotnet test Tests.Host
 
 ## Fase 5 - OP iframe moderno e hardening HTTP
 
-**Depende de:** Fases 1 e 4, DF10-DF16, DF18.
+**Depende de:** Fases 1 e 4, DF10-DF16, DF18, DF22.
 
 **Escopo:** `CheckSessionResult`, CSP helpers/middleware, JavaScript inline, testes de HTML/headers/vetores.
 
@@ -608,7 +785,8 @@ validar parent/origin/formato; aplicar headers sem bloquear framing.
 - [ ] Usar `event.source.postMessage(result, event.origin)` sem target `*`.
 - [ ] Aplicar `no-store`, `no-cache`, `no-referrer`, `nosniff` e content type HTML com charset UTF-8.
 - [ ] Aplicar CSP `default-src 'none'` + nonce necessário, sem `frame-ancestors 'none'`.
-- [ ] Garantir que middleware/header global não injete `X-Frame-Options: DENY` nesse endpoint.
+- [ ] Adicionar teste HTTP que exija ausência de `X-Frame-Options: DENY` e de
+  `frame-ancestors 'none'` na resposta do OP iframe, criando a regressão que o plano RFC 9700 deverá preservar.
 - [ ] Adicionar aviso de derivação/modificação conforme DF18 ou documentar reescrita independente verificável.
 - [ ] Criar testes de vetores que comparem o cálculo de C# com o algoritmo exposto ao JavaScript.
 
@@ -619,8 +797,8 @@ o CSP permite somente o script com nonce; endpoint continua frameable; origem di
 **Testes:**
 
 ```powershell
-dotnet test Tests.Identity --filter "FullyQualifiedName~CheckSessionResult|FullyQualifiedName~SessionStateVector"
-dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSession"
+dotnet test Tests.Identity --filter "FullyQualifiedName~SessionStateFormatTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests"
 ```
 
 ### Resultado da Fase 5
@@ -631,7 +809,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSession"
 
 ## Fase 6 - Aceites HTTP, multi-realm e navegador real
 
-**Depende de:** Fases 2-5, DF11-DF17, ADR-009.
+**Depende de:** Fases 2-5, DF11-DF17, DF22, ADR-009.
 
 **Escopo:** `Tests.Integration`, `Tests.Architecture`, novo projeto `Tests.Browser` com Playwright opt-in,
 `Tests.WebApp` se reutilizado como RP, scripts.
@@ -655,7 +833,9 @@ browser fora da suíte default e fornecer um comando reprodutível.
 - [ ] Testar dois realms com cookies, paths, opções e estados independentes.
 - [ ] Simular cookie indisponível e verificar `changed` sem loop infinito no harness RP.
 - [ ] Garantir que `dotnet test RoyalIdentity.sln` não baixe nem exija browser.
-- [ ] Adicionar guardas de arquitetura contra referência de Playwright nos projetos de runtime.
+- [ ] Criar `Tests.Architecture/CheckSessionBoundaryTests.cs` e adicionar guardas contra referência de
+  Playwright nos projetos de runtime e contra captura de serviços scoped no configurador de cookie.
+- [ ] Nomear a fixture opt-in `Tests.Browser/CheckSessionBrowserTests.cs`.
 
 **Critérios de aceite:** script opt-in passa todos os cenários em Chromium; suite default passa sem browser
 instalado; nenhum teste usa target origin `*`; dois realms não compartilham estado; `changed` conduz ao fluxo
@@ -664,8 +844,8 @@ silencioso correto.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSession|FullyQualifiedName~PromptNone"
-dotnet test Tests.Architecture
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests|FullyQualifiedName~AuthorizeSessionStateTests|FullyQualifiedName~CheckSessionCookieLifecycleTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~CheckSessionBoundaryTests"
 ./scripts/Test-CheckSessionBrowser.ps1
 ```
 
@@ -677,10 +857,12 @@ dotnet test Tests.Architecture
 
 ## Fase 7 - Licenças, atribuições, documentação e fechamento
 
-**Depende de:** Fases 1-6, DF18, DF20.
+**Depende de:** Fases 1-6, DF18, DF20-DF22, DF26.
 
-**Escopo:** raiz Git `C:/git/RoyalCode/RoyalIdentity`, arquivos derivados, README, fundações, planos relacionados,
-suíte integral.
+**Escopo:** raiz Git `C:/git/RoyalCode/RoyalIdentity`; roots upstream
+`old-is4/src/IdentityServer4/src` e `old-is4/src/IdentityModel`; arquivos-fonte de produção rastreados da solução
+com exclusão explícita de `bin`, `obj` e assets vendorizados; inventário de proveniência, README, fundações,
+planos relacionados e suíte integral.
 
 **O que/como:** tornar explícita a combinação AGPLv3 + material Apache-2.0, auditar proveniência conhecida,
 documentar o recurso e fechar rastreabilidade/testes.
@@ -694,8 +876,10 @@ documentar o recurso e fechar rastreabilidade/testes.
 - [ ] Atualizar o README para declarar AGPLv3 para a obra combinada e apontar para `LICENSE`,
   `LICENSES/Apache-2.0.txt` e `THIRD-PARTY-NOTICES.md`.
 - [ ] Remover referências enganosas de arquivos Apache ao `LICENSE` AGPL da raiz.
-- [ ] Inventariar arquivos diretamente copiados/adaptados do IS4/IdentityModel por basename, histórico e comparação
-  de conteúdo; registrar proveniência no notice ou no próprio arquivo.
+- [ ] Criar inventário versionado com cada candidato, upstream, evidência, classificação
+  (`derivado`, `independente` ou `a confirmar`) e ação; nenhum item `a confirmar` pode permanecer no fechamento.
+- [ ] Inventariar candidatos dentro dos roots delimitados por DF26 usando basename, histórico e comparação de
+  conteúdo; registrar proveniência no notice ou no próprio arquivo quando derivado.
 - [ ] Preservar copyrights/atribuições pertinentes e marcar de forma proeminente os arquivos modificados.
 - [ ] Não aplicar cabeçalho Apache a arquivos comprovadamente escritos de forma independente apenas com base em
   especificações públicas.
@@ -707,15 +891,18 @@ documentar o recurso e fechar rastreabilidade/testes.
   manager e testes opt-in.
 - [ ] Atualizar `plan-realm-options-redesign.md` removendo a dívida de endpoint inalcançável sem reescrever seu
   histórico concluído.
-- [ ] Atualizar `plan-rfc9700-security-hardening.md` para registrar a exceção de framing exclusiva do OP iframe.
+- [ ] Confirmar que `plan-rfc9700-security-hardening.md` exclui nominalmente o OP iframe do hardening de framing
+  e exige regressão de ausência dos headers bloqueadores; não aceitar apenas o verbo “reconciliar”.
 - [ ] Registrar este plano no roadmap/backlog vigente se ainda não estiver relacionado no início da fase.
 - [ ] Executar busca por `SessionState` no authorization code, opções removidas, cache/script IS4 e URLs HTTP.
+- [ ] Criar `scripts/Test-ThirdPartyNotices.ps1` para validar licença Apache, notice, paths do inventário,
+  ausência de candidatos pendentes e referências de licença dos arquivos classificados como derivados.
 - [ ] Executar build e suíte integral.
 
-**Critérios de aceite:** raiz mantém AGPLv3 e inclui cópia Apache-2.0 + notices; README explica a combinação sem
-relicenciar copyright alheio; nenhum arquivo derivado conhecido aponta incorretamente para a licença AGPL como
-se fosse Apache; documentação descreve comportamento/limites reais; planos relacionados não contradizem a
-exceção de framing; todos os testes obrigatórios passam.
+**Critérios de aceite:** raiz mantém AGPLv3 e inclui cópia Apache-2.0 + notices; inventário cobre integralmente os
+roots delimitados e não contém classificação pendente; README explica a combinação sem relicenciar copyright
+alheio; nenhum arquivo derivado conhecido aponta incorretamente para a licença AGPL como se fosse Apache; script
+de proveniência, documentação, planos relacionados e todos os testes obrigatórios passam.
 
 **Testes:**
 
@@ -723,6 +910,7 @@ exceção de framing; todos os testes obrigatórios passam.
 Test-Path ../LICENSES/Apache-2.0.txt
 Test-Path ../THIRD-PARTY-NOTICES.md
 Select-String -Path ../README.md -Pattern "AGPL|Apache|THIRD-PARTY"
+./scripts/Test-ThirdPartyNotices.ps1
 rg "CheckSessionCookieDomain|CheckSessionCookieSameSiteMode|LastCheckSessionCookieName|AuthorizationCode.*SessionState|SessionState = code\.SessionState|payload\.SessionState" RoyalIdentity RoyalIdentity.Storage.EntityFramework Tests.Storage
 dotnet build RoyalIdentity.sln
 dotnet test RoyalIdentity.sln
@@ -739,13 +927,14 @@ dotnet test RoyalIdentity.sln
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| OP iframe funcional | 1, 4-6 | DF1-DF2, DF10-DF17 | `unchanged/changed/error`, origem e HTTPS | `Tests.Identity`, `Tests.Integration`, browser script |
-| Estado opaco e realm-scoped | 1-2, 6 | DF3-DF7 | sem PII/`sid`; lifecycle e dois realms | Session/cookie tests + browser multi-realm |
-| `session_state` nas responses | 1, 3 | DF8-DF10 | sucesso OIDC e erros possíveis; OAuth puro ausente | Authorize/Prompt/SessionState tests |
-| `prompt=none` interoperável | 3, 6 | DF1, DF8-DF9 | nenhuma UI; erros OIDC corretos | PromptNone + browser flow |
-| Rota/discovery coerentes | 4 | DF2, DF15 | HTTPS vivo ou metadata ausente; disabled 404 | Discovery/CheckSession HTTP tests |
-| Hardening sem bloquear iframe | 5-6 | DF11-DF16 | CSP/headers/origem; framing preservado | Result tests + Playwright |
-| AGPL + Apache corretos | 5, 7 | DF18 | licença, notices e arquivos derivados coerentes | comandos documentais + suíte integral |
+| OP iframe funcional | 1, 4-6 | DF1-DF2, DF10-DF17, DF22 | `unchanged/changed/error`, origem e HTTPS | SessionStateFormat + CheckSessionEndpoint + browser |
+| Estado opaco e realm-scoped | 1-2, 6 | DF3-DF7, DF23 | sem PII/`sid`; resolução por request e dois realms | CheckSessionCookieLifecycle + browser multi-realm |
+| `session_state` nas responses | 1, 3 | DF8-DF10, DF24 | factory delimitada; sucesso OIDC e erros enumerados; OAuth puro ausente | AuthorizeSessionStateTests |
+| `prompt=none` interoperável | 3, 6 | DF1, DF8-DF9, DF24-DF25 | condições alcançáveis redirecionadas/testadas; não aplicabilidade explícita; nenhuma UI | AuthorizeSessionState + browser flow |
+| Rota/discovery coerentes | 4 | DF2, DF15, DF22 | HTTPS vivo ou metadata ausente; disabled 404 | CheckSessionEndpointTests |
+| Hardening sem bloquear iframe | 5-6 | DF11-DF16 | CSP/headers/origem; framing preservado | CheckSessionEndpoint + Playwright |
+| AGPL + Apache corretos | 5, 7 | DF18, DF26 | inventário delimitado, licença, notices e arquivos derivados coerentes | Test-ThirdPartyNotices + suíte integral |
+| Sequenciamento entre planos | 1, 3, 7 | DF21 | writer/helpers consumidos; sem reintrodução | architecture + revisão documental |
 
 ---
 
@@ -759,24 +948,34 @@ dotnet test RoyalIdentity.sln
 5. Authorization codes continuam single-use e consumidos atomicamente com vínculo a client/redirect.
 6. `session_state` pertence somente a OpenID Connect Authentication Responses e nunca contém espaço.
 7. `prompt=none` nunca exibe login, consentimento ou outra UI.
-8. Discovery não anuncia endpoint desabilitado, HTTP ou inalcançável.
-9. O OP iframe nunca usa `postMessage(..., "*")` nem retorna `unchanged` para origem/client divergente.
-10. Hardening geral de clickjacking não bloqueia exclusivamente o endpoint que precisa ser iframe.
-11. A suíte default permanece autocontida; browser e PostgreSQL continuam opt-in explícitos.
-12. O `LICENSE` AGPLv3 da raiz não é substituído e atribuições Apache pertinentes não são removidas.
+8. `none` combinado com outro prompt falha antes de qualquer decorator produzir interação; os quatro erros OIDC
+   silenciosos seguem exclusivamente a matriz DF25.
+9. Erros alcançáveis da matriz DF25 usam redirect somente após validação do redirect URI e preservam `state`;
+   redirect URI inválido nunca recebe redirect. Os demais terminadores do authorize não mudam de transporte.
+10. Discovery não anuncia endpoint desabilitado, HTTP ou inalcançável.
+11. O OP iframe nunca usa `postMessage(..., "*")` nem retorna `unchanged` para origem/client divergente.
+12. Hardening geral de clickjacking não bloqueia exclusivamente o endpoint que precisa ser iframe.
+13. Delegate cacheado de cookie options não captura serviço scoped, realm ou opção efetiva.
+14. A suíte default permanece autocontida; browser e PostgreSQL continuam opt-in explícitos.
+15. O `LICENSE` AGPLv3 da raiz não é substituído e atribuições Apache pertinentes não são removidas.
 
 ---
 
 ## Critérios globais de conclusão
 
 - Check Session funciona de ponta a ponta em Chromium com RP e OP em origins HTTPS diferentes.
+- `plan-oauth21-token-error-responses.md` está concluído e seus helpers/writer são consumidos sem fork local.
 - Login, logout, troca de usuário, invalidação do ticket e dois realms atualizam o estado conforme DF3-DF7.
-- `session_state` aparece em sucesso/erro OIDC aplicável e não é persistido no authorization code.
-- `prompt=none` retorna os erros OIDC corretos sem UI.
+- `session_state` aparece no sucesso OIDC e nos erros enumerados em DF24, sem ser persistido no authorization code.
+- Cada linha alcançável da matriz de `prompt=none` possui teste exato de erro/redirect após redirect URI válido;
+  condições não aplicáveis estão justificadas, sem teste de ausência, e nenhuma produz UI.
 - Endpoint, discovery, feature gate e forwarded scheme são coerentes e nunca anunciam HTTP.
 - Iframe usa Web Crypto, valida parent/origem, tem headers estritos e permanece frameable.
 - Cookies/payloads/options legados não possuem shim; serializers, seeds, matriz e testes usam as novas versões.
 - Licenças e notices na raiz satisfazem DF18 para todo material derivado conhecido.
+- Inventário de proveniência não possui candidato pendente e `Test-ThirdPartyNotices.ps1` passa.
+- Nenhum comando obrigatório com filtro seleciona zero testes; `Tests.Host` é usado como host/build, nunca como
+  test project.
 - `dotnet build RoyalIdentity.sln` passa.
 - `dotnet test RoyalIdentity.sln` passa sem browser instalado.
 - `./scripts/Test-CheckSessionBrowser.ps1` passa.
@@ -797,6 +996,12 @@ dotnet test RoyalIdentity.sln
 | Playwright entra na suíte default | projeto baixa/exige Chromium | CI/local deixa de ser autocontido | projeto/script opt-in + arquitetura test | Aberto |
 | Auditoria de licença incompleta | arquivo derivado perdeu header/notice | não conformidade de redistribuição | inventário de similaridade/histórico + notice central + revisão manual | Aberto |
 | `session_state` grande | origem longa + envelope v1 | callback/URL cresce | limites/testes e formato Base64Url compacto | Aberto |
+| Planos concorrentes recriam helpers | Session Management inicia antes do plano OAuth 2.1 | conflito em `ConsentDecorator`/respostas | gate DF21 | Aberto |
+| Callback captura scoped/realm | manager ou nome do cookie é fechado no delegate de named options | captive dependency ou realm congelado | DF23 + lifecycle multi-realm | Aberto |
+| Erro enumerado perde `session_state` | cálculo fica somente no `AuthorizeHandler` | Authentication Error Response incompleta | factory delimitada DF24 + testes por caller | Aberto |
+| Prompt silencioso cai em UI/código genérico | classificação continua espalhada | loop/interoperabilidade incorreta | matriz DF25 + teste table-driven | Aberto |
+| Filtro executa zero testes | classe planejada não é criada ou nome diverge | fase fecha em falso verde | DF22 + nomes exatos | Aberto |
+| Factory amplia silenciosamente o transporte do authorize | terminadores fora de DF24 passam a usar redirect | mudança de contrato fora do escopo | callers enumerados + regressão dos terminadores excluídos | Aberto |
 
 ---
 
@@ -810,6 +1015,11 @@ dotnet test RoyalIdentity.sln
   precisarem evoluir.
 - Teste cross-browser Firefox/WebKit — destino: expansão futura do harness após estabilizar Chromium.
 - Auditoria jurídica externa da distribuição combinada — destino: processo de release/compliance, fora do código.
+- Auditoria de dependências de terceiros fora dos roots IS4/IdentityModel definidos em DF26 — destino: processo
+  geral de SBOM/compliance; não ampliar silenciosamente este gate.
+- Taxonomia e transporte completos dos demais erros do authorization endpoint (`RedirectUriValidator`, recursos,
+  PKCE e outros terminadores não enumerados em DF24) — destino: plano próprio já apontado pelo predecessor OAuth
+  2.1; este plano entrega somente os redirects silenciosos necessários a Session Management.
 
 ---
 
@@ -825,6 +1035,6 @@ dotnet test RoyalIdentity.sln
 - `C:/git/RoyalCode/RoyalIdentity/old-is4/src/IdentityServer4/src/Extensions/ValidatedAuthorizeRequestExtensions.cs`.
 - `C:/git/RoyalCode/RoyalIdentity/old-is4/src/IdentityServer4/src/ResponseHandling/Default/AuthorizeResponseGenerator.cs`.
 - `../../adrs/ADR-001.md`, `../../adrs/ADR-009.md`, `../../adrs/ADR-014.md`, `../../adrs/ADR-017.md`.
-- `plan-realm-options-redesign.md`, `plan-rfc9700-security-hardening.md`,
+- `plan-oauth21-token-error-responses.md`, `plan-realm-options-redesign.md`, `plan-rfc9700-security-hardening.md`,
   `plan-data-storage-matrix.md`, `plan-data-operational-storage.md`.
 - `../references/template-plan/template-ai-implementation-plan.md`.

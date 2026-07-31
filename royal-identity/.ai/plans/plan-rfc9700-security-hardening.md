@@ -45,6 +45,8 @@
   o Server já usa backing Operational durável.
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — baseline anterior para
   taxonomia, status e headers do token endpoint; a Fase 3 deste plano consome sua classificação de PKCE.
+- [plan-oidc-session-management.md](plan-oidc-session-management.md) — predecessor que implementa o OP iframe e
+  fixa a exceção protocolar de framing; a Fase 5 deve preservar seus testes de ausência de headers bloqueadores.
 - [plans-roadmap-02.md](plans-roadmap-02.md) e [backlog-001.md](../backlogs/backlog-001.md) — API/UI
   administrativa ainda não existem; este plano deve entregar um contrato puro que o futuro Admin consuma.
 
@@ -94,6 +96,9 @@
   entrega tipos e regras consumíveis e registra o handoff.
 - **Plano de replay ativo:** não modificar nem duplicar `IReplayProtectionStore`; concluir
   `plan-replay-protection.md` antes dos aceites finais deste plano.
+- **OP iframe precisa ser enquadrável:** `check_session_iframe` é deliberadamente carregado por RPs em outra
+  origem. O hardening browser-facing não pode tratá-lo como login/consent/error nem injetar
+  `X-Frame-Options: DENY` ou `frame-ancestors 'none'` nessa rota.
 
 ### Superfícies impactadas a mapear
 
@@ -202,6 +207,10 @@
   `plan-oauth21-token-error-responses.md`; verifier sem challenge retorna `invalid_request`, enquanto verifier
   incorreto contra challenge existente permanece `invalid_grant`. Não duplicar neste plano o redesign de
   respostas. Fonte: OAuth 2.1 draft-15 §§3.2.4/4.1.3 + RFC 7636 §4.6.
+- **DF19 — Exceção nominal de framing:** aplicar proteção contra framing a páginas sensíveis, mas excluir
+  exclusivamente a rota `check_session_iframe`; preservar por teste a ausência de `X-Frame-Options: DENY` e de
+  `frame-ancestors 'none'` nessa resposta, sem relaxar login/consent/logout/error. Fonte:
+  `plan-oidc-session-management.md` DF16 + requisito funcional do OP iframe.
 
 ---
 
@@ -536,7 +545,8 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RefreshToken"
 
 ## Fase 5 - Segurança HTTP, metadata, client authentication e logs
 
-**Depende de:** Fases 1-3, DF6, DF10, DF14, DF17.
+**Depende de:** Fases 1-3, DF6, DF10, DF14, DF17, DF19 e conclusão de
+[plan-oidc-session-management.md](plan-oidc-session-management.md).
 
 **Escopo:** `CspOptions`, middleware/response helpers, `LoggingOptions`/`LoggerExtensions`,
 discovery/mTLS routing, hosts, `RoyalIdentity.Razor`, `Tests.Host`, `Tests.WebApp`,
@@ -547,8 +557,12 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
 
 **Tarefas:**
 
-- [ ] Aplicar CSP `frame-ancestors` nas páginas authorize/login/consent/logout/error e resultados browser-facing.
-- [ ] Aplicar `X-Frame-Options` como fallback coerente sem contradizer `frame-ancestors`.
+- [ ] Aplicar CSP `frame-ancestors` nas páginas authorize/login/consent/logout/error e demais resultados
+  browser-facing, excluindo nominalmente apenas `check_session_iframe` conforme DF19.
+- [ ] Aplicar `X-Frame-Options` como fallback coerente sem contradizer `frame-ancestors` e sem injetar `DENY` no
+  OP iframe.
+- [ ] Reexecutar `CheckSessionEndpointTests` e provar simultaneamente que o iframe permanece frameable e que as
+  páginas sensíveis continuam protegidas.
 - [ ] Aplicar `Referrer-Policy: no-referrer` a todas as páginas/respostas sensíveis.
 - [ ] Garantir que redirects após requests com credenciais nunca usem 307; preferir 303 onde aplicável.
 - [ ] Confirmar por teste que authorization endpoint não recebe CORS.
@@ -559,17 +573,18 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
   que `ClientSecurityAssessment` prova o deployment.
 - [ ] Atualizar findings de client authentication assimétrica e sender constraint como recomendações.
 
-**Critérios de aceite:** nenhuma página sensível pode ser enquadrada por origem não autorizada; referrer não
-carrega parâmetros; logs capturados não contêm segredos/handles; discovery não anuncia rota/método inexistente;
+**Critérios de aceite:** nenhuma página sensível pode ser enquadrada por origem não autorizada; a única exceção é
+o OP iframe, cuja resposta não contém `X-Frame-Options: DENY` nem `frame-ancestors 'none'`; referrer não carrega
+parâmetros; logs capturados não contêm segredos/handles; discovery não anuncia rota/método inexistente;
 authorization endpoint continua fora do CORS; startup falha ou alerta de forma explícita para configuração de
 proxy/issuer insegura conforme o contrato fechado na fase.
 
 **Testes:**
 
 ```powershell
-dotnet test Tests.Host
-dotnet test Tests.WebApp
-dotnet test Tests.Integration --filter "FullyQualifiedName~Discovery|FullyQualifiedName~Logging|FullyQualifiedName~Cors"
+dotnet build Tests.Host
+dotnet build Tests.WebApp
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests|FullyQualifiedName~Discovery|FullyQualifiedName~Logging|FullyQualifiedName~Cors"
 ```
 
 ### Resultado da Fase 5
@@ -631,6 +646,7 @@ dotnet test RoyalIdentity.sln
 | Redirect configurável | 2 | DF7-DF9 | Ordinal/sem wildcard default; relaxamento diagnosticado | testes RedirectUri + Configuration |
 | Replay de refresh | 4 | DF13 + resposta Q1 | sucessor único e revogação de família | contracts SQLite/PostgreSQL + integração |
 | Handoff ao Admin | 6 | DF16 | contrato/documentação e links, sem snapshot | revisão documental + solução |
+| Framing com exceção protocolar | 5 | DF10, DF19 | páginas sensíveis bloqueadas; OP iframe frameable | CheckSessionEndpoint + browser/header tests |
 
 ---
 
@@ -648,6 +664,7 @@ dotnet test RoyalIdentity.sln
 10. Nenhum segredo, code, verifier, token, assertion ou handle aparece em log.
 11. Não reintroduzir password grant ou implicit/hybrid por extension grant acidental.
 12. Não criar `OAuthSecurityProfile`, assessor DI ou snapshot persistido.
+13. O hardening de clickjacking não bloqueia `check_session_iframe` e não amplia essa exceção a outra rota.
 
 ---
 
@@ -678,6 +695,7 @@ dotnet test RoyalIdentity.sln
 | RuleId muda após integração Admin | rename sem coordenação | localização/UX quebradas | constantes estáveis + documentação + testes de unicidade | Aberto |
 | Plano conflita com replay ativo | edits simultâneos em auth/options/tests | regressão ou diff sobreposto | DF17; concluir plano de replay antes do aceite final | Aberto |
 | Fase 3 duplica a taxonomia OAuth 2.1 | helpers/códigos são recriados no hardening | contratos divergentes para o mesmo erro | DF18; consumir o plano de erros concluído | Aberto |
+| Hardening bloqueia o OP iframe | regra global trata todo resultado browser-facing igualmente | Session Management anunciado deixa de funcionar | DF19 + regressão `CheckSessionEndpointTests` | Aberto |
 | Config JSON ausente materializa relaxamento antigo | default de deserialização incorreto | realm não aderente silencioso | roundtrip/legacy payload test com defaults seguros | Aberto |
 
 ---
@@ -708,5 +726,6 @@ dotnet test RoyalIdentity.sln
 - [plan-data-operational-storage.md](plan-data-operational-storage.md).
 - [plan-replay-protection.md](plan-replay-protection.md).
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
+- [plan-oidc-session-management.md](plan-oidc-session-management.md).
 - [plans-roadmap-02.md](plans-roadmap-02.md).
 - [backlog-001.md](../backlogs/backlog-001.md).

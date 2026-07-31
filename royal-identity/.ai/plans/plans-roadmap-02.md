@@ -74,7 +74,7 @@ definida em `../analisys/`.
 ## Próxima execução
 
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) é a próxima baseline protocolar
-planejada e se torna executável após fechar Q1/Q3. Depois dela, executar
+executável: todas as suas decisões estão fechadas (DF1-DF20) e não há pergunta pendente. Depois dela, executar
 [plan-oidc-session-management.md](plan-oidc-session-management.md) e
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), nessa ordem, para que os payloads
 Configuration sejam promovidos deterministicamente para v2 e depois v3. Em seguida, executar
@@ -119,7 +119,7 @@ real testada.
 ### 2. Conformidade das respostas de erro do token endpoint com OAuth 2.1
 
 **Plano criado:** [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md)
-(RASCUNHO — 0/4 fases; Q1/Q3 pendentes antes da Fase 1 e Q2 antes da Fase 3)
+(RASCUNHO — 0/4 fases; decisões fechadas em DF1-DF20, sem perguntas abertas)
 
 Corrige a baseline já exigida pelo RFC 6749 e incorpora a classificação adicional do OAuth 2.1 para PKCE antes
 do hardening RFC 9700. O contrato é o valor exato de `error`, o status HTTP e os headers normativos; encontrar o
@@ -138,14 +138,16 @@ Escopo principal:
 - Testes que desserializam JSON e comparam `error`, status e headers, sem assertions por substring.
 
 Este plano não altera storage e deve ser executado antes da Fase 3 do plano RFC 9700. A auditoria completa dos
-erros de authorize, revocation, UserInfo e protected resources permanece fora deste corte. Q1 decide o impacto
-mínimo do `ResourcesValidator` compartilhado no authorize; Q2 classifica `code_challenge_method` desconhecido já
-persistido; Q3 fecha a localização da factory semântica hoje alojada em `RoyalIdentity.Pipelines`.
+erros de authorize, revocation, UserInfo e protected resources permanece fora deste corte, com uma exceção
+explícita: DF20 mantém o `ResourcesValidator` compartilhado e corrige o campo `error` de
+`invalid_scope`/`invalid_target` também no authorize, sem tocar no transporte. DF18 fixa `invalid_grant` 400,
+nunca 5xx, para `code_challenge_method` persistido desconhecido; DF19 deixa `RoyalIdentity.Pipelines` sem
+nenhuma seleção de código OAuth.
 
 ### 2.1. OpenID Connect Session Management e Check Session
 
 **Plano criado:** [plan-oidc-session-management.md](plan-oidc-session-management.md)
-(RASCUNHO — 0/7 fases)
+(RASCUNHO — 0/7 fases; bloqueado pela conclusão do plano OAuth 2.1)
 
 Implementa o OP side do OpenID Connect Session Management 1.0 sem portar a infraestrutura de sessão legada do
 IS4. O plano cria um OP User Agent State opaco e realm-scoped, corrige `prompt=none`, move `session_state` para
@@ -160,6 +162,10 @@ Escopo principal:
 - OP iframe com Web Crypto, validação de parent/origin, CSP por nonce e headers sem bloquear framing.
 - Aceite Playwright opt-in com OP/RP em origins diferentes e dois realms.
 - Licença Apache-2.0 e notices preservados dentro da distribuição AGPLv3.
+
+O plano consome os helpers/writer finais de `plan-oauth21-token-error-responses.md` antes de alterar
+`ConsentDecorator` e entrega a fatia diferida do authorization endpoint necessária a `prompt=none`. O plano RFC
+9700, executado depois, preserva por regressão a exceção de framing exclusiva do OP iframe.
 
 O plano deve executar depois de
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md), para não disputar os contratos de

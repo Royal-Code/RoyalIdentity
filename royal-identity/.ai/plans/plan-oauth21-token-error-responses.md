@@ -1,6 +1,6 @@
 # Plan: Conformidade das respostas de erro do token endpoint com OAuth 2.1 (`plan-oauth21-token-error-responses`)
 
-## Status: RASCUNHO - Q1/Q3 pendentes antes da Fase 1 e Q2 antes da Fase 3; implementação não iniciada
+## Status: RASCUNHO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; implementação não iniciada
 
 ## Progresso
 
@@ -8,10 +8,10 @@
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Contrato explícito de erro e asserções exatas | Bloqueada por Q1/Q3 |
-| Fase 2 - Forma da requisição e autenticação do client | Bloqueada pela Fase 1 |
-| Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Bloqueada pela Fase 2/Q2 |
-| Fase 4 - Auditoria transversal, regressão e fechamento | Bloqueada pela Fase 3 |
+| Fase 1 - Contrato explícito de erro e asserções exatas | Pendente |
+| Fase 2 - Forma da requisição e autenticação do client | Pendente |
+| Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Pendente |
+| Fase 4 - Auditoria transversal, regressão e fechamento | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -74,8 +74,8 @@
   9700 já possui DF18 com a classificação correta e dependência deste plano; a tarefa executável que ainda
   duplicava o primeiro cenário foi convertida nesta revisão em consumo da regressão entregue por este plano.
 - **Método PKCE persistido desconhecido:** o branch `default` de `PkceMatchValidator` transforma um
-  `code_challenge_method` desconhecido já armazenado no authorization code em `invalid_grant`; esse estado não é
-  input novo do token request e sua classificação ainda não foi decidida (Q2).
+  `code_challenge_method` desconhecido já armazenado no authorization code em `invalid_grant`. DF18 confirma o
+  código; o que falta é a descrição genérica indistinguível e o log do método recusado.
 - **Duplicidade preservada, mas não validada:** `AsNameValueCollection` chama `Add` para cada `StringValues`, e
   `NameValueCollection.GetValues` ainda distingue ocorrências. O problema é que `TryGet`/indexers e `Load` tratam
   parâmetros como escalares sem impor cardinalidade; a validação precisa ocorrer antes dessas leituras e antes
@@ -99,7 +99,7 @@
   `ErrorResponseResult` não escreve `Allow`; adicionar `Allow: POST` será mudança corretiva, não preservação.
 - **Semântica protocolar no projeto neutro:** `RoyalIdentity.Pipelines/Abstractions/EndpointErrorResults.cs`
   hardcoda `invalid_request`, `method_not_allowed`, `not_found` e `Invalid_content_type` no payload genérico. Isso
-  já viola a intenção de DF5 e exige a decisão Q3 antes de alterar a borda.
+  já viola a intenção de DF5 e é corrigido por DF19, que move a seleção para `RoyalIdentity`.
 - **Infraestrutura de testes ausente:** `Tests.Identity` não possui fixtures dos contexts/validators deste plano;
   os filtros `ClientSecret`, `TokenEndpoint`, `GrantType` e `Resources` não selecionam testes, enquanto `Pkce`
   seleciona somente `PkceHelperTests`. Também não existem ainda `TokenErrorTests` em `Tests.Integration` nem
@@ -118,8 +118,9 @@
   criar enum que impeça `invalid_target` ou códigos futuros.
 - **Borda compartilhada:** `ResponseHandler`/`ErrorResponseResult` atendem também revocation, UserInfo,
   End Session e Protected Resource Metadata. `ResourcesValidator` é ainda mais sensível: a mesma instância
-  genérica valida `AuthorizeContext` e `ClientCredentialsContext`, portanto a correção do campo `error` no token
-  endpoint inevitavelmente toca authorize ou exige separar o validator (Q1).
+  genérica valida `AuthorizeContext`, `AuthorizeValidateContext` e `ClientCredentialsContext`, portanto a
+  correção do campo `error` no token endpoint necessariamente toca authorize; DF20 assume esse ajuste mínimo em
+  vez de separar o validator. `AuthorizationCodeContext` e `RefreshTokenContext` não passam por ele.
 - **Transporte de erro do authorize já incorreto:** validators do authorize produzem hoje o mesmo JSON direto de
   `ErrorResponseResult`; depois de validar um `redirect_uri`, RFC 6749 §4.1.2.1 normalmente exige redirecionar o
   erro ao client. Esta dívida é real, mas não precisa ser absorvida pela correção do token endpoint.
@@ -131,11 +132,11 @@
 ### Superfícies impactadas a mapear
 
 - `RoyalIdentity.Pipelines/Abstractions` e `Defaults` — payload, `EndpointErrorResults`, status e headers de
-  respostas genéricas, conforme Q3.
+  respostas genéricas, conforme DF19.
 - `RoyalIdentity/Endpoints/TokenEndpoint.cs` — método/media type, leitura do form, duplicidade e dispatch de grant.
 - `RoyalIdentity/Extensions/ResponseHandlerExtensions.cs` — construção explícita dos erros OAuth.
 - `RoyalIdentity/Contexts/Decorators` e `Validators` — classificação por condição do request/grant, inclusive a
-  borda compartilhada `ResourcesValidator` conforme Q1.
+  borda compartilhada `ResourcesValidator` conforme DF20.
 - `RoyalIdentity/Contracts/Defaults/SecretsEvaluators` — detecção e avaliação de autenticação de client.
 - `Tests.Pipelines`, `Tests.Integration` e `Tests.Architecture` — writer genérico, matriz HTTP e guard de
   boundaries; `Tests.Identity` só recebe testes se surgir unidade pura que não replique a composição HTTP.
@@ -159,8 +160,9 @@
 ## Fora de escopo
 
 - Auditar integralmente a taxonomia e o transporte de erro do authorization endpoint, revocation,
-  introspection, UserInfo ou protected resources; a correção mínima do campo `error` no authorize depende de Q1,
-  e as demais superfícies recebem somente regressões provocadas por helpers compartilhados.
+  introspection, UserInfo ou protected resources; no authorize entra somente a correção do campo `error` do
+  `ResourcesValidator` compartilhado (DF20), e as demais superfícies recebem apenas regressões provocadas por
+  helpers compartilhados.
 - Alterar a semântica atômica ou persistência de authorization codes, refresh tokens ou replay handles.
 - Implementar novos grants, DPoP, PAR, JAR/JARM, Device Authorization ou Token Exchange.
 - Remover extension grants ou o erro `invalid_target` do RFC 8707.
@@ -171,36 +173,8 @@
 
 ---
 
-## Perguntas ao humano
-
-- **Q1 — `ResourcesValidator` compartilhado:** como tratar a correção de `invalid_scope`/`invalid_target` que
-  atravessa token e authorize?
-  - **Opções:**
-    - **A) Recomendada:** corrigir o validator compartilhado para escrever o código exato nos dois contexts e
-      assumir esse ajuste mínimo do authorize neste plano; o transporte redirect versus JSON continua diferido.
-    - **B)** separar validators de authorization e token, corrigindo somente o novo validator do token neste
-      plano e deixando taxonomia/transporte do authorize para plano próprio.
-  - **Impacto se não decidir:** bloqueia o contrato dos helpers, a fronteira de escopo e as Fases 1/3.
-  - **Status:** Aberta.
-
-- **Q2 — `code_challenge_method` desconhecido no code persistido:** como classificar esse estado impossível no
-  fluxo normal?
-  - **Opções:**
-    - **A) Recomendada:** tratar como violação de invariante/dado corrompido e propagar resposta 5xx sem mascarar
-      como erro OAuth do client.
-    - **B)** responder `invalid_grant` genérico, tratando o authorization code inteiro como inválido e mantendo
-      o detalhe fora da resposta.
-  - **Impacto se não decidir:** bloqueia o branch `default`, sua observabilidade e os testes da Fase 3.
-  - **Status:** Aberta.
-
-- **Q3 — `EndpointErrorResults` no projeto Pipelines:** onde deve ficar a seleção semântica dos erros?
-  - **Opções:**
-    - **A) Recomendada:** deixar em `RoyalIdentity.Pipelines` somente writers/resultados HTTP neutros e mover
-      factories que escolhem códigos OAuth para `RoyalIdentity`.
-    - **B)** manter uma factory genérica em Pipelines, mas exigir que o caller do core forneça explicitamente
-      código, status e headers; remover todos os códigos hardcoded de `EndpointErrorResults`.
-  - **Impacto se não decidir:** bloqueia DF5, o desenho do 405/415 e o guard arquitetural da Fase 1.
-  - **Status:** Aberta.
+> **Perguntas ao humano:** nenhuma aberta. Q1, Q2 e Q3 foram respondidas em 2026-07-31 e promovidas a DF20,
+> DF18 e DF19; o registro está em `Histórico de decisões`.
 
 ---
 
@@ -220,7 +194,7 @@
   descrição com um único `string` capazes de aceitar silenciosamente uma constante `Oidc.*.Errors.*`. Fonte:
   callers verificados no código atual.
 - **DF5 — Pipelines neutro ao protocolo:** suporte genérico a status/headers pode permanecer em
-  `RoyalIdentity.Pipelines`, mas regras OAuth e seleção dos códigos ficam em `RoyalIdentity`; Q3 decide a forma
+  `RoyalIdentity.Pipelines`, mas regras OAuth e seleção dos códigos ficam em `RoyalIdentity`; DF19 fixa a forma
   exata dessa fronteira. Fonte: dependency rules do repositório.
 - **DF6 — Basic inválido:** tentativa de autenticação por `Authorization: Basic` que falha retorna
   `invalid_client`, HTTP 401 e `WWW-Authenticate` com scheme `Basic`; falhas de mecanismos no body usam 400,
@@ -261,6 +235,23 @@
 - **DF17 — Ownership do downgrade PKCE:** este plano implementa e testa a classificação do token endpoint; o
   plano RFC 9700 apenas consome a baseline concluída e mantém seus aceites de hardening, sem segunda tarefa de
   implementação. Fonte: `plan-rfc9700-security-hardening.md` DF18 + ordem do roadmap.
+- **DF18 — `code_challenge_method` persistido desconhecido:** o branch `default` de `PkceMatchValidator` responde
+  `invalid_grant` genérico com HTTP 400, tratando o authorization code inteiro como inválido e mantendo o método
+  recusado fora da resposta; o detalhe fica somente em log. Resposta 5xx é reservada a falha de infraestrutura ou
+  bug, não a um artefato que o client apresentou e o servidor não pode honrar. A descrição usa a mesma forma
+  genérica dos demais códigos recusados, preservando a equivalência anti-oracle. Fonte: Q2 resposta humana
+  (opção B) + DF9/DF13.
+- **DF19 — Fronteira de `EndpointErrorResults`:** `RoyalIdentity.Pipelines` mantém somente writers e resultados
+  HTTP neutros; as factories que escolhem códigos OAuth passam para `RoyalIdentity`, e nenhum código protocolar
+  (`invalid_request`, `method_not_allowed`, `not_found`, `Invalid_content_type`) permanece hardcoded no projeto
+  neutro. Fonte: Q3 resposta humana (opção A) + DF5.
+- **DF20 — `ResourcesValidator` permanece compartilhado:** corrigir o validator genérico para escrever o código
+  exato de `invalid_scope`/`invalid_target` no campo `error` em ambos os contexts, sem separá-lo por endpoint.
+  As oito regras do validator são idênticas para authorize e client credentials, e os dois códigos são
+  normativos nos dois endpoints, então a correção move o valor de `error_description` para `error` sem alterar a
+  classificação de nenhum dos lados. O ajuste mínimo do authorize entra neste plano; o transporte redirect versus
+  JSON continua diferido. Fonte: Q1 resposta humana (opção A) + `Pipes.cs` + RFC 6749 §§4.1.2.1/5.2 + RFC 8707
+  §§2.1/2.2.
 
 ---
 
@@ -296,6 +287,36 @@
   validar cardinalidade antes de leitura escalar e efeitos, não necessariamente antes da conversão.
   - **Conclusão:** DF7-DF8.
 
+**Respostas humanas de 2026-07-31:**
+
+- **Q2 — `code_challenge_method` desconhecido no code persistido:** A) 5xx por violação de invariante versus
+  B) `invalid_grant` genérico.
+  - **Resposta Q2:** opção B.
+  - **Considerações Q2:** o client apresentou um artefato que o servidor não pode honrar, e isso é resposta de
+    protocolo; HTTP 5xx sinaliza bug ou indisponibilidade do sistema e não deve ser emitido por dado de request
+    recusado. A escolha também mantém o branch alinhado à equivalência anti-oracle já aplicada aos demais
+    cenários de authorization code recusado.
+  - **Conclusão Q2:** DF18; a recomendação anterior por 5xx foi descartada e a Invariante 10 deixou de precisar
+    de exceção.
+- **Q3 — `EndpointErrorResults` no projeto Pipelines:** A) mover a seleção semântica para `RoyalIdentity` versus
+  B) manter factory genérica em Pipelines recebendo o código do caller.
+  - **Resposta Q3:** opção A.
+  - **Conclusão Q3:** DF19; Pipelines fica restrito a writers/resultados HTTP neutros.
+- **Q1 — `ResourcesValidator` compartilhado:** A) corrigir o validator compartilhado e assumir o ajuste mínimo do
+  authorize versus B) separar validators de authorization e token.
+  - **Resposta Q1:** opção A.
+  - **Considerações Q1:** `Pipes.cs` mostra `ResourcesValidator` registrado em `AuthorizeContext`,
+    `AuthorizeValidateContext` e `ClientCredentialsContext`, e nenhuma das suas oito regras tem branch por
+    endpoint — a única diferenciação é o `switch` final que marca `ResourcesValidated()`. As regras específicas
+    já vivem fora dele: `ResourcesDecorator` (identity scope exige `openid`) para authorize,
+    `ClientResourceDecorator` (identity scope e `offline_access` proibidos, scopes default) para client
+    credentials e `AuthorizationResourcesValidator` (`response_type` × scope) só para authorize. `invalid_scope`
+    é normativo nos dois endpoints (RFC 6749 §4.1.2.1 e §5.2) e `invalid_target` também (RFC 8707 §§2.1/2.2);
+    `Oidc.Authorize.Errors.*` e `Oidc.Token.Errors.*` têm valores de string idênticos. Separar duplicaria oito
+    regras iguais sem ganho normativo. `AuthorizationCodeContext` e `RefreshTokenContext` não usam o validator:
+    resolvem subset no handler por `context.Error(...)`, que já escreve o campo `error` corretamente.
+  - **Conclusão Q1:** DF20; o escopo do authorize neste plano é somente o campo `error`.
+
 ---
 
 ## Design alvo
@@ -305,7 +326,8 @@
 - `ErrorResponseParameters`: continua sendo o payload genérico `error`/`error_description`/`error_uri`.
 - `ErrorResponseResult`/`ResponseHandler`: aceitam status e headers HTTP explícitos sem importar constantes
   OAuth para `RoyalIdentity.Pipelines`.
-- `EndpointErrorResults`: deixa de selecionar/hardcodar semântica OAuth dentro de Pipelines conforme Q3.
+- `EndpointErrorResults`: deixa de selecionar/hardcodar semântica OAuth dentro de Pipelines; as factories que
+  escolhem códigos migram para `RoyalIdentity` conforme DF19.
 - `ResponseHandlerExtensions`: expõe construção inequívoca de erro protocolar; não existe helper de um ou dois
   `string` em que uma constante de código possa ocupar silenciosamente a posição de descrição.
 - Validação estrutural dos parâmetros core do token request ocorre sobre `IFormCollection` ou
@@ -335,7 +357,7 @@
 | Resource indicator inválido ou não autorizado | `invalid_target` | 400; extensão RFC 8707 |
 | `code_verifier` presente sem challenge ou challenge presente sem verifier | `invalid_request` | 400 |
 | `code_verifier` presente e diferente do challenge | `invalid_grant` | 400 |
-| `code_challenge_method` desconhecido já persistido no code | definido por Q2 | 5xx ou 400 |
+| `code_challenge_method` desconhecido já persistido no code | `invalid_grant` | 400, descrição genérica (DF18) |
 
 Regras adicionais:
 
@@ -431,7 +453,7 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Contrato explícito de erro e asserções exatas
 
-**Depende de:** Q1, Q3, DF2-DF5, DF13-DF17.
+**Depende de:** DF2-DF5, DF13-DF17, DF19-DF20.
 
 **Escopo:** `RoyalIdentity.Pipelines/Abstractions`, `RoyalIdentity.Pipelines/Defaults`,
 `EndpointErrorResults`, `RoyalIdentity/Extensions/ResponseHandlerExtensions.cs`, todos os callers de
@@ -446,16 +468,17 @@ verifique `error`, status, content type, cache e headers opcionais.
 
 - [ ] Inventariar todos os callers de `ResponseHandler.Error`, `context.Error`, `InvalidRequest`,
   `InvalidGrant` e `InvalidClient`, registrando endpoint/context e efeito esperado.
-- [ ] Registrar as respostas Q1/Q3 no histórico e promover as decisões correspondentes antes de editar código.
 - [ ] Estender o resultado genérico com headers explícitos sem introduzir referência OAuth em
   `RoyalIdentity.Pipelines`.
-- [ ] Remover a seleção de códigos hardcoded de Pipelines conforme Q3, inclusive o typo
-  `Invalid_content_type`.
+- [ ] Mover para `RoyalIdentity` as factories que escolhem códigos e remover de Pipelines toda seleção
+  hardcoded conforme DF19, inclusive o typo `Invalid_content_type`.
 - [ ] Remover os overloads de um e dois `string` de `InvalidRequest` que aceitam uma constante de erro como
   descrição, substituindo-os por construção inequívoca.
 - [ ] Migrar todos os callers afetados, inclusive `ResourcesDecorator`, `ResourcesValidator`,
-  `AuthorizeMainValidator`, `AuthorizationResourcesValidator`, `LoadClient` e `RedirectUriValidator`, conforme
-  a fronteira escolhida em Q1.
+  `AuthorizeMainValidator`, `AuthorizationResourcesValidator`, `LoadClient` e `RedirectUriValidator`, mantendo o
+  `ResourcesValidator` compartilhado conforme DF20.
+- [ ] Adicionar regressão de authorize provando que `invalid_scope`/`invalid_target` passam a aparecer no campo
+  `error` também nesse endpoint e que o caso de signing algorithm continua `invalid_request`.
 - [ ] Preservar `error_uri` e serialização source-generated.
 - [ ] Criar `Tests.Pipelines/Defaults/ErrorResponseResultTests.cs` para payload, status, headers, content type e
   cache.
@@ -469,14 +492,16 @@ verifique `error`, status, content type, cache e headers opcionais.
 
 **Critérios de aceite:** nenhum helper aceita um `string` livre na posição em que uma constante de erro possa ser
 tratada como descrição; guard impede constantes `Oidc.*.Errors.*` em parâmetros de descrição; `invalid_scope` e
-`invalid_target` aparecem no campo JSON `error` conforme Q1; status e headers chegam à resposta; testes falham se
-o código existir somente em `error_description`; Pipelines não seleciona códigos OAuth.
+`invalid_target` aparecem no campo JSON `error` no token endpoint e no authorize (DF20), sem que o
+`ResourcesValidator` seja duplicado; status e headers chegam à resposta; testes falham se
+o código existir somente em `error_description`; Pipelines não seleciona códigos OAuth e não contém nenhuma
+string de erro protocolar (DF19).
 
 **Testes:**
 
 ```powershell
 dotnet test Tests.Pipelines --filter "FullyQualifiedName~ErrorResponseResultTests"
-dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~ClientToken|FullyQualifiedName~RefreshToken|FullyQualifiedName~CodeToken"
+dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~ClientToken|FullyQualifiedName~RefreshToken|FullyQualifiedName~CodeToken|FullyQualifiedName~CodeAuthorize"
 dotnet test Tests.Architecture --filter "FullyQualifiedName~ProtocolErrorBoundaryTests"
 ```
 
@@ -540,12 +565,12 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|Fully
 
 ## Fase 3 - Taxonomia dos grants, scopes, resources e PKCE
 
-**Depende de:** Fases 1-2, Q2, DF9-DF11, DF16-DF17, conclusão de
+**Depende de:** Fases 1-2, DF9-DF11, DF16-DF18, conclusão de
 [plan-replay-protection.md](plan-replay-protection.md) quando os testes de `private_key_jwt` exigirem o backing
 final.
 
 **Escopo:** `TokenEndpoint`, `GrantTypeValidator`, `LoadCode`, `LoadRefreshToken`, `PkceMatchValidator`,
-resource decorators/validators conforme Q1, handlers de extension grant e
+resource decorators/validators conforme DF20, handlers de extension grant e
 `Tests.Integration/Endpoints/TokenErrorTests.cs`.
 
 **O que/como:** aplicar a matriz normativa a cada grant suportado, distinguindo ausência/má-formação de valor
@@ -565,15 +590,18 @@ apresentado e inválido. Corrigir PKCE sem enfraquecer consumo single-use ou com
 - [ ] Verificar que `invalid_target` permanece no campo correto para RFC 8707 depois da migração única da Fase 1.
 - [ ] Rejeitar verifier sem challenge e challenge sem verifier com `invalid_request`.
 - [ ] Preservar `invalid_grant` para verifier incorreto contra challenge existente.
-- [ ] Tratar `code_challenge_method` persistido desconhecido exatamente conforme Q2.
+- [ ] Responder `invalid_grant` 400 genérico no branch `default` de `PkceMatchValidator` conforme DF18,
+  registrando o método recusado somente em log e mantendo a descrição indistinguível das demais recusas de code.
 - [ ] Confirmar que falha PKCE após consumo não torna authorization code reutilizável.
 - [ ] Auditar extension grants para que usem código core ou de extensão documentado.
 - [ ] Adicionar testes table-driven para cada linha da matriz normativa alvo nos três grants suportados.
 
-**Critérios de aceite:** cada condição da matriz, inclusive Q2, tem ao menos um teste que verifica `error`/status
-exato; ausência e valor inválido não são confundidos; client sem autorização usa `unauthorized_client`; PKCE
-presence mismatch usa `invalid_request`, mismatch criptográfico usa `invalid_grant`; single-use e anti-oracle
-permanecem verdes; nenhuma segunda implementação do downgrade existe no plano RFC 9700.
+**Critérios de aceite:** cada condição da matriz, inclusive o método persistido desconhecido, tem ao menos um
+teste que verifica `error`/status exato; ausência e valor inválido não são confundidos; client sem autorização usa
+`unauthorized_client`; PKCE presence mismatch usa `invalid_request`, mismatch criptográfico e método persistido
+desconhecido usam `invalid_grant` 400 com descrições indistinguíveis; nenhum caminho do token endpoint emite 5xx
+por dado apresentado pelo client; single-use e anti-oracle permanecem verdes; nenhuma segunda implementação do
+downgrade existe no plano RFC 9700.
 
 **Testes:**
 
@@ -589,7 +617,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|Fully
 
 ## Fase 4 - Auditoria transversal, regressão e fechamento
 
-**Depende de:** Fases 1-3, Q1/Q2/Q3 fechadas, DF1-DF17 e decisões originadas das perguntas.
+**Depende de:** Fases 1-3 e DF1-DF20.
 
 **Escopo:** todos os callers de resposta de erro, discovery quando anunciar auth methods, extension grants,
 `Tests.Architecture`, testes amplos, documentação, roadmap e plano RFC 9700.
@@ -635,13 +663,13 @@ git diff --check
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Objetivo 1 — código JSON exato | 1, 3, 4 | DF2-DF5, Q1, Q3 | `error` nunca depende da descrição; Pipelines neutro | ErrorResponseResultTests + TokenErrorTests + architecture |
-| Objetivo 2 — taxonomia completa | 2-3 | DF3, DF9-DF10, DF15, Q2 | forma, auth, autorização, grant, scope e target distintos | TokenErrorTests + Code/Refresh/ClientToken |
+| Objetivo 1 — código JSON exato | 1, 3, 4 | DF2-DF5, DF19-DF20 | `error` nunca depende da descrição; Pipelines neutro | ErrorResponseResultTests + TokenErrorTests + CodeAuthorize + architecture |
+| Objetivo 2 — taxonomia completa | 2-3 | DF3, DF9-DF10, DF15, DF18 | forma, auth, autorização, grant, scope e target distintos | TokenErrorTests + Code/Refresh/ClientToken |
 | Objetivo 3 — HTTP 401/header | 1-2 | DF6, DF12 | Basic inválido retorna 401 + `WWW-Authenticate`; 405 inclui Allow | TokenErrorTests |
 | Objetivo 4 — forma antes de efeitos | 2 | DF7-DF8, DF15 | duplicidade/mecanismos múltiplos não chegam aos evaluators | TokenErrorTests + PrivateKeyJwt |
-| Objetivo 5 — PKCE OAuth 2.1 | 3 | DF11, DF17, Q2 | presence mismatch, mismatch criptográfico e método persistido têm destino definido | TokenErrorTests + CodeSingleUse |
+| Objetivo 5 — PKCE OAuth 2.1 | 3 | DF11, DF17-DF18 | presence mismatch usa `invalid_request`; mismatch criptográfico e método persistido usam `invalid_grant` indistinguível | TokenErrorTests + CodeSingleUse |
 | Objetivo 6 — testes exatos | 1-4 | DF2, DF16 | helper único; sem assertions por substring/filtros vazios | ErrorResponseResultTests + TokenErrorTests + solution |
-| Extensibilidade transversal | 1, 3-4 | DF3, DF8, Q1 | `invalid_target` e erro custom continuam válidos | TokenErrorTests + extension grant |
+| Extensibilidade transversal | 1, 3-4 | DF3, DF8, DF20 | `invalid_target` e erro custom continuam válidos | TokenErrorTests + extension grant |
 | Anti-oracle e sigilo | 2-4 | DF13, DF15 | code/client auth indistinguíveis e nenhum valor sensível | CodeSingleUse + PrivateKeyJwt + logs |
 
 ---
@@ -658,9 +686,11 @@ git diff --check
 7. `resource` continua multivalorado conforme RFC 8707.
 8. Extension grants e códigos de erro de extensões continuam possíveis.
 9. `error_description`, headers e logs nunca expõem credenciais ou artifacts.
-10. Falhas de infraestrutura ou violações de invariante não são traduzidas em falhas de credencial/grant, salvo
-    a decisão explícita Q2-B.
-11. O impacto mínimo em authorize segue Q1; o transporte redirect versus JSON não é corrigido incidentalmente.
+10. Falhas de infraestrutura não são traduzidas em falhas de credencial/grant, e o inverso também vale: nenhum
+    dado apresentado pelo client — inclusive `code_challenge_method` persistido desconhecido — produz 5xx
+    (DF18). 5xx permanece exclusivo de bug ou indisponibilidade.
+11. O impacto em authorize limita-se ao campo `error` do `ResourcesValidator` compartilhado (DF20); o transporte
+    redirect versus JSON e as demais condições do endpoint não são alterados incidentalmente.
 12. Não criar flag de compatibilidade, enum fechado de erros ou opção por client/realm.
 13. Não alterar storage, migrations ou semânticas atômicas fechadas neste plano.
 14. Não reintroduzir password grant.
@@ -669,7 +699,9 @@ git diff --check
 
 ## Critérios globais de conclusão
 
-- Q1/Q2/Q3 foram respondidas, registradas no histórico e promovidas a decisões fechadas.
+- Nenhuma pergunta permanece aberta: Q1/Q2/Q3 estão registradas no histórico e promovidas a DF20/DF18/DF19.
+- `ResourcesValidator` continua único e o authorize passa a expor `invalid_scope`/`invalid_target` no campo
+  `error`, sem alteração de transporte nem de qualquer outra condição do endpoint.
 - Todas as linhas da matriz normativa alvo possuem teste HTTP ou unitário com `error` exato.
 - Basic inválido possui cobertura de HTTP 401 e `WWW-Authenticate`.
 - Método inválido possui cobertura de HTTP 405 e `Allow: POST`.
@@ -677,7 +709,8 @@ git diff --check
 - Assertion malformada após selecionar `private_key_jwt` usa `invalid_client` conforme RFC 7523 e não cria
   oracle de client.
 - OAuth 2.1 PKCE presence mismatch retorna `invalid_request`; verifier incorreto retorna `invalid_grant`.
-- Método PKCE persistido desconhecido segue exatamente Q2.
+- Método PKCE persistido desconhecido retorna `invalid_grant` 400 indistinguível das demais recusas de code, e
+  nenhum caminho do token endpoint responde 5xx por dado apresentado pelo client.
 - `invalid_target` e um erro de extension grant provam que o writer permanece extensível.
 - Não restam assertions por substring para o contrato `error` do token endpoint.
 - Não restam comandos obrigatórios cujo filtro selecione zero testes no baseline da fase correspondente.
@@ -693,15 +726,16 @@ git diff --check
 |---|---|---|---|---|
 | Draft muda durante execução | nova versão altera §3.2.4/PKCE | implementação nasce desatualizada | gate DF1 no início da Fase 4 | Aberto |
 | Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Aberto |
-| `EndpointErrorResults` preserva códigos hardcoded | Q3 é ignorada e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | Q3 + guard da Fase 1 | Aberto |
+| `EndpointErrorResults` preserva códigos hardcoded | factory não migra para o core e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | DF19 + guard da Fase 1 | Aberto |
 | Detecção múltipla ocorre após evaluator | `jti` é registrado antes do `invalid_request` | retry legítimo parece replay | preflight DF7 + teste negativo do store | Aberto |
 | Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Aberto |
 | Validação de duplicidade bloqueia RFC 8707 | regra genérica rejeita `resource` repetido | quebra de resource indicators | allowlist DF8 + regressão multiresource | Aberto |
 | Enum fecha erros | tipo aceita somente seis valores | extension grants/RFC 8707 quebram | strings + teste de extensão DF3 | Aberto |
 | Correção revela detalhes de code | descrições divergem por causa | oracle de existência/binding | preservar igualdade Operational + DF13 | Aberto |
 | Correção revela existência do client | assertion inválida e client desconhecido recebem códigos/descrições distintos | oracle de client e violação RFC 7523 | DF15 + matriz indistinguível | Aberto |
-| Validator compartilhado amplia escopo sem decisão | `ResourcesValidator` é alterado sem fechar Q1 | authorize muda incidentalmente ou token fica incorreto | Q1 antes da Fase 1 | Aberto |
-| PKCE desconhecido mascara corrupção | branch default continua `invalid_grant` sem Q2 | problema de estado parece erro do client | Q2 + teste de invariante | Aberto |
+| Correção do validator vaza para além do campo `error` | edição do `ResourcesValidator` altera condição, ordem ou transporte no authorize | regressão OIDC fora do escopo declarado | DF20 limita a mudança ao campo `error` + regressão `CodeAuthorize` na Fase 1 | Aberto |
+| Método PKCE desconhecido some da observabilidade | `invalid_grant` genérico é emitido sem log do método recusado | corrupção de dado ou bug de seed passa despercebido | DF18 exige log do método + teste que prova descrição indistinguível | Aberto |
+| Recusa de dado do client vira 5xx | branch novo lança em vez de responder `invalid_grant` | erro de protocolo aparece como indisponibilidade e polui alerta | DF18 + invariante 10 + teste de status exato | Aberto |
 | Testes continuam falsos positivos | assertion busca texto no body | regressão passa sem conformidade | helper único e auditoria Fase 4 | Aberto |
 | Filtro obrigatório executa zero testes | arquivo/classe planejado não foi criado ou nome divergiu | comando verde sem verificar critério | DF16 + nomes de classe explícitos | Aberto |
 | Falha de backing vira erro OAuth | catch amplo em evaluator/handler | indisponibilidade mascarada como credencial inválida | teste 5xx e invariant 9 | Aberto |
@@ -713,7 +747,7 @@ git diff --check
 
 - **Taxonomia e transporte completos do authorization endpoint** — destino: plano próprio. Em particular,
   depois de `redirect_uri` válido, erros hoje saem como JSON direto em vez de redirect com `error`/`state`
-  conforme RFC 6749 §4.1.2.1; Q1 cobre somente o campo `error` mínimo ou a separação do validator.
+  conforme RFC 6749 §4.1.2.1; DF20 entrega somente o campo `error` correto, não o transporte.
 - **Erros de revocation/UserInfo/protected resources** — destino: planos dos respectivos endpoints; não ampliar
   este plano sem decisão explícita.
 - **Demais requisitos OAuth 2.1/RFC 9700** — destino:
