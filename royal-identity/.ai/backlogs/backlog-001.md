@@ -363,23 +363,26 @@ concretos e o projeto `RoyalIdentity.Storage.InMemory` foram removidos.
 
 **Área:** OAuth2/OIDC / Authorization endpoint / Storage operacional
 
-**Status:** ANÁLISE EXISTENTE; PLANO DE IMPLEMENTAÇÃO NÃO CRIADO.
+**Status:** PROMOVIDO A PLANO em 2026-07-30; implementação não iniciada.
 
 **Análise:** [an-par-rfc-9126.md](../analisys/an-par-rfc-9126.md) inventaria os requisitos do RFC 9126, o estado
-dos contratos atuais e as alternativas de store, mas declara explicitamente que não é plano nem decisão
-arquitetural. Os planos de OAuth 2.1, RFC 9700, Operational Storage e replay protection mantêm PAR fora de escopo
-ou remetem a esta análise/backlog; nenhum deles implementa a feature.
+dos contratos atuais e as alternativas de store. O plano executável é
+[plan-pushed-authorization-requests.md](../plans/plan-pushed-authorization-requests.md)
+(RASCUNHO — 0/7 fases; Q1/Q2/Q3 pendentes antes da Fase 1).
 
-**Deferral:** PAR é uma feature de protocolo completa, não apenas uma decisão de persistência. Exige endpoint direto
-autenticado, validação antecipada da authorization request, emissão de `request_uri` opaco e imprevisível, vínculo ao
-client, expiração, consumo concorrente seguro, metadata e política global/por client. Incorporar essas decisões ao
-baseline de storage ampliaria o plano e misturaria inventário dos contratos atuais com redesign futuro.
-**Quando revisitar:** Após o baseline dos contratos de storage e antes de planejar PAR ou evoluir o armazenamento de
-authorization requests/mensagens transitórias.
-**Nota de design:** permanecem por decidir `IPushedAuthorizationRequestStore` específico ou evolução para
-`IAuthorizationRequestStore` com operações distintas para continuação interna e PAR. Uma futura
-`PersistentDataMessageStore` continua válida para mensagens transitórias, mas o `IMessageStore` atual não expressa
-realm, client, TTL nem consumo atômico e não deve ser assumido como store de PAR sem redesign.
+**Escopo promovido:** endpoint PAR direto autenticado, validação antecipada e revalidação no authorization
+endpoint, referência opaca com 256 bits de entropia, binding realm/client, TTL, consumo atômico, payload
+Operational protegido, cleanup, policy global/por client, discovery e paridade SQLite/PostgreSQL.
+
+**Quando executar:** depois de
+[plan-reference-tokens-introspection.md](../plans/plan-reference-tokens-introspection.md), conforme
+[plans-roadmap-02.md](../plans/plans-roadmap-02.md). Isso serializa mudanças em `Client`, Configuration,
+Operational, autenticação direta e discovery.
+
+**Decisões abertas:** Q1 fecha facade específica versus facade geral com famílias de operações; Q2 fecha
+single-use estrito versus reload com binding server-side; Q3 fecha lifetime default/faixa. O plano mantém
+`IAuthorizeParametersStore` como continuação interna repetível, descarta `IMessageStore` e
+`IReplayProtectionStore` como backing de PAR e deixa JAR/JARM para plano próprio.
 
 ---
 

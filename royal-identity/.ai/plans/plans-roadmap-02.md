@@ -83,7 +83,10 @@ fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
 executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), que depende da remoção
-do front-channel legado e da rotação final de refresh token.
+do front-channel legado e da rotação final de refresh token. Depois, executar
+[plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md): o PAR consome a baseline final de
+autenticação direta, `Client`, Configuration/Operational e discovery sem disputar migrations ou contratos com
+Reference Tokens/Introspection.
 
 O primeiro corte de persistência (Planos 0-4) está concluído. Os Planos 5 (caching) e 6 (audit/outbox) do macro
 permanecem opcionais e condicionados, respectivamente, a um mecanismo claro de invalidação administrativa e a um
@@ -270,6 +273,35 @@ O plano executa depois de [plan-rfc9700-security-hardening.md](plan-rfc9700-secu
 disputar `RefreshTokenHandler`, migrations Operational nem a remoção da emissão no authorization endpoint. A
 persistência do catálogo de ResourceServers/scopes/secrets permanece fora deste corte.
 
+### 3.2. Pushed Authorization Requests RFC 9126
+
+**Plano criado:** [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md)
+(RASCUNHO — 0/7 fases; Q1/Q2/Q3 pendentes antes da Fase 1)
+
+Implementa PAR como feature protocolar completa: endpoint direto autenticado, validação antecipada da
+authorization request, `request_uri` opaco client-bound, consumo atômico no authorization endpoint, policy por
+realm/client e metadata fiel.
+
+Escopo principal:
+
+- `/{realm}/connect/par` em HTTPS, POST form, com os mesmos métodos de autenticação do token endpoint.
+- Referência URN com 256 bits de entropia, persistida somente por digest realm/type-bound.
+- Store Operational próprio, payload protegido, TTL absoluto, cleanup e concorrência SQLite/PostgreSQL.
+- Resolução antes da materialização de `AuthorizeContext`, sem mesclar parâmetros do front channel.
+- Continuação de login/consentimento preservada no `IAuthorizeParametersStore` repetível já existente.
+- `RequirePushedAuthorizationRequests` por realm/client, default `false`, e discovery RFC 9126 coerente.
+- Separação explícita de PAR e JAR; a metadata atual de Request Object não poderá anunciar o stub como suporte
+  real.
+
+Q1 decide entre facade PAR específica e uma facade geral com operações explicitamente distintas; Q2 decide uso
+estritamente único ou tolerância segura de reload; Q3 fecha lifetime default/faixa. Nenhuma fase inicia enquanto
+essas decisões de arquitetura/segurança estiverem abertas.
+
+O plano executa depois de
+[plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), para consumir o desenho final de
+`Client`, autenticação direta, endpoints, discovery e migrations. JAR/JARM, Dynamic Client Registration, FAPI,
+Admin e persistência do catálogo de resources/scopes continuam fora deste corte.
+
 ### 4. Administração de Sessões por Dispositivo
 
 **Plano sugerido:** `plan-session-administration.md`
@@ -378,6 +410,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 7. Executar [plan-localization.md](plan-localization.md).
 8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.
-10. Evoluir administração de sessões por dispositivo.
-11. Criar API/UI administrativa, consumindo `ClientSecurityAssessment` e a infraestrutura de localização.
-12. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.
+10. Executar [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md), após fechar Q1/Q2/Q3.
+11. Evoluir administração de sessões por dispositivo.
+12. Criar API/UI administrativa, consumindo `ClientSecurityAssessment` e a infraestrutura de localização.
+13. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.
