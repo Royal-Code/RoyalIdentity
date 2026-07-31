@@ -81,7 +81,9 @@ Configuration sejam promovidos deterministicamente para v2 e depois v3. Em segui
 [plan-localization.md](plan-localization.md), que consome a baseline v3, promove as options de realm para v4 e
 fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
-“Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md).
+“Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
+executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), que depende da remoção
+do front-channel legado e da rotação final de refresh token.
 
 O primeiro corte de persistência (Planos 0-4) está concluído. Os Planos 5 (caching) e 6 (audit/outbox) do macro
 permanecem opcionais e condicionados, respectivamente, a um mecanismo claro de invalidação administrativa e a um
@@ -241,6 +243,33 @@ O plano depende do fechamento de `plan-replay-protection.md`; sua Fase 3 depende
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md). A apresentação administrativa
 depende do item 5 deste roadmap; a implementação do core não depende da existência do Admin.
 
+### 3.1. Reference Tokens e Token Introspection RFC 7662
+
+**Plano criado:** [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md)
+(RASCUNHO — 0/7 fases; Q1/Q2 pendentes antes da Fase 5)
+
+Completa o suporte parcial já existente para access tokens opacos: adiciona o tipo persistido por client, centraliza
+a emissão inicial e por refresh, preserva o handle somente como digest no storage Operational e entrega validação
+remota autenticada para ResourceServers pelo Token Introspection.
+
+Escopo principal:
+
+- `Client.AccessTokenType` com JWT como default e migrations Configuration SQLite/PostgreSQL.
+- Handle reference com 256 bits de entropia, sem assinatura, claim `jti`, persistência bruta ou log em claro.
+- Emissão por authorization code, client credentials e refresh, sempre pelo `DefaultTokenFactory`.
+- Bearer, expiração e revogação exercitados com tokens realmente emitidos, preservando AT-01..AT-04.
+- Endpoint RFC 7662 autenticado por `ResourceServer.Secrets`, com `active=false` indistinguível e disclosure
+  restrito à audience/resource do caller.
+- Discovery e metadata de autenticação fiéis, além de aceites multi-realm e PostgreSQL real.
+
+Q1 decide os métodos de autenticação do ResourceServer no primeiro corte; Q2 decide se introspection cobre somente
+reference access tokens ou também JWT/refresh tokens. As Fases 1-4 não dependem dessas respostas, mas o endpoint e
+os aceites finais não iniciam enquanto elas estiverem abertas.
+
+O plano executa depois de [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), para não
+disputar `RefreshTokenHandler`, migrations Operational nem a remoção da emissão no authorization endpoint. A
+persistência do catálogo de ResourceServers/scopes/secrets permanece fora deste corte.
+
 ### 4. Administração de Sessões por Dispositivo
 
 **Plano sugerido:** `plan-session-administration.md`
@@ -348,6 +377,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
 7. Executar [plan-localization.md](plan-localization.md).
 8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
-9. Evoluir administração de sessões por dispositivo.
-10. Criar API/UI administrativa, consumindo `ClientSecurityAssessment` e a infraestrutura de localização.
-11. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.
+9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.
+10. Evoluir administração de sessões por dispositivo.
+11. Criar API/UI administrativa, consumindo `ClientSecurityAssessment` e a infraestrutura de localização.
+12. Avançar federação, MFA/passwordless e KMS conforme prioridade de produto.

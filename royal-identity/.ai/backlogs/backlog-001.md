@@ -147,7 +147,10 @@ como inseguras/não aderentes. Não criar tabela, snapshot ou campo persistido p
 
 **Área:** Tokens / DefaultTokenFactory
 
-**Status:** PENDENTE. Reavaliado em 2026-07-30.
+**Status:** PROMOVIDO A PLANO em 2026-07-30; implementação não iniciada.
+
+**Plano:** [plan-reference-tokens-introspection.md](../plans/plan-reference-tokens-introspection.md)
+(RASCUNHO — 0/7 fases; Q1/Q2 pendentes antes da Fase 5).
 
 **Estado verificado:** a infraestrutura de persistência e validação já entende `AccessTokenType.Reference`:
 o store EF usa digest realm-scoped do handle, preserva o tipo, remove somente reference tokens e possui testes de
@@ -162,12 +165,13 @@ semeado diretamente no store. A emissão, entretanto, continua ausente:
   produz JWT;
 - não existe endpoint de introspection implementado.
 
-**Deferral:** implementar a configuração por client, gerar handle opaco criptograficamente aleatório, aplicar o
+**Escopo promovido:** implementar a configuração por client, gerar handle opaco criptograficamente aleatório, aplicar o
 mesmo tipo na emissão inicial e por refresh, nunca assinar o reference token, devolver o handle como `access_token`
-e ampliar os testes de emissão/renovação/revogação. A introspection deve entrar no mesmo plano ou em predecessor
-explícito, pois é o mecanismo natural para resource servers validarem esses tokens.
+e ampliar os testes de emissão/renovação/revogação. O plano também inclui Token Introspection RFC 7662, conforme
+o destino conjunto já registrado por `plan-refactoring-debt-closure.md`.
 
-**Quando revisitar:** Quando houver demanda de clientes que não podem validar JWTs localmente, ou quando a introspection endpoint for implementada (que é o mecanismo de validação natural de reference tokens).
+**Quando executar:** após `plan-rfc9700-security-hardening.md`, para consumir a remoção do front-channel legado e
+a rotação final de refresh token sem editar os mesmos handlers em paralelo.
 
 **Nota de design:**
 - Adicionar e persistir `Client.AccessTokenType`, com JWT como default seguro/compatível com o comportamento atual.
