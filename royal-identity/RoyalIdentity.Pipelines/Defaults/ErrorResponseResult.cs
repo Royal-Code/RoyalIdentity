@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using RoyalIdentity.Pipelines.Abstractions;
+using System.Collections.Frozen;
 using System.Text.Json;
 
 namespace RoyalIdentity.Pipelines.Defaults;
@@ -15,8 +16,18 @@ namespace RoyalIdentity.Pipelines.Defaults;
 /// </remarks>
 public sealed class ErrorResponseResult : IResult, IStatusCodeHttpResult
 {
-    private static readonly IReadOnlyDictionary<string, string> NoHeaders =
-        new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Headers this writer owns. A caller cannot supply them, because doing so would let a response opt out of
+    /// the <c>no-store</c> guarantee every protocol error depends on, or disagree with the body actually
+    /// written.
+    /// </summary>
+    private static readonly FrozenSet<string> ReservedHeaders = new[]
+    {
+        "Cache-Control",
+        "Pragma",
+        "Content-Type",
+        "Content-Length"
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     public static ErrorResponseResult Create(
         string error,
@@ -43,18 +54,29 @@ public sealed class ErrorResponseResult : IResult, IStatusCodeHttpResult
         Headers = Snapshot(headers);
     }
 
-    // Copied so the response cannot change after it was decided: the caller's dictionary is theirs to keep
-    // mutating, and a header written on the wire must be the one chosen when the error was classified.
-    private static IReadOnlyDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? headers)
+    // Frozen so the response cannot change after it was decided: the caller's dictionary is theirs to keep
+    // mutating, a header written on the wire must be the one chosen when the error was classified, and the
+    // exposed collection has no mutable implementation to cast back to.
+    private static FrozenDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? headers)
     {
         if (headers is null || headers.Count is 0)
-            return NoHeaders;
+            return FrozenDictionary<string, string>.Empty;
 
         var copy = new Dictionary<string, string>(headers.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var header in headers)
-            copy[header.Key] = header.Value;
+        {
+            if (ReservedHeaders.Contains(header.Key))
+            {
+                throw new ArgumentException(
+                    $"'{header.Key}' is written by the error response itself and cannot be supplied by the " +
+                    "caller.",
+                    nameof(headers));
+            }
 
-        return copy;
+            copy[header.Key] = header.Value;
+        }
+
+        return copy.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
     }
 
     public int? StatusCode { get; }

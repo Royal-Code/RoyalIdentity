@@ -18,29 +18,75 @@ public class ProtocolErrorBoundaryTests
     private const string CoreName = "RoyalIdentity";
 
     /// <summary>
-    /// Protocol error codes. None of them may be written in the neutral project — not as the selected code,
-    /// not as a fallback, not as a typo of one.
+    /// Matches an <c>Oidc.*.Errors.*</c> constant sitting where a description belongs — either as the second
+    /// positional argument of <c>.Error(</c>, or bound by name to <c>errorDescription</c>. The first positional
+    /// argument is where a code belongs and is deliberately not matched.
     /// </summary>
-    private static readonly string[] ProtocolErrorCodes =
-    [
-        "invalid_request",
-        "invalid_client",
-        "invalid_grant",
-        "invalid_scope",
-        "invalid_target",
-        "invalid_token",
-        "unauthorized_client",
-        "unsupported_grant_type",
-        "unsupported_response_type",
-        "unsupported_response_mode",
-        "access_denied",
-        "login_required",
-        "consent_required",
-        "interaction_required",
-        "method_not_allowed",
-        "not_found",
-        "content_type",
-    ];
+    private static readonly Regex ErrorConstantInDescriptionPosition = new(
+        @"\.Error\(\s*[^,)]+,\s*Oidc\.[A-Za-z]+\.Errors\.|errorDescription\s*:\s*Oidc\.[A-Za-z]+\.Errors\.",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Every protocol error code the product knows, read from where it is defined instead of from a hand
+    /// written list. A list maintained by hand drifts: it silently stops covering codes added to
+    /// <c>Constants</c> later, and an entry that does not exactly match a literal (<c>content_type</c> against
+    /// <c>"invalid_content_type"</c>) never matches anything at all.
+    /// </summary>
+    public static IReadOnlyCollection<string> ProtocolErrorCodes { get; } = CollectProtocolErrorCodes();
+
+    private static IReadOnlyCollection<string> CollectProtocolErrorCodes()
+    {
+        var codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Codes declared under any Constants.Oidc.*.Errors group, at any nesting depth.
+        var constants = Core.GetType("RoyalIdentity.Options.Constants", throwOnError: true)!;
+        CollectConstStrings(constants, insideErrorsGroup: false, codes);
+
+        // The HTTP-level codes the core selects for failures that happen before a protocol request exists.
+        // They are private to EndpointErrors, which is exactly why they are read rather than retyped here.
+        var endpointErrors = Core.GetType("RoyalIdentity.Endpoints.EndpointErrors", throwOnError: true)!;
+        foreach (var value in ConstStringsOf(endpointErrors))
+            codes.Add(value);
+
+        return codes;
+    }
+
+    private static void CollectConstStrings(Type type, bool insideErrorsGroup, HashSet<string> codes)
+    {
+        if (insideErrorsGroup)
+        {
+            foreach (var value in ConstStringsOf(type))
+                codes.Add(value);
+        }
+
+        foreach (var nested in type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic))
+        {
+            var isErrorsGroup = insideErrorsGroup
+                || string.Equals(nested.Name, "Errors", StringComparison.Ordinal);
+
+            CollectConstStrings(nested, isErrorsGroup, codes);
+        }
+    }
+
+    private static IEnumerable<string> ConstStringsOf(Type type)
+    {
+        return type
+            .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(field => field.IsLiteral && !field.IsInitOnly && field.FieldType == typeof(string))
+            .Select(field => (string?)field.GetRawConstantValue())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!);
+    }
+
+    /// <summary>
+    /// Reports every protocol code written as a string literal in the given source text.
+    /// </summary>
+    private static IReadOnlyList<string> FindProtocolCodeLiterals(string text, IEnumerable<string> codes)
+    {
+        return codes
+            .Where(code => text.Contains($"\"{code}\"", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
 
     private static IEnumerable<(string Path, string Text)> SourceFilesOf(string project)
     {
@@ -62,6 +108,53 @@ public class ProtocolErrorBoundaryTests
     }
 
     [Fact]
+    public void ProtocolErrorCodes_AreDiscoveredFromTheProduct()
+    {
+        // Keeps the guard from silently becoming vacuous: if the reflection walk stops finding the Errors
+        // groups, the scan below would pass over anything.
+        Assert.True(
+            ProtocolErrorCodes.Count >= 30,
+            $"Expected the Errors groups to yield at least 30 codes, found {ProtocolErrorCodes.Count}.");
+
+        // The codes the neutral project used to hardcode, plus a few the old hand written list missed.
+        string[] mustBeCovered =
+        [
+            "invalid_request",
+            "invalid_client",
+            "invalid_grant",
+            "invalid_scope",
+            "invalid_target",
+            "unauthorized_client",
+            "unsupported_grant_type",
+            "server_error",
+            "temporarily_unavailable",
+            "invalid_request_uri",
+            "request_not_supported",
+            "method_not_allowed",
+            "invalid_content_type",
+            "not_found",
+        ];
+
+        foreach (var code in mustBeCovered)
+            Assert.Contains(code, ProtocolErrorCodes, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FindProtocolCodeLiterals_DetectsWhatItClaimsTo()
+    {
+        // Proof cases. The previous version of this guard listed "content_type" and therefore matched neither
+        // the typo it was meant to catch nor its corrected spelling.
+        Assert.NotEmpty(FindProtocolCodeLiterals("""x = "Invalid_content_type";""", ProtocolErrorCodes));
+        Assert.NotEmpty(FindProtocolCodeLiterals("""x = "invalid_content_type";""", ProtocolErrorCodes));
+        Assert.NotEmpty(FindProtocolCodeLiterals("""x = "server_error";""", ProtocolErrorCodes));
+        Assert.NotEmpty(FindProtocolCodeLiterals("""Error("invalid_request", d);""", ProtocolErrorCodes));
+
+        // A code arriving as an argument is the supported shape and must not be flagged.
+        Assert.Empty(FindProtocolCodeLiterals("Error(error, description);", ProtocolErrorCodes));
+        Assert.Empty(FindProtocolCodeLiterals("""x = "content-type";""", ProtocolErrorCodes));
+    }
+
+    [Fact]
     public void PipelinesLibrary_ContainsNoProtocolErrorCode()
     {
         // DF19: the neutral project used to hardcode invalid_request, method_not_allowed, not_found and the
@@ -71,11 +164,8 @@ public class ProtocolErrorBoundaryTests
 
         foreach (var (path, text) in SourceFilesOf("RoyalIdentity.Pipelines"))
         {
-            foreach (var code in ProtocolErrorCodes)
-            {
-                if (text.Contains($"\"{code}\"", StringComparison.OrdinalIgnoreCase))
-                    offenders.Add($"{path}: \"{code}\"");
-            }
+            foreach (var code in FindProtocolCodeLiterals(text, ProtocolErrorCodes))
+                offenders.Add($"{path}: \"{code}\"");
         }
 
         Assert.Empty(offenders);
@@ -102,16 +192,39 @@ public class ProtocolErrorBoundaryTests
     }
 
     [Fact]
+    public void ErrorConstantInDescriptionPosition_DetectsWhatItClaimsTo()
+    {
+        // Proof cases, positional and named. The named form was previously able to slip past.
+        Assert.Matches(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(Oidc.Authorize.Errors.InvalidRequest, Oidc.Token.Errors.InvalidScope);");
+        Assert.Matches(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(\n    \"a description\",\n    Oidc.Token.Errors.InvalidScope);");
+        Assert.Matches(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(Oidc.Token.Errors.InvalidGrant, errorDescription: Oidc.Token.Errors.InvalidScope);");
+        Assert.Matches(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(errorDescription: Oidc.Token.Errors.InvalidScope, error: Oidc.Token.Errors.InvalidGrant);");
+
+        // The supported shapes: the code first, the description second, on one line or several.
+        Assert.DoesNotMatch(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(Oidc.Authorize.Errors.InvalidScope, \"Requested scopes are invalid\");");
+        Assert.DoesNotMatch(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(\n    Oidc.Authorize.Errors.InvalidScope,\n    \"Requested scope is not allowed\");");
+        Assert.DoesNotMatch(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(error: Oidc.Token.Errors.InvalidGrant, errorDescription: \"Invalid refresh token\");");
+    }
+
+    [Fact]
     public void Core_NeverPassesAnErrorConstantAsADescription()
     {
-        // Matches `.Error(<something>, Oidc.<Area>.Errors.<Code>` — a code in the second (description)
-        // position. The first position is where a code belongs and is deliberately not matched.
-        var errorInDescriptionPosition = new Regex(
-            @"\.Error\(\s*[^,)]+,\s*Oidc\.[A-Za-z]+\.Errors\.",
-            RegexOptions.Compiled);
-
         var offenders = SourceFilesOf(CoreName)
-            .Where(file => errorInDescriptionPosition.IsMatch(file.Text))
+            .Where(file => ErrorConstantInDescriptionPosition.IsMatch(file.Text))
             .Select(file => file.Path)
             .ToList();
 

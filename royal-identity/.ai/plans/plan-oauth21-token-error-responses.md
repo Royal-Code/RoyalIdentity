@@ -491,11 +491,15 @@ verifique `error`, status, content type, cache e headers opcionais.
 - [x] Executar regressão dos endpoints que compartilham o writer.
 
 **Critérios de aceite:** nenhum helper aceita um `string` livre na posição em que uma constante de erro possa ser
-tratada como descrição; guard impede constantes `Oidc.*.Errors.*` em parâmetros de descrição; `invalid_scope` e
-`invalid_target` aparecem no campo JSON `error` no token endpoint e no authorize (DF20), sem que o
-`ResourcesValidator` seja duplicado; status e headers chegam à resposta; testes falham se
-o código existir somente em `error_description`; Pipelines não seleciona códigos OAuth e não contém nenhuma
-string de erro protocolar (DF19).
+tratada como descrição; guard impede constantes `Oidc.*.Errors.*` em parâmetros de descrição, tanto posicionais
+quanto nomeados; `invalid_scope` e `invalid_target` aparecem no campo JSON `error` no token endpoint e no
+authorize (DF20), sem que o `ResourcesValidator` seja duplicado; **os demais callers migrados do authorize
+(`unsupported_response_type`, `unsupported_response_mode`, `unauthorized_client`) também expõem o código no
+campo `error`, com regressão própria, e nenhum deles muda condição, ordem ou transporte**; status e headers
+chegam à resposta e a coleção de headers é imutável e não permite sobrescrever o `no-store` obrigatório; testes
+falham se o código existir somente em `error_description`; Pipelines não seleciona códigos OAuth e não contém
+nenhuma string de erro protocolar (DF19), com a lista de códigos do guard derivada de `Constants.Oidc.*.Errors`
+por reflexão em vez de mantida à mão.
 
 **Testes:**
 
@@ -507,21 +511,57 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~ProtocolErrorBoundar
 
 ### Resultado da Fase 1
 
-**Concluída em 2026-07-31.** Build e suíte completa verdes: 1252 aprovados, 50 ignorados (opt-in PostgreSQL/
-Aspire), 0 falhas. Comandos da fase: `ErrorResponseResultTests` 13/13, o filtro de integração 99/99,
-`ProtocolErrorBoundaryTests` 5/5. `git diff --check` limpo.
+**Concluída em 2026-07-31**, com uma segunda rodada no mesmo dia respondendo a uma revisão externa da
+implementação. Os quatro achados da revisão procederam e foram verificados antes de aceitos: o guard de códigos
+protocolares tinha duas lacunas reais (lista à mão desatualizada e entrada `content_type` que não casava com
+literal nenhum; regex cega a argumento nomeado); a invariante 11 contradizia o escopo que a própria tarefa de
+migração exigia; a coleção de headers era copiada mas não imutável e permitia sobrescrever o `no-store`; e o
+inventário publicado estava aritmeticamente errado. Todos corrigidos nesta seção e no corpo do plano.
 
-**Inventário (tarefa 1).** 110 call sites em cinco famílias — `InvalidRequest(string)` 27,
-`InvalidRequest(string, string?)` 21, `InvalidGrant(string)` 15, `InvalidClient(string)` 6, `context.Error`/
-`ResponseHandler.Error` explícitos 8, `EndpointErrorResults.*` 24. **21 perdiam o código OAuth**:
-`ResourcesValidator` 7, `AuthorizeMainValidator` 7, `ClientResourceDecorator` 4 (únicos já em
-`Oidc.Token.Errors.*`), `AuthorizationResourcesValidator` 3, `ResourcesDecorator` 3, `RedirectUriValidator` 2,
-`LoadClient` 1.
+Build e suíte completa verdes: **1267 aprovados, 50 ignorados** (opt-in PostgreSQL/Aspire), **0 falhas**.
+Comandos da fase: `ErrorResponseResultTests` 21/21, o filtro de integração 103/103,
+`ProtocolErrorBoundaryTests` 8/8. `git diff --check` limpo.
+
+**Inventário (tarefa 1).** Contado contra o commit anterior à fase (`0c0eb22`), excluindo a fiação interna do
+próprio helper (a auto-delegação em `ResponseHandlerExtensions` e a chamada de `EndpointErrorResults.InvalidRequest`
+para `BadRequest`): **104 call sites**.
+
+| API | Sites | Situação |
+|---|---|---|
+| `context.InvalidRequest(...)` | 52 | 27 passavam constante na posição de descrição |
+| `context.InvalidGrant(...)` | 16 | código correto, descrição correta |
+| `context.InvalidClient(...)` | 6 | idem |
+| `context.Error(...)` | 6 | já explícitos |
+| `ResponseHandler.Error(...)` direto | 1 | `RevocationHandler` |
+| `EndpointErrorResults.*` | 23 | fronteira DF19 |
+
+Dos 27 que passavam constante, **25 tinham classificação efetivamente diferente**: `AuthorizeMainValidator:76` e
+`RedirectUriValidator:60` passavam a própria `Errors.InvalidRequest`, então o campo `error` já saía correto e
+apenas a descrição carregava o prefixo redundante.
+
+Onde o código estava e para onde foi:
+
+| Caller | Context/endpoint | Sites | `error` antes | `error` depois |
+|---|---|---|---|---|
+| `ResourcesValidator` | authorize + client credentials (compartilhado, DF20) | 7 | `invalid_request` | `invalid_scope` (5), `invalid_target` (2) |
+| `AuthorizeMainValidator` | authorize | 7 | `invalid_request` | `unsupported_response_type` (3), `unsupported_response_mode` (1), `invalid_scope` (2), `invalid_request` (1, inalterado) |
+| `ClientResourceDecorator` | client credentials | 4 | `invalid_request` | `invalid_target` (1), `invalid_scope` (3) |
+| `ResourcesDecorator` | authorize | 3 | `invalid_request` | `invalid_target` (1), `invalid_scope` (2) |
+| `AuthorizationResourcesValidator` | authorize | 3 | `invalid_request` | `invalid_scope` (3) |
+| `RedirectUriValidator` | authorize + code | 2 | `invalid_request` | `unauthorized_client` (1), `invalid_request` (1, inalterado) |
+| `LoadClient` | todos os contexts com client | 1 | `invalid_request` | `unauthorized_client` |
+
+Os outros 77 call sites já produziam o código correto — implícito no nome do helper (`InvalidGrant`,
+`InvalidClient`) ou explícito no argumento (`context.Error`, `EndpointErrorResults`) — e mudaram apenas de API,
+sem alteração observável.
 
 **Borda genérica.** `ErrorResponseResult` e `ResponseHandler.Error` passaram a aceitar
-`IReadOnlyDictionary<string, string>? headers`. A coleção é **copiada na construção**: mutar o dicionário do
-caller depois de o erro ter sido classificado não muda o que vai para a resposta. Nenhuma constante OAuth entrou
-em `RoyalIdentity.Pipelines`.
+`IReadOnlyDictionary<string, string>? headers`. A coleção é **congelada na construção** (`FrozenDictionary`,
+incluindo o caso vazio): mutar o dicionário do caller depois de o erro ter sido classificado não muda o que vai
+para a resposta, e a coleção exposta não tem implementação mutável para a qual voltar por cast. `Cache-Control`,
+`Pragma`, `Content-Type` e `Content-Length` são **reservados**: o writer os escreve e recusa recebê-los, porque
+um caller capaz de mandar `Cache-Control: public` desligaria em silêncio o `no-store` de que toda resposta de
+erro depende. Nenhuma constante OAuth entrou em `RoyalIdentity.Pipelines`.
 
 **DF19.** `EndpointErrorResults` ficou com duas factories neutras — `Error(httpContext, error, description,
 statusCode, headers)` e `BadRequest(httpContext, error, description)` — ambas recebendo o código do caller. As
@@ -542,27 +582,44 @@ de erro possa ser tratada como descrição" fica satisfeito por construção: es
 `context.Error(ErrorDetails)` permanece para resultados já classificados, e o `?? Oidc.Authorize.Errors.
 InvalidRequest` morto (o membro é `required string`) foi retirado.
 
-**Comportamento.** Os 21 sítios passaram a expor o código correto no campo `error`. Nada mais mudou: as três
+**Comportamento.** Os 25 sítios com classificação diferente passaram a expor o código correto no campo `error`,
+em ambos os endpoints. Nada mais mudou: as três
 correções de taxonomia (`GrantTypeValidator` → `unauthorized_client`, `LoadCode` → `invalid_request`,
 `PkceMatchValidator` verifier ausente → `invalid_request`) continuam com a classificação atual e são da Fase 3,
 com testes que asseveram o valor de hoje e nomeiam a fase que os corrige.
 
-**Testes.** `ErrorResponseResultTests` (13) cobre campo exato, `error_uri`, status default e explícito,
-content type, cache, headers explícitos, ausência de header quando nenhum foi dado, snapshot na construção e
-código de extensão. `Tests.Integration/Prepare/ProtocolErrorResponse.cs` substituiu o `ReadErrorAsync` privado:
+**Testes.** `ErrorResponseResultTests` (21) cobre campo exato, `error_uri`, status default e explícito,
+content type, cache, headers explícitos, ausência de header quando nenhum foi dado, snapshot na construção,
+recusa de cada header reservado, preservação do `no-store` ao lado de um header permitido, imutabilidade sob
+cast (com e sem headers) e código de extensão. `Tests.Integration/Prepare/ProtocolErrorResponse.cs` substituiu o
+`ReadErrorAsync` privado:
 `ProtocolError` carrega `Error`, `Description`, `Uri`, `StatusCode`, `ContentType`, `CacheControl` e `Headers`,
 e expõe `Answer` como o par usado nas igualdades anti-oracle — assim uma asserção anti-oracle nunca passa por
 acidente só porque status e headers coincidem. `AssertErrorAsync` confere código, status, content type e
-`Cache-Control` de uma vez. `TokenErrorTests` tem 19 casos; `CodeAuthorizeTests` ganhou as duas regressões de
-DF20; 11 assertions por substring viraram asserções de campo exato em `ClientTokenTests` (7),
-`RefreshTokenTests`, `CodeTokenTests`, `SigningAlgorithmTests` e `CodeAuthorizeTests`.
+`Cache-Control` de uma vez. `TokenErrorTests` tem 19 casos; `CodeAuthorizeTests` ganhou seis regressões — as
+duas de DF20 (`invalid_scope`/`invalid_target`) e as quatro dos demais callers migrados
+(`unsupported_response_type`, `unsupported_response_mode`, `unauthorized_client` e o contraste com
+`invalid_request` para `client_id` ausente, que prova que os dois não convergiram); 11 assertions por substring
+viraram asserções de campo exato em `ClientTokenTests` (7), `RefreshTokenTests`, `CodeTokenTests`,
+`SigningAlgorithmTests` e `CodeAuthorizeTests`.
 
-**Guard.** `ProtocolErrorBoundaryTests` (5) tem quatro travas: Pipelines não referencia o core; nenhum código
-protocolar aparece como literal no fonte de Pipelines (17 códigos varridos, incluindo o typo); o core não
-declara `InvalidRequest`/`InvalidGrant`/`InvalidClient` em `ResponseHandlerExtensions`; e nenhuma chamada
-`.Error(<algo>, Oidc.*.Errors.*)` coloca uma constante na posição de descrição. A regex do quarto guard foi
-verificada nos dois sentidos — casa com o padrão proibido inclusive quebrado em múltiplas linhas e não casa com
-a forma correta multi-linha.
+**Guard.** `ProtocolErrorBoundaryTests` (8) tem quatro travas mais dois testes de prova. As travas: Pipelines não
+referencia o core; nenhum código protocolar aparece como literal no fonte de Pipelines; o core não declara
+`InvalidRequest`/`InvalidGrant`/`InvalidClient` em `ResponseHandlerExtensions`; e nenhuma chamada põe uma
+constante `Oidc.*.Errors.*` na posição de descrição, posicional **ou nomeada** (`errorDescription:`).
+
+A lista de códigos é **derivada por reflexão** de todo grupo `Errors` sob `Constants.Oidc` — em qualquer
+profundidade, o que inclui `Oidc.Errors.Revocation` — somada às constantes privadas de `EndpointErrors`. Uma
+lista mantida à mão não serve para isto por duas razões que a revisão externa expôs: ela envelhece (não cobria
+`server_error`, `temporarily_unavailable`, `invalid_request_uri`, `request_not_supported`) e uma entrada que não
+casa exatamente com o literal nunca casa com nada — a entrada `content_type` não detectava nem o typo
+`"Invalid_content_type"` nem a grafia corrigida, porque a busca é pelo literal entre aspas. Um teste assevera
+que a reflexão devolve pelo menos 30 códigos, para o guard não virar vácuo em silêncio se o walk quebrar.
+
+Os dois testes de prova exercitam os detectores contra texto sintético, nos dois sentidos: o scan de literais
+casa com o typo, com a grafia corrigida e com `server_error`, e não casa com um código chegando como argumento;
+a regex casa com constante na segunda posição, com a forma quebrada em múltiplas linhas e com o argumento
+nomeado, e não casa com nenhuma das formas corretas.
 
 **Achado entregue à Fase 2.** Cliente desconhecido e segredo errado convergem em `invalid_client` 400, mas
 **não na descrição**: `"No client identified"` versus `"Client secret validation failed"`. É um oráculo de
@@ -755,8 +812,14 @@ git diff --check
 10. Falhas de infraestrutura não são traduzidas em falhas de credencial/grant, e o inverso também vale: nenhum
     dado apresentado pelo client — inclusive `code_challenge_method` persistido desconhecido — produz 5xx
     (DF18). 5xx permanece exclusivo de bug ou indisponibilidade.
-11. O impacto em authorize limita-se ao campo `error` do `ResourcesValidator` compartilhado (DF20); o transporte
-    redirect versus JSON e as demais condições do endpoint não são alterados incidentalmente.
+11. O impacto em authorize limita-se ao **campo `error`** de todos os callers migrados; nenhuma condição, ordem
+    de avaliação ou transporte muda incidentalmente, e o transporte redirect versus JSON continua diferido.
+    DF20 é o caso que exigiu decisão humana — o `ResourcesValidator` é compartilhado com o token endpoint e não
+    poderia ser corrigido de um lado só — mas a varredura de DF4 alcança necessariamente todo caller do
+    authorize que passava a constante como descrição: `AuthorizeMainValidator`
+    (`unsupported_response_type`, `unsupported_response_mode`), `LoadClient` e `RedirectUriValidator`
+    (`unauthorized_client`), `ResourcesDecorator` e `AuthorizationResourcesValidator`
+    (`invalid_scope`/`invalid_target`). Cada um desses códigos tem regressão própria em `CodeAuthorizeTests`.
 12. Não criar flag de compatibilidade, enum fechado de erros ou opção por client/realm.
 13. Não alterar storage, migrations ou semânticas atômicas fechadas neste plano.
 14. Não reintroduzir password grant.
@@ -766,8 +829,10 @@ git diff --check
 ## Critérios globais de conclusão
 
 - Nenhuma pergunta permanece aberta: Q1/Q2/Q3 estão registradas no histórico e promovidas a DF20/DF18/DF19.
-- `ResourcesValidator` continua único e o authorize passa a expor `invalid_scope`/`invalid_target` no campo
-  `error`, sem alteração de transporte nem de qualquer outra condição do endpoint.
+- `ResourcesValidator` continua único e o authorize passa a expor no campo `error` todos os códigos que antes
+  ficavam na descrição — `invalid_scope`, `invalid_target`, `unsupported_response_type`,
+  `unsupported_response_mode` e `unauthorized_client` — sem alteração de transporte nem de qualquer outra
+  condição do endpoint.
 - Todas as linhas da matriz normativa alvo possuem teste HTTP ou unitário com `error` exato.
 - Basic inválido possui cobertura de HTTP 401 e `WWW-Authenticate`.
 - Método inválido possui cobertura de HTTP 405 e `Allow: POST`.

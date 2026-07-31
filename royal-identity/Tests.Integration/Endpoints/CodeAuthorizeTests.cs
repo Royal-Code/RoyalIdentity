@@ -531,6 +531,85 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
     // -----------------------------------------------------------------------------------------------------
 
     [Fact]
+    public async Task Get_WithoutResponseType_Must_AnswerUnsupportedResponseTypeInTheErrorField()
+    {
+        var client = factory.CreateClient();
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile")
+            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            .AddQueryString("code_challenge_method", "S256");
+
+        var response = await client.GetAsync(path);
+
+        var error = await response.AssertErrorAsync(Oidc.Authorize.Errors.UnsupportedResponseType);
+        Assert.DoesNotContain(Oidc.Authorize.Errors.UnsupportedResponseType, error.Description ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Get_WithUnsupportedResponseMode_Must_AnswerUnsupportedResponseModeInTheErrorField()
+    {
+        var client = factory.CreateClient();
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "no-such-response-mode")
+            .AddQueryString("scope", "openid profile")
+            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            .AddQueryString("code_challenge_method", "S256");
+
+        var response = await client.GetAsync(path);
+
+        // This one used to answer invalid_request with the real code as the whole description, because the
+        // constant was the single argument of InvalidRequest(...).
+        var error = await response.AssertErrorAsync(Oidc.Authorize.Errors.UnsupportedResponseMode);
+        Assert.DoesNotContain(Oidc.Authorize.Errors.UnsupportedResponseMode, error.Description ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Get_WithUnknownClient_Must_AnswerUnauthorizedClientInTheErrorField()
+    {
+        var client = factory.CreateClient();
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", $"no-such-client-{CryptoRandom.CreateUniqueId(6)}")
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile")
+            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            .AddQueryString("code_challenge_method", "S256");
+
+        var response = await client.GetAsync(path);
+
+        var error = await response.AssertErrorAsync(Oidc.Authorize.Errors.UnauthorizedClient);
+        Assert.DoesNotContain(Oidc.Authorize.Errors.UnauthorizedClient, error.Description ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Get_WithoutClientId_Must_AnswerInvalidRequestInTheErrorField()
+    {
+        // The counterpart of the case above: a missing client_id is a malformed request, not an unauthorized
+        // client, and the two must not have converged while the callers were migrated.
+        var client = factory.CreateClient();
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile")
+            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("state", "state");
+
+        var response = await client.GetAsync(path);
+
+        await response.AssertErrorAsync(Oidc.Authorize.Errors.InvalidRequest);
+    }
+
+    [Fact]
     public async Task Get_WithUnknownScope_Must_AnswerInvalidScopeInTheErrorField()
     {
         var client = factory.CreateClient();

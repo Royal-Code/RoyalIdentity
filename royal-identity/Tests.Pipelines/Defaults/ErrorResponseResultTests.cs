@@ -179,6 +179,68 @@ public class ErrorResponseResultTests
         Assert.False(httpContext.Response.Headers.ContainsKey("WWW-Authenticate"));
     }
 
+    [Theory]
+    [InlineData("Cache-Control")]
+    [InlineData("cache-control")]
+    [InlineData("Pragma")]
+    [InlineData("Content-Type")]
+    [InlineData("Content-Length")]
+    public void Headers_Must_RejectTheHeadersTheWriterOwns(string reserved)
+    {
+        // A caller able to send Cache-Control: public would silently opt the response out of no-store, which
+        // every protocol error response depends on. The writer owns these four and refuses to be overridden.
+        var headers = new Dictionary<string, string> { [reserved] = "public" };
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => ErrorResponseResult.Create("invalid_request", headers: headers));
+
+        Assert.Contains(reserved, exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Execute_Must_KeepNoStore_EvenNextToAnAllowedHeader()
+    {
+        // arrange
+        var (httpContext, _) = CreateHttpContext();
+        var headers = new Dictionary<string, string> { ["Allow"] = "POST" };
+        var result = ErrorResponseResult.Create("invalid_request", headers: headers);
+
+        // act
+        await result.ExecuteAsync(httpContext);
+
+        // assert
+        Assert.Equal("no-store, no-cache, max-age=0", httpContext.Response.Headers["Cache-Control"]);
+        Assert.Equal("POST", httpContext.Response.Headers["Allow"]);
+    }
+
+    [Fact]
+    public void Headers_Must_NotBeMutableThroughACast()
+    {
+        // The property type is read-only, but a plain Dictionary behind it could be cast back and mutated.
+        var result = ErrorResponseResult.Create(
+            "invalid_request",
+            headers: new Dictionary<string, string> { ["Allow"] = "POST" });
+
+        var asMutable = Assert.IsAssignableFrom<IDictionary<string, string>>(result.Headers);
+
+        Assert.Throws<NotSupportedException>(() => asMutable.Add("WWW-Authenticate", "Basic"));
+        Assert.Throws<NotSupportedException>(() => asMutable["Allow"] = "GET");
+        Assert.Equal("POST", result.Headers["Allow"]);
+    }
+
+    [Fact]
+    public void NoHeaders_Must_NotBeMutableThroughACast()
+    {
+        // The empty case used to be a shared static dictionary: mutating it through a cast would have leaked
+        // into every other error response in the process.
+        var result = ErrorResponseResult.Create("invalid_request");
+
+        var asMutable = Assert.IsAssignableFrom<IDictionary<string, string>>(result.Headers);
+
+        Assert.Throws<NotSupportedException>(() => asMutable.Add("Allow", "POST"));
+        Assert.Empty(ErrorResponseResult.Create("invalid_grant").Headers);
+    }
+
     [Fact]
     public async Task Execute_Must_AcceptAnExtensionErrorCode()
     {
