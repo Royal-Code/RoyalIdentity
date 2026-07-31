@@ -37,6 +37,12 @@
   decisão atômica de replay de `private_key_jwt`; não armazena payload de authorization request.
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — baseline de erros JSON e
   autenticação do token endpoint que este plano deve reutilizar.
+- [plan-oidc-session-management.md](plan-oidc-session-management.md) — predecessor que fixa a validação do valor
+  bruto de `prompt` antes de `AuthorizeContext.Load`; mover o `Load` não pode perder essa regra.
+- [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — predecessor que torna `acr_values`
+  ordenado, remove `Tests.Endpoints` e entrega a este plano a correção da metadata falsa de Request Object/JAR.
+- [plan-localization.md](plan-localization.md) — predecessor que resolve `ui_locales` de authorization parameters
+  armazenados; PAR deve materializar o payload completo antes de gravar a continuação de login/consentimento.
 - [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — baseline de redirect URI, PKCE,
   remoção de front-channel token e política de segurança executada antes de PAR.
 - [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md) — predecessor imediato na
@@ -63,6 +69,7 @@
   metadata, políticas e segurança de PAR.
 - [RFC 9101](https://www.rfc-editor.org/rfc/rfc9101.html) — semântica e erros de `request`/`request_uri`.
 - [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html) — metadata do authorization server.
+- [RFC 8705](https://www.rfc-editor.org/rfc/rfc8705.html) — autenticação mTLS e aliases opcionais de endpoints.
 
 ### Estado atual do código (verificado em 2026-07-31)
 
@@ -86,6 +93,8 @@
   fica materializado com apenas `client_id`/`request_uri`.
 - **JAR não implementado:** `ProcessRequestObject` não processa `request` nem `request_uri` remoto; a metadata
   atual afirma capacidade inexistente.
+- **Sem alias mTLS próprio de PAR:** não há builder, rota alternativa ou entrada PAR em `mtls_endpoint_aliases`;
+  o RFC 8705 permite usar a URL convencional quando um alias não é publicado.
 - **Configuration relacional:** novo scalar público em `Client` exige coluna, materializer, migrations
   SQLite/PostgreSQL, seeds e teste de cobertura; options de realm usam payload JSON versionado.
 - **Audience fixa no token endpoint:** `PrivateKeyJwtSecretEvaluator` calcula somente a URL do token endpoint;
@@ -113,6 +122,12 @@
   resolução incorretas.
 - **Ordem de execução:** implementar depois de Reference Tokens/Introspection evita migrations e edições
   concorrentes em `Client`, endpoints, autenticação direta e discovery.
+- **Handoffs anteriores ao `Load`:** Session Management valida o valor bruto de `prompt` antes que valores
+  desconhecidos sejam descartados, e Debt Closure preserva a ordem de `acr_values` dentro do parse. Mover o
+  `Load` exige reancorar as duas propriedades, não apenas transportar a chamada.
+- **Cultura após PAR:** o middleware do primeiro `/authorize` vê apenas `client_id`/`request_uri`; `ui_locales`
+  empurrado passa a governar login/consentimento quando o payload resolvido substitui `Raw` antes de a continuação
+  completa ser gravada em `IAuthorizeParametersStore`.
 - **Audience normativa assimétrica:** o endpoint PAR deve aceitar issuer, URL do token ou URL de PAR; isso não
   autoriza ampliar o conjunto do token endpoint com a URL de PAR. A política precisa conhecer o endpoint atual.
 
@@ -195,8 +210,9 @@
 ## Decisões fechadas
 
 - **DF1 — Ordem do roadmap:** executar depois de
-  [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md). Fonte: decisão humana na
-  discussão que originou este plano.
+  [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), consumindo também os contratos
+  já fechados por Session Management, Debt Closure e Localization. Fonte: decisão humana na discussão que
+  originou este plano + ordem completa do roadmap.
 - **DF2 — Endpoint direto:** mapear endpoint realm-scoped `/{realm}/connect/par`, somente HTTPS efetivo, método
   POST e `application/x-www-form-urlencoded`; sucesso retorna HTTP 201 JSON, `request_uri`, `expires_in` e
   `Cache-Control: no-store`. Fonte: RFC 9126 §§2, 2.2.
@@ -248,7 +264,9 @@
   seedam implicitamente. Fonte: arquitetura de storage.
 - **DF17 — Metadata fiel:** discovery publica `pushed_authorization_request_endpoint` somente quando endpoint
   está executável e `require_pushed_authorization_requests` somente para policy global do realm; exigência por
-  client não altera metadata global. Fonte: RFC 9126 §§5-6.
+  client não altera metadata global. No primeiro corte, PAR não é publicado em `mtls_endpoint_aliases`: clientes
+  mTLS usam a URL PAR convencional, como permite o RFC 8705 §5, e um alias só poderá ser anunciado junto de rota
+  alternativa realmente alcançável. Fonte: RFC 9126 §§5-6 + RFC 8705 §5.
 - **DF18 — Cleanup físico:** expiração é absoluta e capturada no POST; leitura/consumo falha fechado no limite
   exato e cleanup periódico remove abandonados sem ser condição de segurança. Fonte: baseline Operational.
 - **DF19 — Breaking change direto:** atualizar contexts, pipelines, options, serializers, migrations, seeds e
@@ -347,8 +365,9 @@
 - `ResolvePushedAuthorizationRequest`: primeiro decorator das pipelines `AuthorizeContext` e
   `AuthorizeValidateContext`; resolve somente URNs emitidas pelo servidor e substitui a fonte crua antes da
   materialização.
-- `LoadAuthorizeRequest`: realiza uma única carga dos parâmetros depois da resolução, eliminando a carga
-  antecipada dos callers atuais.
+- `LoadAuthorizeRequest`: valida o `prompt` bruto final e realiza uma única carga dos parâmetros depois da
+  resolução, eliminando a carga antecipada dos callers atuais; o parse mantém a ordem/deduplicação de
+  `acr_values` já fixada pelo predecessor.
 - `RequirePushedAuthorizationRequestValidator`: depois de `LoadClient`, aplica policy de realm/client usando
   `AuthorizationRequestSource`.
 
@@ -438,6 +457,7 @@ GET|POST /{realm}/connect/authorize?client_id=...&request_uri=...
   -> consumir atomicamente por realm + client
   -> substituir Raw pelo payload armazenado
   -> marcar source=Pushed
+  -> validar prompt bruto final
   -> carregar AuthorizeContext
   -> carregar client e aplicar policy PAR
   -> revalidar redirect/resources/PKCE/client vigente
@@ -625,6 +645,7 @@ reutilize os evaluators do token endpoint e valide a authorization request compl
 - [ ] Responder 405 para método incorreto, 415 para media type incorreto e respeitar limite de body.
 - [ ] Criar context/pipeline no padrão `IEndpointHandler` → decorators/validators → handler.
 - [ ] Reutilizar `EvaluateClient`/`IClientSecretChecker`, inclusive client público conforme sua configuração.
+- [ ] Aceitar autenticação mTLS no endpoint PAR convencional, sem depender de alias alternativo de discovery.
 - [ ] Tornar a policy de audience do `PrivateKeyJwtSecretEvaluator` consciente do endpoint sem criar lista
   global: PAR aceita issuer, token endpoint e PAR endpoint; token preserva sua baseline e rejeita a URL de PAR.
 - [ ] Preservar o `purpose` único do replay store e provar que o mesmo `jti` aceito primeiro em PAR ou token é
@@ -644,8 +665,9 @@ reutilize os evaluators do token endpoint e valide a authorization request compl
 
 **Critérios de aceite:** endpoint HTTP/anônimo/form inválido não cria registro; client e request inválidos falham
 antes da persistência; sucesso retorna 201 com URN e `expires_in`; payload não contém credenciais; erro segue a
-taxonomia do protocolo e nunca redireciona; URL de PAR nunca autentica no token endpoint; as três audiences
-exigidas pelo RFC autenticam no PAR; replay cross-endpoint é recusado; cada filtro obrigatório seleciona testes.
+taxonomia do protocolo e nunca redireciona; mTLS autentica pela URL PAR convencional; URL de PAR nunca autentica
+no token endpoint; as três audiences exigidas pelo RFC autenticam no PAR; replay cross-endpoint é recusado; cada
+filtro obrigatório seleciona testes.
 
 **Testes:**
 
@@ -664,11 +686,14 @@ dotnet test Tests.Pipelines --filter "FullyQualifiedName~ErrorResponseResultTest
 
 ## Fase 4 - Resolução no authorization endpoint
 
-**Depende de:** Fase 3, DF7, DF11-DF13, DF21 e decisão originada por Q2.
+**Depende de:** Fase 3, DF7, DF11-DF13, DF21, decisão originada por Q2 e contratos concluídos de
+[plan-oidc-session-management.md](plan-oidc-session-management.md),
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) e
+[plan-localization.md](plan-localization.md).
 
 **Escopo:** `AuthorizeEndpoint`, `AuthorizeContext`, `AuthorizeValidateContext`,
 `DefaultAuthorizeRequestValidator`, decorators/validators, pipelines, responses de erro e fluxos de
-login/consentimento.
+login/consentimento, `IAuthorizeParametersStore`, `IAuthorizationContextResolver` e testes de cultura.
 
 **O que/como:** resolver a referência antes de materializar `AuthorizeContext`, marcar a origem internamente e
 deixar todo o restante do fluxo percorrer as mesmas validações e handlers da request direta.
@@ -678,30 +703,42 @@ deixar todo o restante do fluxo percorrer as mesmas validações e handlers da r
 - [ ] Remover a carga antecipada de `AuthorizeContext` do endpoint e do validator interno.
 - [ ] Criar decorator de resolução como primeiro passo das duas pipelines de autorização.
 - [ ] Criar carga única/idempotente dos parâmetros depois da resolução.
+- [ ] Reancorar a validação da lista bruta de `prompt` entregue por Session Management para executá-la sobre o
+  conjunto final — inline ou resolvido por PAR — imediatamente antes de `Load`; `none` combinado com valor
+  desconhecido continua `invalid_request`.
+- [ ] Preservar no `Load` a representação ordenada de `acr_values` entregue por Debt Closure, com deduplicação
+  pela primeira ocorrência e comparação ordinal, tanto no caminho direto quanto no PAR.
 - [ ] Reconhecer somente URN PAR emitida pelo servidor; não buscar URIs remotas.
 - [ ] Exigir `client_id` e `request_uri` singulares no front channel.
 - [ ] Rejeitar parâmetros adicionais sem mesclar/sobrescrever o payload.
 - [ ] Consumir por realm + expected client e mapear toda falha para `invalid_request_uri`.
 - [ ] Não redirecionar falha de resolução, pois o redirect armazenado não foi autenticado/materializado.
-- [ ] Substituir os parâmetros crus por uma cópia do payload somente no sucesso.
+- [ ] Substituir os parâmetros crus por uma cópia do payload somente no sucesso e antes de qualquer gravação da
+  continuação em `IAuthorizeParametersStore`.
 - [ ] Marcar `AuthorizationRequestSource.Pushed` por API interna não controlada pelo input.
 - [ ] Reexecutar load-client, redirect, resources/scopes, response type e PKCE sobre estado vigente.
 - [ ] Confirmar que policy/client alterados depois do POST invalidam a autorização quando aplicável.
-- [ ] Preservar o uso posterior de `IAuthorizeParametersStore` para login/consentimento.
-- [ ] Provar authorization code, login, consent, `prompt=none`, state e nonce pelo caminho PAR.
+- [ ] Preservar o uso posterior de `IAuthorizeParametersStore` para login/consentimento, incluindo `ui_locales`
+  do payload empurrado para que `IAuthorizationContextResolver` aplique a cultura no request de interação.
+- [ ] Provar authorization code, login, consent, `prompt=none`, `acr_values`, `ui_locales`, state e nonce pelo
+  caminho PAR.
 - [ ] Criar `Tests.Integration/Endpoints/PushedAuthorizationRequestAuthorizeTests.cs` para resolução, ausência de
-  merge, revalidação, code/login/consent/`prompt=none`, state e nonce.
+  merge, revalidação, code/login/consent/`prompt=none`, prompt bruto, ACR ordenado, state e nonce; estender também
+  `Tests.Integration/Localization/RequestCultureTests.cs` com `ui_locales=es-419` empurrado por PAR chegando à
+  tela de login/consentimento apesar de o front channel conter somente `client_id` e `request_uri`.
 - [ ] Criar `PushedAuthorizationRequestConcurrencyTests.cs` para concorrência e reload conforme Q2 no nível HTTP.
 
 **Critérios de aceite:** payload só entra na pipeline depois de consumo válido; não há merge com front channel;
-client/realm mismatch não vaza dados; policy vigente é revalidada; interação continua funcionando pelo store
-interno; concorrência observa exatamente Q2; cada filtro obrigatório seleciona testes.
+client/realm mismatch não vaza dados; prompt bruto e ACR ordenado preservam as regras dos predecessores; policy
+vigente é revalidada; interação continua funcionando pelo store interno e respeita `ui_locales` empurrado;
+concorrência observa exatamente Q2; cada filtro obrigatório seleciona testes.
 
 **Testes:**
 
 ```powershell
 dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestAuthorizeTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRequestConcurrencyTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~RequestCultureTests"
 ```
 
 ### Resultado da Fase 4
@@ -714,8 +751,8 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~PushedAuthorizationRe
 
 **Depende de:** Fase 4, DF10, DF14, DF15, DF17 e DF21-DF22.
 
-**Escopo:** policy validators, options/snapshot, discovery, constants, `ProcessRequestObject`,
-`EnableJwtRequestUri`, tests de metadata e integração.
+**Escopo:** policy validators, options/snapshot, discovery, `mtls_endpoint_aliases`, constants,
+`ProcessRequestObject`, `EnableJwtRequestUri`, tests de metadata e integração.
 
 **O que/como:** aplicar obrigatoriedade somente depois de conhecer o client e publicar apenas capacidades
 executáveis. Distinguir a URN de PAR de Request Object por valor/URI e retirar a alegação falsa de JAR.
@@ -730,6 +767,8 @@ executáveis. Distinguir a URN de PAR de Request Object por valor/URI e retirar 
 - [ ] Publicar `require_pushed_authorization_requests=true` somente para policy global.
 - [ ] Omitir `require_pushed_authorization_requests` quando policy global está desativada, inclusive quando apenas
   algum client exige PAR; não publicar `false` nem projetar policy de client como metadata global.
+- [ ] Omitir PAR de `mtls_endpoint_aliases` neste corte e provar que autenticação mTLS continua usando o endpoint
+  PAR convencional; não criar `BuildMtlsPushedAuthorizationRequestUrl` nem anunciar rota alternativa inexistente.
 - [ ] Não condicionar PAR a `EnableJwtRequestUri`, `request_uri_parameter_supported` ou registro de URI JAR.
 - [ ] Corrigir `request_parameter_supported` para não anunciar Request Object enquanto o stub existir.
 - [ ] Corrigir `request_uri_parameter_supported`/`EnableJwtRequestUri` para não prometer fetch JAR inexistente.
@@ -740,9 +779,9 @@ executáveis. Distinguir a URN de PAR de Request Object por valor/URI e retirar 
 - [ ] Adicionar guard que falha se metadata de JAR voltar sem implementação real.
 
 **Critérios de aceite:** policy global/client aceita apenas origem PAR quando exigida; discovery anuncia endpoint
-real e policy global correta; metadata de JAR não é usada para PAR nem afirma suporte inexistente; desligar PAR
-não deixa configuração obrigatória silenciosamente inválida; policy global `false` omite a metadata; cada filtro
-obrigatório seleciona testes.
+real e policy global correta, sem inventar alias mTLS; metadata de JAR não é usada para PAR nem afirma suporte
+inexistente; desligar PAR não deixa configuração obrigatória silenciosamente inválida; policy global `false`
+omite a metadata; cada filtro obrigatório seleciona testes.
 
 **Testes:**
 
@@ -862,9 +901,9 @@ dotnet test RoyalIdentity.sln
 |---|---|---|---|---|
 | Endpoint PAR autenticado | 1, 3 | DF2-DF4, DF9, DF21, Q3 | POST/HTTPS/form; 201; audience contextual; replay único; erros diretos | PushedAuthorizationRequestEndpoint; Authentication; PrivateKeyJwtEndpointAudience |
 | Handle seguro e consumível | 2, 4 | DF5, DF6, DF11-DF13, Q1, Q2 | digest-only; binding; decisão atômica | storage contracts; concorrência HTTP |
-| Validação vigente | 3, 4 | DF7, DF8 | valida no push e no authorize | Authorize; PKCE; resources; redirect |
+| Validação vigente e handoffs pré-Load | 3, 4 | DF7, DF8 | valida no push/authorize; prompt bruto e ACR ordenado preservados | Authorize; PKCE; resources; redirect; RequestCulture |
 | Policy realm/client | 1, 5 | DF14, DF15, DF20-DF22 | direct rejeitada apenas quando exigida; Server v6/Realm v7 | PushedAuthorizationRequestPolicy; options; snapshot |
-| Metadata fiel e JAR separado | 5 | DF10, DF17, DF22 | endpoint/policy reais; `false` omitido; sem capability falsa | PushedAuthorizationRequestDiscovery; RequestObjectSeparation |
+| Metadata fiel e JAR separado | 5 | DF10, DF17, DF22 | endpoint/policy reais; `false` e alias mTLS PAR omitidos; sem capability falsa | PushedAuthorizationRequestDiscovery; RequestObjectSeparation |
 | Providers e isolamento | 2, 6 | DF16, DF18-DF21 | SQLite/PostgreSQL; realm/client fail-closed | storage; provider scripts; end-to-end |
 | Fechamento documental | 7 | DF1-DF22 | backlog/roadmap/matriz alinhados | `rg`; build; solution test |
 
@@ -895,6 +934,11 @@ dotnet test RoyalIdentity.sln
 20. A Fase 1 parte somente de Server v5/Realm v6 e termina em Server v6/Realm v7, sem fallback.
 21. Policy global `false` é omitida do discovery; policy somente por client nunca aparece como global.
 22. Nenhum comando obrigatório com filtro pode concluir selecionando zero testes ou teste incidental.
+23. A validação do `prompt` bruto final ocorre antes de `Load`, e `acr_values` mantém ordem e deduplicação dos
+    contratos predecessores nos caminhos direto e PAR.
+24. O payload PAR completo, inclusive `ui_locales`, substitui `Raw` antes de a continuação de interação ser
+    persistida.
+25. mTLS no PAR usa a URL convencional; discovery não anuncia alias PAR sem rota alternativa real.
 
 ---
 
@@ -906,8 +950,10 @@ dotnet test RoyalIdentity.sln
 - Handle e credenciais não são persistidos ou registrados em claro.
 - Consumo observa atomicamente a semântica escolhida em Q2.
 - Authorization endpoint não mescla parâmetros e revalida o estado vigente.
+- A mudança de posição de `Load` preserva a validação bruta de `prompt`, a ordem de `acr_values` e a seleção de
+  cultura por `ui_locales` na continuação de login/consentimento.
 - Policy global/client e feature gate possuem defaults/validação/documentação coerentes.
-- Discovery anuncia PAR real, omite policy global `false` e não anuncia JAR inexistente.
+- Discovery anuncia PAR real, omite policy global `false` e alias mTLS inexistente, e não anuncia JAR inexistente.
 - `private_key_jwt` aceita no PAR as três audiences do RFC, não amplia o token endpoint com a URL de PAR e
   preserva replay cross-endpoint.
 - Payloads Configuration partem de Server v5/Realm v6 e terminam em Server v6/Realm v7, sem fallback.
@@ -939,6 +985,9 @@ dotnet test RoyalIdentity.sln
 | Cadeia Configuration parte da versão errada | executor ignora predecessor de introspection | options perdidas ou payload incompatível | DF20 + gate Server v5/Realm v6 | Aberto |
 | Filtro amplo fica verde por teste incidental | nome como `ClientAssertion` seleciona option alheia a PAR | fase fecha sem provar endpoint | DF21 + classes/comandos explícitos | Aberto |
 | Metadata afirma JAR | stub continua com flag true | clientes enviam formato não processado | correção/guard da Fase 5 | Aberto |
+| Validação pré-Load se perde | mover `Load` sem consumir Session Management/Debt Closure | prompt inválido aceito ou ACR reordenado | handoffs nominais + regressões direct/PAR | Aberto |
+| `ui_locales` PAR não chega à interação | continuação é gravada antes de substituir `Raw` | login/consent cai em header/default | ordem explícita + `RequestCultureTests` | Aberto |
+| Alias mTLS PAR é inventado | metadata ganha URL sem rota alternativa | cliente segue endpoint inexistente | DF17 + omissão testada; usar URL convencional | Aberto |
 
 ---
 
@@ -969,11 +1018,15 @@ dotnet test RoyalIdentity.sln
 - [plan-data-operational-storage.md](plan-data-operational-storage.md).
 - [plan-replay-protection.md](plan-replay-protection.md).
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
+- [plan-oidc-session-management.md](plan-oidc-session-management.md).
+- [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
+- [plan-localization.md](plan-localization.md).
 - [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 - [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md).
 - [ADR-013](../../adrs/ADR-013.md) e [ADR-018](../../adrs/ADR-018.md).
 - [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749.html).
 - [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html).
+- [RFC 8705](https://www.rfc-editor.org/rfc/rfc8705.html).
 - [RFC 9101](https://www.rfc-editor.org/rfc/rfc9101.html).
 - [RFC 9126](https://www.rfc-editor.org/rfc/rfc9126.html).
 - [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html).

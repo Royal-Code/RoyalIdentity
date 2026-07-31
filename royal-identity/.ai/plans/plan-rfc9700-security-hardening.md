@@ -518,11 +518,12 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RedirectUriPolicyTest
 ## Fase 3 - Authorization Code, PKCE e remoção do front-channel legado
 
 **Depende de:** Fases 1-2, DF10-DF12, DF15, DF18, DF21-DF22 e conclusão de
-[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) e
+[plan-oidc-session-management.md](plan-oidc-session-management.md).
 
 **Escopo:** `PkceValidator`, `PkceMatchValidator`, `AuthorizeMainValidator`, `AuthorizeHandler`,
-`DiscoveryOptions`, `DiscoveryHandler`, response modes/results, constants apenas se ficarem sem consumidores,
-seeds, `Tests.Integration`.
+`AuthorizeResponseFactory` entregue pelo plano de Session Management, `DiscoveryOptions`, `DiscoveryHandler`,
+response modes/results, constants apenas se ficarem sem consumidores, seeds, `Tests.Integration`.
 
 **O que/como:** tornar authorization code + PKCE o único fluxo interativo suportado, fechar downgrade e remover
 emissão/anúncio de tokens no front-channel sem opção legada.
@@ -537,7 +538,9 @@ emissão/anúncio de tokens no front-channel sem opção legada.
 - [ ] Manter `S256` obrigatório e `plain` anunciado enquanto a option/path runtime existirem; tratar a metadata
   como capacidade, não preferência, e gerar finding para client com `AllowPlainTextPkce=true` conforme DF22.
 - [ ] Remover `token`, `id_token` e combinações implicit/hybrid do discovery e da validação global.
-- [ ] Remover branches de emissão de access/identity token da authorization response.
+- [ ] Remover branches de emissão de access/identity token da `AuthorizeResponseFactory`, do
+  `AuthorizeHandler` e dos response results ainda envolvidos; preservar na factory o caminho de authorization
+  code e a decoração de `session_state` entregue pelo predecessor.
 - [ ] Remover response modes/resultados exclusivos do fluxo legado quando não houver consumidor remanescente.
 - [ ] Garantir que `AllowedResponseTypes` legado não reabilita suporte removido.
 - [ ] Adicionar regression test que prova a ausência do password grant.

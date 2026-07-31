@@ -86,9 +86,11 @@
 - **Testes reutilizáveis:** `Tests.Integration/UI` já cobre login e consentimento sobre
   `PersistentStorageAppFactory`; `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs` cobre
   roundtrip, versão, defaults ausentes e cópia das options.
-- **Projeto de teste órfão:** `Tests.Endpoints` não pertence a `RoyalIdentity.sln` e contém somente uma cópia de
-  `EndpointHandler_Must_CreateResponse`, já coberto por `Tests.Pipelines/ServerEndpointTests.cs`; discovery é
-  exercitado por `Tests.Integration/Endpoints/DiscoveryTests.cs`.
+- **Projeto de teste órfão no código-base revisado:** `Tests.Endpoints` não pertence a `RoyalIdentity.sln` e
+  contém somente uma cópia de `EndpointHandler_Must_CreateResponse`, já coberto por
+  `Tests.Pipelines/ServerEndpointTests.cs`. O predecessor `plan-refactoring-debt-closure.md` é o dono de sua
+  remoção; portanto este plano começa com o projeto ausente e mantém discovery em
+  `Tests.Integration/Endpoints/DiscoveryTests.cs`.
 - **Inventário de tradução:** a superfície atual foi deduplicada em 57 chaves de `AccountResources` e cinco de
   `ValidationResources`; com as três culturas do primeiro corte são 186 entradas em seis arquivos físicos.
 
@@ -272,7 +274,8 @@
 
 **Revisão externa de executabilidade (2026-07-31):**
 
-- **Confirmados:** `Tests.Endpoints` está fora da solution e não cobre discovery; `HashSet<string>` não satisfaz
+- **Confirmados:** no código-base revisado, `Tests.Endpoints` estava fora da solution e não cobria discovery; sua
+  remoção foi atribuída ao predecessor e este plano deve encontrá-lo ausente. `HashSet<string>` não satisfaz
   ordem/casing; os filtros de options, snapshot e middleware não possuíam fixtures; o gate precisava verificar os
   dois serializers predecessores; o guard PowerShell tinha escaping frágil. Aplicar DF22/DF23 e as correções nas
   Fases 1-7.
@@ -863,9 +866,6 @@ dotnet test RoyalIdentity.sln
 - Localização da futura API/UI administrativa e findings de segurança — destino: `plan-admin-api-ui.md`;
   reutilizar infraestrutura e localizar por `RuleId`.
 - Localização da RP de testes `Tests.WebApp` — fora do produto OP; revisar somente se virar aplicação distribuída.
-- `Tests.Endpoints` órfão e duplicado — destino: limpeza geral de
-  [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md); não é infraestrutura de discovery nem gate
-  deste plano.
 
 ---
 

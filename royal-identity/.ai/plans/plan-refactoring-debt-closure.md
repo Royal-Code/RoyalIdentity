@@ -43,6 +43,9 @@
 - [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md) — reintroduzirá introspection
   somente junto da rota/pipeline reais; deve consumir a remoção da option feita aqui e a versão Configuration
   vigente depois dos planos intermediários, sem assumir v3.
+- [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md) — é o dono da separação entre a
+  referência PAR e Request Object/JAR e removerá a metadata `request_parameter_supported=true` enquanto
+  `ProcessRequestObject` continuar sem implementação.
 - `git show f3478412 -- RoyalIdentity/Contracts/IClientSecretChecker.cs` — a alteração marcada no
   `[Redesign]` já ocorreu: `ParsedSecret?`/`ParseAsync` viraram `EvaluatedClient?`/`EvaluateClientAsync`.
 - `RoyalIdentity/Extensions/AuthenticationPropertiesExtensions.cs`,
@@ -71,6 +74,9 @@
   `PkceHelper.GenerateCodeChallengeS256` não possuem consumidor localizado fora de sua própria declaração.
 - **Metadata morta:** `EnableIntrospectionEndpoint=true` por default publica `introspection_endpoint` sem rota;
   Device Authorization pode publicar endpoint, alias mTLS e grant sem implementação.
+- **Exceção JAR conhecida:** discovery também publica `request_parameter_supported=true`, embora
+  `ProcessRequestObject` seja um stub. Este plano não antecipa a separação semântica de `request_uri`; a correção
+  e seu guard pertencem ao plano posterior de PAR/JAR.
 - **Alias mTLS de revocation incorreto:** `DiscoveryHandler` constrói os aliases mTLS de token, revocation,
   introspection e Device Authorization com `BuildMtlsTokenUrl`; remover as duas superfícies mortas elimina seus
   aliases incorretos, mas deixa revocation apontando para a rota de token. `BuildMtlsRevocationUrl` já existe e não
@@ -173,10 +179,12 @@
 - **DF6 — Obsoletos removidos diretamente:** apagar `AuthenticationPropertiesExtensions`,
   `AuthorizationContext.IdP` e `GenerateCodeChallengeS256` depois de confirmar zero callers; não criar shims.
   Fonte: inventário local + breaking changes permitidos.
-- **DF7 — Discovery prova runtime e rota exata:** endpoint/metadata/grant só são anunciados quando há implementação
-  alcançável; introspection e Device Authorization desaparecem até seus planos próprios. O alias mTLS de
-  revocation permanece e usa `BuildMtlsRevocationUrl`, nunca a rota de token. Fonte: decisão humana + RFC 9700
-  plan + código verificado de `DiscoveryHandler`/`Constants`.
+- **DF7 — Discovery prova runtime e rota exata, com corte delimitado:** nesta fase, introspection e Device
+  Authorization desaparecem até seus planos próprios, e o alias mTLS de revocation permanece usando
+  `BuildMtlsRevocationUrl`, nunca a rota de token. A metadata falsa `request_parameter_supported=true` é uma
+  exceção temporária explicitamente inventariada, não um precedente: sua remoção pertence ao plano de PAR, junto
+  da separação entre referência PAR e Request Object/JAR. Fonte: decisão humana + RFC 9700 plan + código
+  verificado de `DiscoveryHandler`/`Constants`.
 - **DF8 — Extension grants pelo provider:** remover branches vazios de `DeviceCode` e `TokenExchange`; o branch
   default consulta `IExtensionsGrantsProvider`, e ausência continua `unsupported_grant_type`. Fonte: arquitetura
   atual do token endpoint.
@@ -310,7 +318,7 @@ RoyalIdentity/
   Endpoints/TokenEndpoint.cs
     3 grants core + fallback IExtensionsGrantsProvider
   Handlers/DiscoveryHandler.cs
-    somente metadata alcançável
+    introspection/device somente com runtime; exceção JAR inventariada para PAR
   Options/
     sem switches de features inexistentes ou logging sem efeito
   Contexts/Validators/AuthorizeMainValidator.cs
@@ -489,6 +497,9 @@ extension provider, retirar logging sem efeito e fazer um único bump de options
 - [ ] Corrigir o alias mTLS vivo de revocation para `BuildMtlsRevocationUrl`; não alterar o alias correto de token.
 - [ ] Registrar no handoff de `plan-reference-tokens-introspection.md` que eventual alias de introspection usa
   `BuildMtlsIntrospectionUrl`, nunca a rota de token ou revocation.
+- [ ] Preservar o handoff para `plan-pushed-authorization-requests.md`: não tratar
+  `request_parameter_supported=true` como capacidade válida nem removê-lo isoladamente antes de separar
+  referência PAR de Request Object/JAR.
 - [ ] Remover os `case DeviceCode` e `case TokenExchange` vazios do token endpoint.
 - [ ] Garantir que o branch default consulte `IExtensionsGrantsProvider` para ambos quando registrados.
 - [ ] Garantir `unsupported_grant_type` exato quando nenhuma extensão possuir o grant.
@@ -589,6 +600,8 @@ rastreabilidade e diferidos.
 - [ ] Confirmar que o plano OAuth 2.1 continua dono dos códigos/status/headers de token errors.
 - [ ] Confirmar que `plan-reference-tokens-introspection.md` consome a remoção da option/payload v3, restaura o
   gate somente com runtime real e não reutiliza `BuildMtlsTokenUrl` para introspection.
+- [ ] Confirmar que `plan-pushed-authorization-requests.md` possui nominalmente a remoção da metadata JAR falsa e
+  seu guard depois de separar a referência PAR.
 - [ ] Atualizar roadmap com o estado real deste plano quando sua execução terminar.
 - [ ] Registrar a futura persistência de resources sem criar o plano antes da decisão do mantenedor.
 - [ ] Executar build e suíte integral.
@@ -636,7 +649,8 @@ dotnet test RoyalIdentity.sln
 2. `IWith*` e os decorators mantêm sua hierarquia/constraints atuais.
 3. Eventos continuam recebendo valores de token obfuscados.
 4. Os três grants core mantêm seus contextos; demais grants pertencem ao extension provider.
-5. Metadata nunca afirma suporte sem rota e runtime funcionais.
+5. Introspection e Device Authorization não afirmam suporte sem rota/runtime; a metadata JAR falsa permanece
+   somente como exceção temporária inventariada e entregue nominalmente ao plano PAR.
 6. Filtros de secrets/assertions/tokens nos logs não são reduzidos.
 7. `acr_values` não autentica, não seleciona IdP e não cria claim por si.
 8. Authorization codes continuam single-use; PKCE usa os helpers não obsoletos.
@@ -685,6 +699,7 @@ dotnet test RoyalIdentity.sln
 | Alias mTLS sobrevivente aponta para token | remoção apaga branches mortos, mas não corrige revocation | metadata conduz ao endpoint errado | DF7 + teste exato de URL | Aberto |
 | Filtro executa zero testes | classe planejada não existe ou filtro é amplo/incorreto | fase fecha em falso verde | DF17 + fixtures e filtros nomeados | Aberto |
 | Introspection futura assume payload v3 | plano ignora Localization/planos intermediários | colisão de versão ou option perdida | DF18 + handoff bilateral | Aberto |
+| Exceção JAR vira precedente | DF7 é lida como se metadata falsa fosse aceitável em geral | novas capabilities sem runtime | delimitação de DF7 + handoff nominal ao plano PAR | Aberto |
 
 ---
 
@@ -698,6 +713,9 @@ dotnet test RoyalIdentity.sln
   `EnableIntrospectionEndpoint` somente com endpoint real e parte das versões Configuration vigentes naquele
   momento; não copiar o alias mTLS incorreto removido/corrigido aqui.
 - Device Authorization e Token Exchange — destino: planos/extensões próprios quando priorizados.
+- Metadata de Request Object/JAR anunciada sem implementação — destino:
+  [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md), que separa a URN PAR antes de
+  omitir `request_parameter_supported` e `request_uri_parameter_supported` falsos.
 - MFA/federação e catálogo realm-scoped de ACR — destino:
   `plan-auth-methods-mfa-passwordless.md`/`plan-federation-identity-brokering.md`.
 - Evolução de eventos, auditoria durável e outbox — destino: nova necessidade e novo plano; não é dívida ativa.
@@ -715,6 +733,7 @@ dotnet test RoyalIdentity.sln
 - [plan-oidc-session-management.md](plan-oidc-session-management.md).
 - [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 - [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md).
+- [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md).
 - [plans-roadmap-02.md](plans-roadmap-02.md).
 - [OpenID Connect Core 1.0 incorporating errata set 2](https://openid.net/specs/openid-connect-core-1_0.html).
 - `../../adrs/ADR-009.md`, `../../adrs/ADR-010.md`, `../../adrs/ADR-014.md`.

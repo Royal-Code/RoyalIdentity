@@ -277,8 +277,11 @@
   `AuthorizeErrorResponse` e redirect somente depois da validação de client/redirect URI, preservando `state` e
   response mode. `RedirectUriValidator`, `ResourcesDecorator`, `ResourcesValidator`,
   `AuthorizationResourcesValidator` e os demais terminadores não enumerados não são migrados para a factory; seu
-  transporte permanece diferido. Os response objects apenas transportam o valor imutável. Fonte: decorators
-  encerram antes do handler + OpenID Connect Core §3.1.2.6 + Session Management §2.
+  transporte permanece diferido. Os response objects apenas transportam o valor imutável. O alvo final do
+  roadmap é somente authorization code, conforme DF12 de `plan-rfc9700-security-hardening.md`; esta fase não cria
+  branches nem fixtures exclusivas para implicit/hybrid que o sucessor removerá, embora o caminho genérico de
+  sucesso permaneça correto enquanto esses response types ainda forem alcançáveis. Fonte: decorators encerram
+  antes do handler + OpenID Connect Core §3.1.2.6 + Session Management §2.
 - **DF25 — Taxonomia silenciosa explícita:** validar `none` combinado com qualquer outro prompt antes de qualquer
   interação e retornar `invalid_request`; sob `none`, autenticação/reauth retorna `login_required`, consentimento
   retorna `consent_required`, seleção real de sessão retorna `account_selection_required` e outra interação não
@@ -683,7 +686,9 @@ redirect URI; remover o estado do authorization code e versionar seu payload sem
   (diretamente ou por validator dedicado), somente após client e redirect URI válidos.
 - [ ] Não migrar `RedirectUriValidator`, `ResourcesDecorator`, `ResourcesValidator`,
   `AuthorizationResourcesValidator` ou outros terminadores fora de DF24 para essa factory.
-- [ ] Gerar `session_state` pela factory para toda Authentication Response OIDC bem-sucedida suportada.
+- [ ] Gerar `session_state` pela factory no caminho genérico de Authentication Response OIDC bem-sucedida, com
+  authorization code como alvo final; não adicionar cases ou testes exclusivos de `token`, `id_token` ou
+  combinações implicit/hybrid que a DF12 do plano RFC 9700 removerá.
 - [ ] Garantir que OAuth authorization sem `openid` não receba o parâmetro.
 - [ ] Estender `AuthorizeErrorResponse` com `session_state?`.
 - [ ] Rejeitar `none` combinado com qualquer outro prompt como `invalid_request` antes de
@@ -703,7 +708,8 @@ redirect URI; remover o estado do authorization code e versionar seu payload sem
   UI, `state`, response mode, redirect e `session_state` em sucesso/erro aplicável.
 
 **Critérios de aceite:** authorization code não contém/persiste `session_state`; somente a factory calcula o
-valor das respostas enumeradas em DF24; toda resposta OIDC de sucesso suportada contém valor sem espaços;
+valor das respostas enumeradas em DF24; o caminho genérico de sucesso OIDC contém valor sem espaços e não ganha
+branches exclusivos para response types legados; authorization code é o alvo final do roadmap;
 resposta OAuth pura não contém; cada linha alcançável da matriz silenciosa possui teste, a não aplicabilidade de
 seleção de conta está explícita sem teste vazio e `prompt=none` nunca renderiza UI; erros corretos chegam ao
 redirect com `state` e, quando possível, `session_state`; terminadores fora de DF24 não são migrados; consumo
@@ -929,7 +935,7 @@ dotnet test RoyalIdentity.sln
 |---|---|---|---|---|
 | OP iframe funcional | 1, 4-6 | DF1-DF2, DF10-DF17, DF22 | `unchanged/changed/error`, origem e HTTPS | SessionStateFormat + CheckSessionEndpoint + browser |
 | Estado opaco e realm-scoped | 1-2, 6 | DF3-DF7, DF23 | sem PII/`sid`; resolução por request e dois realms | CheckSessionCookieLifecycle + browser multi-realm |
-| `session_state` nas responses | 1, 3 | DF8-DF10, DF24 | factory delimitada; sucesso OIDC e erros enumerados; OAuth puro ausente | AuthorizeSessionStateTests |
+| `session_state` nas responses | 1, 3 | DF8-DF10, DF24 | factory delimitada; caminho OIDC genérico sem branches legados; alvo final code; erros enumerados | AuthorizeSessionStateTests |
 | `prompt=none` interoperável | 3, 6 | DF1, DF8-DF9, DF24-DF25 | condições alcançáveis redirecionadas/testadas; não aplicabilidade explícita; nenhuma UI | AuthorizeSessionState + browser flow |
 | Rota/discovery coerentes | 4 | DF2, DF15, DF22 | HTTPS vivo ou metadata ausente; disabled 404 | CheckSessionEndpointTests |
 | Hardening sem bloquear iframe | 5-6 | DF11-DF16 | CSP/headers/origem; framing preservado | CheckSessionEndpoint + Playwright |
@@ -966,7 +972,8 @@ dotnet test RoyalIdentity.sln
 - Check Session funciona de ponta a ponta em Chromium com RP e OP em origins HTTPS diferentes.
 - `plan-oauth21-token-error-responses.md` está concluído e seus helpers/writer são consumidos sem fork local.
 - Login, logout, troca de usuário, invalidação do ticket e dois realms atualizam o estado conforme DF3-DF7.
-- `session_state` aparece no sucesso OIDC e nos erros enumerados em DF24, sem ser persistido no authorization code.
+- `session_state` aparece no caminho genérico de sucesso OIDC e nos erros enumerados em DF24, sem ser persistido
+  no authorization code e sem criar cases exclusivos para implicit/hybrid que o plano RFC 9700 removerá.
 - Cada linha alcançável da matriz de `prompt=none` possui teste exato de erro/redirect após redirect URI válido;
   condições não aplicáveis estão justificadas, sem teste de ausência, e nenhuma produz UI.
 - Endpoint, discovery, feature gate e forwarded scheme são coerentes e nunca anunciam HTTP.
