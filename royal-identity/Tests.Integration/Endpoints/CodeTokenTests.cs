@@ -540,8 +540,6 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["resource"] = "https://unknown.example.test/resource"
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_target", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidTarget);
     }
 }

@@ -28,7 +28,7 @@ public class UserInfoEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP method for user info endpoint.");
 
-            return EndpointErrorResults.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext);
         }
 
         // user info requires an access token on the request

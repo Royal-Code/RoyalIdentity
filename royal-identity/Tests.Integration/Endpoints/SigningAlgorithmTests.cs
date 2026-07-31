@@ -97,11 +97,8 @@ public class SigningAlgorithmTests : IClassFixture<PersistentStorageAppFactory>
                 [Oidc.Token.Request.Scope] = $"{firstScope} {secondScope}"
             }));
 
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("invalid_request", body);
-        Assert.Contains("Signing algorithms requirements", body);
+        var error = await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
+        Assert.Contains("Signing algorithms requirements", error.Description ?? string.Empty);
     }
 
     [Fact]

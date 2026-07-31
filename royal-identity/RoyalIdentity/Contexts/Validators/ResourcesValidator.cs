@@ -31,7 +31,7 @@ public class ResourcesValidator : IValidator<IWithResources>
         if (!resources.IsValid)
         {
             logger.LogError(context, "Resources are not load or invalid", context.Scope);
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
+            context.Error(Oidc.Authorize.Errors.InvalidScope, "Requested scopes are invalid");
             return default;
         }
 
@@ -44,7 +44,7 @@ public class ResourcesValidator : IValidator<IWithResources>
             else
             {
                 logger.LogError(context, "Offline access is not allowed for this client", $"{client.Id}, {client.Name}");
-                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "Offline access is not allowed for this client");
+                context.Error(Oidc.Authorize.Errors.InvalidScope, "Offline access is not allowed for this client");
                 return default;
             }
         }
@@ -54,7 +54,7 @@ public class ResourcesValidator : IValidator<IWithResources>
             if (!client.AllowedIdentityScopes.Contains(identity.Name))
             {
                 logger.LogError(context, "Identity Scope not allowed for the client", $"{identity.Name}, {client.Id}, {client.Name}");
-                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
+                context.Error(Oidc.Authorize.Errors.InvalidScope, "Requested scope is not allowed for this client");
                 return default;
             }
         }
@@ -69,14 +69,16 @@ public class ResourcesValidator : IValidator<IWithResources>
             if (owner is not null && !owner.AllowScopeRequests)
             {
                 logger.LogError(context, "Scope requests are not allowed for the resource server", $"{owner.Name}, {scope.Name}, {client.Id}");
-                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
+                context.Error(
+                    Oidc.Authorize.Errors.InvalidScope,
+                    "Requested scope cannot be requested through the scope parameter");
                 return default;
             }
 
             if (!IsScopeAllowed(client, scope, owner))
             {
                 logger.LogError(context, "Scope not allowed for the client", $"{scope.Name}, {client.Id}, {client.Name}");
-                context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
+                context.Error(Oidc.Authorize.Errors.InvalidScope, "Requested scope is not allowed for this client");
                 return default;
             }
         }
@@ -92,7 +94,7 @@ public class ResourcesValidator : IValidator<IWithResources>
             if (!allowed)
             {
                 logger.LogError(context, "Resource indicator not allowed for the client", $"{resource.ResourceUri}, {client.Id}, {client.Name}");
-                context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "resource indicator not allowed for this client");
+                context.Error(Oidc.Authorize.Errors.InvalidTarget, "resource indicator not allowed for this client");
                 return default;
             }
         }
@@ -102,7 +104,7 @@ public class ResourcesValidator : IValidator<IWithResources>
         if (!resources.IsScopeResourceCoherent())
         {
             logger.LogError(context, "Requested scopes require a matching resource indicator", $"{client.Id}, {client.Name}");
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidTarget, "scope requires a matching resource indicator");
+            context.Error(Oidc.Authorize.Errors.InvalidTarget, "scope requires a matching resource indicator");
             return default;
         }
 

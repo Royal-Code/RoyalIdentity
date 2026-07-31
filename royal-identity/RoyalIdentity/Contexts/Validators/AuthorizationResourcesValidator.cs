@@ -25,7 +25,7 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
         if (context.ResponseTypes.Contains(Oidc.ResponseTypes.IdToken) && !context.Scopes.IsOpenId)
         {
             logger.LogError(context, "The parameter response_type requires the openid scope");
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "missing openid scope");
+            context.Error(Oidc.Authorize.Errors.InvalidScope, "missing openid scope");
             return default;
         }
 
@@ -33,7 +33,9 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
             (context.Scopes.Scopes.Any() || context.Scopes.ResourceServers.Any()))
         {
             logger.LogError(context, "Requests for id_token response type only must include identity scopes only");
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "resource scopes are not allowed for id_token response type only");
+            context.Error(
+                Oidc.Authorize.Errors.InvalidScope,
+                "resource scopes are not allowed for id_token response type only");
             return default;
         }
 
@@ -42,7 +44,7 @@ public class AuthorizationResourcesValidator : IValidator<IAuthorizationContextB
             && !context.Scopes.ProtectedResources.Any())
         {
             logger.LogError(context, "The parameter response_type requires resource scopes or resource indicators");
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "missing resource scopes or resource indicators");
+            context.Error(Oidc.Authorize.Errors.InvalidScope, "missing resource scopes or resource indicators");
             return default;
         }
 

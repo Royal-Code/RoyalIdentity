@@ -3,47 +3,36 @@ using RoyalIdentity.Pipelines.Defaults;
 
 namespace RoyalIdentity.Pipelines.Abstractions;
 
+/// <summary>
+/// Builds an <see cref="EndpointCreationResult"/> that fails before a typed context exists.
+/// </summary>
+/// <remarks>
+/// Every factory here receives the error code, the status and the headers from the caller. This project stays
+/// neutral to the protocol: it must not know, choose or hardcode any OAuth/OIDC error code. The factories that
+/// select those codes live in <c>RoyalIdentity</c>.
+/// </remarks>
 public static class EndpointErrorResults
 {
-    public static EndpointCreationResult MethodNotAllowed(HttpContext httpContext)
+    /// <summary>
+    /// Fails endpoint creation with the code, status and headers chosen by the caller.
+    /// </summary>
+    public static EndpointCreationResult Error(
+        HttpContext httpContext,
+        string error,
+        string? description = null,
+        int statusCode = StatusCodes.Status400BadRequest,
+        IReadOnlyDictionary<string, string>? headers = null)
     {
         return new EndpointCreationResult(
             httpContext,
-            ResponseHandler.Error(
-                "method_not_allowed", 
-                "The HTTP method is not allowed", 
-                statusCode: StatusCodes.Status405MethodNotAllowed));
+            ResponseHandler.Error(error, description, statusCode: statusCode, headers: headers));
     }
 
-    public static EndpointCreationResult UnsupportedMediaType(HttpContext httpContext)
-    {
-        return new EndpointCreationResult(
-            httpContext,
-            ResponseHandler.Error(
-                "Invalid_content_type",
-                "The content type must be: application/x-www-form-urlencoded",
-                statusCode: StatusCodes.Status415UnsupportedMediaType));
-    }
-
-    public static EndpointCreationResult NotFound(HttpContext httpContext, string? description)
-    {
-        return new EndpointCreationResult(
-            httpContext,
-            ResponseHandler.Error(
-                "not_found",
-                description,
-                statusCode: StatusCodes.Status404NotFound));
-    }
-
+    /// <summary>
+    /// Fails endpoint creation with HTTP 400 and the code chosen by the caller.
+    /// </summary>
     public static EndpointCreationResult BadRequest(HttpContext httpContext, string error, string? description)
     {
-        return new EndpointCreationResult(
-            httpContext,
-            ResponseHandler.Error(error, description, statusCode: StatusCodes.Status400BadRequest));
-    }
-
-    public static EndpointCreationResult InvalidRequest(HttpContext httpContext, string? description)
-    {
-        return BadRequest(httpContext, "invalid_request", description);
+        return Error(httpContext, error, description, StatusCodes.Status400BadRequest);
     }
 }

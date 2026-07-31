@@ -32,14 +32,14 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         if (code.IsMissing())
         {
             logger.LogError(context, "Authorization code is missing");
-            context.InvalidGrant("Authorization code is missing");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Authorization code is missing");
             return;
         }
 
         if (code.Length > restrictions.AuthorizationCode)
         {
             logger.LogError(context, "Authorization code is too long");
-            context.InvalidGrant("Authorization code is too long");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Authorization code is too long");
             return;
         }
 
@@ -55,7 +55,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
             // must not become an oracle about which codes exist or who they belong to. The OAuth code stays
             // invalid_grant; only the description is now this single generic one (DF11).
             logger.LogError(context, "Authorization code is invalid");
-            context.InvalidGrant("Authorization code is invalid");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Authorization code is invalid");
             return;
         }
 
@@ -64,7 +64,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         if (authorizationCode.CreationTime.HasExceeded(authorizationCode.Lifetime, clock.GetUtcNow().DateTime))
         {
             logger.LogError(context, "Authorization code expired");
-            context.InvalidGrant("Authorization code expired");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Authorization code expired");
             return;
         }
 

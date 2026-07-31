@@ -144,9 +144,7 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["scope"] = "api"
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_scope", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidScope);
     }
 
     [Fact]
@@ -174,10 +172,8 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["scope"] = "api offline_access"
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_scope", body);
-        Assert.DoesNotContain("access_token", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidScope);
+        Assert.DoesNotContain("access_token", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -272,9 +268,7 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["resource"] = "https://unknown.example/api"
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_target", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidTarget);
     }
 
     [Fact]
@@ -301,9 +295,7 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["resource"] = "https://api.demo.local/apiserver"
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_target", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidTarget);
     }
 
     [Fact]
@@ -404,9 +396,7 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["resource"] = ordersResource
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_target", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidTarget);
     }
 
     [Fact]
@@ -446,9 +436,7 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["scope"] = scopeName
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_scope", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidScope);
     }
 
     [Fact]
@@ -535,9 +523,7 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["resource"] = resourceUri
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_target", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidTarget);
     }
 
     [Fact]

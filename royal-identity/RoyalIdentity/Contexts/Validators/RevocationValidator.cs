@@ -23,7 +23,7 @@ public class RevocationValidator : IValidator<RevocationContext>
         if (token.IsMissing())
         {
             logger.LogError("No token found in request");
-            context.InvalidRequest("No token found");
+            context.Error(Oidc.Token.Errors.InvalidRequest, "No token found");
             return default;
         }
 
@@ -34,7 +34,7 @@ public class RevocationValidator : IValidator<RevocationContext>
         if (hint.IsPresent() && !context.Options.Discovery.TokenTypeHintIsSupported(hint))
         {
             logger.LogError("Invalid token type hint: {TokenTypeHint}", hint);
-            context.InvalidRequest("Invalid token type hint");
+            context.Error(Oidc.Token.Errors.InvalidRequest, "Invalid token type hint");
         }
 
         return default;

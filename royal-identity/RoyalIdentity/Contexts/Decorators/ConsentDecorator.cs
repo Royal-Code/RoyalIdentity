@@ -42,7 +42,9 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         {
             logger.LogError(context, "Invalid prompt mode", context.PromptModes.ToSpaceSeparatedString());
 
-            context.InvalidRequest("Invalid prompt mode", context.PromptModes.ToSpaceSeparatedString());
+            context.Error(
+                Oidc.Authorize.Errors.InvalidRequest,
+                $"Invalid prompt mode: {context.PromptModes.ToSpaceSeparatedString()}");
 
             return;
         }
@@ -57,7 +59,7 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         {
             logger.LogError(context, "Error: prompt=none requested, but consent is required.", context.PromptModes.ToSpaceSeparatedString());
 
-            context.InvalidRequest("Invalid prompt mode", "consent is required");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid prompt mode: consent is required");
 
             return;
         }

@@ -11,7 +11,7 @@ public class EndSessionValidator : IValidator<EndSessionContext>
         if (context.IdToken is not null && context.IsAuthenticated && 
             context.IdToken.Principal.GetSubjectId() != context.Principal.GetSubjectId())
         {
-            context.InvalidRequest("Invalid subject in id_token_hint.");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid subject in id_token_hint.");
             return default;
         }
 
@@ -19,7 +19,7 @@ public class EndSessionValidator : IValidator<EndSessionContext>
         if (context.IdToken is not null && context.ClientParameters.Client is not null && 
             context.IdToken.Client.Id != context.ClientParameters.Client.Id)
         {
-            context.InvalidRequest("Invalid client_id in id_token_hint.");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid client_id in id_token_hint.");
             return default;
         }
 
@@ -29,14 +29,14 @@ public class EndSessionValidator : IValidator<EndSessionContext>
             // if client is not informed, then the request is invalid
             if (context.ClientParameters.Client is null)
             {
-                context.InvalidRequest("Client is not informed.");
+                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Client is not informed.");
                 return default;
             }
 
             // if post_logout_redirect_uri is not in client's list of post_logout_redirect_uris, then the request is invalid
             if (!context.ClientParameters.Client.PostLogoutRedirectUris.Contains(context.PostLogoutRedirectUri))
             {
-                context.InvalidRequest("Invalid post_logout_redirect_uri.");
+                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid post_logout_redirect_uri.");
                 return default;
             }
         }
@@ -44,7 +44,7 @@ public class EndSessionValidator : IValidator<EndSessionContext>
         // validate logout_hint as subject_id if present
         if (context.LogoutHint.IsPresent() && context.LogoutHint != context.Principal.GetSubjectId())
         {
-            context.InvalidRequest("Invalid logout_hint.");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid logout_hint.");
             return default;
         }
 

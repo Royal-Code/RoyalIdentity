@@ -32,7 +32,7 @@ public class EndSessionEndpoint : IEndpointHandler
                 logger.LogWarning("Unsupported media type, content type is not valid.");
 
                 // return a problem details of a UnsupportedMediaType informing the ContentType is invalid
-                return EndpointErrorResults.UnsupportedMediaType(httpContext);
+                return EndpointErrors.UnsupportedMediaType(httpContext);
             }
 
             parameters = (await httpContext.Request.ReadFormAsync()).AsNameValueCollection();
@@ -40,7 +40,7 @@ public class EndSessionEndpoint : IEndpointHandler
         else
         {
             logger.LogWarning("Invalid HTTP method for end session endpoint.");
-            return EndpointErrorResults.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext);
         }
 
         var items = new ContextItems();

@@ -28,14 +28,14 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         if (context.RedirectUri.IsMissingOrTooLong(context.Options.InputLengthRestrictions.RedirectUri))
         {
             logger.LogError(context, "The parameter redirect_uri is missing or too long");
-            context.InvalidRequest("Invalid redirect_uri");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid redirect_uri");
 
             return;
         }
         else if (!Uri.TryCreate(context.RedirectUri, UriKind.Absolute, out _))
         {
             logger.LogError(context, "Malformed redirect_uri", context.RedirectUri);
-            context.InvalidRequest("Invalid redirect_uri", context.RedirectUri);
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, $"Invalid redirect_uri: {context.RedirectUri}");
 
             return;
         }
@@ -46,7 +46,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         if (client.ProtocolType is not Server.ProtocolTypes.OpenIdConnect)
         {
             logger.LogError(context, "Invalid protocol type for OIDC authorize endpoint", client.ProtocolType);
-            context.InvalidRequest(Oidc.Authorize.Errors.UnauthorizedClient, "Invalid protocol");
+            context.Error(Oidc.Authorize.Errors.UnauthorizedClient, "Invalid protocol");
 
             return;
         }
@@ -57,7 +57,7 @@ internal class RedirectUriValidator : IValidator<IWithRedirectUri>
         if (!await uriValidator.IsRedirectUriValidAsync(context.RedirectUri, client))
         {
             logger.LogError(context, "Invalid redirect_uri", context.RedirectUri);
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidRequest, "Invalid redirect_uri");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid redirect_uri");
 
             return;
         }

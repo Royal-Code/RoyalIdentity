@@ -22,14 +22,14 @@ public class ProtectedResourceMetadataEndpoint : IEndpointHandler
         if (!HttpMethods.IsGet(httpContext.Request.Method))
         {
             logger.LogWarning("Protected resource metadata endpoint only supports GET requests");
-            return ValueTask.FromResult(EndpointErrorResults.MethodNotAllowed(httpContext));
+            return ValueTask.FromResult(EndpointErrors.MethodNotAllowed(httpContext));
         }
 
         var realmOptions = httpContext.GetRealmOptions();
         if (!realmOptions.Endpoints.EnableDiscoveryEndpoint)
         {
             logger.LogInformation("Discovery endpoint disabled. 404.");
-            return ValueTask.FromResult(EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled"));
+            return ValueTask.FromResult(EndpointErrors.NotFound(httpContext, "Discovery endpoint is disabled"));
         }
 
         var parameters = httpContext.Request.Query.AsNameValueCollection();
@@ -37,8 +37,9 @@ public class ProtectedResourceMetadataEndpoint : IEndpointHandler
         if (resourceValues is null || resourceValues.Length is not 1 || resourceValues[0].IsMissing())
         {
             logger.LogWarning("Protected resource metadata request requires exactly one resource parameter");
-            return ValueTask.FromResult(EndpointErrorResults.InvalidRequest(
+            return ValueTask.FromResult(EndpointErrorResults.BadRequest(
                 httpContext,
+                Oidc.Token.Errors.InvalidRequest,
                 "Protected resource metadata request requires exactly one resource parameter"));
         }
 

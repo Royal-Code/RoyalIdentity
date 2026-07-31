@@ -1,14 +1,14 @@
 # Plan: Conformidade das respostas de erro do token endpoint com OAuth 2.1 (`plan-oauth21-token-error-responses`)
 
-## Status: RASCUNHO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; implementação não iniciada
+## Status: EM EXECUÇÃO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; Fase 1 concluída
 
 ## Progresso
 
-`░░░░` **0%** - 0 de 4 fases
+`█░░░` **25%** - 1 de 4 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Contrato explícito de erro e asserções exatas | Pendente |
+| Fase 1 - Contrato explícito de erro e asserções exatas | Concluida |
 | Fase 2 - Forma da requisição e autenticação do client | Pendente |
 | Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Pendente |
 | Fase 4 - Auditoria transversal, regressão e fechamento | Pendente |
@@ -466,29 +466,29 @@ verifique `error`, status, content type, cache e headers opcionais.
 
 **Tarefas:**
 
-- [ ] Inventariar todos os callers de `ResponseHandler.Error`, `context.Error`, `InvalidRequest`,
+- [x] Inventariar todos os callers de `ResponseHandler.Error`, `context.Error`, `InvalidRequest`,
   `InvalidGrant` e `InvalidClient`, registrando endpoint/context e efeito esperado.
-- [ ] Estender o resultado genérico com headers explícitos sem introduzir referência OAuth em
+- [x] Estender o resultado genérico com headers explícitos sem introduzir referência OAuth em
   `RoyalIdentity.Pipelines`.
-- [ ] Mover para `RoyalIdentity` as factories que escolhem códigos e remover de Pipelines toda seleção
+- [x] Mover para `RoyalIdentity` as factories que escolhem códigos e remover de Pipelines toda seleção
   hardcoded conforme DF19, inclusive o typo `Invalid_content_type`.
-- [ ] Remover os overloads de um e dois `string` de `InvalidRequest` que aceitam uma constante de erro como
+- [x] Remover os overloads de um e dois `string` de `InvalidRequest` que aceitam uma constante de erro como
   descrição, substituindo-os por construção inequívoca.
-- [ ] Migrar todos os callers afetados, inclusive `ResourcesDecorator`, `ResourcesValidator`,
+- [x] Migrar todos os callers afetados, inclusive `ResourcesDecorator`, `ResourcesValidator`,
   `AuthorizeMainValidator`, `AuthorizationResourcesValidator`, `LoadClient` e `RedirectUriValidator`, mantendo o
   `ResourcesValidator` compartilhado conforme DF20.
-- [ ] Adicionar regressão de authorize provando que `invalid_scope`/`invalid_target` passam a aparecer no campo
+- [x] Adicionar regressão de authorize provando que `invalid_scope`/`invalid_target` passam a aparecer no campo
   `error` também nesse endpoint e que o caso de signing algorithm continua `invalid_request`.
-- [ ] Preservar `error_uri` e serialização source-generated.
-- [ ] Criar `Tests.Pipelines/Defaults/ErrorResponseResultTests.cs` para payload, status, headers, content type e
+- [x] Preservar `error_uri` e serialização source-generated.
+- [x] Criar `Tests.Pipelines/Defaults/ErrorResponseResultTests.cs` para payload, status, headers, content type e
   cache.
-- [ ] Extrair `CodeSingleUseTests.ReadErrorAsync` para um helper compartilhado de integração e estendê-lo com
+- [x] Extrair `CodeSingleUseTests.ReadErrorAsync` para um helper compartilhado de integração e estendê-lo com
   status, content type, cache e headers opcionais.
-- [ ] Criar `Tests.Integration/Endpoints/TokenErrorTests.cs` e mover para ele a baseline table-driven da matriz.
-- [ ] Substituir assertions por substring nos casos tocados pela fase.
-- [ ] Criar `Tests.Architecture/ProtocolErrorBoundaryTests.cs` para impedir semântica OAuth hardcoded em
+- [x] Criar `Tests.Integration/Endpoints/TokenErrorTests.cs` e mover para ele a baseline table-driven da matriz.
+- [x] Substituir assertions por substring nos casos tocados pela fase.
+- [x] Criar `Tests.Architecture/ProtocolErrorBoundaryTests.cs` para impedir semântica OAuth hardcoded em
   Pipelines e a reintrodução das assinaturas ambíguas.
-- [ ] Executar regressão dos endpoints que compartilham o writer.
+- [x] Executar regressão dos endpoints que compartilham o writer.
 
 **Critérios de aceite:** nenhum helper aceita um `string` livre na posição em que uma constante de erro possa ser
 tratada como descrição; guard impede constantes `Oidc.*.Errors.*` em parâmetros de descrição; `invalid_scope` e
@@ -507,7 +507,68 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~ProtocolErrorBoundar
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Concluída em 2026-07-31.** Build e suíte completa verdes: 1252 aprovados, 50 ignorados (opt-in PostgreSQL/
+Aspire), 0 falhas. Comandos da fase: `ErrorResponseResultTests` 13/13, o filtro de integração 99/99,
+`ProtocolErrorBoundaryTests` 5/5. `git diff --check` limpo.
+
+**Inventário (tarefa 1).** 110 call sites em cinco famílias — `InvalidRequest(string)` 27,
+`InvalidRequest(string, string?)` 21, `InvalidGrant(string)` 15, `InvalidClient(string)` 6, `context.Error`/
+`ResponseHandler.Error` explícitos 8, `EndpointErrorResults.*` 24. **21 perdiam o código OAuth**:
+`ResourcesValidator` 7, `AuthorizeMainValidator` 7, `ClientResourceDecorator` 4 (únicos já em
+`Oidc.Token.Errors.*`), `AuthorizationResourcesValidator` 3, `ResourcesDecorator` 3, `RedirectUriValidator` 2,
+`LoadClient` 1.
+
+**Borda genérica.** `ErrorResponseResult` e `ResponseHandler.Error` passaram a aceitar
+`IReadOnlyDictionary<string, string>? headers`. A coleção é **copiada na construção**: mutar o dicionário do
+caller depois de o erro ter sido classificado não muda o que vai para a resposta. Nenhuma constante OAuth entrou
+em `RoyalIdentity.Pipelines`.
+
+**DF19.** `EndpointErrorResults` ficou com duas factories neutras — `Error(httpContext, error, description,
+statusCode, headers)` e `BadRequest(httpContext, error, description)` — ambas recebendo o código do caller. As
+três falhas de nível HTTP mudaram para `RoyalIdentity/Endpoints/EndpointErrors.cs` (`MethodNotAllowed`,
+`UnsupportedMediaType`, `NotFound`), com o typo `Invalid_content_type` corrigido para `invalid_content_type`.
+O nome mudou de propósito: `EndpointErrorResults` e `EndpointErrors` coexistiriam ambiguamente se
+compartilhassem o nome, porque todo endpoint importa `RoyalIdentity.Pipelines.Abstractions`.
+
+A fase encontrou **um quinto ponto de seleção hardcoded que o plano não previa**:
+`RoyalIdentity.Pipelines/Defaults/ProblemsExtensions.ToErrorResult` usava `problemDetails.Title ??
+"invalid_request"`. Sem callers, mas violava o critério de aceite. O fallback virou parâmetro obrigatório
+(`ToErrorResult(this ProblemDetails, string fallbackError)`), mantendo a escolha do código com o core.
+
+**DF4.** `InvalidRequest`, `InvalidGrant` e `InvalidClient` foram removidos por inteiro em vez de terem
+overloads podados. Restou uma única forma — `context.Error(error, description, statusCode, headers)` — em que a
+posição 0 é sempre o código. O critério "nenhum helper aceita um `string` livre na posição em que uma constante
+de erro possa ser tratada como descrição" fica satisfeito por construção: essa posição deixou de existir.
+`context.Error(ErrorDetails)` permanece para resultados já classificados, e o `?? Oidc.Authorize.Errors.
+InvalidRequest` morto (o membro é `required string`) foi retirado.
+
+**Comportamento.** Os 21 sítios passaram a expor o código correto no campo `error`. Nada mais mudou: as três
+correções de taxonomia (`GrantTypeValidator` → `unauthorized_client`, `LoadCode` → `invalid_request`,
+`PkceMatchValidator` verifier ausente → `invalid_request`) continuam com a classificação atual e são da Fase 3,
+com testes que asseveram o valor de hoje e nomeiam a fase que os corrige.
+
+**Testes.** `ErrorResponseResultTests` (13) cobre campo exato, `error_uri`, status default e explícito,
+content type, cache, headers explícitos, ausência de header quando nenhum foi dado, snapshot na construção e
+código de extensão. `Tests.Integration/Prepare/ProtocolErrorResponse.cs` substituiu o `ReadErrorAsync` privado:
+`ProtocolError` carrega `Error`, `Description`, `Uri`, `StatusCode`, `ContentType`, `CacheControl` e `Headers`,
+e expõe `Answer` como o par usado nas igualdades anti-oracle — assim uma asserção anti-oracle nunca passa por
+acidente só porque status e headers coincidem. `AssertErrorAsync` confere código, status, content type e
+`Cache-Control` de uma vez. `TokenErrorTests` tem 19 casos; `CodeAuthorizeTests` ganhou as duas regressões de
+DF20; 11 assertions por substring viraram asserções de campo exato em `ClientTokenTests` (7),
+`RefreshTokenTests`, `CodeTokenTests`, `SigningAlgorithmTests` e `CodeAuthorizeTests`.
+
+**Guard.** `ProtocolErrorBoundaryTests` (5) tem quatro travas: Pipelines não referencia o core; nenhum código
+protocolar aparece como literal no fonte de Pipelines (17 códigos varridos, incluindo o typo); o core não
+declara `InvalidRequest`/`InvalidGrant`/`InvalidClient` em `ResponseHandlerExtensions`; e nenhuma chamada
+`.Error(<algo>, Oidc.*.Errors.*)` coloca uma constante na posição de descrição. A regex do quarto guard foi
+verificada nos dois sentidos — casa com o padrão proibido inclusive quebrado em múltiplas linhas e não casa com
+a forma correta multi-linha.
+
+**Achado entregue à Fase 2.** Cliente desconhecido e segredo errado convergem em `invalid_client` 400, mas
+**não na descrição**: `"No client identified"` versus `"Client secret validation failed"`. É um oráculo de
+existência de client, dentro de DF15/Invariante 6 e do critério de aceite da Fase 2, não da Fase 1. O teste
+`Post_WithUnknownClient_And_WithWrongSecret_Must_ShareCodeAndStatus` assevera hoje o que já é garantido (código
+e status) e registra que a Fase 2 o aperta para igualdade de `Answer`.
 
 ---
 
@@ -538,6 +599,11 @@ produzir o status/header correto quando a autenticação via `Authorization` fal
   como `invalid_client`.
 - [ ] Tratar assertion selecionada, mas não parseável, sem `sub`, de client desconhecido ou criptograficamente
   inválida como `invalid_client`, com descrição indistinguível conforme DF15.
+- [ ] Fechar o oráculo de existência de client achado na Fase 1: `EvaluateClient` responde hoje
+  `"No client identified"` para client desconhecido e `"Client secret validation failed"` para segredo errado,
+  com o mesmo código e status. Unificar a descrição e apertar
+  `TokenErrorTests.Post_WithUnknownClient_And_WithWrongSecret_Must_ShareCodeAndStatus` para igualdade de
+  `ProtocolError.Answer`.
 - [ ] Garantir que request rejeitado não consulta client store, não valida JWT e não grava replay handle.
 - [ ] Produzir `invalid_client` 401 e `WWW-Authenticate: Basic...` para tentativa Basic inválida/malformada.
 - [ ] Manter `invalid_client` 400 para falha de autenticação no body, salvo requisito específico.
@@ -725,21 +791,21 @@ git diff --check
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
 | Draft muda durante execução | nova versão altera §3.2.4/PKCE | implementação nasce desatualizada | gate DF1 no início da Fase 4 | Aberto |
-| Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Aberto |
-| `EndpointErrorResults` preserva códigos hardcoded | factory não migra para o core e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | DF19 + guard da Fase 1 | Aberto |
+| Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Mitigado na Fase 1 — `ProtocolErrorBoundaryTests` varre o fonte de Pipelines por 17 códigos protocolares |
+| `EndpointErrorResults` preserva códigos hardcoded | factory não migra para o core e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | DF19 + guard da Fase 1 | Fechado na Fase 1 — factories em `RoyalIdentity/Endpoints/EndpointErrors.cs`; o quinto ponto não previsto (`ProblemsExtensions`) virou parâmetro |
 | Detecção múltipla ocorre após evaluator | `jti` é registrado antes do `invalid_request` | retry legítimo parece replay | preflight DF7 + teste negativo do store | Aberto |
 | Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Aberto |
 | Validação de duplicidade bloqueia RFC 8707 | regra genérica rejeita `resource` repetido | quebra de resource indicators | allowlist DF8 + regressão multiresource | Aberto |
 | Enum fecha erros | tipo aceita somente seis valores | extension grants/RFC 8707 quebram | strings + teste de extensão DF3 | Aberto |
 | Correção revela detalhes de code | descrições divergem por causa | oracle de existência/binding | preservar igualdade Operational + DF13 | Aberto |
 | Correção revela existência do client | assertion inválida e client desconhecido recebem códigos/descrições distintos | oracle de client e violação RFC 7523 | DF15 + matriz indistinguível | Aberto |
-| Correção do validator vaza para além do campo `error` | edição do `ResourcesValidator` altera condição, ordem ou transporte no authorize | regressão OIDC fora do escopo declarado | DF20 limita a mudança ao campo `error` + regressão `CodeAuthorize` na Fase 1 | Aberto |
+| Correção do validator vaza para além do campo `error` | edição do `ResourcesValidator` altera condição, ordem ou transporte no authorize | regressão OIDC fora do escopo declarado | DF20 limita a mudança ao campo `error` + regressão `CodeAuthorize` na Fase 1 | Mitigado na Fase 1 — suíte completa verde e as duas regressões de authorize passam |
 | Método PKCE desconhecido some da observabilidade | `invalid_grant` genérico é emitido sem log do método recusado | corrupção de dado ou bug de seed passa despercebido | DF18 exige log do método + teste que prova descrição indistinguível | Aberto |
 | Recusa de dado do client vira 5xx | branch novo lança em vez de responder `invalid_grant` | erro de protocolo aparece como indisponibilidade e polui alerta | DF18 + invariante 10 + teste de status exato | Aberto |
 | Testes continuam falsos positivos | assertion busca texto no body | regressão passa sem conformidade | helper único e auditoria Fase 4 | Aberto |
 | Filtro obrigatório executa zero testes | arquivo/classe planejado não foi criado ou nome divergiu | comando verde sem verificar critério | DF16 + nomes de classe explícitos | Aberto |
 | Falha de backing vira erro OAuth | catch amplo em evaluator/handler | indisponibilidade mascarada como credencial inválida | teste 5xx e invariant 9 | Aberto |
-| Alteração compartilhada afeta authorize | helper comum muda payload/redirect | regressão OIDC fora do token endpoint | suíte ampla na Fase 1/4 | Aberto |
+| Alteração compartilhada afeta authorize | helper comum muda payload/redirect | regressão OIDC fora do token endpoint | suíte ampla na Fase 1/4 | Mitigado na Fase 1 — 1252 aprovados, 0 falhas; reavaliar na Fase 4 |
 
 ---
 

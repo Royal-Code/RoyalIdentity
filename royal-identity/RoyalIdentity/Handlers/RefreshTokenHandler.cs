@@ -162,7 +162,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         if (transition.Outcome is RefreshTokenTransitionOutcome.NotFound)
         {
             logger.LogWarning("The refresh token no longer exists.");
-            context.InvalidGrant("Invalid refresh token");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Invalid refresh token");
             return null;
         }
 
@@ -176,7 +176,7 @@ public class RefreshTokenHandler : IHandler<RefreshTokenContext>
         }
 
         logger.LogWarning("Rejecting refresh token because it has been consumed already.");
-        context.InvalidGrant("Refresh token has been consumed already.");
+        context.Error(Oidc.Token.Errors.InvalidGrant, "Refresh token has been consumed already.");
         return null;
     }
 

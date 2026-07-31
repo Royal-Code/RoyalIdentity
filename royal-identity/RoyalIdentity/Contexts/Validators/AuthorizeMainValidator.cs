@@ -26,14 +26,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (responseTypes.Count is 0)
         {
             logger.LogError(context, "Missing response_type");
-            context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseType, "Missing response_type");
+            context.Error(Oidc.Authorize.Errors.UnsupportedResponseType, "Missing response_type");
             return ValueTask.CompletedTask;
         }
 
         if (!context.Options.Discovery.ResponseTypesIsSupported(responseTypes))
         {
             logger.LogError(context, "Response type not supported", responseTypes.ToSpaceSeparatedString());
-            context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseType, "Response type not supported");
+            context.Error(Oidc.Authorize.Errors.UnsupportedResponseType, "Response type not supported");
             return ValueTask.CompletedTask;
         }
 
@@ -44,7 +44,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 "Response type not allowed for the client",
                 $"{responseTypes.ToSpaceSeparatedString()} - {client.Id} - {client.Name}");
 
-            context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseType, "Response type not allowed");
+            context.Error(Oidc.Authorize.Errors.UnsupportedResponseType, "Response type not allowed");
             
             return ValueTask.CompletedTask;
         }
@@ -61,7 +61,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             if (!context.Options.Discovery.ResponseModeIsSupported(responseMode))
             {
                 logger.LogError(context, "Unsupported response_mode", responseMode);
-                context.InvalidRequest(Oidc.Authorize.Errors.UnsupportedResponseMode);
+                context.Error(Oidc.Authorize.Errors.UnsupportedResponseMode, "Response mode not supported");
                 return ValueTask.CompletedTask;
             }
 
@@ -73,7 +73,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                     "Invalid response_mode for response_type",
                     $"{responseMode} - {responseTypes.ToSpaceSeparatedString()}");
 
-                context.InvalidRequest(Oidc.Authorize.Errors.InvalidRequest, "Invalid response_mode for response_type");
+                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid response_mode for response_type");
 
                 return ValueTask.CompletedTask;
             }            
@@ -94,14 +94,14 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (context.Scope.IsMissing())
         {
             logger.LogError(context, "scope is missing");
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope);
+            context.Error(Oidc.Authorize.Errors.InvalidScope, "scope is missing");
             return ValueTask.CompletedTask;
         }
 
         if (context.Scope.Length > restrictions.Scope)
         {
             logger.LogError(context, "Scopes too long");
-            context.InvalidRequest(Oidc.Authorize.Errors.InvalidScope, "scopes too long");
+            context.Error(Oidc.Authorize.Errors.InvalidScope, "scopes too long");
             return ValueTask.CompletedTask;
         }
 
@@ -114,7 +114,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             if (context.Nonce.Length > restrictions.Nonce)
             {
                 logger.LogError(context, "Nonce too long");
-                context.InvalidRequest("Invalid nonce", "too long");
+                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid nonce: too long");
                 return ValueTask.CompletedTask;
             }
         }
@@ -122,7 +122,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             context.ResponseTypes.Contains(Oidc.ResponseTypes.Token))
         {
             logger.LogError(context, "Nonce required for implicit flow with openid scope");
-            context.InvalidRequest("Invalid nonce", "required");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid nonce: required");
             return ValueTask.CompletedTask;
         }
 
@@ -133,7 +133,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (context.PromptModes.Count > 1 && context.PromptModes.Contains(Oidc.PromptModes.None))
         {
             logger.LogError(context, "The property prompt contains 'none' and other values. 'none' should be used by itself.");
-            context.InvalidRequest("Invalid prompt");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid prompt");
             return ValueTask.CompletedTask;
         }
 
@@ -144,7 +144,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (context.UiLocales.IsPresent() && context.UiLocales.Length > restrictions.UiLocale)
         {
             logger.LogError(context, "UI locale too long");
-            context.InvalidRequest("Invalid ui_locales");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid ui_locales");
             return ValueTask.CompletedTask;
         }
 
@@ -155,7 +155,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         if (context.LoginHint.IsPresent() && context.LoginHint.Length > restrictions.LoginHint)
         {
             logger.LogError(context, "Login hint too long");
-            context.InvalidRequest("Invalid login_hint", "too long");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid login_hint: too long");
             return ValueTask.CompletedTask;
         }
 
@@ -169,7 +169,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             if (acrValues.Length > restrictions.AcrValues)
             {
                 logger.LogError(context, "Acr values too long");
-                context.InvalidRequest("Invalid acr_values", "too long");
+                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid acr_values: too long");
                 return ValueTask.CompletedTask;
             }
 

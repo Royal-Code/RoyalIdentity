@@ -461,10 +461,8 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("redirect_uri", "http://localhost:5000/callback");
 
         var response = await client.GetAsync(path);
-        var body = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("invalid_scope", body);
+        await response.AssertErrorAsync(Oidc.Authorize.Errors.InvalidScope);
     }
 
     [Fact]
@@ -519,10 +517,57 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("redirect_uri", "http://localhost:5000/callback");
 
         var response = await client.GetAsync(path);
-        var body = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("invalid_request", body);
-        Assert.Contains("Signing algorithms requirements", body);
+        // DF20: correcting the shared ResourcesValidator moved invalid_scope/invalid_target into the error
+        // field, and this branch must keep the classification it already had.
+        var error = await response.AssertErrorAsync(Oidc.Authorize.Errors.InvalidRequest);
+        Assert.Contains("Signing algorithms requirements", error.Description ?? string.Empty);
+    }
+
+    // -----------------------------------------------------------------------------------------------------
+    // DF20 regression: the shared ResourcesValidator/ResourcesDecorator used to bury the real code inside
+    // error_description and answer invalid_request. The authorize endpoint now names the code in the error
+    // field. The transport (JSON here, instead of a redirect carrying error/state) stays deferred.
+    // -----------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Get_WithUnknownScope_Must_AnswerInvalidScopeInTheErrorField()
+    {
+        var client = factory.CreateClient();
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", $"openid no-such-scope-{CryptoRandom.CreateUniqueId(4, OutputFormat.Hex)}")
+            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            .AddQueryString("code_challenge_method", "S256");
+
+        var response = await client.GetAsync(path);
+
+        var error = await response.AssertErrorAsync(Oidc.Authorize.Errors.InvalidScope);
+        Assert.DoesNotContain(Oidc.Authorize.Errors.InvalidScope, error.Description ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Get_WithUnknownResourceIndicator_Must_AnswerInvalidTargetInTheErrorField()
+    {
+        var client = factory.CreateClient();
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile")
+            .AddQueryString("resource", "https://unknown.example/api")
+            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            .AddQueryString("code_challenge_method", "S256");
+
+        var response = await client.GetAsync(path);
+
+        var error = await response.AssertErrorAsync(Oidc.Authorize.Errors.InvalidTarget);
+        Assert.DoesNotContain(Oidc.Authorize.Errors.InvalidTarget, error.Description ?? string.Empty);
     }
 }

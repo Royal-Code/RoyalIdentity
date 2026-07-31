@@ -27,7 +27,7 @@ public class EvaluateClient : IDecorator<IWithClient>
         {
             logger.LogError("No client identifier found");
 
-            context.InvalidClient("No client identified");
+            context.Error(Oidc.Token.Errors.InvalidClient, "No client identified");
             return;
         }
 
@@ -37,18 +37,18 @@ public class EvaluateClient : IDecorator<IWithClient>
                 evaluatedClient.Client.Name,
                 evaluatedClient.Client.Id);
 
-            context.InvalidClient("Client secret validation failed");
+            context.Error(Oidc.Token.Errors.InvalidClient, "Client secret validation failed");
             return;
         }
 
-        if (evaluatedClient.Client.RequireClientSecret && 
+        if (evaluatedClient.Client.RequireClientSecret &&
             evaluatedClient.Credential.Type is Server.ParsedSecretTypes.NoSecret)
         {
             logger.LogError("Client secret not informed for client: {Name} ({Id})",
                 evaluatedClient.Client.Name,
                 evaluatedClient.Client.Id);
 
-            context.InvalidClient("Client secret validation failed");
+            context.Error(Oidc.Token.Errors.InvalidClient, "Client secret validation failed");
             return;
         }
 
@@ -58,7 +58,7 @@ public class EvaluateClient : IDecorator<IWithClient>
                 evaluatedClient.Client.Name,
                 evaluatedClient.Client.Id);
 
-            context.InvalidClient("Client not found");
+            context.Error(Oidc.Token.Errors.InvalidClient, "Client not found");
             return;
         }
 

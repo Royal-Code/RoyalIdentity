@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models.Tokens;
@@ -82,15 +81,6 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
             Oidc.Routes.BuildTokenUrl(factory.Handles.Demo.Path), new FormUrlEncodedContent(form));
     }
 
-    private static async Task<(string Error, string? Description)> ReadErrorAsync(HttpResponseMessage response)
-    {
-        var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-
-        return (content!["error"].ToString()!, content.TryGetValue("error_description", out var value)
-            ? value.ToString()
-            : null);
-    }
-
     // The core rule: a code works once.
     [Fact]
     public async Task ExchangingTheSameCodeTwice_SucceedsOnlyTheFirstTime()
@@ -102,7 +92,7 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
-        Assert.Equal("invalid_grant", (await ReadErrorAsync(second)).Error);
+        await second.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
     }
 
     // DF11: a mismatched binding does not consume the code, so the legitimate exchange still works afterwards.
@@ -133,16 +123,16 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
         await ExchangeAsync(consumed.Code);
         var bound = await SeedCodeAsync();
 
-        var unknownCode = await ReadErrorAsync(await ExchangeAsync("code-that-was-never-issued"));
-        var alreadyConsumed = await ReadErrorAsync(await ExchangeAsync(consumed.Code));
-        var clientMismatch = await ReadErrorAsync(await ExchangeAsync(bound.Code, clientId: OtherClientId));
-        var redirectMismatch = await ReadErrorAsync(
-            await ExchangeAsync(bound.Code, redirectUri: "http://localhost:5000/other-callback"));
+        var unknownCode = await (await ExchangeAsync("code-that-was-never-issued")).ReadErrorAsync();
+        var alreadyConsumed = await (await ExchangeAsync(consumed.Code)).ReadErrorAsync();
+        var clientMismatch = await (await ExchangeAsync(bound.Code, clientId: OtherClientId)).ReadErrorAsync();
+        var redirectMismatch = await (
+            await ExchangeAsync(bound.Code, redirectUri: "http://localhost:5000/other-callback")).ReadErrorAsync();
 
-        Assert.Equal("invalid_grant", unknownCode.Error);
-        Assert.Equal(unknownCode, alreadyConsumed);
-        Assert.Equal(unknownCode, clientMismatch);
-        Assert.Equal(unknownCode, redirectMismatch);
+        Assert.Equal(Oidc.Token.Errors.InvalidGrant, unknownCode.Error);
+        Assert.Equal(unknownCode.Answer, alreadyConsumed.Answer);
+        Assert.Equal(unknownCode.Answer, clientMismatch.Answer);
+        Assert.Equal(unknownCode.Answer, redirectMismatch.Answer);
         Assert.DoesNotContain("redirect", unknownCode.Description ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -153,14 +143,14 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
     {
         var code = await SeedCodeAsync(creationTime: DateTime.UtcNow.AddHours(-1));
 
-        var first = await ReadErrorAsync(await ExchangeAsync(code.Code));
-        var second = await ReadErrorAsync(await ExchangeAsync(code.Code));
-        var unknownCode = await ReadErrorAsync(await ExchangeAsync("code-that-was-never-issued"));
+        var first = await (await ExchangeAsync(code.Code)).ReadErrorAsync();
+        var second = await (await ExchangeAsync(code.Code)).ReadErrorAsync();
+        var unknownCode = await (await ExchangeAsync("code-that-was-never-issued")).ReadErrorAsync();
 
-        Assert.Equal("invalid_grant", first.Error);
+        Assert.Equal(Oidc.Token.Errors.InvalidGrant, first.Error);
         Assert.Contains("expired", first.Description ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         // The expiry answer is only given once: the code was consumed, so the retry is the generic refusal.
-        Assert.Equal(unknownCode, second);
+        Assert.Equal(unknownCode.Answer, second.Answer);
     }
 
     // DF11: PKCE is validated after the consumption, so a failed verifier does not hand the code back — a
@@ -177,6 +167,6 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
         Assert.Equal(HttpStatusCode.BadRequest, wrongVerifier.StatusCode);
         // The code is gone: winning the code and then failing PKCE never makes it reusable.
         Assert.Equal(HttpStatusCode.BadRequest, rightVerifier.StatusCode);
-        Assert.Equal("invalid_grant", (await ReadErrorAsync(rightVerifier)).Error);
+        await rightVerifier.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
     }
 }

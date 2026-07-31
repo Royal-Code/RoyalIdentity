@@ -44,7 +44,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
                     "The parameter code_challenge is missing", 
                     context.ResponseTypes.ToSpaceSeparatedString());
 
-                context.InvalidRequest("Code challenge required");
+                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Code challenge required");
             }
             else
             {
@@ -59,7 +59,7 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
             codeChallenge.Length > restrictions.CodeChallengeMaxLength)
         {
             logger.LogError(context, "The parameter code_challenge is either too short or too long");
-            context.InvalidRequest("Invalid code_challenge", "too long");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid code_challenge: too long");
 
             return default;
         }
@@ -74,7 +74,9 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         if (!context.Options.Discovery.CodeChallengeMethodIsSupported(codeChallengeMethod))
         {
             logger.LogError(context, "Unsupported code_challenge_method", codeChallengeMethod);
-            context.InvalidRequest("Transform algorithm not supported", "unsupported code_challenge_method");
+            context.Error(
+                Oidc.Authorize.Errors.InvalidRequest,
+                "Transform algorithm not supported: unsupported code_challenge_method");
             return default;
         }
 
@@ -82,7 +84,9 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
         if (codeChallengeMethod == Oidc.CodeChallenge.Methods.Plain && !context.ClientParameters.Client.AllowPlainTextPkce)
         {
             logger.LogError(context, "The parameter code_challenge_method of plain is not allowed", codeChallengeMethod);
-            context.InvalidRequest("Transform algorithm not supported", "code_challenge_method of plain is not allowed");
+            context.Error(
+                Oidc.Authorize.Errors.InvalidRequest,
+                "Transform algorithm not supported: code_challenge_method of plain is not allowed");
         }
 
         return default;

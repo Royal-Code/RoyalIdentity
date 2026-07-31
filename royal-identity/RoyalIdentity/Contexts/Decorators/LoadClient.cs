@@ -30,7 +30,7 @@ public class LoadClient : IDecorator<IWithClient>
         if (clientId.IsMissingOrTooLong(context.Options.InputLengthRestrictions.ClientId))
         {
             logger.LogError(context, "The parameter client_id is missing or too long");
-            context.InvalidRequest("Invalid client_id");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid client_id");
             return;
         }
 
@@ -39,7 +39,7 @@ public class LoadClient : IDecorator<IWithClient>
         if (client is null)
         {
             logger.LogError(context, "Unknown client or not enabled", clientId);
-            context.InvalidRequest(Oidc.Authorize.Errors.UnauthorizedClient, "Unknown client or client not enabled");
+            context.Error(Oidc.Authorize.Errors.UnauthorizedClient, "Unknown client or client not enabled");
             return;
         }
 

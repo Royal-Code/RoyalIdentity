@@ -23,14 +23,14 @@ public class RevocationEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP method");
 
-            return new(EndpointErrorResults.MethodNotAllowed(httpContext));
+            return new(EndpointErrors.MethodNotAllowed(httpContext));
         }
 
         if (!httpContext.Request.HasApplicationFormContentType())
         {
             logger.LogWarning("Invalid media type");
 
-            return new(EndpointErrorResults.UnsupportedMediaType(httpContext));
+            return new(EndpointErrors.UnsupportedMediaType(httpContext));
         }
 
         var items = new ContextItems();

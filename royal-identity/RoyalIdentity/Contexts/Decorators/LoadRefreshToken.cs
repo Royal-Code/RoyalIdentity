@@ -34,14 +34,14 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (token.IsMissing())
         {
             logger.LogError(context, "Refresh token is missing");
-            context.InvalidRequest("Refresh token is missing");
+            context.Error(Oidc.Token.Errors.InvalidRequest, "Refresh token is missing");
             return;
         }
 
         if (token.Length > restrictions.RefreshToken)
         {
             logger.LogError(context, "Refresh token too long");
-            context.InvalidRequest("Refresh token too long");
+            context.Error(Oidc.Token.Errors.InvalidRequest, "Refresh token too long");
             return;
         }
 
@@ -49,7 +49,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (refreshToken is null)
         {
             logger.LogWarning("Invalid refresh token");
-            context.InvalidGrant("Invalid refresh token");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Invalid refresh token");
             return;
         }
 
@@ -59,7 +59,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (refreshToken.CreationTime.HasExceeded(refreshToken.Lifetime, clock.GetUtcNow().DateTime))
         {
             logger.LogWarning("Refresh token has expired.");
-            context.InvalidGrant("Refresh token has expired");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Refresh token has expired");
             return;
         }
 
@@ -69,7 +69,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (client.Id != refreshToken.ClientId)
         {
             logger.LogError("{ClientId} tries to refresh token belonging to {RefreshTokenClientId}", client.Id, refreshToken.ClientId);
-            context.InvalidGrant("Invalid client");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Invalid client");
             return;
         }
 
@@ -79,7 +79,7 @@ public class LoadRefreshToken : IDecorator<RefreshTokenContext>
         if (!client.AllowOfflineAccess)
         {
             logger.LogError("{ClientId} does not have access to offline_access scope anymore", client.Id);
-            context.InvalidGrant("Invalid client");
+            context.Error(Oidc.Token.Errors.InvalidGrant, "Invalid client");
             return;
         }
 

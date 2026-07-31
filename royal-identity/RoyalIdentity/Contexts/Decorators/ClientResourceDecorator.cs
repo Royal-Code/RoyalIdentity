@@ -48,28 +48,28 @@ public class ClientResourceDecorator : IDecorator<ClientCredentialsContext>
         if (resourcesFromStore.HasInvalidTargets)
         {
             logger.LogError(context, "Requested resource indicators are invalid: {Resources}", resourcesFromStore.GetInvalidTargets());
-            context.InvalidRequest(Oidc.Token.Errors.InvalidTarget, "resource indicators requested are invalid");
+            context.Error(Oidc.Token.Errors.InvalidTarget, "resource indicators requested are invalid");
             return;
         }
 
         if (resourcesFromStore.MissingScopes.Count is not 0)
         {
             logger.LogError(context, "Requested scopes are invalid or inactive: {Scopes}", string.Join(" ", resourcesFromStore.MissingScopes));
-            context.InvalidRequest(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
+            context.Error(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
             return;
         }
 
         if (resourcesFromStore.IdentityScopes.Count is not 0)
         {
             logger.LogError(context, "Client cannot request OpenID scopes in client credentials flow");
-            context.InvalidRequest(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
+            context.Error(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
             return;
         }
 
         if (resourcesFromStore.OfflineAccess)
         {
             logger.LogError(context, "Client cannot request a refresh token in client credentials flow");
-            context.InvalidRequest(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
+            context.Error(Oidc.Token.Errors.InvalidScope, "scopes requested are invalid or inactive");
             return;
         }
 

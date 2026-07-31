@@ -337,9 +337,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["resource"] = ordersResource
                 }));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_target", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidTarget);
     }
 
     private string AddOrdersResourceServer()

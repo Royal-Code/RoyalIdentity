@@ -20,7 +20,7 @@ public class GrantTypeValidator : IValidator<ITokenEndpointContextBase>
         if (!context.ClientParameters.Client.AllowedGrantTypes.Contains(context.GrantType))
         {
             logger.LogError(context, "Client not authorized for flow", context.GrantType);
-            context.InvalidGrant($"Client not authorized for {context.GrantType} flow");
+            context.Error(Oidc.Token.Errors.InvalidGrant, $"Client not authorized for {context.GrantType} flow");
         }
 
         return default;

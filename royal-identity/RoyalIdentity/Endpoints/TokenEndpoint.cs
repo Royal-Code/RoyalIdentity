@@ -32,7 +32,7 @@ public class TokenEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP request for token endpoint, invalid method");
 
-            return EndpointErrorResults.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext);
         }
 
         // validate HTTP content type
@@ -40,7 +40,7 @@ public class TokenEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP request for token endpoint, content type");
 
-            return EndpointErrorResults.UnsupportedMediaType(httpContext);
+            return EndpointErrors.UnsupportedMediaType(httpContext);
         }
 
         // read parameters
@@ -52,14 +52,20 @@ public class TokenEndpoint : IEndpointHandler
         {
             logger.LogWarning("Grant type parameter not found");
 
-            return EndpointErrorResults.InvalidRequest(httpContext, "Grant type parameter not found");
+            return EndpointErrorResults.BadRequest(
+                httpContext,
+                Oidc.Token.Errors.InvalidRequest,
+                "Grant type parameter not found");
         }
 
         if (grantType.Length > realmOptions.InputLengthRestrictions.GrantType)
         {
             logger.LogError("Grant type is too long");
 
-            return EndpointErrorResults.InvalidRequest(httpContext, "Grant type is too long");
+            return EndpointErrorResults.BadRequest(
+                httpContext,
+                Oidc.Token.Errors.InvalidRequest,
+                "Grant type is too long");
         }
 
         // create the context

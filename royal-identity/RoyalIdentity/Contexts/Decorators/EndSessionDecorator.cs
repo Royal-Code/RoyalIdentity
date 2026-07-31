@@ -40,7 +40,7 @@ public class EndSessionDecorator : IDecorator<EndSessionContext>
             // when IdToken is not informed and user is not authenticated
             // then the request is invalid
 
-            context.InvalidRequest("IdTokenHint is missing.");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "IdTokenHint is missing.");
             return;
         }
 

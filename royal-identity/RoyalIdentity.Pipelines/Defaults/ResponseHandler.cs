@@ -16,7 +16,12 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
     public static ResponseHandler Create(HttpStatusCode statusCode, object value)
         => new(Results.Json(value, statusCode: (int)statusCode));
 
-    public static ResponseHandler Error(string error, string? description = null, string? uri = null, int statusCode = 400)
+    public static ResponseHandler Error(
+        string error,
+        string? description = null,
+        string? uri = null,
+        int statusCode = StatusCodes.Status400BadRequest,
+        IReadOnlyDictionary<string, string>? headers = null)
         => new(new ErrorResponseResult(
             new ErrorResponseParameters
             {
@@ -24,10 +29,14 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
                 ErrorDescription = description,
                 ErrorUri = uri
             },
-            statusCode));
+            statusCode,
+            headers));
 
-    public static ResponseHandler Error(ErrorResponseParameters error, int statusCode = 400)
-        => new(new ErrorResponseResult(error, statusCode));
+    public static ResponseHandler Error(
+        ErrorResponseParameters error,
+        int statusCode = StatusCodes.Status400BadRequest,
+        IReadOnlyDictionary<string, string>? headers = null)
+        => new(new ErrorResponseResult(error, statusCode, headers));
 
     public static ResponseHandler Ok() => new(Results.Ok());
 

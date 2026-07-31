@@ -32,14 +32,14 @@ public class AuthorizeEndpoint : IEndpointHandler
         else if (HttpMethods.IsPost(httpContext.Request.Method))
         {
             if (!httpContext.Request.HasApplicationFormContentType())
-                return ValueTask.FromResult(EndpointErrorResults.UnsupportedMediaType(httpContext));
+                return ValueTask.FromResult(EndpointErrors.UnsupportedMediaType(httpContext));
 
             values = httpContext.Request.Form.AsNameValueCollection();
         }
         else
         {
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return new(EndpointErrorResults.MethodNotAllowed(httpContext));
+            return new(EndpointErrors.MethodNotAllowed(httpContext));
         }
 
         var context = new AuthorizeContext(httpContext, values, httpContext.User);

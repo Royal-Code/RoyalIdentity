@@ -29,7 +29,7 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
             logger.LogWarning("Invalid HTTP method for authorize endpoint.");
 
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return EndpointErrorResults.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext);
         }
 
         logger.LogDebug("Start authorize callback request");
@@ -49,7 +49,10 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
         }
 
         if (parameters is null)
-            return EndpointErrorResults.InvalidRequest(httpContext, "Invalid parameters");
+            return EndpointErrorResults.BadRequest(
+                httpContext,
+                Oidc.Authorize.Errors.InvalidRequest,
+                "Invalid parameters");
 
         var user = httpContext.User;
 

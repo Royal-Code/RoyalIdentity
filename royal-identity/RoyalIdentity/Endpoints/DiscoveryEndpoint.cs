@@ -25,7 +25,7 @@ public class DiscoveryEndpoint : IEndpointHandler
             logger.LogWarning("Discovery endpoint only supports GET requests");
 
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return EndpointErrorResults.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext);
         }
 
         logger.LogDebug("Start discovery request");
@@ -37,7 +37,7 @@ public class DiscoveryEndpoint : IEndpointHandler
             logger.LogInformation("Discovery endpoint disabled. 404.");
 
             // return a problem details of a NotFound informing the discovery endpoint is disabled
-            return EndpointErrorResults.NotFound(httpContext, "Discovery endpoint is disabled");
+            return EndpointErrors.NotFound(httpContext, "Discovery endpoint is disabled");
         }
 
         var context = new DiscoveryContext(httpContext, realmOptions);
