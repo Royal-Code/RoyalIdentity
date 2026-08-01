@@ -43,9 +43,9 @@ public class PostgreSqlPrivateKeyJwtReplayTests
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
-        Assert.NotEqual(HttpStatusCode.OK, second.StatusCode);
-        Assert.Contains(
-            "invalid_client", await second.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        // Exact field, not a substring: this suite is opt-in, so a false positive here would never be caught by
+        // the default run.
+        await second.AssertErrorAsync(Oidc.Token.Errors.InvalidClient);
 
         // The refusal came from a row that is actually there — not from the request failing for some other
         // reason before the store was ever reached. The delta makes this independent of fixture test order.

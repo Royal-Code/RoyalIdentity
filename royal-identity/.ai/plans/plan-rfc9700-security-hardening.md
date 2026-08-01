@@ -78,8 +78,12 @@
 - **Proteção web incompleta:** CSP existe em resultados com script, mas não há `frame-ancestors` nem
   `X-Frame-Options` global para login/consent/authorize; `Referrer-Policy: no-referrer` aparece apenas no
   `form_post`.
-- **Redação de logs incompleta:** `LoggingOptions.SensitiveValuesFilter` não inclui authorization code,
-  `code_verifier`, `state` e `nonce`.
+- **Redação de logs parcialmente resolvida:** a Fase 4 do `plan-oauth21-token-error-responses.md` (2026-07-31)
+  achou o authorization code sendo escrito em claro por `DefaultCodeFactory` e o request bruto sendo logado sem
+  redigir `code`/`code_verifier`. Os dois foram corrigidos, e a proteção deixou de ser configurável: nomes
+  obrigatórios agora vivem em `LoggingOptions.AlwaysRedacted`, um piso que a configuração só amplia — porque
+  `RealmOptions` é serializado inteiro no payload Configuration e um realm persistido manteria a lista antiga.
+  **Permanecem para este plano:** `state`, `nonce` e a auditoria dos demais logs (assertions e tokens).
 - **Assessment inexistente:** não existem `ClientSecurityAssessment`, `ClientSecurityFinding`, catálogo de
   `RuleId` ou snapshot persistido.
 - **Admin inexistente neste repositório:** há login/consent/logout em `RoyalIdentity.Razor`; API e UI
@@ -660,12 +664,19 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
 - [ ] Aplicar `Referrer-Policy: no-referrer` a todas as páginas/respostas sensíveis.
 - [ ] Garantir que redirects após requests com credenciais nunca usem 307; preferir 303 onde aplicável.
 - [ ] Confirmar por teste que authorization endpoint não recebe CORS.
-- [ ] Redigir authorization code, `code_verifier`, `state`, `nonce`, assertions e tokens dos logs de erro.
+- [ ] Redigir `state`, `nonce`, assertions e tokens dos logs de erro. Authorization code e `code_verifier` já
+  estão no piso obrigatório `LoggingOptions.AlwaysRedacted`; acrescentar ali, e não em `SensitiveValuesFilter`,
+  o que também não puder depender de configuração.
 - [ ] Consumir `LoggingOptions` sem `UseLogService` e ampliar somente `SensitiveValuesFilter`/redaction; não
   reintroduzir option ou branch removido pelo plano predecessor.
 - [ ] Preservar o alias mTLS de revocation já corrigido para `BuildMtlsRevocationUrl`; corrigir/mapear somente
   endpoints restantes antes de anunciá-los e omitir aliases/métodos indisponíveis.
 - [ ] Preservar `private_key_jwt` com backing de replay declarado e incluir seu uso no assessment.
+- [ ] Provar por teste que `tls_client_auth` e `self_signed_tls_client_auth` autenticam de fato, antes de
+  mantê-los anunciados. Entregue pela Fase 4 do plano de erros: o discovery os anuncia quando
+  `MutualTls.Enabled`, e `DiscoveryTests.Get_WithMutualTlsEnabled_Must_AnnounceTheTwoMtlsMethodsOnTop` fixa a
+  composição, mas nenhum teste exercita a autenticação — o test server in-memory não apresenta certificado de
+  cliente. Os outros três métodos anunciados já têm caso de sucesso.
 - [ ] Adicionar validação de startup para issuer/forwarded headers/trusted proxy necessária ao host, sem alegar
   que `ClientSecurityAssessment` prova o deployment.
 - [ ] Atualizar findings de client authentication assimétrica e sender constraint como recomendações.

@@ -61,7 +61,9 @@ public class DefaultCodeFactory : ICodeFactory
         var userSessionStore = storage.GetUserSessionStore(context.Realm);
         await userSessionStore.RecordClientAsync(sid, context.ClientId!, ct);
 
-        logger.LogDebug("Code issued for {ClientId} / {SubjectId}: {Code}", context.ClientId, context.Identity?.Name, code.Code);
+        // The code itself never goes to the log: it is a single-use credential, and a Debug line is still a
+        // line someone can read later. The client and subject are enough to correlate the issuance.
+        logger.LogDebug("Code issued for {ClientId} / {SubjectId}", context.ClientId, context.Identity?.Name);
 
         return code;
     }

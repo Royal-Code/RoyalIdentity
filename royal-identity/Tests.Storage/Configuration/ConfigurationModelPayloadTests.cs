@@ -254,4 +254,49 @@ public class ConfigurationModelPayloadTests
         Assert.Throws<ConfigurationPayloadException>(
             () => realmSerializer.Deserialize(RealmOptionsPayloadSerializer.CurrentVersion, json, new ServerOptions()));
     }
+
+    /// <summary>
+    /// A realm persisted before a name joined the redaction set must not keep logging it.
+    /// </summary>
+    /// <remarks>
+    /// The payload carries the whole <c>RealmOptions</c> graph, so it carries the logging configuration too:
+    /// raising the default of a configurable list reaches new realms only, and every realm already stored keeps
+    /// the older, weaker value. That is why the credentials that must never be logged live in a mandatory floor
+    /// instead of in <c>SensitiveValuesFilter</c> — the floor is code, not data, so it applies the moment the
+    /// server starts, to every realm, without a payload version bump the version chain has no room for.
+    /// </remarks>
+    [Fact]
+    public void RealmOptions_PersistedWithAnOlderRedactionList_StillRedactsTheMandatoryNames()
+    {
+        // A payload as it would have been written before code/code_verifier were protected at all.
+        const string json = """
+            {"Logging":{"SensitiveValuesFilter":["client_secret","password","refresh_token"]}}
+            """;
+
+        var restored = realmSerializer.Deserialize(
+            RealmOptionsPayloadSerializer.CurrentVersion, json, new ServerOptions());
+
+        Assert.Equal(
+            ["client_secret", "password", "refresh_token"],
+            restored.Logging.SensitiveValuesFilter);
+
+        Assert.Contains(Constants.Oidc.Token.Request.Code, restored.Logging.RedactedParameterNames);
+        Assert.Contains(Constants.Oidc.Token.Request.CodeVerifier, restored.Logging.RedactedParameterNames);
+        Assert.Contains(Constants.Oidc.Token.Request.ClientAssertion, restored.Logging.RedactedParameterNames);
+    }
+
+    [Fact]
+    public void RealmOptions_WithAnEmptiedRedactionList_StillRedactsTheMandatoryNames()
+    {
+        // The stronger case: configuration actively removing everything cannot switch the protection off.
+        const string json = """{"Logging":{"SensitiveValuesFilter":[]}}""";
+
+        var restored = realmSerializer.Deserialize(
+            RealmOptionsPayloadSerializer.CurrentVersion, json, new ServerOptions());
+
+        Assert.Empty(restored.Logging.SensitiveValuesFilter);
+
+        foreach (var mandatory in LoggingOptions.AlwaysRedacted)
+            Assert.Contains(mandatory, restored.Logging.RedactedParameterNames);
+    }
 }

@@ -39,7 +39,7 @@ public static class CollectionExtensions
 
     public static Dictionary<string, string> ToScrubbedDictionary(
         this NameValueCollection collection,
-        ICollection<string> nameFilter)
+        IEnumerable<string> nameFilter)
     {
         var dict = new Dictionary<string, string>();
 

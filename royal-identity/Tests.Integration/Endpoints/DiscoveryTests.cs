@@ -148,7 +148,9 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
         // Covered by: client_secret_basic in TokenErrorTests.Post_WithValidBasicCredentials_Must_IssueAToken,
         // client_secret_post throughout ClientTokenTests, and private_key_jwt in
         // PrivateKeyJwtReplayProtectionTests.FirstPresentation_IsAccepted_AndTheSamePresentationAgainIsRefused.
-        // tls_client_auth is deliberately absent: its evaluator reports no method name, so it is not announced.
+        //
+        // This is the default realm configuration. The two mTLS methods are announced only when
+        // MutualTls.Enabled is set — see the test below, and the handoff recorded there.
         var client = factory.CreateClient();
         var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
 
@@ -167,5 +169,53 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
                 Oidc.Endpoint.AuthMethods.PrivateKeyJwt
             ],
             methods);
+    }
+
+    /// <summary>
+    /// With mTLS enabled the announcement gains two methods that <b>no test proves a client can authenticate
+    /// with</b>.
+    /// </summary>
+    /// <remarks>
+    /// Exercising them needs a client certificate presented through the connection, which this in-memory test
+    /// server does not provide, so this test pins the composition only: the two names are added on top of the
+    /// three, and adding a third one silently is not possible. Proving they authenticate belongs to
+    /// <c>plan-rfc9700-security-hardening.md</c>, which owns the mTLS metadata and aliases and has the task
+    /// recorded.
+    /// </remarks>
+    [Fact]
+    public async Task Get_WithMutualTlsEnabled_Must_AnnounceTheTwoMtlsMethodsOnTop()
+    {
+        await factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options => options.MutualTls.Enabled = true);
+        try
+        {
+            var client = factory.CreateClient();
+            var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
+
+            var content = await client.GetStringAsync(url);
+            var document = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content);
+
+            var methods = document![Oidc.Discovery.TokenEndpointAuthenticationMethodsSupported]
+                .EnumerateArray()
+                .Select(value => value.GetString())
+                .ToArray();
+
+            Assert.Equal(
+                [
+                    Oidc.Endpoint.AuthMethods.BasicAuthentication,
+                    Oidc.Endpoint.AuthMethods.PostBody,
+                    Oidc.Endpoint.AuthMethods.PrivateKeyJwt,
+                    Oidc.Endpoint.AuthMethods.TlsClientAuth,
+                    Oidc.Endpoint.AuthMethods.SelfSignedTlsClientAuth
+                ],
+                methods);
+        }
+        finally
+        {
+            await factory.UpdateRealmAsync(
+                factory.Handles.Demo,
+                options => options.MutualTls.Enabled = false);
+        }
     }
 }

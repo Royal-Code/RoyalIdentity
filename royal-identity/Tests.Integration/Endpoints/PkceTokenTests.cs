@@ -1,7 +1,10 @@
 // Ignore Spelling: Pkce
 
 using System.Net;
+using System.Web;
+using Microsoft.AspNetCore.Mvc.Testing;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Tokens;
 using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
@@ -274,6 +277,39 @@ public class PkceTokenTests : IClassFixture<LogCapturingAppFactory>
         var log = factory.AllLogText;
         Assert.DoesNotContain(code.Code, log, StringComparison.Ordinal);
         Assert.DoesNotContain(presentedVerifier, log, StringComparison.Ordinal);
+    }
+
+    // The seeded-code tests above never reach ICodeFactory, so they cannot see what issuance logs. This one
+    // drives the real authorization flow: the code that comes back in the redirect must not appear anywhere in
+    // the log, which is where it was being written in clear by DefaultCodeFactory.
+    [Fact]
+    public async Task IssuingACodeThroughTheAuthorizationFlow_LeaksItNowhereInTheLog()
+    {
+        var options = new WebApplicationFactoryClientOptions { AllowAutoRedirect = false };
+        var http = factory.CreateClient(options);
+        await http.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
+
+        var verifier = CryptoRandom.CreateUniqueId();
+        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
+            .AddQueryString("client_id", ClientId)
+            .AddQueryString("response_type", "code")
+            .AddQueryString("response_mode", "query")
+            .AddQueryString("scope", "openid profile")
+            .AddQueryString("redirect_uri", RedirectUri)
+            .AddQueryString("state", "state")
+            .AddQueryString("code_challenge", PkceHelper.GenerateS256CodeChallenge(verifier))
+            .AddQueryString("code_challenge_method", "S256");
+
+        factory.ClearLog();
+        var response = await http.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+
+        var query = HttpUtility.ParseQueryString(response.Headers.Location!.ToString().Split('?')[1]);
+        var issuedCode = query["code"];
+
+        Assert.NotNull(issuedCode);
+        Assert.DoesNotContain(issuedCode, factory.AllLogText, StringComparison.Ordinal);
     }
 
     [Fact]

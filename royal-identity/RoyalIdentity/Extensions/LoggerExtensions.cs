@@ -35,7 +35,7 @@ public static class LoggerExtensions
         string message,
         IEndpointContextBase context)
     {
-        var raw = GetRaw(context, options.SensitiveValuesFilter);
+        var raw = GetRaw(context, options.RedactedParameterNames);
         logger.LogError("{Message}\n{Raw}", message, raw);
 
         if (options.UseLogService)
@@ -50,7 +50,7 @@ public static class LoggerExtensions
         string? details,
         IEndpointContextBase context)
     {
-        var raw = GetRaw(context, options.SensitiveValuesFilter);
+        var raw = GetRaw(context, options.RedactedParameterNames);
         logger.LogError("{Message}: {Details}\n{Raw}", message, details, raw);
 
         if (options.UseLogService)
@@ -65,7 +65,7 @@ public static class LoggerExtensions
         string message,
         IEndpointContextBase context)
     {
-        var raw = GetRaw(context, options.SensitiveValuesFilter);
+        var raw = GetRaw(context, options.RedactedParameterNames);
         logger.LogError(ex, "{Message}\n{Raw}", message, raw);
 
         if (options.UseLogService)
@@ -95,9 +95,9 @@ public static class LoggerExtensions
         logger.LogError(options, ex, message, context);
     }
 
-    private static string GetRaw(IEndpointContextBase context, ICollection<string> sensitiveValuesFilter)
+    private static string GetRaw(IEndpointContextBase context, IEnumerable<string> redactedParameterNames)
     {
-        var dict = context.Raw.ToScrubbedDictionary(sensitiveValuesFilter);
+        var dict = context.Raw.ToScrubbedDictionary(redactedParameterNames);
 
         if (context.HttpContext.TraceIdentifier is not null)
             dict["request_id"] = context.HttpContext.TraceIdentifier;

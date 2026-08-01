@@ -1004,8 +1004,10 @@ git diff --check
 
 ### Resultado da Fase 4
 
-**Concluída em 2026-07-31.** Build e suíte completa verdes: **1365 aprovados, 51 ignorados** (opt-in
-PostgreSQL/Aspire), **0 falhas**. `ProtocolErrorBoundaryTests` 10/10. `git diff --check` limpo.
+**Concluída em 2026-07-31**, com uma segunda rodada no mesmo dia respondendo a uma revisão externa da
+implementação — que achou dois problemas de segurança que esta auditoria tinha declarado inexistentes. Build e
+suíte completa verdes: **1369 aprovados, 51 ignorados** (opt-in PostgreSQL/Aspire), **0 falhas**.
+`ProtocolErrorBoundaryTests` 10/10. `git diff --check` limpo.
 
 **Inventário final.** 108 sítios de resposta de erro em `RoyalIdentity`, todos nomeando o código
 explicitamente. Os do token endpoint foram classificados um a um contra a matriz normativa e todos conferem.
@@ -1014,18 +1016,41 @@ propagam `resolution.Error`, que vem de `ResourceStoreExtensions` e só produz `
 `invalid_scope`; `RevocationHandler` responde `unsupported_token_type` com **status 200**, que é o
 comportamento deliberado do RFC 7009 §2.2 e não uma resposta de erro do token endpoint.
 
-**Assertions por substring.** Não resta nenhuma validando o campo `error`. As três remanescentes foram
-resolvidas: `DiscoveryTests` passou a `AssertErrorAsync`; `PrivateKeyJwtBackingFailureTests` mantém as
-asserções negativas, que é a forma certa ali, e ganhou o status exato; `CodeAuthorizeTests` mantém um
-`DoesNotContain` sobre um corpo de **sucesso**, que não é validação de `error`.
+**Assertions por substring.** Não resta nenhuma validando o campo `error`. `DiscoveryTests` passou a
+`AssertErrorAsync`; `PrivateKeyJwtBackingFailureTests` mantém as asserções negativas, que é a forma certa ali, e
+ganhou o status exato; `CodeAuthorizeTests` mantém um `DoesNotContain` sobre um corpo de **sucesso**, que não é
+validação de `error`. A revisão externa achou uma quarta que minha varredura perdeu:
+`PostgreSqlPrivateKeyJwtReplayTests`, opt-in e portanto invisível à suíte padrão — exatamente onde um falso
+positivo sobrevive mais tempo. Também convertida.
 
-**Achado: vazamento de credencial em log.** `LoggingOptions.SensitiveValuesFilter` cobria `client_secret`,
-`password`, `client_assertion`, `refresh_token`, `device_code` e `id_token_hint`, mas **não** `code` nem
-`code_verifier` — e `logger.LogError(context, ...)` despeja o request bruto scrubbed em toda recusa. Ou seja,
-authorization code e verifier iam em claro para o log justamente nos caminhos que mais logam. Reproduzido antes
-de corrigir. Os dois entraram na lista; como `LoggingOptions` não é serializado no payload Configuration, a
-mudança vale para todos os realms sem implicação de versão. Regressão em
+**Achado: vazamento de credencial em log — em dois lugares, e a primeira correção estava errada.**
+`LoggingOptions.SensitiveValuesFilter` cobria `client_secret`, `password`, `client_assertion`, `refresh_token`,
+`device_code` e `id_token_hint`, mas **não** `code` nem `code_verifier` — e `logger.LogError(context, ...)`
+despeja o request bruto scrubbed em toda recusa. Reproduzido antes de corrigir, com regressão em
 `PkceTokenTests.RefusingAnExchange_LeaksNeitherTheCodeNorTheVerifier`.
+
+A revisão externa mostrou que acrescentar os dois nomes ao default **não bastava**, e que a justificativa que eu
+tinha escrito era falsa. Eu havia afirmado que `LoggingOptions` não é serializado no payload Configuration; a
+verificação que me levou a isso foi um grep por `Logging` no diretório do serializer, que não acha nada porque
+`RealmOptionsPayloadSerializer` serializa o grafo inteiro genericamente — não nomeia propriedade alguma. Um
+serializador genérico é invisível a busca por nome, e eu tratei ausência de match como ausência de
+serialização.
+
+A consequência é concreta: um realm persistido antes da mudança carrega a lista antiga, que sobrescreve o
+initializer novo, e continuaria logando `code` e `code_verifier`. A correção definitiva separa o que é
+obrigatório do que é configurável — `LoggingOptions.AlwaysRedacted` é um piso em código, e
+`SensitiveValuesFilter` passou a ser apenas o que o operador acrescenta, coisas que o produto não pode conhecer
+(parâmetros de um extension grant próprio). O piso não é removível por configuração nem envelhece com o payload,
+e evita um bump v1→v2 que colidiria com a cadeia de versões reservada pelos planos seguintes.
+`ConfigurationModelPayloadTests` ganhou dois casos: um payload com a lista antiga e um com a lista esvaziada, os
+dois ainda redigindo os nomes obrigatórios.
+
+**Achado: o código emitido era gravado no log pelo factory.** `DefaultCodeFactory` escrevia
+`"Code issued for {ClientId} / {SubjectId}: {Code}"`. Nenhum teste desta fase podia pegar isso: os de PKCE
+semeiam o code direto no storage e nunca passam pelo factory. O `{Code}` saiu do log — client e subject bastam
+para correlacionar a emissão — e a regressão
+`PkceTokenTests.IssuingACodeThroughTheAuthorizationFlow_LeaksItNowhereInTheLog` percorre o authorization flow
+real e confere o código que volta no redirect contra o log inteiro.
 
 Descrições: nenhuma carrega credencial. As únicas interpoladas são `redirect_uri`, `grant_type`, prompt modes,
 nome de parâmetro e texto computado de algoritmos de assinatura — nenhum deles é segredo, code, verifier,
@@ -1035,8 +1060,14 @@ refresh token ou replay handle.
 Basic da suíte asseveravam **falha** — nenhum provava que o mecanismo autentica. A reescrita da seleção de
 evaluator na Fase 2 poderia tê-lo quebrado por inteiro e só os caminhos de falha continuariam verdes.
 Acrescentados o caso de sucesso e um teste que fixa o conjunto exato anunciado, com o teste de sucesso de cada
-entrada nomeado no comentário. `tls_client_auth` continua fora por decisão do próprio evaluator, que não reporta
-nome de método.
+entrada nomeado no comentário.
+
+Minha primeira redação dizia que `tls_client_auth` fica fora porque o evaluator não reporta nome de método.
+Isso vale para a configuração padrão e só para ela: `DiscoveryHandler` **acrescenta** `tls_client_auth` e
+`self_signed_tls_client_auth` quando `MutualTls.Enabled`. Um segundo teste passou a fixar essa composição, mas
+exercitar a autenticação exige certificado de cliente pela conexão, que o test server in-memory não fornece.
+O aceite desta fase fica delimitado à configuração padrão, e **provar que os dois métodos mTLS autenticam foi
+entregue como tarefa ao `plan-rfc9700-security-hardening.md`**, que já é dono da metadata e dos aliases mTLS.
 
 **Infraestrutura versus credencial.** A invariante 10 vale nos dois sentidos e agora tem teste dos dois lados:
 dado do client nunca vira 5xx (Fase 3, método PKCE desconhecido) e falha de backing nunca vira erro OAuth —
@@ -1137,7 +1168,7 @@ refresh usará `context.Error(<código>, <descrição>)` como todo o resto.
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
 | Draft muda durante execução | nova versão altera §3.2.4/PKCE | implementação nasce desatualizada | gate DF1 no início da Fase 4 | Fechado na Fase 4 — datatracker consultado em 2026-07-31: draft-15 (2026-03-02) ainda é a revisão mais recente, sem delta |
-| Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Mitigado na Fase 1 — `ProtocolErrorBoundaryTests` varre o fonte de Pipelines por 17 códigos protocolares |
+| Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Fechado — `ProtocolErrorBoundaryTests` varre o fonte de Pipelines por todo código descoberto por reflexão em `Constants.Oidc.*.Errors`, mais os pseudocódigos aposentados |
 | `EndpointErrorResults` preserva códigos hardcoded | factory não migra para o core e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | DF19 + guard da Fase 1 | Fechado na Fase 1 — factories em `RoyalIdentity/Endpoints/EndpointErrors.cs`; o quinto ponto não previsto (`ProblemsExtensions`) virou parâmetro |
 | Detecção múltipla ocorre após evaluator | `jti` é registrado antes do `invalid_request` | retry legítimo parece replay | preflight DF7 + teste negativo do store | Fechado na Fase 2 — `AMalformedRequestCarryingAnAssertion_RegistersNoHandle` apresenta a mesma assertion malformada e depois sozinha |
 | Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Mitigado na Fase 2 — o certificado não é fonte apresentada; só decide em `Source.None` |
