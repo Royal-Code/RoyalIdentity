@@ -141,6 +141,12 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public HashSet<string> PromptModes { get; set; } = [];
 
     /// <summary>
+    /// Gets every distinct prompt value supplied by the caller, including values this server does not support.
+    /// This preserves the raw protocol shape for validations that must run before unsupported values are ignored.
+    /// </summary>
+    public HashSet<string> RequestedPromptModes { get; } = [];
+
+    /// <summary>
     /// Gets or sets the maximum age.
     /// </summary>
     /// <value>
@@ -244,6 +250,8 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
             var prompts = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             foreach(var p in prompts)
             {
+                RequestedPromptModes.Add(p);
+
                 if (Options.Discovery.PromptModeIsSupported(p))
                 {
                     PromptModes.Add(p);

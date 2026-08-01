@@ -1,15 +1,21 @@
 ﻿using Microsoft.Extensions.Logging;
+using RoyalIdentity.Contracts;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Responses;
 
 namespace RoyalIdentity.Contexts.Validators;
 
 public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
 {
     private readonly ILogger logger;
+    private readonly ISessionStateGenerator sessionStateGenerator;
 
-    public AuthorizeMainValidator(ILogger<AuthorizeMainValidator> logger)
+    public AuthorizeMainValidator(
+        ISessionStateGenerator sessionStateGenerator,
+        ILogger<AuthorizeMainValidator> logger)
     {
+        this.sessionStateGenerator = sessionStateGenerator;
         this.logger = logger;
     }
 
@@ -130,10 +136,27 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         // check prompt
         //////////////////////////////////////////////////////////
-        if (context.PromptModes.Count > 1 && context.PromptModes.Contains(Oidc.PromptModes.None))
+        if (context.RequestedPromptModes.Count > 1 &&
+            context.RequestedPromptModes.Contains(Oidc.PromptModes.None))
         {
             logger.LogError(context, "The property prompt contains 'none' and other values. 'none' should be used by itself.");
-            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid prompt");
+
+            // AuthorizeValidateContext is the server-side continuation validator. Its caller consumes a
+            // ProblemDetails contract, not an Authentication Response. The browser-facing authorize request,
+            // whose client and redirect URI have already been validated at this point, uses the bounded factory.
+            if (context is not AuthorizeContext browserContext || context is AuthorizeValidateContext)
+            {
+                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid prompt");
+            }
+            else
+            {
+                context.Response = AuthorizeResponseFactory.CreateError(
+                    sessionStateGenerator,
+                    browserContext,
+                    Oidc.Authorize.Errors.InvalidRequest,
+                    "The prompt value 'none' must not be combined with another value.");
+            }
+
             return ValueTask.CompletedTask;
         }
 

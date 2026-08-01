@@ -44,7 +44,6 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
                 ClientId,
                 SubjectFactory.CreateWithSession(
                     storage, realm, factory.Handles.Alice.SubjectId, "Test Name", "admin"),
-                "session",
                 creationTime ?? DateTime.UtcNow,
                 300,
                 resources,

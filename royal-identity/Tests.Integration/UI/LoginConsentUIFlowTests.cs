@@ -396,6 +396,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
         Assert.NotNull(callbackData);
         Assert.Equal("access_denied", callbackData["error"]);
         Assert.Equal("state", callbackData["state"]);
+        Assert.False(string.IsNullOrEmpty(callbackData["session_state"]));
         Assert.DoesNotContain("code", callbackData.Keys);
     }
 }

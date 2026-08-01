@@ -10,18 +10,15 @@ namespace RoyalIdentity.Contracts.Defaults;
 public class DefaultCodeFactory : ICodeFactory
 {
     private readonly TimeProvider time;
-    private readonly ISessionStateGenerator sessionStateGenerator;
     private readonly IStorage storage;
     private readonly ILogger logger;
 
     public DefaultCodeFactory(
         TimeProvider time,
-        ISessionStateGenerator sessionStateGenerator,
         IStorage storage,
         ILogger<DefaultCodeFactory> logger)
     {
         this.time = time;
-        this.sessionStateGenerator = sessionStateGenerator;
         this.storage = storage;
         this.logger = logger;
     }
@@ -35,14 +32,9 @@ public class DefaultCodeFactory : ICodeFactory
 
         var sid = context.Subject.GetSessionId();
 
-        // SessionState leaves the authorization-code payload in Fase 3 of plan-oidc-session-management. Until
-        // that schema cut lands, an ineligible OAuth request uses the old non-null slot as an empty transport.
-        var sessionState = sessionStateGenerator.GenerateSessionStateValue(context) ?? string.Empty;
-
         var code = new AuthorizationCode(
             context.ClientParameters.Client.Id,
             context.Subject,
-            sessionState,
             time.GetUtcNow().UtcDateTime,
             context.ClientParameters.Client.AuthorizationCodeLifetime,
             context.Scopes,

@@ -1,16 +1,16 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: EM EXECUÇÃO - Fases 1-2 concluídas; Fase 3 é a próxima; 2 de 7 fases concluídas
+## Status: EM EXECUÇÃO - Fases 1-3 concluídas; Fase 4 é a próxima; 3 de 7 fases concluídas
 
 ## Progresso
 
-`██░░░░░` **29%** - 2 de 7 fases
+`███░░░░` **43%** - 3 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato de estado do User Agent e opções | Concluida |
 | Fase 2 - Ciclo de vida do estado no login, cookie e logout | Concluida |
-| Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Pendente |
+| Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Concluida |
 | Fase 4 - Rota, discovery HTTPS e isolamento por realm | Pendente |
 | Fase 5 - OP iframe moderno e hardening HTTP | Pendente |
 | Fase 6 - Aceites HTTP, multi-realm e navegador real | Pendente |
@@ -272,7 +272,7 @@
   `context.HttpContext.RequestServices` em cada invocação e o manager deriva realm, opções, nome e path do cookie
   naquele request; o delegate cacheado não captura manager, realm ou opções efetivas. Fonte: lifetime de named
   options + padrão já usado por `ValidateUserSessionAsync`.
-- **DF24 — Factory delimitada de Authentication Response:** um `AuthorizeResponseFactory` interno/concreto
+- **DF24 — Factory delimitada de Authentication Response:** um `AuthorizeResponseFactory` interno/estático
   calcula `session_state` via `ISessionStateGenerator` e constrói somente as respostas de sucesso/erro assumidas
   por este plano: sucesso no `AuthorizeHandler`, `access_denied` já emitido por `ConsentDecorator` e os novos erros
   da matriz de `prompt=none`, inclusive a combinação inválida de prompts. Esses erros usam
@@ -302,6 +302,14 @@
 - **DF27 — Test seam interno delimitado:** `SessionStateFormat` permanece `internal`; o assembly concede
   `InternalsVisibleTo` somente a `Tests.Identity` para vetores e parser puros, sem tornar o formato API pública e
   sem conceder acesso aos demais projetos. Fonte: topologia DF22 + implementação da Fase 1.
+- **DF28 — Contratos capability-based do pipeline são preservados:** adicionar uma necessidade exclusiva de um
+  branch não autoriza estreitar um decorator/validator inteiro para um contexto concreto. `RequestedPromptModes`
+  pertence a `IWithPrompt`; `PromptLoginDecorator` continua `IDecorator<IWithPrompt>` e somente o branch que
+  produz uma Authentication Response usa `AuthorizeContext`. Decorators, validators e handlers do core
+  permanecem publicamente componíveis. `AuthorizeResponseFactory` é uma factory estática interna para que os
+  consumidores públicos dependam apenas de `ISessionStateGenerator`, sem expor uma implementação nem criar uma
+  interface artificial. `Tests.Architecture/PipelineComponentContractTests.cs` fixa visibilidade e contratos
+  reutilizáveis. Fonte: revisão de design posterior à Fase 3 + histórico do contrato (`4acc7e5`).
 
 ---
 
@@ -375,15 +383,16 @@
   em `HttpContext.Items` e deriva o nome/path do realm.
 - `ISessionStateGenerator.GenerateSessionStateValue(AuthorizeContext) -> string?`: mantém o seam existente,
   passa a retornar `null` quando DF2/DF9 não forem satisfeitas e usa o estado canônico da request.
-- `AuthorizeResponseFactory` (nome final pode seguir convenção local, sem interface pública): ponto único que
+- `AuthorizeResponseFactory` (nome final pode seguir convenção local, sem interface pública): factory estática
+  interna e ponto único que
   invoca `ISessionStateGenerator` para as Authentication Responses no escopo deste plano. É usada no sucesso do
   `AuthorizeHandler`, no `access_denied` existente do consentimento e nos erros novos da matriz de `prompt=none`;
   não captura todos os terminadores do authorize.
 - `AuthorizeResponse`: recebe o `session_state` calculado pela factory independentemente do authorization code.
 - `AuthorizeErrorResponse`: recebe o `session_state?` calculado pela mesma factory quando a requisição já possui
   client, redirect e OIDC validados; não resolve serviços durante `CreateResponseAsync`.
-- `PromptLoginDecorator`: especializa o contexto de autorização necessário para emitir `login_required` em
-  `prompt=none`; não mostra UI nesse modo.
+- `PromptLoginDecorator`: permanece `IDecorator<IWithPrompt>`; somente o branch que emite `login_required` como
+  Authentication Response exige `AuthorizeContext`, sem estreitar o contrato inteiro e sem mostrar UI nesse modo.
 - `ConsentDecorator`: emite `consent_required` em `prompt=none`; `access_denied` continua sendo a decisão
   explícita do usuário.
 - `CheckSessionEndpoint`: continua GET-only, aplica realm, feature gate e HTTPS antes de produzir a resposta.
@@ -725,38 +734,39 @@ redirect URI; remover o estado do authorization code e versionar seu payload sem
 
 **Tarefas:**
 
-- [ ] Remover `ISessionStateGenerator` de `DefaultCodeFactory`.
-- [ ] Remover `SessionState` dos construtores/propriedades de `AuthorizationCode`.
-- [ ] Remover `SessionState` de `AuthorizationCodePayload` e incrementar o serializer para versão 2.
-- [ ] Atualizar `.ai/plans/plan-data-storage-matrix.md` para declarar que `session_state` não pertence ao code.
-- [ ] Atualizar contratos SQLite/PostgreSQL, payload tests, parity e fixtures sem alterar binding/single-use.
-- [ ] Criar `AuthorizeResponseFactory` interna/concreta e registrá-la com lifetime compatível com
-  `ISessionStateGenerator`; ela é o único ponto de cálculo para as Authentication Responses enumeradas em DF24.
-- [ ] Fazer o sucesso do `AuthorizeHandler`, o `access_denied` atual de `ConsentDecorator` e os novos erros de
+- [x] Remover `ISessionStateGenerator` de `DefaultCodeFactory`.
+- [x] Remover `SessionState` dos construtores/propriedades de `AuthorizationCode`.
+- [x] Remover `SessionState` de `AuthorizationCodePayload` e incrementar o serializer para versão 2.
+- [x] Atualizar `.ai/plans/plan-data-storage-matrix.md` para declarar que `session_state` não pertence ao code.
+- [x] Atualizar contratos SQLite/PostgreSQL, payload tests, parity e fixtures sem alterar binding/single-use.
+- [x] Criar `AuthorizeResponseFactory` interna/estática, mantendo `ISessionStateGenerator` como dependência
+  pública dos componentes de pipeline; ela é o único ponto de cálculo para as Authentication Responses
+  enumeradas em DF24.
+- [x] Fazer o sucesso do `AuthorizeHandler`, o `access_denied` atual de `ConsentDecorator` e os novos erros de
   `prompt=none` de `PromptLoginDecorator`/`ConsentDecorator` construir respostas pela factory.
-- [ ] Encaminhar `none` combinado com outro prompt, hoje encerrado por `AuthorizeMainValidator`, à mesma factory
+- [x] Encaminhar `none` combinado com outro prompt, hoje encerrado por `AuthorizeMainValidator`, à mesma factory
   (diretamente ou por validator dedicado), somente após client e redirect URI válidos.
-- [ ] Não migrar `RedirectUriValidator`, `ResourcesDecorator`, `ResourcesValidator`,
+- [x] Não migrar `RedirectUriValidator`, `ResourcesDecorator`, `ResourcesValidator`,
   `AuthorizationResourcesValidator` ou outros terminadores fora de DF24 para essa factory.
-- [ ] Gerar `session_state` pela factory no caminho genérico de Authentication Response OIDC bem-sucedida, com
+- [x] Gerar `session_state` pela factory no caminho genérico de Authentication Response OIDC bem-sucedida, com
   authorization code como alvo final; não adicionar cases ou testes exclusivos de `token`, `id_token` ou
   combinações implicit/hybrid que a DF12 do plano RFC 9700 removerá.
-- [ ] Garantir que OAuth authorization sem `openid` não receba o parâmetro.
-- [ ] Estender `AuthorizeErrorResponse` com `session_state?`.
-- [ ] Rejeitar `none` combinado com qualquer outro prompt como `invalid_request` antes de
+- [x] Garantir que OAuth authorization sem `openid` não receba o parâmetro.
+- [x] Estender `AuthorizeErrorResponse` com `session_state?`.
+- [x] Rejeitar `none` combinado com qualquer outro prompt como `invalid_request` antes de
   `PromptLoginDecorator`/`ConsentDecorator` produzirem UI.
-- [ ] Validar a lista bruta de valores de `prompt` antes que valores desconhecidos sejam ignorados por `Load`,
+- [x] Validar a lista bruta de valores de `prompt` antes que valores desconhecidos sejam ignorados por `Load`,
   pois `none` combinado com qualquer outro valor deve falhar mesmo quando esse valor não é suportado.
-- [ ] Implementar todas as linhas atualmente alcançáveis da matriz de `prompt=none`; manter
+- [x] Implementar todas as linhas atualmente alcançáveis da matriz de `prompt=none`; manter
   `interaction_required` como fallback para interação não classificada e documentar a não aplicabilidade atual de
   `account_selection_required` sem inventar estado multi-account ou teste de ausência.
-- [ ] Preservar `select_account` sem `none` como fluxo interativo; não convertê-lo automaticamente em
+- [x] Preservar `select_account` sem `none` como fluxo interativo; não convertê-lo automaticamente em
   `account_selection_required`.
-- [ ] Preservar `state`, response mode e redirect URI validado nos erros; assumir nesta fase o transporte por
+- [x] Preservar `state`, response mode e redirect URI validado nos erros; assumir nesta fase o transporte por
   redirect de todas as condições alcançáveis da matriz, sem depender do predecessor para entregá-lo.
-- [ ] Incluir `session_state` nos erros OIDC quando client/origem/redirect já forem confiáveis.
-- [ ] Cobrir usuário anônimo, sessão ativa, sessão trocada e novo `prompt=none` após `changed`.
-- [ ] Criar `Tests.Integration/Endpoints/AuthorizeSessionStateTests.cs` com tabela condição → erro, ausência de
+- [x] Incluir `session_state` nos erros OIDC quando client/origem/redirect já forem confiáveis.
+- [x] Cobrir usuário anônimo, sessão ativa, sessão trocada e novo `prompt=none` após `changed`.
+- [x] Criar `Tests.Integration/Endpoints/AuthorizeSessionStateTests.cs` com tabela condição → erro, ausência de
   UI, `state`, response mode, redirect e `session_state` em sucesso/erro aplicável.
 
 **Critérios de aceite:** authorization code não contém/persiste `session_state`; somente a factory calcula o
@@ -775,11 +785,44 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteOperationalAuthoriz
 dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizeSessionStateTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~CodeAuthorizeTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~PromptInteractionCharacterizationTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~AuthorizeResponseBoundaryTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~PipelineComponentContractTests"
 ```
 
 ### Resultado da Fase 3
 
-*a preencher*
+- `session_state` saiu de `DefaultCodeFactory`, de `AuthorizationCode` e do payload operacional. O serializer de
+  authorization code passou para v2 e rejeita v1 fail-closed; os contratos SQLite, fixtures, paridade e consumo
+  atômico single-use continuam verdes. A matriz de storage registra explicitamente que o valor pertence à
+  Authentication Response, não ao code.
+- `AuthorizeResponseFactory` é interna/estática e o único ponto que invoca `ISessionStateGenerator` ou constrói
+  `AuthorizeResponse`/`AuthorizeErrorResponse`. Guards arquiteturais fixam também os quatro consumidores
+  permitidos: sucesso do handler, `access_denied`, erros de `prompt=none` e combinação inválida de prompts. Os
+  terminadores anteriores à confiança em client/redirect permanecem no transporte JSON existente.
+- O caminho genérico de sucesso emite estado apenas para OIDC elegível. OAuth sem `openid` não recebe o parâmetro;
+  redirect sem origem de browser e request sem estado autenticado continuam fail-closed. `AuthorizeErrorResponse`
+  preserva `state`, query/form_post e inclui o estado quando ele pode ser calculado.
+- A lista bruta distinta de prompts é preservada antes do filtro de suporte: `none` com `login` ou mesmo com valor
+  desconhecido responde `invalid_request`. Usuário anônimo, reautenticação (`max_age`), restrições de método/IdP e
+  SSO vencido convergem em `login_required`; consentimento necessário responde `consent_required`; interação não
+  classificada tem fallback `interaction_required`. O modelo atual não possui seleção multi-account, portanto
+  `account_selection_required` permanece explicitamente sem condição alcançável e sem teste vazio;
+  `select_account` isolado continua interativo.
+- `AuthorizeSessionStateTests` cobre sucesso OIDC/OAuth, erros silenciosos, ausência de UI, query/form_post,
+  preservação de `state`, consentimento, sessão trocada e novo `prompt=none`. O fluxo real de negação de
+  consentimento prova `access_denied` com `session_state`.
+- A primeira suíte transversal detectou que o nome inicial `responseFactory.Error(context, code, ...)` recriava a
+  forma posicional ambígua proibida pelo plano OAuth 2.1. A operação foi renomeada para `CreateError`, e o guard
+  protocolar voltou a ficar verde.
+- A revisão posterior corrigiu um estreitamento indevido: `RequestedPromptModes` passou para `IWithPrompt`,
+  `PromptLoginDecorator` voltou a `IDecorator<IWithPrompt>` e os quatro componentes alterados recuperaram sua
+  visibilidade pública. A auditoria de todos os decorators, validators e handlers não encontrou outro contrato
+  recentemente estreitado; corrigiu ainda a inconsistência antiga de `RedirectUriValidator`, agora público como
+  os demais componentes. Um guard arquitetural fixa essas decisões (DF28).
+- Verificação final: aceites focados com 9 `AuthorizeSessionStateTests`, 32 regressões authorize/UI, 67 testes
+  diretos de payload/authorization code, 3 guards da factory e 13 guards de contratos/visibilidade do pipeline;
+  build sem erros; suíte completa com 1.448
+  aprovados, 51 ignorados por opt-in e nenhuma falha; `git diff --check` limpo.
 
 ---
 

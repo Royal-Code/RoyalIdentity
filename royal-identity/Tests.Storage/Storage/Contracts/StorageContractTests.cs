@@ -97,7 +97,7 @@ public abstract class StorageContractTests
         Realm realm, string clientId, string subjectId, DateTime? creationTime = null, int lifetime = 300)
     {
         var subject = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", subjectId)], "contract"));
-        return new AuthorizationCode(clientId, subject, "session-state", creationTime ?? Start, lifetime,
+        return new AuthorizationCode(clientId, subject, creationTime ?? Start, lifetime,
             new RequestedResources(), "https://client.contract.test/callback")
         {
             RealmId = realm.Id,

@@ -21,6 +21,11 @@ public interface IWithPrompt : IWithClient, IWithAcr
     public HashSet<string> PromptModes { get; }
 
     /// <summary>
+    /// Gets every distinct prompt value supplied by the caller, including unsupported values.
+    /// </summary>
+    public HashSet<string> RequestedPromptModes { get; }
+
+    /// <summary>
     /// Gets or sets the maximum age.
     /// </summary>
     /// <value>

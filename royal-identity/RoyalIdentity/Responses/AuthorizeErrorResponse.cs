@@ -27,11 +27,16 @@ public class AuthorizeErrorResponse : IResponseHandler
     /// <param name="context">The authorize context that owns the validated redirect URI and response mode.</param>
     /// <param name="error">The protocol error code to return to the client.</param>
     /// <param name="errorDescription">An optional human-readable error description.</param>
-    public AuthorizeErrorResponse(AuthorizeContext context, string error, string? errorDescription = null)
+    internal AuthorizeErrorResponse(
+        AuthorizeContext context,
+        string error,
+        string? errorDescription,
+        string? sessionState)
     {
         Context = context;
         Error = error;
         ErrorDescription = errorDescription;
+        SessionState = sessionState;
     }
 
     /// <summary>
@@ -48,6 +53,11 @@ public class AuthorizeErrorResponse : IResponseHandler
     /// Gets the optional human-readable error description returned to the client.
     /// </summary>
     public string? ErrorDescription { get; }
+
+    /// <summary>
+    /// Gets the opaque OP browser-session state, when this is an eligible OIDC response.
+    /// </summary>
+    public string? SessionState { get; }
 
     /// <summary>
     /// Gets the state value from the original authorize request.
@@ -100,6 +110,9 @@ public class AuthorizeErrorResponse : IResponseHandler
 
         if (State.IsPresent())
             collection.Add(Oidc.Authorize.Response.State, State);
+
+        if (SessionState.IsPresent())
+            collection.Add(Oidc.Authorize.Response.SessionState, SessionState);
 
         return collection;
     }

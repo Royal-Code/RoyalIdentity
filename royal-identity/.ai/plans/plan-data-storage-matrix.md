@@ -153,6 +153,12 @@ Implementação: `RefreshTokenStore`, sobre `RealmMemoryStore.RefreshTokens`.
 
 Implementação: `AuthorizationCodeStore`, sobre `RealmMemoryStore.AuthorizationCodes`.
 
+> **Contrato atualizado por `plan-oidc-session-management` Fase 3:** `session_state` pertence à
+> Authentication Response e não ao authorization code. `AuthorizationCode`, seu payload operacional v2 e as
+> projeções SQLite/PostgreSQL não armazenam esse valor. O corte é fail-closed: payload v1 é rejeitado, sem
+> compatibilidade ou materialização parcial. Binding por realm/client/redirect URI, handle opaco e consumo
+> atômico single-use permanecem inalterados.
+
 | ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|---|
 | AC-01 | `StoreAuthorizationCodeAsync(code, ct)` | Operational / realm / chave `code.Code` | Indexação substitui valor de mesmo código e retorna o código. | `DefaultCodeFactory` | fluxo: `CodeTokenTests`; isolation direto | duplicate-write `avaliar` (DF16); live reference `descartar`; P3/baseline |

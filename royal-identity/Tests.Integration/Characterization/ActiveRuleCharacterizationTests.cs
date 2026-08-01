@@ -36,7 +36,6 @@ public class ActiveRuleCharacterizationTests : IClassFixture<PersistentStorageAp
         var code = new RoyalIdentity.Models.Tokens.AuthorizationCode(
             factory.Handles.DemoClient.ClientId,
             SubjectFactory.Create(factory.Handles.Alice.SubjectId, "Alice", "admin"),
-            "session",
             DateTime.UtcNow,
             300,
             resources,

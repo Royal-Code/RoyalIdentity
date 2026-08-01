@@ -12,15 +12,18 @@ namespace RoyalIdentity.Contexts.Decorators;
 public class PromptLoginDecorator : IDecorator<IWithPrompt>
 {
     private readonly IProfileService profileService;
+    private readonly ISessionStateGenerator sessionStateGenerator;
     private readonly ILogger logger;
     private readonly TimeProvider time;
 
     public PromptLoginDecorator(
-        IProfileService profileService, 
+        IProfileService profileService,
+        ISessionStateGenerator sessionStateGenerator,
         ILogger<PromptLoginDecorator> logger,
         TimeProvider? time = null)
     {
         this.profileService = profileService;
+        this.sessionStateGenerator = sessionStateGenerator;
         this.logger = logger;
         this.time = time ?? TimeProvider.System;
     }
@@ -40,10 +43,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             // we won't think we need to force a prompt again
             context.Raw.Remove(Oidc.Authorize.Request.Prompt);
 
-            context.Response = new InteractionResponse(context)
-            {
-                IsLogin = true 
-            };
+            RequireLogin(context, "The request requires user interaction.");
 
             return;
         }
@@ -62,10 +62,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
         {
             logger.LogInformation("Showing login: User is not authenticated or not active");
 
-            context.Response = new InteractionResponse(context)
-            {
-                IsLogin = true
-            };
+            RequireLogin(context, "The user is not authenticated or is no longer active.");
 
             return;
         }
@@ -81,10 +78,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             {
                 logger.LogInformation("Showing login: Requested MaxAge exceeded.");
 
-                context.Response = new InteractionResponse(context)
-                {
-                    IsLogin = true
-                };
+                RequireLogin(context, "The current authentication is not fresh enough.");
 
                 return;
             }
@@ -97,10 +91,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             {
                 logger.LogInformation("Showing login: User logged in locally, but client does not allow local logins");
 
-                context.Response = new InteractionResponse(context)
-                {
-                    IsLogin = true
-                };
+                RequireLogin(context, "The current authentication method is not allowed for this client.");
 
                 return;
             }
@@ -110,10 +101,7 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
             !context.ClientParameters.Client.IdentityProviderRestrictions.Contains(currentIdp))
         {
             logger.LogInformation("Showing login: User is logged in with IdP: {IdP}, but IdP not in client restriction list.", currentIdp);
-            context.Response = new InteractionResponse(context)
-            {
-                IsLogin = true
-            };
+            RequireLogin(context, "The current identity provider is not allowed for this client.");
 
             return;
         }
@@ -130,15 +118,38 @@ public class PromptLoginDecorator : IDecorator<IWithPrompt>
                 logger.LogInformation("Showing login: User's auth session duration: {SessionDuration} exceeds client's user SSO lifetime: {UserSsoLifetime}.", diff, context.ClientParameters.Client.UserSsoLifetime);
 
                 logger.LogInformation("Showing login: User is logged in with IdP: {IdP}, but IdP not in client restriction list.", currentIdp);
-                context.Response = new InteractionResponse(context)
-                {
-                    IsLogin = true
-                };
+                RequireLogin(context, "The client's single sign-on lifetime has expired.");
 
                 return;
             }
         }
 
         await next();
+    }
+
+    private void RequireLogin(IWithPrompt context, string description)
+    {
+        if (context.PromptModes.Contains(Oidc.PromptModes.None))
+        {
+            if (context is AuthorizeContext authorizeContext)
+            {
+                context.Response = AuthorizeResponseFactory.Interaction(
+                    sessionStateGenerator,
+                    authorizeContext,
+                    AuthorizeInteractionKind.Login,
+                    description);
+            }
+            else
+            {
+                context.Error(Oidc.Authorize.Errors.LoginRequired, description);
+            }
+
+            return;
+        }
+
+        context.Response = new InteractionResponse(context)
+        {
+            IsLogin = true
+        };
     }
 }

@@ -33,7 +33,7 @@ public class SqliteOperationalAuthorizationCodeTests
     {
         var subject = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", subjectId)], "contract"));
 
-        return new AuthorizationCode(clientId, subject, "session-state", Start, lifetime,
+        return new AuthorizationCode(clientId, subject, Start, lifetime,
             new RequestedResources(), redirectUri)
         {
             RealmId = realm.Id,
@@ -69,7 +69,7 @@ public class SqliteOperationalAuthorizationCodeTests
         await Assert.ThrowsAnyAsync<DbUpdateException>(async () =>
             await store.StoreAuthorizationCodeAsync(
                 new AuthorizationCode(
-                    code.Code, "client-other", duplicate.Subject, "session-state", Start, 300,
+                    code.Code, "client-other", duplicate.Subject, Start, 300,
                     new RequestedResources(), RedirectUri)
                 {
                     RealmId = harness.RealmA.Id,
@@ -244,7 +244,6 @@ public class SqliteOperationalAuthorizationCodeTests
         Assert.Equal("challenge", consumed.CodeChallenge);
         Assert.Equal("S256", consumed.CodeChallengeMethod);
         Assert.Equal("session-a", consumed.SessionId);
-        Assert.Equal("session-state", consumed.SessionState);
         Assert.Equal("value", consumed.Properties!["custom"]);
         Assert.Equal(harness.RealmA.Id, consumed.RealmId);
     }

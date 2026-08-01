@@ -268,7 +268,6 @@ public class OperationalPayloadTests
         Assert.Equal(code.Code, restored.Code);
         Assert.Equal(code.ClientId, restored.ClientId);
         Assert.Equal(code.RedirectUri, restored.RedirectUri);
-        Assert.Equal(code.SessionState, restored.SessionState);
         Assert.Equal(code.CreationTime, restored.CreationTime);
         Assert.Equal(code.Lifetime, restored.Lifetime);
         Assert.Equal(code.RealmId, restored.RealmId);
@@ -292,6 +291,19 @@ public class OperationalPayloadTests
 
         Assert.DoesNotContain(code.Code, json, StringComparison.Ordinal);
         Assert.Equal("code-handle-value", restored.Code);
+    }
+
+    [Fact]
+    public void AuthorizationCode_VersionOnePayload_FailsClosed()
+    {
+        var code = OperationalTestData.NewAuthorizationCode();
+        var (_, json) = authorizationCodes.Serialize(code);
+
+        Assert.Equal(2, AuthorizationCodePayloadSerializer.CurrentVersion);
+        Assert.Throws<OperationalPayloadException>(() => authorizationCodes.Deserialize(
+            1,
+            json,
+            OperationalTestData.IdentityOf(code)));
     }
 
     // The subject principal survives with its identity metadata and its claims.

@@ -223,7 +223,6 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
         var code = new AuthorizationCode(
             "demo_client",
             SubjectFactory.Create("alice", "Alice", "admin"),
-            "session",
             DateTime.UtcNow,
             300,
             resources,
@@ -370,7 +369,6 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
         var code = new AuthorizationCode(
             "demo_client",
             SubjectFactory.Create("alice", "Alice", "admin"),
-            "session",
             DateTime.UtcNow,
             300,
             resources,

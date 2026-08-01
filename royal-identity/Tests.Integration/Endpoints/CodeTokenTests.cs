@@ -45,7 +45,6 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                 factory.Handles.Alice.SubjectId,
                 "Test Name",
                 "admin"),
-            "session",
             DateTime.UtcNow,
             300,
             resources,

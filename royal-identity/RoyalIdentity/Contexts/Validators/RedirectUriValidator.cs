@@ -7,7 +7,7 @@ using RoyalIdentity.Pipelines.Abstractions;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-internal class RedirectUriValidator : IValidator<IWithRedirectUri>
+public class RedirectUriValidator : IValidator<IWithRedirectUri>
 {
     private readonly IRedirectUriValidator uriValidator;
     private readonly ILogger logger;

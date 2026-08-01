@@ -169,7 +169,6 @@ internal static class OperationalTestData
         return new AuthorizationCode(
             "client-one",
             new ClaimsPrincipal(identity),
-            "session-state",
             CreationTime,
             300,
             NewRequestedResources(),

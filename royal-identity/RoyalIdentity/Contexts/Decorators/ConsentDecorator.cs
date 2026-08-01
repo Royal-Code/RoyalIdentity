@@ -10,11 +10,16 @@ namespace RoyalIdentity.Contexts.Decorators;
 public class ConsentDecorator : IDecorator<AuthorizeContext>
 {
     private readonly IConsentService consent;
+    private readonly ISessionStateGenerator sessionStateGenerator;
     private readonly ILogger logger;
 
-    public ConsentDecorator(IConsentService consent, ILogger<ConsentDecorator> logger)
+    public ConsentDecorator(
+        IConsentService consent,
+        ISessionStateGenerator sessionStateGenerator,
+        ILogger<ConsentDecorator> logger)
     {
         this.consent = consent;
+        this.sessionStateGenerator = sessionStateGenerator;
         this.logger = logger;
     }
 
@@ -28,7 +33,8 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         {
             logger.LogInformation("Resource owner denied consent; returning access_denied to the client");
 
-            context.Response = new AuthorizeErrorResponse(
+            context.Response = AuthorizeResponseFactory.CreateError(
+                sessionStateGenerator,
                 context,
                 Oidc.Authorize.Errors.AccessDenied,
                 "The resource owner denied the request.");
@@ -59,7 +65,11 @@ public class ConsentDecorator : IDecorator<AuthorizeContext>
         {
             logger.LogError(context, "Error: prompt=none requested, but consent is required.", context.PromptModes.ToSpaceSeparatedString());
 
-            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid prompt mode: consent is required");
+            context.Response = AuthorizeResponseFactory.Interaction(
+                sessionStateGenerator,
+                context,
+                AuthorizeInteractionKind.Consent,
+                "The request requires consent.");
 
             return;
         }

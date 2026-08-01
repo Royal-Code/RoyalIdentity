@@ -50,7 +50,7 @@ public abstract class OperationalPurgeRealmTests : OperationalParitySuite
             new AuthorizationCode(
                 "client-a",
                 new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "subject-a")], "contract")),
-                "session-state", Start, 300, new RequestedResources(), "https://client.contract.test/callback")
+                Start, 300, new RequestedResources(), "https://client.contract.test/callback")
             {
                 RealmId = realm.Id,
             },

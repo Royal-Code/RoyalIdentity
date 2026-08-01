@@ -398,7 +398,6 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
                 clientId,
                 SubjectFactory.CreateWithSession(
                     storage, realm, factory.Handles.Alice.SubjectId, "Test Name", "admin"),
-                "session",
                 DateTime.UtcNow,
                 300,
                 resources,

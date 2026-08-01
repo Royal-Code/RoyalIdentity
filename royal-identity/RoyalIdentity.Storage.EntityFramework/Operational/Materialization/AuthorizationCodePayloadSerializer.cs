@@ -16,7 +16,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 public sealed class AuthorizationCodePayloadSerializer
 {
     /// <summary>Current payload schema version.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     private readonly OperationalPayloadCodec<AuthorizationCodePayload> codec =
         new(nameof(AuthorizationCode), CurrentVersion);
@@ -27,7 +27,6 @@ public sealed class AuthorizationCodePayloadSerializer
 
         var payload = new AuthorizationCodePayload
         {
-            SessionState = code.SessionState,
             Nonce = code.Nonce,
             StateHash = code.StateHash,
             CodeChallenge = code.CodeChallenge,
@@ -53,7 +52,6 @@ public sealed class AuthorizationCodePayloadSerializer
             identity.Code,
             identity.ClientId,
             payload.Subject.ToClaimsPrincipal(nameof(AuthorizationCode)),
-            payload.SessionState,
             identity.CreatedAtUtc,
             identity.Lifetime,
             payload.Scopes.ToRequestedResources(nameof(AuthorizationCode)),

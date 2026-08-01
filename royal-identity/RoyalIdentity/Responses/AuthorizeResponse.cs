@@ -11,7 +11,7 @@ namespace RoyalIdentity.Responses;
 
 public class AuthorizeResponse : IResponseHandler
 {
-    public AuthorizeResponse(AuthorizeContext context, string? code, string? sessionState,
+    internal AuthorizeResponse(AuthorizeContext context, string? code, string? sessionState,
         string? identityToken = null, string? token = null)
     {
         Context = context;

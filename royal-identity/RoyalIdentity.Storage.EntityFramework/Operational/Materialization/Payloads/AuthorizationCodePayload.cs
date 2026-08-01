@@ -14,8 +14,6 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization.Payl
 /// </summary>
 public sealed class AuthorizationCodePayload
 {
-    public required string SessionState { get; set; }
-
     public string? Nonce { get; set; }
 
     public string? StateHash { get; set; }

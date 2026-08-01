@@ -12,10 +12,10 @@ namespace RoyalIdentity.Models.Tokens;
 /// </summary>
 public class AuthorizationCode
 {
-    public AuthorizationCode(string clientId, ClaimsPrincipal subject, string sessionState,
+    public AuthorizationCode(string clientId, ClaimsPrincipal subject,
         DateTime creationTime, int lifetime,
         RequestedResources scopes, string redirectUri)
-        : this(CryptoRandom.CreateUniqueId(), clientId, subject, sessionState, creationTime, lifetime, scopes, redirectUri)
+        : this(CryptoRandom.CreateUniqueId(), clientId, subject, creationTime, lifetime, scopes, redirectUri)
     {
     }
 
@@ -24,14 +24,13 @@ public class AuthorizationCode
     /// key is its digest (plan-data-operational-storage DF38) — so the handle comes back from the lookup
     /// argument and this overload restores it instead of generating a new one.
     /// </summary>
-    public AuthorizationCode(string code, string clientId, ClaimsPrincipal subject, string sessionState,
+    public AuthorizationCode(string code, string clientId, ClaimsPrincipal subject,
         DateTime creationTime, int lifetime,
         RequestedResources scopes, string redirectUri)
     {
         Code = code;
         ClientId = clientId;
         Subject = subject;
-        SessionState = sessionState;
         CreationTime = creationTime;
         Lifetime = lifetime;
         Scopes = scopes;
@@ -61,11 +60,6 @@ public class AuthorizationCode
     /// The subject.
     /// </value>
     public ClaimsPrincipal Subject { get; }
-
-    /// <summary>
-    /// Gets or sets the session state.
-    /// </summary>
-    public string SessionState { get; }
 
     /// <summary>
     /// Gets or sets the creation time.

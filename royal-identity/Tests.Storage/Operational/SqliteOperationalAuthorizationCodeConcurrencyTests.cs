@@ -27,7 +27,7 @@ public class SqliteOperationalAuthorizationCodeConcurrencyTests
     {
         var subject = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "subject-race")], "contract"));
 
-        return new AuthorizationCode(ClientId, subject, "session-state", Start, 300,
+        return new AuthorizationCode(ClientId, subject, Start, 300,
             new RequestedResources(), RedirectUri)
         {
             RealmId = realm.Id,

@@ -50,7 +50,7 @@ public abstract class OperationalCleanupTests : OperationalParitySuite
 
     private static AuthorizationCode NewCode(Realm realm, int lifetime = 300)
         => new("client-a", new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "subject-a")], "contract")),
-            "session-state", Start, lifetime, new RequestedResources(), "https://client.contract.test/callback")
+            Start, lifetime, new RequestedResources(), "https://client.contract.test/callback")
         {
             RealmId = realm.Id,
         };

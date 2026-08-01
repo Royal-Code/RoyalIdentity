@@ -13,17 +13,20 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
 {
     private readonly ICodeFactory codeFactory;
     private readonly ITokenFactory tokenFactory;
+    private readonly ISessionStateGenerator sessionStateGenerator;
     private readonly IEventDispatcher eventDispatcher;
     private readonly ILogger logger;
 
     public AuthorizeHandler(
         ICodeFactory codeFactory,
         ITokenFactory tokenFactory,
+        ISessionStateGenerator sessionStateGenerator,
         IEventDispatcher eventDispatcher, 
         ILogger<AuthorizeHandler> logger) 
     {
         this.codeFactory = codeFactory;
         this.tokenFactory = tokenFactory;
+        this.sessionStateGenerator = sessionStateGenerator;
         this.eventDispatcher = eventDispatcher;
         this.logger = logger;
     }
@@ -37,7 +40,6 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
         context.AssertResourcesValidated();
 
         string? codeValue = null;
-        string? sessionState = null;
         string? accessTokenValue = null;
         string? identityTokenValue = null;
         CodeIssuedEvent? codeEvent = null;
@@ -48,8 +50,6 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
         {
             var code = await codeFactory.CreateCodeAsync(context, ct);
             codeValue = code.Code;
-            sessionState = code.SessionState;
-
             var token = new Token(Oidc.Token.Types.Code, codeValue);
             codeEvent = new CodeIssuedEvent(context, token);
 
@@ -99,10 +99,10 @@ public class AuthorizeHandler : IHandler<AuthorizeContext>
             logger.LogDebug("Identity Token generated");
         }
 
-        context.Response = new AuthorizeResponse(
+        context.Response = AuthorizeResponseFactory.Success(
+            sessionStateGenerator,
             context,
             codeValue, 
-            sessionState, 
             identityTokenValue, 
             accessTokenValue);
 
