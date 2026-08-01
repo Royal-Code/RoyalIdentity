@@ -1,10 +1,10 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: EM EXECUÇÃO - Fases 1-5 concluídas; Fase 6 é a próxima; 5 de 7 fases concluídas
+## Status: EM EXECUÇÃO - Fases 1-6 concluídas; Fase 7 é a próxima; 6 de 7 fases concluídas
 
 ## Progresso
 
-`█████░░` **71%** - 5 de 7 fases
+`██████░` **86%** - 6 de 7 fases
 
 | Fase | Estado |
 |---|---|
@@ -13,7 +13,7 @@
 | Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Concluida |
 | Fase 4 - Rota, discovery HTTPS e isolamento por realm | Concluida |
 | Fase 5 - OP iframe moderno e hardening HTTP | Concluida |
-| Fase 6 - Aceites HTTP, multi-realm e navegador real | Pendente |
+| Fase 6 - Aceites HTTP, multi-realm e navegador real | Concluida |
 | Fase 7 - Licenças, atribuições, documentação e fechamento | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -997,23 +997,23 @@ browser fora da suíte default e fornecer um comando reprodutível.
 
 **Tarefas:**
 
-- [ ] Criar projeto/harness xUnit de browser sem dependência de runtime dos produtos.
-- [ ] Subir OP e RP reais em Kestrel HTTPS com certificado efêmero e ports/origins distintos.
-- [ ] Criar página RP mínima que carrega o OP iframe oculto e usa `postMessage` com target origin exato.
-- [ ] Instalar Chromium somente pelo script opt-in `scripts/Test-CheckSessionBrowser.ps1`.
-- [ ] Testar estado corrente retornando `unchanged`.
-- [ ] Testar logout/troca de usuário retornando `changed`.
-- [ ] Testar mensagem malformada retornando `error`.
-- [ ] Testar client errado e origem diferente nunca retornando `unchanged`.
-- [ ] Testar `event.source` que não seja parent sendo ignorado/rejeitado.
-- [ ] Testar `prompt=none` após `changed`: mesmo usuário atualiza estado; usuário ausente retorna
+- [x] Criar projeto/harness xUnit de browser sem dependência de runtime dos produtos.
+- [x] Subir OP e RP reais em Kestrel HTTPS com certificado efêmero e ports/origins distintos.
+- [x] Criar página RP mínima que carrega o OP iframe oculto e usa `postMessage` com target origin exato.
+- [x] Instalar Chromium somente pelo script opt-in `scripts/Test-CheckSessionBrowser.ps1`.
+- [x] Testar estado corrente retornando `unchanged`.
+- [x] Testar logout/troca de usuário retornando `changed`.
+- [x] Testar mensagem malformada retornando `error`.
+- [x] Testar client errado e origem diferente nunca retornando `unchanged`.
+- [x] Testar `event.source` que não seja parent sendo ignorado/rejeitado.
+- [x] Testar `prompt=none` após `changed`: mesmo usuário atualiza estado; usuário ausente retorna
   `login_required`; consentimento ausente retorna `consent_required`.
-- [ ] Testar dois realms com cookies, paths, opções e estados independentes.
-- [ ] Simular cookie indisponível e verificar `changed` sem loop infinito no harness RP.
-- [ ] Garantir que `dotnet test RoyalIdentity.sln` não baixe nem exija browser.
-- [ ] Criar `Tests.Architecture/CheckSessionBoundaryTests.cs` e adicionar guardas contra referência de
+- [x] Testar dois realms com cookies, paths, opções e estados independentes.
+- [x] Simular cookie indisponível e verificar `changed` sem loop infinito no harness RP.
+- [x] Garantir que `dotnet test RoyalIdentity.sln` não baixe nem exija browser.
+- [x] Criar `Tests.Architecture/CheckSessionBoundaryTests.cs` e adicionar guardas contra referência de
   Playwright nos projetos de runtime e contra captura de serviços scoped no configurador de cookie.
-- [ ] Nomear a fixture opt-in `Tests.Browser/CheckSessionBrowserTests.cs`.
+- [x] Nomear a fixture opt-in `Tests.Browser/CheckSessionBrowserTests.cs`.
 
 **Critérios de aceite:** script opt-in passa todos os cenários em Chromium; suite default passa sem browser
 instalado; nenhum teste usa target origin `*`; dois realms não compartilham estado; `changed` conduz ao fluxo
@@ -1031,7 +1031,28 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~CheckSessionBoundary
 
 ### Resultado da Fase 6
 
-*a preencher*
+- Criado `Tests.Browser`, deliberadamente fora de `RoyalIdentity.sln`, com Playwright 1.61.0 e uma fixture
+  `CheckSessionBrowserTests` que reutiliza o `Tests.Host` real sobre Kestrel HTTPS, sobe dois RPs mínimos em
+  origins/ports distintos e usa certificado efêmero; nenhum projeto de runtime referencia Playwright ou o
+  harness.
+- O RP de aceite carrega o OP iframe oculto, usa somente target origins exatos e executa uma verificação
+  delimitada por página, sem polling/retry automático. Chromium prova `unchanged`, `changed` por rotação do
+  mesmo usuário, troca de usuário e logout, `error` para mensagem/origin inválidos, client divergente nunca
+  `unchanged` e mensagem de um sibling frame ignorada por `event.source`.
+- O fluxo após `changed` foi fechado com `prompt=none`: o mesmo usuário recebe novo code/`session_state`; sessão
+  ausente recebe `login_required`; consentimento ausente recebe `consent_required`. O aceite multi-realm usa
+  `demo` e `account`, verifica nomes, paths e valores de cookies diferentes e prova que logout em um realm não
+  altera o estado do outro.
+- Cookie indisponível é simulado no boundary JavaScript do iframe: o resultado é um único `changed`, e o RP não
+  entra em loop. `scripts/Test-CheckSessionBrowser.ps1` é o único comando que instala Chromium e executa os cinco
+  aceites opt-in.
+- `CheckSessionBoundaryTests` entrega quatro guardas: Playwright ausente do runtime, projeto browser fora da
+  solution default, nenhuma captura de manager scoped/realm/options no callback de cookie e nenhum wildcard em
+  `postMessage` no harness.
+- Verificação final: filtros obrigatórios selecionaram 8 `CheckSessionEndpointTests`, 13
+  `AuthorizeSessionStateTests`, 11 `CheckSessionCookieLifecycleTests` e 4 `CheckSessionBoundaryTests`; o script
+  opt-in aprovou 5 cenários Chromium. A suíte default, sem construir/exigir browser, aprovou 1.470 testes, ignorou
+  51 opt-in e não teve falhas; `git diff --check` limpo.
 
 ---
 
@@ -1169,21 +1190,21 @@ dotnet test RoyalIdentity.sln
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Bloqueio de third-party cookie | iframe não vê cookie presente no first-party OP | falsos `changed`/loop no RP | DF14, harness defensivo, documentação e Back-Channel Logout | Aberto |
-| Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | CSP própria frameable + teste HTTP entregue; browser e reexecução pelo RFC 9700 permanecem | Mitigado |
+| Bloqueio de third-party cookie | iframe não vê cookie presente no first-party OP | falsos `changed`/loop no RP | DF14, harness defensivo sem retry automático e aceite Chromium de cookie indisponível; documentação/Back-Channel Logout permanecem | Mitigado |
+| Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | CSP própria frameable + testes HTTP/Chromium entregues; reexecução pelo RFC 9700 permanece | Mitigado |
 | Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host; confiança permanece configurada pelo host | Mitigado |
 | Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única/validação entregues na Fase 1; lifecycle multi-realm na Fase 2 | Mitigado |
 | Estado vaza em token/log | principal/telemetria copia propriedade/cookie | correlação ou exposição | propriedade protegida, não claim; filtros e testes de log/token | Aberto |
 | Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6, vetor UTF-8 independente e probe Node opt-in reproduzível; Chromium real na Fase 6 | Mitigado |
 | Payload v1 permanece em banco dev | serializer sobe para v2 com artefato antigo | falha fechada temporária | breaking aceito; codes efêmeros; reprovisionar seeds/config | Aceito |
-| Playwright entra na suíte default | projeto baixa/exige Chromium | CI/local deixa de ser autocontido | projeto/script opt-in + arquitetura test | Aberto |
+| Playwright entra na suíte default | projeto baixa/exige Chromium | CI/local deixa de ser autocontido | projeto fora da solution, script opt-in e guardas arquiteturais; suíte default verificada sem browser | Fechado |
 | Auditoria de licença incompleta | arquivo derivado perdeu header/notice | não conformidade de redistribuição | inventário de similaridade/histórico + notice central + revisão manual | Aberto |
 | `session_state` grande | origem longa + envelope v1 | callback/URL cresce | limites/testes e formato Base64Url compacto | Aberto |
 | Planos concorrentes recriam helpers | Session Management inicia antes do plano OAuth 2.1 | conflito em `ConsentDecorator`/respostas | gate DF21 satisfeito antes da Fase 1 | Fechado |
-| Callback captura scoped/realm | manager ou nome do cookie é fechado no delegate de named options | captive dependency ou realm congelado | DF23 + lifecycle multi-realm | Aberto |
+| Callback captura scoped/realm | manager ou nome do cookie é fechado no delegate de named options | captive dependency ou realm congelado | DF23 + lifecycle/browser multi-realm + guarda sobre dependências e closure do callback | Fechado |
 | Erro enumerado perde `session_state` | cálculo fica somente no `AuthorizeHandler` | Authentication Error Response incompleta | factory delimitada DF24 + testes por caller | Aberto |
 | Prompt silencioso cai em UI/código genérico | classificação continua espalhada | loop/interoperabilidade incorreta | matriz DF25 + rede sobre produtores posteriores + testes HTTP/customização terminal | Mitigado |
-| Filtro executa zero testes | classe planejada não é criada ou nome diverge | fase fecha em falso verde | DF22 + nomes exatos | Aberto |
+| Filtro executa zero testes | classe planejada não é criada ou nome diverge | fase fecha em falso verde | DF22 + nomes exatos; todos os cinco comandos da Fase 6 selecionam testes | Fechado |
 | Factory amplia silenciosamente o transporte do authorize | terminadores fora de DF24 passam a usar redirect | mudança de contrato fora do escopo | callers enumerados + regressão dos terminadores excluídos | Aberto |
 
 ---
