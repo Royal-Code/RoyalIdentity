@@ -40,7 +40,7 @@ public class SessionStateFormatTests
     }
 
     [Fact]
-    public void BrowserAlgorithmVector_MatchesTheServerEnvelopeHashWithUtf8Fields()
+    public void IndependentCanonicalEncodingVector_MatchesTheServerEnvelopeHashWithUtf8Fields()
     {
         const string clientId = "cliente-ç";
         const string origin = "https://xn--exmple-xta.test:8443";
@@ -50,8 +50,8 @@ public class SessionStateFormatTests
 
         Assert.True(SessionStateFormat.TryParse(envelope, out var parsed));
 
-        var browserReferenceHash = ComputeBrowserReferenceHash(clientId, origin, userAgentState, salt);
-        Assert.Equal(browserReferenceHash, parsed!.Hash);
+        var referenceHash = ComputeIndependentReferenceHash(clientId, origin, userAgentState, salt);
+        Assert.Equal(referenceHash, parsed!.Hash);
     }
 
     [Fact]
@@ -295,7 +295,7 @@ public class SessionStateFormatTests
         return new Realm("realm-id", "realm.example", path, "Realm", false, new RealmOptions(serverOptions));
     }
 
-    private static byte[] ComputeBrowserReferenceHash(
+    private static byte[] ComputeIndependentReferenceHash(
         string clientId,
         string origin,
         string userAgentState,

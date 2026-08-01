@@ -952,6 +952,7 @@ o CSP permite somente o script com nonce; endpoint continua frameable; origem di
 ```powershell
 dotnet test Tests.Identity --filter "FullyQualifiedName~SessionStateFormatTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests"
+./scripts/Test-CheckSessionJavaScript.ps1 # opt-in; requer Node.js 20+
 ```
 
 ### Resultado da Fase 5
@@ -970,8 +971,11 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointT
   estado diferente e resulta em `changed`.
 - O listener só existe dentro de iframe, ignora fontes diferentes de `window.parent`, exige origem incorporada
   exatamente igual a `event.origin` e responde exclusivamente pelo mesmo `event.source`/`event.origin`, sem
-  target `*`. Uma sonda independente com Node 22 sobre o script renderizado confirmou
-  `unchanged,changed,error`; o aceite em Chromium real permanece corretamente na Fase 6.
+  target `*`. `scripts/Test-CheckSessionJavaScript.ps1` é um probe opt-in persistente: o emissor .NET fora da
+  solution usa `SessionStateFormat` e `CheckSessionResult` compilados, e Node 20+ executa o script renderizado com
+  Web Crypto real. A matriz prova `unchanged`, `changed`, `error` e ausência de resposta para source divergente;
+  client id divergente resulta deliberadamente em `changed`, pois o iframe não possui catálogo/autorização de
+  clients e DF11 exige apenas que ele nunca resulte em `unchanged`. O aceite em Chromium real permanece na Fase 6.
 - A resposta agora fixa `no-store, no-cache, max-age=0`, `Pragma: no-cache`, `Referrer-Policy: no-referrer`,
   `X-Content-Type-Options: nosniff` e `text/html; charset=UTF-8`. A CSP exata é
   `default-src 'none'; script-src 'nonce-…'`, preservando a opção realm-scoped do header depreciado, sem
@@ -1090,6 +1094,7 @@ Select-String -Path ../README.md -Pattern "AGPL|Apache|THIRD-PARTY"
 rg "CheckSessionCookieDomain|CheckSessionCookieSameSiteMode|LastCheckSessionCookieName|AuthorizationCode.*SessionState|SessionState = code\.SessionState|payload\.SessionState" RoyalIdentity RoyalIdentity.Storage.EntityFramework Tests.Storage
 dotnet build RoyalIdentity.sln
 dotnet test RoyalIdentity.sln
+./scripts/Test-CheckSessionJavaScript.ps1
 ./scripts/Test-CheckSessionBrowser.ps1
 ```
 
@@ -1155,6 +1160,7 @@ dotnet test RoyalIdentity.sln
   test project.
 - `dotnet build RoyalIdentity.sln` passa.
 - `dotnet test RoyalIdentity.sln` passa sem browser instalado.
+- `./scripts/Test-CheckSessionJavaScript.ps1` passa quando o probe Node opt-in é solicitado.
 - `./scripts/Test-CheckSessionBrowser.ps1` passa.
 
 ---
@@ -1168,7 +1174,7 @@ dotnet test RoyalIdentity.sln
 | Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host; confiança permanece configurada pelo host | Mitigado |
 | Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única/validação entregues na Fase 1; lifecycle multi-realm na Fase 2 | Mitigado |
 | Estado vaza em token/log | principal/telemetria copia propriedade/cookie | correlação ou exposição | propriedade protegida, não claim; filtros e testes de log/token | Aberto |
-| Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6, vetor UTF-8 independente e sonda JS entregues; Chromium real na Fase 6 | Mitigado |
+| Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6, vetor UTF-8 independente e probe Node opt-in reproduzível; Chromium real na Fase 6 | Mitigado |
 | Payload v1 permanece em banco dev | serializer sobe para v2 com artefato antigo | falha fechada temporária | breaking aceito; codes efêmeros; reprovisionar seeds/config | Aceito |
 | Playwright entra na suíte default | projeto baixa/exige Chromium | CI/local deixa de ser autocontido | projeto/script opt-in + arquitetura test | Aberto |
 | Auditoria de licença incompleta | arquivo derivado perdeu header/notice | não conformidade de redistribuição | inventário de similaridade/histórico + notice central + revisão manual | Aberto |
