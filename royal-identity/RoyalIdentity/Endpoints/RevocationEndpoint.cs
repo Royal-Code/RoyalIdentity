@@ -23,7 +23,7 @@ public class RevocationEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP method");
 
-            return new(EndpointErrors.MethodNotAllowed(httpContext));
+            return new(EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Post));
         }
 
         if (!httpContext.Request.HasApplicationFormContentType())
@@ -33,8 +33,20 @@ public class RevocationEndpoint : IEndpointHandler
             return new(EndpointErrors.UnsupportedMediaType(httpContext));
         }
 
-        var items = new ContextItems();
         var parameters = httpContext.Request.Form.AsNameValueCollection();
+
+        if (!DirectRequestPreflight.TryEvaluate(
+                httpContext,
+                parameters,
+                DirectRequestPreflight.RevocationRequestParameters,
+                logger,
+                out var clientAuthentication,
+                out var preflightFailure))
+        {
+            return ValueTask.FromResult(preflightFailure);
+        }
+
+        var items = ContextItems.From(clientAuthentication);
         var context = new RevocationContext(httpContext, parameters, items);
 
         return ValueTask.FromResult(new EndpointCreationResult(context));

@@ -32,7 +32,7 @@ public class TokenEndpoint : IEndpointHandler
         {
             logger.LogWarning("Invalid HTTP request for token endpoint, invalid method");
 
-            return EndpointErrors.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Post);
         }
 
         // validate HTTP content type
@@ -46,6 +46,19 @@ public class TokenEndpoint : IEndpointHandler
         // read parameters
         var form = await httpContext.Request.ReadFormAsync();
         var parameters = form.AsNameValueCollection();
+
+        // Cardinality and the client authentication mechanism are decided here, before any parameter is read as
+        // a scalar and before any evaluator can consult a store or burn a replay handle (DF7/DF8).
+        if (!DirectRequestPreflight.TryEvaluate(
+                httpContext,
+                parameters,
+                DirectRequestPreflight.TokenRequestParameters,
+                logger,
+                out var clientAuthentication,
+                out var preflightFailure))
+        {
+            return preflightFailure;
+        }
 
         // validate request
         if (!parameters.TryGet(Oidc.Token.Request.GrantType, out var grantType))
@@ -103,6 +116,9 @@ public class TokenEndpoint : IEndpointHandler
 
             return EndpointErrorResults.BadRequest(httpContext, Oidc.Token.Errors.UnsupportedGrantType, "Grant type not supported");
         }
+
+        // Set after the switch so an extension grant, which builds its own context and items, is covered too.
+        context.Items.Set(clientAuthentication);
 
         context.Load(logger);
 

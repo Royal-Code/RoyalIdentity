@@ -24,6 +24,14 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
     /// </summary>
     public override string AuthenticationMethod => string.Empty;
 
+    /// <summary>
+    /// A connection certificate authenticates the client only when the request presented no credential of its
+    /// own. The precedence used to live in this class, as a check for an assertion, a secret or an
+    /// Authorization header; it now belongs to the preflight, which refuses a request presenting more than one
+    /// mechanism and tells the checker which evaluators may run.
+    /// </summary>
+    public override ClientAuthenticationSource Source => ClientAuthenticationSource.None;
+
     protected override EvaluatedCredential InvalidCredentials => X509InvalidCredentials;
 
     public override async Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct)
@@ -34,15 +42,6 @@ public class TlsClientAuthSecretEvaluator : SecretEvaluatorBase
         if (clientCertificate is null)
         {
             logger.LogDebug("Client certificate not present");
-            return null;
-        }
-
-        // when there is a secret, assertion, or authorization header, the client will not be evaluated
-        if (context.Raw.TryGet(Oidc.Token.Request.ClientAssertion, out _) ||
-            context.Raw.TryGet(Oidc.Token.Request.ClientSecret, out _) ||
-            context.HttpContext.Request.Headers.Authorization.FirstOrDefault().IsPresent())
-        {
-            logger.LogDebug("Client assertion, or secret, or authorization header found in post body, aborting client evaluation");
             return null;
         }
 

@@ -34,6 +34,8 @@ public class PrivateKeyJwtSecretEvaluator : SecretEvaluatorBase
 
     public override string AuthenticationMethod => Oidc.Endpoint.AuthMethods.PrivateKeyJwt;
 
+    public override ClientAuthenticationSource Source => ClientAuthenticationSource.ClientAssertion;
+
     public override async Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct)
     {
         logger.LogDebug("Start parsing and evaluate PrivateKeyJwt Authentication secret");

@@ -17,20 +17,17 @@ public class NoSecretEvaluator : SecretEvaluatorBase
 
     public override string AuthenticationMethod => string.Empty;
 
+    /// <summary>
+    /// Only reached when the request presented no credential at all; the preflight guarantees it, so the check
+    /// for an assertion, a secret or an Authorization header that used to live here would now be dead code.
+    /// </summary>
+    public override ClientAuthenticationSource Source => ClientAuthenticationSource.None;
+
     protected override EvaluatedCredential InvalidCredentials => throw new InvalidOperationException("No secret evaluator should not be used");
 
     public override async Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct)
     {
         logger.LogDebug("Start parsing and evaluate No secret");
-
-        // when there is a secret, assertion, or authorization header, the client will not be evaluated
-        if (context.Raw.TryGet(Oidc.Token.Request.ClientAssertion, out _) ||
-            context.Raw.TryGet(Oidc.Token.Request.ClientSecret, out _) ||
-            context.HttpContext.Request.Headers.Authorization.FirstOrDefault().IsPresent())
-        {
-            logger.LogDebug("Client assertion, or secret, or authorization header found in post body, aborting client evaluation");
-            return null;
-        }
 
         var hasClientId = context.Raw.TryGet(Oidc.Token.Request.ClientId, out var clientId);
         if (!hasClientId)

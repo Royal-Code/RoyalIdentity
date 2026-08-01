@@ -22,7 +22,7 @@ public class CheckSessionEndpoint : IEndpointHandler
         {
             logger.LogDebug("Invalid HTTP method for check session endpoint");
 
-            return ValueTask.FromResult(EndpointErrors.MethodNotAllowed(httpContext));
+            return ValueTask.FromResult(EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Get));
         }
         else
         {

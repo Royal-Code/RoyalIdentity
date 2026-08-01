@@ -22,6 +22,8 @@ public class PostBodySecretEvaluator : SecretEvaluatorBase
 
     public override string AuthenticationMethod => Oidc.Endpoint.AuthMethods.PostBody;
 
+    public override ClientAuthenticationSource Source => ClientAuthenticationSource.PostBody;
+
     public override async Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct)
     {
         logger.LogDebug("Start parsing and evaluate PostBody Authentication secret");

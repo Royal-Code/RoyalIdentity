@@ -22,7 +22,7 @@ public class ProtectedResourceMetadataEndpoint : IEndpointHandler
         if (!HttpMethods.IsGet(httpContext.Request.Method))
         {
             logger.LogWarning("Protected resource metadata endpoint only supports GET requests");
-            return ValueTask.FromResult(EndpointErrors.MethodNotAllowed(httpContext));
+            return ValueTask.FromResult(EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Get));
         }
 
         var realmOptions = httpContext.GetRealmOptions();

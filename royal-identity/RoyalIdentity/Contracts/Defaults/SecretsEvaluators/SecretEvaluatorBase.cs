@@ -27,6 +27,8 @@ public abstract class SecretEvaluatorBase : IClientSecretEvaluator
 
     public abstract string AuthenticationMethod { get; }
 
+    public abstract ClientAuthenticationSource Source { get; }
+
     public abstract Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct);
 
     protected async Task<EvaluatedClient?> EvaluateAsync(

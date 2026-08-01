@@ -1,15 +1,15 @@
 # Plan: Conformidade das respostas de erro do token endpoint com OAuth 2.1 (`plan-oauth21-token-error-responses`)
 
-## Status: EM EXECUÇÃO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; Fase 1 concluída
+## Status: EM EXECUÇÃO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; Fases 1-2 concluídas
 
 ## Progresso
 
-`█░░░` **25%** - 1 de 4 fases
+`██░░` **50%** - 2 de 4 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato explícito de erro e asserções exatas | Concluida |
-| Fase 2 - Forma da requisição e autenticação do client | Pendente |
+| Fase 2 - Forma da requisição e autenticação do client | Concluida |
 | Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Pendente |
 | Fase 4 - Auditoria transversal, regressão e fechamento | Pendente |
 
@@ -644,30 +644,36 @@ produzir o status/header correto quando a autenticação via `Authorization` fal
 
 **Tarefas:**
 
-- [ ] Definir a lista de parâmetros core não repetíveis e a exceção multivalorada `resource`.
-- [ ] Validar repetição antes de `TryGet`/indexers/`Load`, reutilizando a cardinalidade que
+- [x] Definir a lista de parâmetros core não repetíveis e a exceção multivalorada `resource`.
+- [x] Validar repetição antes de `TryGet`/indexers/`Load`, reutilizando a cardinalidade que
   `AsNameValueCollection` já preserva ou operando diretamente no form.
-- [ ] Preservar todos os valores de `resource` e deixar parâmetros desconhecidos para validação pelo extension
+- [x] Preservar todos os valores de `resource` e deixar parâmetros desconhecidos para validação pelo extension
   grant proprietário.
-- [ ] Detectar Basic, post secret, client assertion e demais mecanismos suportados sem validar credenciais.
-- [ ] Rejeitar múltiplas credenciais/mecanismos com `invalid_request` antes de chamar evaluators.
-- [ ] Centralizar no preflight a precedência hoje duplicada em `TlsClientAuthSecretEvaluator`, removendo ou
+- [x] Detectar Basic, post secret, client assertion e demais mecanismos suportados sem validar credenciais.
+- [x] Rejeitar múltiplas credenciais/mecanismos com `invalid_request` antes de chamar evaluators.
+- [x] Centralizar no preflight a precedência hoje duplicada em `TlsClientAuthSecretEvaluator`, removendo ou
   tornando inalcançável a regra local divergente.
-- [ ] Tratar pares incompletos de client assertion como `invalid_request` e tipo/método completo não suportado
+- [x] Tratar pares incompletos de client assertion como `invalid_request` e tipo/método completo não suportado
   como `invalid_client`.
-- [ ] Tratar assertion selecionada, mas não parseável, sem `sub`, de client desconhecido ou criptograficamente
+- [x] Tratar assertion selecionada, mas não parseável, sem `sub`, de client desconhecido ou criptograficamente
   inválida como `invalid_client`, com descrição indistinguível conforme DF15.
-- [ ] Fechar o oráculo de existência de client achado na Fase 1: `EvaluateClient` responde hoje
+- [x] Fechar o oráculo de existência de client achado na Fase 1: `EvaluateClient` responde hoje
   `"No client identified"` para client desconhecido e `"Client secret validation failed"` para segredo errado,
   com o mesmo código e status. Unificar a descrição e apertar
   `TokenErrorTests.Post_WithUnknownClient_And_WithWrongSecret_Must_ShareCodeAndStatus` para igualdade de
   `ProtocolError.Answer`.
-- [ ] Garantir que request rejeitado não consulta client store, não valida JWT e não grava replay handle.
-- [ ] Produzir `invalid_client` 401 e `WWW-Authenticate: Basic...` para tentativa Basic inválida/malformada.
-- [ ] Manter `invalid_client` 400 para falha de autenticação no body, salvo requisito específico.
-- [ ] Alinhar 405 com `Allow: POST` e 415 sem códigos OAuth inventados.
-- [ ] Adicionar testes de parâmetros repetidos, resource repetido, Basic+post, Basic+assertion,
+- [x] Garantir que request rejeitado não consulta client store, não valida JWT e não grava replay handle.
+- [x] Produzir `invalid_client` 401 e `WWW-Authenticate: Basic...` para tentativa Basic inválida/malformada.
+- [x] Manter `invalid_client` 400 para falha de autenticação no body, salvo requisito específico.
+- [x] Alinhar 405 com `Allow: POST` e 415 sem códigos OAuth inventados.
+- [x] Adicionar testes de parâmetros repetidos, resource repetido, Basic+post, Basic+assertion,
   post+assertion, assertion incompleta e ausência de autenticação obrigatória.
+- [x] Classificar **qualquer** header `Authorization` presente como tentativa in-band, com cardinalidade
+  própria, para que um esquema não suportado nunca vire `None` e caia em certificado/no-secret.
+- [x] Repetir as regressões negativas de forma e autenticação no endpoint de revocation, que compartilha o
+  preflight, e incluir `RevocationTests` no comando da fase.
+- [x] Cobrir o contrato HTTP de DF12 em todos os endpoints alterados, não só no token: valor de `Allow`,
+  `application/problem+json` e ausência do campo `error` em 405/415/404.
 
 **Critérios de aceite:** nenhum request com dois mecanismos chega a um evaluator; a regra de precedência não
 permanece duplicada no TLS evaluator; `resource` repetido continua funcional; parâmetros core repetidos e par de
@@ -678,12 +684,118 @@ consomem `jti`; método/media type retornam 405 com `Allow: POST`/415.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~PrivateKeyJwt|FullyQualifiedName~ClientToken"
+dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~PrivateKeyJwt|FullyQualifiedName~ClientToken|FullyQualifiedName~RevocationTests|FullyQualifiedName~HttpFailureTests"
 ```
+
+> `RevocationTests` e `HttpFailureTests` entraram no filtro nesta fase. Revocation é o segundo endpoint cujo
+> pipeline chega a `EvaluateClient` e passou a depender estruturalmente do preflight; `HttpFailureTests` cobre o
+> contrato HTTP de DF12 em todos os endpoints, não só no token.
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída em 2026-07-31**, com uma segunda rodada no mesmo dia respondendo a uma revisão externa da
+implementação. Os três achados procederam; o primeiro era um defeito funcional real, reproduzido antes de
+qualquer correção. Build e suíte completa verdes: **1334 aprovados, 50 ignorados** (opt-in PostgreSQL/Aspire),
+**0 falhas**. Comando da fase: 118 aprovados, 2 ignorados. `git diff --check` limpo.
+
+**Preflight.** `RoyalIdentity/Endpoints/DirectRequestPreflight.cs` roda sobre a `NameValueCollection` original,
+antes de qualquer leitura escalar, da criação do context e de qualquer efeito. Ele decide três coisas:
+cardinalidade, forma do par de assertion e qual mecanismo de autenticação a requisição apresentou. Está ligado
+em `TokenEndpoint` e `RevocationEndpoint` — os dois únicos endpoints cujos pipelines chegam a `EvaluateClient`
+(`AuthorizationCodeContext`, `RefreshTokenContext`, `ClientCredentialsContext`, `RevocationContext`). No
+`TokenEndpoint` o resultado é gravado **depois** do switch de grant, para cobrir também o context que um
+extension grant constrói por conta própria.
+
+Dez parâmetros core são single-valued; `resource` fica deliberadamente de fora e continua multivalorado
+conforme RFC 8707 §2.1. Presença é a chave existir, não o valor ser útil — `client_secret=` vazio é um cliente
+tentando autenticar com segredo, que é como os evaluators sempre leram.
+
+**Precedência.** Esta é a mudança estrutural da fase. `DefaultClientSecretChecker` deixou de percorrer todos os
+evaluators e ficar com o primeiro que achou algo: agora consulta apenas os que declaram a fonte detectada
+(`IClientSecretEvaluator.Source`). Com isso as regras locais de `TlsClientAuthSecretEvaluator` e
+`NoSecretEvaluator` — cada uma verificando assertion/secret/header por conta própria — foram **removidas**, não
+apenas contornadas: elas passaram a ser inalcançáveis, e manter duas fontes de verdade sobre precedência era
+exatamente o defeito.
+
+O certificado de conexão **não** conta como mecanismo apresentado. Ele é propriedade da conexão, não credencial
+da requisição, e uma implantação pode terminar mTLS por motivos alheios à autenticação de client; contá-lo
+transformaria toda conexão com certificado em segundo mecanismo e recusaria requisições Basic legítimas. Ele
+decide somente quando nada foi apresentado in-band (`Source.None`, onde TLS e NoSecret são consultados na ordem
+de registro).
+
+**Correção da primeira rodada (achado externo, Alta).** A detecção do header foi escrita com prefixo — só
+`Basic ` contava — e isso reabria pela porta dos fundos exatamente o fallback que a fase existe para fechar:
+`Authorization: Bearer x`, `Authorization: Basic` sem credenciais, `Negotiate`, `Digest` e qualquer outro
+esquema caíam em `Source.None` e chegavam ao certificado da conexão ou ao `NoSecretEvaluator` — que, para um
+client público, **autenticava**. Pior que o estado anterior à fase, porque as guardas locais dos dois
+evaluators, que barravam qualquer header presente, tinham acabado de ser removidas. O defeito foi reproduzido
+antes de corrigido: os quatro esquemas falharam o teste novo, e o controle com client público sem header
+passou.
+
+A fonte passou a ser `AuthorizationHeader`, decidida por **presença**, não por esquema: um header que o
+endpoint não sabe usar continua sendo um client tentando autenticar, e classificá-lo como "nada apresentado" é
+que era o erro. `BasicSecretEvaluator` responde por todo o header e devolve `null` para qualquer esquema que
+não seja Basic, de modo que a recusa sai por um caminho único — `EvaluateClient` com 401 e challenge. Mais de
+um header `Authorization` é `invalid_request`, pela mesma razão de cardinalidade dos parâmetros: escolher um
+entre vários deixaria a credencial que autentica diferente da que foi inspecionada.
+
+O ganho concreto: header Basic malformado, esquema não suportado e header duplicado agora são **recusados**, em
+vez de caírem silenciosamente no certificado ou no caminho sem segredo.
+
+**Anti-oracle.** `EvaluateClient` responde `"Client authentication failed"` para os quatro caminhos: client
+desconhecido, segredo errado, client que exige segredo e não mandou nenhum, client desabilitado. O oráculo de
+existência achado na Fase 1 está fechado, e três testes provam a convergência — desconhecido versus segredo
+errado, sem credencial versus segredo errado, e header versus body (onde só o status difere).
+
+**DF6.** Falha de autenticação tentada via `Authorization` responde 401 com
+`WWW-Authenticate: Basic realm="{realm}"`; pelo body continua 400. O challenge carrega apenas o esquema e o
+espaço de proteção, nunca nada que a requisição forneceu.
+
+**DF12.** As três falhas de nível HTTP deixaram de fingir taxonomia OAuth. 405, 415 e 404 agora respondem
+`application/problem+json` via `HttpFailureResult`, e os códigos inventados `method_not_allowed`,
+`Invalid_content_type` e `not_found` desapareceram — não foram renomeados. O 405 passou a incluir `Allow`, com
+os métodos declarados por cada endpoint (`POST` no token e no revocation, `GET` na descoberta/JWKS/check
+session/authorize callback, `GET, POST` no UserInfo/end session/authorize).
+
+Isto quebrou dois testes do guard da Fase 1, que estavam fixados nos códigos inventados por reflexão sobre
+`EndpointErrors` — a falha certa, no lugar certo. O guard passou a tratá-los como **códigos aposentados**: duas
+travas novas asseveram que `EndpointErrors` não declara constante de código nenhuma e que os três literais não
+reaparecem nem no core nem em Pipelines. `ProtocolErrorBoundaryTests` foi de 8 para 10.
+
+**Cobertura das outras duas superfícies (achados externos, Médias).** As regressões negativas existiam só no
+token endpoint, embora a fase tivesse alterado dez endpoints e tornado revocation estruturalmente dependente do
+preflight.
+
+`RevocationTests` ganhou nove casos — parâmetro repetido em teoria de quatro, dois mecanismos, par de assertion
+incompleto, Basic inválido com 401 e challenge, ausência do segredo exigido, e o header inutilizável nas duas
+formas. Revocation é onde a falha do achado 1 mordia mais fundo: `demo_client` é público, então um header
+`Authorization` classificado como "nada apresentado" revogava com sucesso. RFC 7009 §2.2 torna token
+desconhecido um sucesso, o que deixa "aceito" e "recusado" nitidamente distinguíveis nesse endpoint.
+
+`Tests.Integration/Endpoints/HttpFailureTests.cs` cobre o contrato de DF12 em todos os endpoints roteados: o
+valor exato de `Allow` por endpoint (`POST`, `GET`, `GET, POST`), `application/problem+json` e ausência dos
+campos `error`/`error_description` em 405, 415 e 404. O guard arquitetural prova que os pseudocódigos não
+voltaram; esta suíte prova o contrato que os substituiu.
+
+Escrever essa suíte revelou que **`CheckSessionEndpoint` não tem rota**: `MapOpenIdConnectProviderEndpoints`
+não o mapeia, e um método não suportado responde 404 por ausência de rota, não 405. Não é defeito desta fase —
+mapeá-lo pertence a [plan-oidc-session-management.md](plan-oidc-session-management.md) — e a exclusão está
+anotada na própria tabela de casos para não parecer esquecimento.
+
+**Testes.** `TokenErrorTests` foi de 19 para 49 casos: dez parâmetros core repetidos em teoria, `resource`
+repetido que precisa continuar funcionando, os três pares de mecanismos simultâneos, par de assertion incompleto
+nos dois sentidos, tipo de assertion não suportado, Basic inválido e Basic malformado com challenge, secret de
+body sem challenge, as três convergências anti-oracle, os quatro esquemas de header inutilizável, header
+duplicado, o controle provando que client público sem header continua funcionando, `Allow` no 405 e a prova de
+que 405/415 não têm campo
+`error`. Em `PrivateKeyJwtReplayProtectionTests`, um teste novo apresenta a mesma assertion primeiro junto de um
+`client_secret` (malformada) e depois sozinha: a segunda tem de ser aceita, o que só acontece se o `jti` não
+tiver sido gravado pela primeira. A asserção por substring do arquivo virou `AssertErrorAsync`.
+
+**Ponto de atenção registrado.** Um erro de composição — um pipeline que autentica client sem que o endpoint
+rode o preflight — lança `InvalidOperationException` em vez de assumir um mecanismo. Assumir reintroduziria
+exatamente a adivinhação que o preflight existe para eliminar, e hoje os quatro contexts afetados nascem dos
+dois endpoints cobertos.
 
 ---
 
@@ -859,12 +971,12 @@ git diff --check
 | Draft muda durante execução | nova versão altera §3.2.4/PKCE | implementação nasce desatualizada | gate DF1 no início da Fase 4 | Aberto |
 | Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Mitigado na Fase 1 — `ProtocolErrorBoundaryTests` varre o fonte de Pipelines por 17 códigos protocolares |
 | `EndpointErrorResults` preserva códigos hardcoded | factory não migra para o core e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | DF19 + guard da Fase 1 | Fechado na Fase 1 — factories em `RoyalIdentity/Endpoints/EndpointErrors.cs`; o quinto ponto não previsto (`ProblemsExtensions`) virou parâmetro |
-| Detecção múltipla ocorre após evaluator | `jti` é registrado antes do `invalid_request` | retry legítimo parece replay | preflight DF7 + teste negativo do store | Aberto |
-| Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Aberto |
-| Validação de duplicidade bloqueia RFC 8707 | regra genérica rejeita `resource` repetido | quebra de resource indicators | allowlist DF8 + regressão multiresource | Aberto |
+| Detecção múltipla ocorre após evaluator | `jti` é registrado antes do `invalid_request` | retry legítimo parece replay | preflight DF7 + teste negativo do store | Fechado na Fase 2 — `AMalformedRequestCarryingAnAssertion_RegistersNoHandle` apresenta a mesma assertion malformada e depois sozinha |
+| Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Mitigado na Fase 2 — o certificado não é fonte apresentada; só decide em `Source.None` |
+| Validação de duplicidade bloqueia RFC 8707 | regra genérica rejeita `resource` repetido | quebra de resource indicators | allowlist DF8 + regressão multiresource | Fechado na Fase 2 — `resource` fora da lista single-valued, com regressão própria e a multiresource de `ClientTokenTests` verde |
 | Enum fecha erros | tipo aceita somente seis valores | extension grants/RFC 8707 quebram | strings + teste de extensão DF3 | Aberto |
 | Correção revela detalhes de code | descrições divergem por causa | oracle de existência/binding | preservar igualdade Operational + DF13 | Aberto |
-| Correção revela existência do client | assertion inválida e client desconhecido recebem códigos/descrições distintos | oracle de client e violação RFC 7523 | DF15 + matriz indistinguível | Aberto |
+| Correção revela existência do client | assertion inválida e client desconhecido recebem códigos/descrições distintos | oracle de client e violação RFC 7523 | DF15 + matriz indistinguível | Fechado na Fase 2 — descrição única em `EvaluateClient` e três testes de convergência |
 | Correção do validator vaza para além do campo `error` | edição do `ResourcesValidator` altera condição, ordem ou transporte no authorize | regressão OIDC fora do escopo declarado | DF20 limita a mudança ao campo `error` + regressão `CodeAuthorize` na Fase 1 | Mitigado na Fase 1 — suíte completa verde e as duas regressões de authorize passam |
 | Método PKCE desconhecido some da observabilidade | `invalid_grant` genérico é emitido sem log do método recusado | corrupção de dado ou bug de seed passa despercebido | DF18 exige log do método + teste que prova descrição indistinguível | Aberto |
 | Recusa de dado do client vira 5xx | branch novo lança em vez de responder `invalid_grant` | erro de protocolo aparece como indisponibilidade e polui alerta | DF18 + invariante 10 + teste de status exato | Aberto |

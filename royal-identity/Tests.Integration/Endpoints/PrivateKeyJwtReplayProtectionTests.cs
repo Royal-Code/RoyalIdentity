@@ -218,6 +218,34 @@ public class PrivateKeyJwtReplayProtectionTests : IClassFixture<LogCapturingAppF
         }
     }
 
+    // DF7 / invariant 5: a request refused for its shape must not have reached the evaluator at all, or a
+    // malformed request would burn the jti of the assertion it carried and deny the client's next legitimate
+    // attempt. Here the same assertion is first sent alongside a client_secret — two mechanisms, which is
+    // malformed — and then on its own, where it must still be accepted.
+    [Fact]
+    public async Task AMalformedRequestCarryingAnAssertion_RegistersNoHandle()
+    {
+        var http = factory.CreateClient();
+        var clientId = await SaveClientAsync(factory.Handles.Demo, "pkj_preflight_client");
+        var tokenEndpoint = await GetTokenEndpointAsync(http, factory.Handles.Demo);
+        var assertion = CreateAssertion(clientId, tokenEndpoint, "pkj-preflight-jti");
+
+        var malformed = await http.PostAsync(tokenEndpoint, new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "client_credentials",
+                ["client_assertion_type"] = Oidc.ClientAssertionTypes.JwtBearer,
+                ["client_assertion"] = assertion,
+                ["client_secret"] = "a-second-mechanism",
+                ["scope"] = "api",
+            }));
+
+        var legitimate = await PresentAsync(http, tokenEndpoint, assertion);
+
+        await malformed.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
+        Assert.Equal(HttpStatusCode.OK, legitimate.StatusCode);
+    }
+
     // Invariant 5: the refusal must be diagnosable without the credential itself ending up in the log.
     [Fact]
     public async Task RefusingAReplay_LeaksNeitherTheAssertionNorTheIdentifier()
@@ -279,10 +307,8 @@ public class PrivateKeyJwtReplayProtectionTests : IClassFixture<LogCapturingAppF
 
     private static async Task AssertRefusedAsCredentialAsync(HttpResponseMessage response)
     {
-        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("invalid_client", body, StringComparison.Ordinal);
+        // The assertion is not presented through the Authorization header, so the refusal is a plain 400.
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidClient);
     }
 
     public void Dispose()

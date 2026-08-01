@@ -25,7 +25,7 @@ public class DiscoveryEndpoint : IEndpointHandler
             logger.LogWarning("Discovery endpoint only supports GET requests");
 
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return EndpointErrors.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Get);
         }
 
         logger.LogDebug("Start discovery request");

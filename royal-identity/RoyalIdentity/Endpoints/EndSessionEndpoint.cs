@@ -40,7 +40,7 @@ public class EndSessionEndpoint : IEndpointHandler
         else
         {
             logger.LogWarning("Invalid HTTP method for end session endpoint.");
-            return EndpointErrors.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Get, HttpMethods.Post);
         }
 
         var items = new ContextItems();

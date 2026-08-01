@@ -23,6 +23,13 @@ public class BasicSecretEvaluator : SecretEvaluatorBase
 
     public override string AuthenticationMethod => Oidc.Endpoint.AuthMethods.BasicAuthentication;
 
+    /// <summary>
+    /// This evaluator answers for the whole <c>Authorization</c> header, not only for well formed Basic
+    /// credentials. A header naming another scheme, or Basic credentials it cannot decode, returns no
+    /// evaluation and the request is refused — never handed to another mechanism.
+    /// </summary>
+    public override ClientAuthenticationSource Source => ClientAuthenticationSource.AuthorizationHeader;
+
     public override async Task<EvaluatedClient?> EvaluateAsync(IEndpointContextBase context, CancellationToken ct)
     {
         logger.LogDebug("Start parsing and evaluate Basic Authentication secret");

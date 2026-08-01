@@ -29,6 +29,21 @@ public class ProtocolErrorBoundaryTests
         RegexOptions.Compiled);
 
     /// <summary>
+    /// Codes that never existed in any RFC: they were invented so that HTTP-level failures would look like
+    /// protocol errors. DF12 removed them, and they must not come back anywhere.
+    /// </summary>
+    /// <remarks>
+    /// Declared before <see cref="ProtocolErrorCodes"/> on purpose: static field initializers run in
+    /// declaration order, and the collector below reads this one.
+    /// </remarks>
+    private static readonly string[] RetiredPseudoCodes =
+    [
+        "method_not_allowed",
+        "invalid_content_type",
+        "not_found",
+    ];
+
+    /// <summary>
     /// Every protocol error code the product knows, read from where it is defined instead of from a hand
     /// written list. A list maintained by hand drifts: it silently stops covering codes added to
     /// <c>Constants</c> later, and an entry that does not exactly match a literal (<c>content_type</c> against
@@ -44,11 +59,8 @@ public class ProtocolErrorBoundaryTests
         var constants = Core.GetType("RoyalIdentity.Options.Constants", throwOnError: true)!;
         CollectConstStrings(constants, insideErrorsGroup: false, codes);
 
-        // The HTTP-level codes the core selects for failures that happen before a protocol request exists.
-        // They are private to EndpointErrors, which is exactly why they are read rather than retyped here.
-        var endpointErrors = Core.GetType("RoyalIdentity.Endpoints.EndpointErrors", throwOnError: true)!;
-        foreach (var value in ConstStringsOf(endpointErrors))
-            codes.Add(value);
+        foreach (var retired in RetiredPseudoCodes)
+            codes.Add(retired);
 
         return codes;
     }
@@ -132,9 +144,6 @@ public class ProtocolErrorBoundaryTests
             "temporarily_unavailable",
             "invalid_request_uri",
             "request_not_supported",
-            "method_not_allowed",
-            "invalid_content_type",
-            "not_found",
         ];
 
         foreach (var code in mustBeCovered)
@@ -253,5 +262,33 @@ public class ProtocolErrorBoundaryTests
         Assert.Contains("MethodNotAllowed", declared);
         Assert.Contains("UnsupportedMediaType", declared);
         Assert.Contains("NotFound", declared);
+    }
+
+    [Fact]
+    public void EndpointErrors_DeclaresNoErrorCode()
+    {
+        // DF12: 405, 415 and 404 are HTTP conditions, not members of the RFC 6749 §5.2 taxonomy. They used to
+        // answer with an OAuth-shaped body carrying method_not_allowed, Invalid_content_type and not_found —
+        // codes no RFC defines. They now answer application/problem+json, and no code may come back here.
+        var endpointErrors = Core.GetType("RoyalIdentity.Endpoints.EndpointErrors", throwOnError: true)!;
+
+        Assert.Empty(ConstStringsOf(endpointErrors));
+    }
+
+    [Fact]
+    public void RetiredPseudoCodes_DoNotComeBack()
+    {
+        var offenders = new List<string>();
+
+        foreach (var project in new[] { "RoyalIdentity", "RoyalIdentity.Pipelines" })
+        {
+            foreach (var (path, text) in SourceFilesOf(project))
+            {
+                foreach (var code in FindProtocolCodeLiterals(text, RetiredPseudoCodes))
+                    offenders.Add($"{project}/{path}: \"{code}\"");
+            }
+        }
+
+        Assert.Empty(offenders);
     }
 }

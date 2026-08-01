@@ -39,7 +39,7 @@ public class AuthorizeEndpoint : IEndpointHandler
         else
         {
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return new(EndpointErrors.MethodNotAllowed(httpContext));
+            return new(EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Get, HttpMethods.Post));
         }
 
         var context = new AuthorizeContext(httpContext, values, httpContext.User);

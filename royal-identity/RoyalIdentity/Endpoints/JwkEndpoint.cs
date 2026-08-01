@@ -27,7 +27,7 @@ public class JwkEndpoint : IEndpointHandler
             logger.LogWarning("JWK Discovery endpoint only supports GET requests");
 
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return EndpointErrors.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Get);
         }
 
         logger.LogDebug("Start jwk discovery request");

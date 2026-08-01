@@ -24,4 +24,11 @@ public interface IClientSecretEvaluator
     /// The authentication method.
     /// </value>
     string AuthenticationMethod { get; }
+
+    /// <summary>
+    /// The mechanism this evaluator answers for. The preflight decides which mechanism a request presented,
+    /// and only the evaluators declaring it are consulted — so an evaluator never has to guess whether another
+    /// one should have won.
+    /// </summary>
+    ClientAuthenticationSource Source { get; }
 }

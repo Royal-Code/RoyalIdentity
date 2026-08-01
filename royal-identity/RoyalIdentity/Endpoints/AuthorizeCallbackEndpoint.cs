@@ -29,7 +29,7 @@ public class AuthorizeCallbackEndpoint : IEndpointHandler
             logger.LogWarning("Invalid HTTP method for authorize endpoint.");
 
             // return a problem details of a MethodNotAllowed informing the http method is not allowed
-            return EndpointErrors.MethodNotAllowed(httpContext);
+            return EndpointErrors.MethodNotAllowed(httpContext, HttpMethods.Get);
         }
 
         logger.LogDebug("Start authorize callback request");

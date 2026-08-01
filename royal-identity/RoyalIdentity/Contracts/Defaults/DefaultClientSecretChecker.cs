@@ -23,9 +23,13 @@ public class DefaultClientSecretChecker : IClientSecretChecker
     {
         logger.LogDebug("Start evaluate client secret");
 
-        // see if a registered evaluators finds a secret on the request
+        var attempt = context.GetClientAuthenticationAttempt();
+
+        // Only the evaluators answering for the mechanism the request actually presented are consulted. Trying
+        // them all and keeping the first that found something is how a malformed Authorization header could end
+        // up authenticated by the connection certificate instead of being refused.
         EvaluatedClient? evaluation = null;
-        foreach (var evaluator in evaluators)
+        foreach (var evaluator in evaluators.Where(e => e.Source == attempt.Source))
         {
             var evaluatedClient = await evaluator.EvaluateAsync(context, ct);
             if (evaluatedClient is null)
@@ -34,9 +38,7 @@ public class DefaultClientSecretChecker : IClientSecretChecker
             logger.LogDebug("Evaluator found secret: {Type}", evaluator.GetType().Name);
 
             evaluation = evaluatedClient;
-
-            if (evaluatedClient.Credential.Type is not Server.ParsedSecretTypes.NoSecret)
-                break;
+            break;
         }
 
         if (evaluation is not null)
