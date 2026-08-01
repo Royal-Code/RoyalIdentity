@@ -1,10 +1,10 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: EM EXECUÇÃO - Fases 1-4 concluídas; Fase 5 é a próxima; 4 de 7 fases concluídas
+## Status: EM EXECUÇÃO - Fases 1-5 concluídas; Fase 6 é a próxima; 5 de 7 fases concluídas
 
 ## Progresso
 
-`████░░░` **57%** - 4 de 7 fases
+`█████░░` **71%** - 5 de 7 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Ciclo de vida do estado no login, cookie e logout | Concluida |
 | Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Concluida |
 | Fase 4 - Rota, discovery HTTPS e isolamento por realm | Concluida |
-| Fase 5 - OP iframe moderno e hardening HTTP | Pendente |
+| Fase 5 - OP iframe moderno e hardening HTTP | Concluida |
 | Fase 6 - Aceites HTTP, multi-realm e navegador real | Pendente |
 | Fase 7 - Licenças, atribuições, documentação e fechamento | Pendente |
 
@@ -926,22 +926,22 @@ validar parent/origin/formato; aplicar headers sem bloquear framing.
 
 **Tarefas:**
 
-- [ ] Manter ausente o cache estático cross-realm removido na Fase 4 e remover SHA-256 manual e substituição
+- [x] Manter ausente o cache estático cross-realm removido na Fase 4 e remover SHA-256 manual e substituição
   textual de `{cookieName}`.
-- [ ] Implementar hash assíncrono com `crypto.subtle.digest`.
-- [ ] Serializar nome do cookie e constantes do formato com encoder JSON/HTML.
-- [ ] Gerar nonce CSP criptográfico por response e aplicá-lo ao único script inline.
-- [ ] Exigir `window.parent !== window` e `event.source === window.parent`.
-- [ ] Rejeitar payload não string, espaços inválidos, client vazio, versão/segmentos/Base64Url/origem inválidos.
-- [ ] Comparar a origem incorporada com `event.origin` usando igualdade exata antes de responder.
-- [ ] Recalcular o hash com client, origem, cookie e salt; responder apenas `error`, `changed` ou `unchanged`.
-- [ ] Usar `event.source.postMessage(result, event.origin)` sem target `*`.
-- [ ] Aplicar `no-store`, `no-cache`, `no-referrer`, `nosniff` e content type HTML com charset UTF-8.
-- [ ] Aplicar CSP `default-src 'none'` + nonce necessário, sem `frame-ancestors 'none'`.
-- [ ] Adicionar teste HTTP que exija ausência de `X-Frame-Options: DENY` e de
+- [x] Implementar hash assíncrono com `crypto.subtle.digest`.
+- [x] Serializar nome do cookie e constantes do formato com encoder JSON/HTML.
+- [x] Gerar nonce CSP criptográfico por response e aplicá-lo ao único script inline.
+- [x] Exigir `window.parent !== window` e `event.source === window.parent`.
+- [x] Rejeitar payload não string, espaços inválidos, client vazio, versão/segmentos/Base64Url/origem inválidos.
+- [x] Comparar a origem incorporada com `event.origin` usando igualdade exata antes de responder.
+- [x] Recalcular o hash com client, origem, cookie e salt; responder apenas `error`, `changed` ou `unchanged`.
+- [x] Usar `event.source.postMessage(result, event.origin)` sem target `*`.
+- [x] Aplicar `no-store`, `no-cache`, `no-referrer`, `nosniff` e content type HTML com charset UTF-8.
+- [x] Aplicar CSP `default-src 'none'` + nonce necessário, sem `frame-ancestors 'none'`.
+- [x] Adicionar teste HTTP que exija ausência de `X-Frame-Options: DENY` e de
   `frame-ancestors 'none'` na resposta do OP iframe, criando a regressão que o plano RFC 9700 deverá preservar.
-- [ ] Adicionar aviso de derivação/modificação conforme DF18 ou documentar reescrita independente verificável.
-- [ ] Criar testes de vetores que comparem o cálculo de C# com o algoritmo exposto ao JavaScript.
+- [x] Adicionar aviso de derivação/modificação conforme DF18 ou documentar reescrita independente verificável.
+- [x] Criar testes de vetores que comparem o cálculo de C# com o algoritmo exposto ao JavaScript.
 
 **Critérios de aceite:** o resultado não contém implementação SHA legada, interpolação crua ou estado estático;
 o CSP permite somente o script com nonce; endpoint continua frameable; origem diferente nunca recebe
@@ -956,7 +956,28 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointT
 
 ### Resultado da Fase 5
 
-*a preencher*
+- `CheckSessionResult` foi substancialmente reescrito. Saíram o SHA-256 manual de terceiros, extensões de
+  prototype, conversores hex/Base64 legados, cache global e substituição textual do cookie. O arquivo preserva
+  aviso explícito da origem Apache/IS4 e registra a reimplementação RoyalIdentity de 2026; o HTML emitido não
+  aponta mais incorretamente para o `LICENSE` AGPL como se ele fosse Apache.
+- A página contém um único script inline e recebe nonce Base64Url criptográfico novo em cada resposta. Nome do
+  cookie, versão e tamanhos do envelope são um objeto JSON serializado pelo encoder padrão; o nonce passa pelo
+  encoder HTML. Um teste com payload hostil prova que `</script>` não atravessa a fronteira de serialização, e
+  reflexão impede retorno de estado estático mutável.
+- O JavaScript usa `TextEncoder`/`TextDecoder` estrito, Base64Url canônico, `URL.origin`, campos com comprimento
+  big-endian e `crypto.subtle.digest('SHA-256', ...)`, correspondendo ao formato v1 do servidor. Envelope,
+  versão, segmentos, tamanhos, UTF-8, origem e mensagem são validados antes do hash; cookie ausente calcula um
+  estado diferente e resulta em `changed`.
+- O listener só existe dentro de iframe, ignora fontes diferentes de `window.parent`, exige origem incorporada
+  exatamente igual a `event.origin` e responde exclusivamente pelo mesmo `event.source`/`event.origin`, sem
+  target `*`. Uma sonda independente com Node 22 sobre o script renderizado confirmou
+  `unchanged,changed,error`; o aceite em Chromium real permanece corretamente na Fase 6.
+- A resposta agora fixa `no-store, no-cache, max-age=0`, `Pragma: no-cache`, `Referrer-Policy: no-referrer`,
+  `X-Content-Type-Options: nosniff` e `text/html; charset=UTF-8`. A CSP exata é
+  `default-src 'none'; script-src 'nonce-…'`, preservando a opção realm-scoped do header depreciado, sem
+  `frame-ancestors 'none'` e sem `X-Frame-Options`, portanto o OP iframe continua embutível.
+- Verificação final: 38 `SessionStateFormatTests` e 8 `CheckSessionEndpointTests` aprovados; suíte completa com
+  1.466 aprovados, 51 ignorados por opt-in e nenhuma falha; `git diff --check` limpo.
 
 ---
 
@@ -1143,11 +1164,11 @@ dotnet test RoyalIdentity.sln
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
 | Bloqueio de third-party cookie | iframe não vê cookie presente no first-party OP | falsos `changed`/loop no RP | DF14, harness defensivo, documentação e Back-Channel Logout | Aberto |
-| Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | exceção exata por endpoint + teste browser/header | Aberto |
+| Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | CSP própria frameable + teste HTTP entregue; browser e reexecução pelo RFC 9700 permanecem | Mitigado |
 | Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host; confiança permanece configurada pelo host | Mitigado |
 | Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única/validação entregues na Fase 1; lifecycle multi-realm na Fase 2 | Mitigado |
 | Estado vaza em token/log | principal/telemetria copia propriedade/cookie | correlação ou exposição | propriedade protegida, não claim; filtros e testes de log/token | Aberto |
-| Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6 e vetor C# entregues; comparação JS/browser nas Fases 5-6 | Aberto |
+| Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6, vetor UTF-8 independente e sonda JS entregues; Chromium real na Fase 6 | Mitigado |
 | Payload v1 permanece em banco dev | serializer sobe para v2 com artefato antigo | falha fechada temporária | breaking aceito; codes efêmeros; reprovisionar seeds/config | Aceito |
 | Playwright entra na suíte default | projeto baixa/exige Chromium | CI/local deixa de ser autocontido | projeto/script opt-in + arquitetura test | Aberto |
 | Auditoria de licença incompleta | arquivo derivado perdeu header/notice | não conformidade de redistribuição | inventário de similaridade/histórico + notice central + revisão manual | Aberto |

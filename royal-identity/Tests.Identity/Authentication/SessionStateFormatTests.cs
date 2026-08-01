@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Authentication;
@@ -5,6 +8,7 @@ using RoyalIdentity.Contracts.Defaults;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
+using RoyalIdentity.Responses.HttpResults;
 using RoyalIdentity.Security.Encoding;
 using AuthenticationProperties = Microsoft.AspNetCore.Authentication.AuthenticationProperties;
 
@@ -33,6 +37,51 @@ public class SessionStateFormatTests
             "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
             value);
         Assert.DoesNotContain(' ', value);
+    }
+
+    [Fact]
+    public void BrowserAlgorithmVector_MatchesTheServerEnvelopeHashWithUtf8Fields()
+    {
+        const string clientId = "cliente-ç";
+        const string origin = "https://xn--exmple-xta.test:8443";
+        var userAgentState = Base64Url.Encode(Enumerable.Repeat((byte)0xA5, 32).ToArray());
+        var salt = Enumerable.Range(32, SessionStateFormat.SaltSize).Select(value => (byte)value).ToArray();
+        var envelope = SessionStateFormat.Create(clientId, origin, userAgentState, salt);
+
+        Assert.True(SessionStateFormat.TryParse(envelope, out var parsed));
+
+        var browserReferenceHash = ComputeBrowserReferenceHash(clientId, origin, userAgentState, salt);
+        Assert.Equal(browserReferenceHash, parsed!.Hash);
+    }
+
+    [Fact]
+    public void IframeHtml_SerializesConfigurationAndExposesOnlyTheModernAlgorithm()
+    {
+        const string hostileName = "</script><script>alert('cookie')</script>";
+
+        var html = CheckSessionResult.CreateHtml(hostileName, "test-nonce");
+
+        Assert.DoesNotContain(hostileName, html, StringComparison.Ordinal);
+        Assert.Contains("\\u003C/script\\u003E", html, StringComparison.Ordinal);
+        Assert.Contains("crypto.subtle.digest('SHA-256', canonical)", html, StringComparison.Ordinal);
+        Assert.Contains("new DataView(length.buffer).setUint32(0, value.length, false)", html, StringComparison.Ordinal);
+        Assert.Contains("event.source !== window.parent", html, StringComparison.Ordinal);
+        Assert.Contains("event.source.postMessage(result, event.origin)", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sha256.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("postMessage(result, '*')", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("{cookieName}", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IframeResult_HasNoMutableStaticState()
+    {
+        var staticState = typeof(CheckSessionResult)
+            .GetFields(System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic)
+            .Where(field => !field.IsLiteral);
+
+        Assert.Empty(staticState);
     }
 
     [Fact]
@@ -244,5 +293,32 @@ public class SessionStateFormatTests
     {
         var serverOptions = new ServerOptions { Authentication = authentication };
         return new Realm("realm-id", "realm.example", path, "Realm", false, new RealmOptions(serverOptions));
+    }
+
+    private static byte[] ComputeBrowserReferenceHash(
+        string clientId,
+        string origin,
+        string userAgentState,
+        byte[] salt)
+    {
+        var fields = new byte[][]
+        {
+            Encoding.UTF8.GetBytes(SessionStateFormat.Version),
+            Encoding.UTF8.GetBytes(clientId),
+            Encoding.UTF8.GetBytes(origin),
+            Encoding.UTF8.GetBytes(userAgentState),
+            salt,
+        };
+        var canonical = new byte[fields.Sum(field => sizeof(int) + field.Length)];
+        var offset = 0;
+        foreach (var field in fields)
+        {
+            BinaryPrimitives.WriteInt32BigEndian(canonical.AsSpan(offset, sizeof(int)), field.Length);
+            offset += sizeof(int);
+            field.CopyTo(canonical, offset);
+            offset += field.Length;
+        }
+
+        return SHA256.HashData(canonical);
     }
 }

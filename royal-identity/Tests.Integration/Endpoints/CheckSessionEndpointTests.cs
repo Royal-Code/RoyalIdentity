@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -49,6 +50,42 @@ public class CheckSessionEndpointTests
         Assert.Equal(HttpStatusCode.MethodNotAllowed, post.StatusCode);
         Assert.Equal("GET", string.Join(", ", post.Content.Headers.Allow));
         Assert.Equal("application/problem+json", post.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task HttpsIframe_UsesFreshNonceStrictHeadersAndRemainsFrameable()
+    {
+        var client = CreateHttpsClient();
+        var url = Oidc.Routes.BuildCheckSessionUrl(factory.Handles.Demo.Path);
+
+        var first = await client.GetAsync(url);
+        var second = await client.GetAsync(url);
+        var firstHtml = await first.Content.ReadAsStringAsync();
+        var secondHtml = await second.Content.ReadAsStringAsync();
+        var firstNonce = ExtractNonce(firstHtml);
+        var secondNonce = ExtractNonce(secondHtml);
+        var csp = Assert.Single(first.Headers.GetValues("Content-Security-Policy"));
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal("text/html", first.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("UTF-8", first.Content.Headers.ContentType?.CharSet);
+        Assert.Equal("no-referrer", Assert.Single(first.Headers.GetValues("Referrer-Policy")));
+        Assert.Equal("nosniff", Assert.Single(first.Headers.GetValues("X-Content-Type-Options")));
+        Assert.Contains("no-store", Assert.Single(first.Headers.GetValues("Cache-Control")), StringComparison.Ordinal);
+        Assert.Contains("no-cache", Assert.Single(first.Headers.GetValues("Cache-Control")), StringComparison.Ordinal);
+        Assert.Equal("no-cache", Assert.Single(first.Headers.GetValues("Pragma")));
+        Assert.Equal($"default-src 'none'; script-src 'nonce-{firstNonce}'", csp);
+        Assert.DoesNotContain("frame-ancestors", csp, StringComparison.OrdinalIgnoreCase);
+        Assert.False(first.Headers.Contains("X-Frame-Options"));
+        Assert.Matches("^[A-Za-z0-9_-]{43}$", firstNonce);
+        Assert.NotEqual(firstNonce, secondNonce);
+        Assert.Single(Regex.Matches(firstHtml, "<script(?:\\s|>)", RegexOptions.CultureInvariant).Cast<Match>());
+        Assert.Contains("crypto.subtle.digest('SHA-256', canonical)", firstHtml, StringComparison.Ordinal);
+        Assert.Contains("window.parent === window", firstHtml, StringComparison.Ordinal);
+        Assert.Contains("event.source !== window.parent", firstHtml, StringComparison.Ordinal);
+        Assert.Contains("event.source.postMessage(result, event.origin)", firstHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("postMessage(result, '*')", firstHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("frame-ancestors 'none'", firstHtml, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -212,6 +249,16 @@ public class CheckSessionEndpointTests
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return document.RootElement.Clone();
+    }
+
+    private static string ExtractNonce(string html)
+    {
+        var match = Regex.Match(
+            html,
+            "<script nonce=\"(?<nonce>[A-Za-z0-9_-]+)\">",
+            RegexOptions.CultureInvariant);
+        Assert.True(match.Success, "The iframe must contain one nonce-bearing inline script.");
+        return match.Groups["nonce"].Value;
     }
 
     public sealed class ForwardedHeadersAppFactory : PersistentStorageAppFactory

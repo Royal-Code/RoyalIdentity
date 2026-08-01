@@ -80,9 +80,10 @@ definida em `../analisys/`.
 
 ## Próxima execução
 
-A próxima execução é a Fase 5 de [plan-oidc-session-management.md](plan-oidc-session-management.md); as Fases 1-4
+A próxima execução é a Fase 6 de [plan-oidc-session-management.md](plan-oidc-session-management.md); as Fases 1-5
 já fixaram estado opaco, formato v1, payloads Configuration v2, ciclo ticket/cookie/logout, Authentication
-Responses, `prompt=none`, authorization-code payload operacional v2 e rota/discovery HTTPS realm-scoped sobre a baseline protocolar concluída por
+Responses, `prompt=none`, authorization-code payload operacional v2, rota/discovery HTTPS realm-scoped e o OP
+iframe moderno com Web Crypto/CSP por nonce sobre a baseline protocolar concluída por
 `plan-oauth21-token-error-responses.md`. Depois, executar
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), para que os payloads Configuration sejam
 promovidos deterministicamente de v2 para v3. Em seguida, executar
@@ -155,7 +156,7 @@ nenhuma seleção de código OAuth.
 ### 2.1. OpenID Connect Session Management e Check Session
 
 **Plano criado:** [plan-oidc-session-management.md](plan-oidc-session-management.md)
-(EM EXECUÇÃO — Fases 1-4 concluídas; Fase 5 é a próxima; 4/7 fases concluídas)
+(EM EXECUÇÃO — Fases 1-5 concluídas; Fase 6 é a próxima; 5/7 fases concluídas)
 
 Implementa o OP side do OpenID Connect Session Management 1.0 sem portar a infraestrutura de sessão legada do
 IS4. O plano cria um OP User Agent State opaco e realm-scoped, corrige `prompt=none`, move `session_state` para
