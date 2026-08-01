@@ -353,6 +353,25 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
     // ---------------------------------------------------------------------------------------------------
 
     [Fact]
+    public async Task Post_WithValidBasicCredentials_Must_IssueAToken()
+    {
+        // Discovery announces client_secret_basic as supported. Until this test, every Basic case in the suite
+        // asserted a refusal, so the announcement was unverified: the mechanism could have stopped working
+        // entirely — as the Fase 2 rewrite of the evaluator selection could easily have made it — and only the
+        // failure paths would still have passed.
+        await SeedClientAsync();
+
+        var response = await PostWithBasicAsync(
+            ClientId,
+            ClientSecret,
+            Field("grant_type", "client_credentials"),
+            Field("scope", "api"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("access_token", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Post_WithInvalidBasicCredentials_Must_Answer401WithAChallenge()
     {
         await SeedClientAsync();

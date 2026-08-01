@@ -134,9 +134,38 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("resource", "https://unknown.example.test/resource");
 
         var response = await client.GetAsync(url);
-        var body = await response.Content.ReadAsStringAsync();
 
-        Assert.False(response.IsSuccessStatusCode);
-        Assert.Contains("invalid_target", body);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidTarget);
+    }
+
+    [Fact]
+    public async Task Get_Must_AnnounceExactlyTheAuthenticationMethodsThatAreTested()
+    {
+        // The announcement is a promise, and a promise nothing verifies is how a mechanism silently stops
+        // working. Pinning the exact set means adding a method to discovery — or losing one to a refactor of
+        // the evaluator chain — cannot happen without this test and the success case behind each entry.
+        //
+        // Covered by: client_secret_basic in TokenErrorTests.Post_WithValidBasicCredentials_Must_IssueAToken,
+        // client_secret_post throughout ClientTokenTests, and private_key_jwt in
+        // PrivateKeyJwtReplayProtectionTests.FirstPresentation_IsAccepted_AndTheSamePresentationAgainIsRefused.
+        // tls_client_auth is deliberately absent: its evaluator reports no method name, so it is not announced.
+        var client = factory.CreateClient();
+        var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
+
+        var content = await client.GetStringAsync(url);
+        var document = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content);
+
+        var methods = document![Oidc.Discovery.TokenEndpointAuthenticationMethodsSupported]
+            .EnumerateArray()
+            .Select(value => value.GetString())
+            .ToArray();
+
+        Assert.Equal(
+            [
+                Oidc.Endpoint.AuthMethods.BasicAuthentication,
+                Oidc.Endpoint.AuthMethods.PostBody,
+                Oidc.Endpoint.AuthMethods.PrivateKeyJwt
+            ],
+            methods);
     }
 }

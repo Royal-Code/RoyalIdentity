@@ -1,17 +1,17 @@
 # Plan: Conformidade das respostas de erro do token endpoint com OAuth 2.1 (`plan-oauth21-token-error-responses`)
 
-## Status: EM EXECUÇÃO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; Fases 1-3 concluídas
+## Status: CONCLUÍDO (2026-07-31) - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; 4/4 fases
 
 ## Progresso
 
-`███░` **75%** - 3 de 4 fases
+`████` **100%** - 4 de 4 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato explícito de erro e asserções exatas | Concluida |
 | Fase 2 - Forma da requisição e autenticação do client | Concluida |
 | Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Concluida |
-| Fase 4 - Auditoria transversal, regressão e fechamento | Pendente |
+| Fase 4 - Auditoria transversal, regressão e fechamento | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -976,18 +976,18 @@ endpoint, validar extensibilidade e registrar a versão do draft efetivamente im
 
 **Tarefas:**
 
-- [ ] Repetir busca por todos os callers e classificar cada erro do token endpoint contra a matriz.
-- [ ] Remover `Assert.Contains` e equivalentes quando o teste pretende validar o campo `error`.
-- [ ] Confirmar que `error_description` e logs não contêm secret, assertion, code, verifier, refresh token ou
+- [x] Repetir busca por todos os callers e classificar cada erro do token endpoint contra a matriz.
+- [x] Remover `Assert.Contains` e equivalentes quando o teste pretende validar o campo `error`.
+- [x] Confirmar que `error_description` e logs não contêm secret, assertion, code, verifier, refresh token ou
   replay handle.
-- [ ] Confirmar que falhas de backing/infraestrutura continuam 5xx e não viram `invalid_client`/`invalid_grant`.
-- [ ] Confirmar que discovery anuncia somente métodos de autenticação realmente testados.
-- [ ] Validar extension grant de teste com código de erro próprio para provar que o contrato não foi fechado.
-- [ ] Comparar o draft OAuth 2.1 vigente no início da fase com `draft-15` e registrar qualquer delta.
-- [ ] Atualizar roadmap e o status do plano RFC 9700, confirmando que a sobreposição executável já foi removida
+- [x] Confirmar que falhas de backing/infraestrutura continuam 5xx e não viram `invalid_client`/`invalid_grant`.
+- [x] Confirmar que discovery anuncia somente métodos de autenticação realmente testados.
+- [x] Validar extension grant de teste com código de erro próprio para provar que o contrato não foi fechado.
+- [x] Comparar o draft OAuth 2.1 vigente no início da fase com `draft-15` e registrar qualquer delta.
+- [x] Atualizar roadmap e o status do plano RFC 9700, confirmando que a sobreposição executável já foi removida
   por DF17.
-- [ ] Executar o guard arquitetural de neutralidade de Pipelines e assinaturas de erro.
-- [ ] Executar build, suíte completa e `git diff --check`.
+- [x] Executar o guard arquitetural de neutralidade de Pipelines e assinaturas de erro.
+- [x] Executar build, suíte completa e `git diff --check`.
 
 **Critérios de aceite:** não resta assertion por substring para validar `error` do token endpoint; os seis códigos
 base e `invalid_target` têm cobertura exata; código de extensão continua serializável; nenhuma falha de
@@ -1004,7 +1004,62 @@ git diff --check
 
 ### Resultado da Fase 4
 
-*a preencher*
+**Concluída em 2026-07-31.** Build e suíte completa verdes: **1365 aprovados, 51 ignorados** (opt-in
+PostgreSQL/Aspire), **0 falhas**. `ProtocolErrorBoundaryTests` 10/10. `git diff --check` limpo.
+
+**Inventário final.** 108 sítios de resposta de erro em `RoyalIdentity`, todos nomeando o código
+explicitamente. Os do token endpoint foram classificados um a um contra a matriz normativa e todos conferem.
+Três sítios eram indiretos e precisaram ser rastreados: `RefreshTokenHandler` e `AuthorizationCodeHandler`
+propagam `resolution.Error`, que vem de `ResourceStoreExtensions` e só produz `invalid_target` ou
+`invalid_scope`; `RevocationHandler` responde `unsupported_token_type` com **status 200**, que é o
+comportamento deliberado do RFC 7009 §2.2 e não uma resposta de erro do token endpoint.
+
+**Assertions por substring.** Não resta nenhuma validando o campo `error`. As três remanescentes foram
+resolvidas: `DiscoveryTests` passou a `AssertErrorAsync`; `PrivateKeyJwtBackingFailureTests` mantém as
+asserções negativas, que é a forma certa ali, e ganhou o status exato; `CodeAuthorizeTests` mantém um
+`DoesNotContain` sobre um corpo de **sucesso**, que não é validação de `error`.
+
+**Achado: vazamento de credencial em log.** `LoggingOptions.SensitiveValuesFilter` cobria `client_secret`,
+`password`, `client_assertion`, `refresh_token`, `device_code` e `id_token_hint`, mas **não** `code` nem
+`code_verifier` — e `logger.LogError(context, ...)` despeja o request bruto scrubbed em toda recusa. Ou seja,
+authorization code e verifier iam em claro para o log justamente nos caminhos que mais logam. Reproduzido antes
+de corrigir. Os dois entraram na lista; como `LoggingOptions` não é serializado no payload Configuration, a
+mudança vale para todos os realms sem implicação de versão. Regressão em
+`PkceTokenTests.RefusingAnExchange_LeaksNeitherTheCodeNorTheVerifier`.
+
+Descrições: nenhuma carrega credencial. As únicas interpoladas são `redirect_uri`, `grant_type`, prompt modes,
+nome de parâmetro e texto computado de algoritmos de assinatura — nenhum deles é segredo, code, verifier,
+refresh token ou replay handle.
+
+**Achado: `client_secret_basic` anunciado e nunca provado.** Discovery anuncia três métodos, mas todos os testes
+Basic da suíte asseveravam **falha** — nenhum provava que o mecanismo autentica. A reescrita da seleção de
+evaluator na Fase 2 poderia tê-lo quebrado por inteiro e só os caminhos de falha continuariam verdes.
+Acrescentados o caso de sucesso e um teste que fixa o conjunto exato anunciado, com o teste de sucesso de cada
+entrada nomeado no comentário. `tls_client_auth` continua fora por decisão do próprio evaluator, que não reporta
+nome de método.
+
+**Infraestrutura versus credencial.** A invariante 10 vale nos dois sentidos e agora tem teste dos dois lados:
+dado do client nunca vira 5xx (Fase 3, método PKCE desconhecido) e falha de backing nunca vira erro OAuth —
+`PrivateKeyJwtBackingFailureTests` passou a exigir 500 exato e ausência de `invalid_client` **e**
+`invalid_grant`.
+
+**Extensibilidade (DF3).** `Tests.Integration/Endpoints/ExtensionGrantErrorTests.cs` registra um extension grant
+real com contexto, pipeline e handler próprios, que responde `urn:example:teapot_required` — um código que
+nenhum RFC define e nenhuma constante do repositório declara. O handler usa **somente o writer público**, porque
+é tudo o que uma extensão em outro assembly alcança: `context.Error` é `internal`. Um segundo teste é o controle
+de que a extensão foi alcançada por estar registrada, e não porque o endpoint parou de checar. Um enum de erros
+— a forma óbvia de tornar os seis códigos base exaustivos — teria tornado isso e `invalid_target` impossíveis.
+
+**Gate DF1.** Verificado no datatracker em 2026-07-31: `draft-ietf-oauth-v2-1-15`, de 2026-03-02, continua sendo
+a revisão mais recente, ainda como Active Internet-Draft sem RFC publicado (milestone de submissão ao IESG em
+dez/2026). **Sem delta normativo** — a implementação corresponde exatamente à versão fixada por DF1.
+
+**Handoffs.** O roadmap registra o plano como concluído e promove
+[plan-oidc-session-management.md](plan-oidc-session-management.md) a próxima execução. No
+`plan-rfc9700-security-hardening.md`, DF18 passou a registrar o pré-requisito satisfeito e o que exatamente ele
+consome: a classificação de PKCE já existe e não deve ser reimplementada (DF17), o writer aceita status e
+headers explícitos, e os helpers `InvalidGrant`/`InvalidClient`/`InvalidRequest` não existem mais — a família de
+refresh usará `context.Error(<código>, <descrição>)` como todo o resto.
 
 ---
 
@@ -1081,21 +1136,21 @@ git diff --check
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Draft muda durante execução | nova versão altera §3.2.4/PKCE | implementação nasce desatualizada | gate DF1 no início da Fase 4 | Aberto |
+| Draft muda durante execução | nova versão altera §3.2.4/PKCE | implementação nasce desatualizada | gate DF1 no início da Fase 4 | Fechado na Fase 4 — datatracker consultado em 2026-07-31: draft-15 (2026-03-02) ainda é a revisão mais recente, sem delta |
 | Writer genérico ganha semântica OAuth | constantes OAuth entram em Pipelines | quebra de boundary | DF5 + teste de arquitetura | Mitigado na Fase 1 — `ProtocolErrorBoundaryTests` varre o fonte de Pipelines por 17 códigos protocolares |
 | `EndpointErrorResults` preserva códigos hardcoded | factory não migra para o core e helper permanece no projeto neutro | DF5 continua violada apesar do novo writer | DF19 + guard da Fase 1 | Fechado na Fase 1 — factories em `RoyalIdentity/Endpoints/EndpointErrors.cs`; o quinto ponto não previsto (`ProblemsExtensions`) virou parâmetro |
 | Detecção múltipla ocorre após evaluator | `jti` é registrado antes do `invalid_request` | retry legítimo parece replay | preflight DF7 + teste negativo do store | Fechado na Fase 2 — `AMalformedRequestCarryingAnAssertion_RegistersNoHandle` apresenta a mesma assertion malformada e depois sozinha |
 | Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Mitigado na Fase 2 — o certificado não é fonte apresentada; só decide em `Source.None` |
 | Validação de duplicidade bloqueia RFC 8707 | regra genérica rejeita `resource` repetido | quebra de resource indicators | allowlist DF8 + regressão multiresource | Fechado na Fase 2 — `resource` fora da lista single-valued, com regressão própria e a multiresource de `ClientTokenTests` verde |
-| Enum fecha erros | tipo aceita somente seis valores | extension grants/RFC 8707 quebram | strings + teste de extensão DF3 | Aberto |
+| Enum fecha erros | tipo aceita somente seis valores | extension grants/RFC 8707 quebram | strings + teste de extensão DF3 | Fechado na Fase 4 — `ExtensionGrantErrorTests` responde `urn:example:teapot_required` pelo writer público |
 | Correção revela detalhes de code | descrições divergem por causa | oracle de existência/binding | preservar igualdade Operational + DF13 | Fechado na Fase 3 — descrição única em `AuthorizationCodeRefusal`, com teste de igualdade entre as três recusas |
 | Correção revela existência do client | assertion inválida e client desconhecido recebem códigos/descrições distintos | oracle de client e violação RFC 7523 | DF15 + matriz indistinguível | Fechado na Fase 2 — descrição única em `EvaluateClient` e três testes de convergência |
 | Correção do validator vaza para além do campo `error` | edição do `ResourcesValidator` altera condição, ordem ou transporte no authorize | regressão OIDC fora do escopo declarado | DF20 limita a mudança ao campo `error` + regressão `CodeAuthorize` na Fase 1 | Mitigado na Fase 1 — suíte completa verde e as duas regressões de authorize passam |
 | Método PKCE desconhecido some da observabilidade | `invalid_grant` genérico é emitido sem log do método recusado | corrupção de dado ou bug de seed passa despercebido | DF18 exige log do método + teste que prova descrição indistinguível | Fechado na Fase 3 — `AnUnsupportedStoredMethod_IsNamedInTheLog_AndNowhereInTheResponse` prova os dois lados |
 | Recusa de dado do client vira 5xx | branch novo lança em vez de responder `invalid_grant` | erro de protocolo aparece como indisponibilidade e polui alerta | DF18 + invariante 10 + teste de status exato | Fechado na Fase 3 — o branch responde 400 e o teste assevera `NotEqual(InternalServerError)` |
-| Testes continuam falsos positivos | assertion busca texto no body | regressão passa sem conformidade | helper único e auditoria Fase 4 | Aberto |
-| Filtro obrigatório executa zero testes | arquivo/classe planejado não foi criado ou nome divergiu | comando verde sem verificar critério | DF16 + nomes de classe explícitos | Aberto |
-| Falha de backing vira erro OAuth | catch amplo em evaluator/handler | indisponibilidade mascarada como credencial inválida | teste 5xx e invariant 9 | Aberto |
+| Testes continuam falsos positivos | assertion busca texto no body | regressão passa sem conformidade | helper único e auditoria Fase 4 | Fechado na Fase 4 — nenhuma assertion por substring valida `error`; as remanescentes são negativas ou sobre corpo de sucesso |
+| Filtro obrigatório executa zero testes | arquivo/classe planejado não foi criado ou nome divergiu | comando verde sem verificar critério | DF16 + nomes de classe explícitos | Fechado — todo filtro das quatro fases seleciona testes; fixtures novas (`RevocationTests`, `HttpFailureTests`, `PkceTokenTests`) foram acrescentadas explicitamente aos comandos |
+| Falha de backing vira erro OAuth | catch amplo em evaluator/handler | indisponibilidade mascarada como credencial inválida | teste 5xx e invariant 9 | Fechado na Fase 4 — `PrivateKeyJwtBackingFailureTests` exige 500 exato e ausência de `invalid_client`/`invalid_grant` |
 | Alteração compartilhada afeta authorize | helper comum muda payload/redirect | regressão OIDC fora do token endpoint | suíte ampla na Fase 1/4 | Mitigado na Fase 1 — 1252 aprovados, 0 falhas; reavaliar na Fase 4 |
 
 ---

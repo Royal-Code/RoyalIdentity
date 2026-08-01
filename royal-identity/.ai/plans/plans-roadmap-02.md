@@ -70,12 +70,20 @@ definida em `../analisys/`.
   contra replay de `private_key_jwt`: contrato atômico realm/issuer-bound, backings in-memory e Operational,
   declaração obrigatória por composition root, guard global das implementações produtivas e aceite PostgreSQL
   ponta a ponta.
+- [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — CONCLUÍDO (2026-07-31),
+  4/4 fases. Baseline de erros do token endpoint conforme RFC 6749 §5.2 e OAuth 2.1 draft-15 §3.2.4: uma única
+  forma de sinalizar erro, com o código sempre na primeira posição; `RoyalIdentity.Pipelines` sem nenhuma string
+  protocolar; preflight que decide cardinalidade e mecanismo de autenticação antes de qualquer efeito; 401 com
+  `WWW-Authenticate` para tentativa via header; taxonomia corrigida em `unauthorized_client`, `invalid_request`
+  e PKCE; recusas de authorization code indistinguíveis por construção; 405/415/404 como Problem Details, sem
+  códigos OAuth inventados. Guard arquitetural com códigos derivados por reflexão impede regressão.
 
 ## Próxima execução
 
-[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) é a próxima baseline protocolar
-executável: todas as suas decisões estão fechadas (DF1-DF20) e não há pergunta pendente. Depois dela, executar
-[plan-oidc-session-management.md](plan-oidc-session-management.md) e
+[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) está **CONCLUÍDO (2026-07-31,
+4/4 fases)** — a baseline protocolar de erros do token endpoint já existe e os planos seguintes a consomem. A
+próxima execução é
+[plan-oidc-session-management.md](plan-oidc-session-management.md), seguido de
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), nessa ordem, para que os payloads
 Configuration sejam promovidos deterministicamente para v2 e depois v3. Em seguida, executar
 [plan-localization.md](plan-localization.md), que consome a baseline v3, promove as options de realm para v4 e
@@ -119,7 +127,7 @@ real testada.
 ### 2. Conformidade das respostas de erro do token endpoint com OAuth 2.1
 
 **Plano criado:** [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md)
-(RASCUNHO — 0/4 fases; decisões fechadas em DF1-DF20, sem perguntas abertas)
+(CONCLUÍDO — 2026-07-31, 4/4 fases; decisões fechadas em DF1-DF20, sem perguntas abertas)
 
 Corrige a baseline já exigida pelo RFC 6749 e incorpora a classificação adicional do OAuth 2.1 para PKCE antes
 do hardening RFC 9700. O contrato é o valor exato de `error`, o status HTTP e os headers normativos; encontrar o
@@ -412,7 +420,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
    operational-storage → test-migration).~~ CONCLUÍDO. Avaliar caching e audit-outbox (5-6) depois, só se ainda
    fizerem sentido no momento.
 3. ~~Concluir `plan-replay-protection.md` (Fase 3).~~ CONCLUÍDO.
-4. Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).
+4. ~~Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).~~ CONCLUÍDO.
 5. Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).
 6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
 7. Executar [plan-localization.md](plan-localization.md).

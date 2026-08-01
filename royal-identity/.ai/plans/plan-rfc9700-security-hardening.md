@@ -221,6 +221,11 @@
   Verifier sem challenge retorna `invalid_request`, enquanto verifier incorreto contra challenge existente e
   replay/família revogada retornam `invalid_grant` sem recriar o transporte. Fonte: OAuth 2.1 draft-15
   §§3.2.4/4.1.3 + RFC 7636 §4.6.
+  **Pré-requisito satisfeito em 2026-07-31:** o plano de erros concluiu 4/4 fases. A classificação de PKCE já
+  existe e está coberta por `Tests.Integration/Endpoints/PkceTokenTests.cs`; este plano a consome e não
+  reimplementa nada dela (DF17 do plano de erros). O writer aceita status e headers explícitos, e a família de
+  refresh deve usar `context.Error(<código>, <descrição>)` como todo o resto — os helpers `InvalidGrant`/
+  `InvalidClient`/`InvalidRequest` não existem mais.
 - **DF19 — Exceção nominal de framing:** aplicar proteção contra framing a páginas sensíveis, mas excluir
   exclusivamente a rota `check_session_iframe`; preservar por teste a ausência de `X-Frame-Options: DENY` e de
   `frame-ancestors 'none'` nessa resposta, sem relaxar login/consent/logout/error. Fonte:

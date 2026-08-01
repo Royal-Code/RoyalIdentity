@@ -32,7 +32,12 @@ public class LoggingOptions
             Oidc.Token.Request.ClientAssertion,
             Oidc.Token.Request.RefreshToken,
             Oidc.Token.Request.DeviceCode,
-            Oidc.Authorize.Request.IdTokenHint
+            Oidc.Authorize.Request.IdTokenHint,
+
+            // Single-use credentials that were reaching the log in clear on every refused exchange — which is
+            // most of the paths that log at all. A log is read by more people, for longer, than a response is.
+            Oidc.Token.Request.Code,
+            Oidc.Token.Request.CodeVerifier
         ];
 
     /// <summary>

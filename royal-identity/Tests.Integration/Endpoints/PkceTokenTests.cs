@@ -255,6 +255,27 @@ public class PkceTokenTests : IClassFixture<LogCapturingAppFactory>
         await withTheRightVerifier.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
     }
 
+    // Invariant 9: a refusal has to be diagnosable without the artifacts themselves ending up in the log. The
+    // authorization code and the code_verifier are single-use credentials, and a log is read by more people,
+    // for longer, than a response ever is.
+    [Fact]
+    public async Task RefusingAnExchange_LeaksNeitherTheCodeNorTheVerifier()
+    {
+        var storedVerifier = CryptoRandom.CreateUniqueId();
+        var code = await SeedCodeAsync(
+            PkceHelper.GenerateStoredS256CodeChallengeHash(storedVerifier), "S256");
+        var presentedVerifier = CryptoRandom.CreateUniqueId();
+
+        factory.ClearLog();
+        var response = await ExchangeAsync(code.Code, presentedVerifier);
+
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
+
+        var log = factory.AllLogText;
+        Assert.DoesNotContain(code.Code, log, StringComparison.Ordinal);
+        Assert.DoesNotContain(presentedVerifier, log, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task TheRightVerifier_StillWorks()
     {

@@ -63,10 +63,13 @@ public class PrivateKeyJwtBackingFailureTests
 
         var body = await response.Content.ReadAsStringAsync();
 
-        // Not authorized, and not disguised: no token, and no credential verdict either.
-        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        // Not authorized, and not disguised: the backing is unavailable, so the answer is an outage and not a
+        // verdict about the credential. Invariant 10 runs both ways — client data never becomes a 5xx, and
+        // infrastructure never becomes an OAuth error — and this is the second direction.
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.DoesNotContain("access_token", body, StringComparison.Ordinal);
         Assert.DoesNotContain("invalid_client", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("invalid_grant", body, StringComparison.Ordinal);
     }
 
     public void Dispose()
