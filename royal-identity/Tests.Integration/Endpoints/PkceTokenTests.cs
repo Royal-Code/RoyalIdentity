@@ -140,7 +140,7 @@ public class PkceTokenTests : IClassFixture<LogCapturingAppFactory>
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "42 characters, one below the minimum")]
     [InlineData(
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "129 characters, one above the maximum")]
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa+", "a character outside the unreserved set")]
     public async Task AMalformedVerifier_IsRefusedAsMalformed_NotAsAFailedGrant(string verifier, string _)
