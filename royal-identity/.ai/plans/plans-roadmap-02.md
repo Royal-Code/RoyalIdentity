@@ -80,12 +80,10 @@ definida em `../analisys/`.
 
 ## Próxima execução
 
-[plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) está **CONCLUÍDO (2026-07-31,
-4/4 fases)** — a baseline protocolar de erros do token endpoint já existe e os planos seguintes a consomem. A
-próxima execução é
-[plan-oidc-session-management.md](plan-oidc-session-management.md), seguido de
-[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), nessa ordem, para que os payloads
-Configuration sejam promovidos deterministicamente para v2 e depois v3. Em seguida, executar
+A próxima execução é [plan-oidc-session-management.md](plan-oidc-session-management.md), que consome a baseline
+protocolar já concluída por `plan-oauth21-token-error-responses.md`. Depois, executar
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), para que os payloads Configuration sejam
+promovidos deterministicamente para v2 e depois v3. Em seguida, executar
 [plan-localization.md](plan-localization.md), que consome a baseline v3, promove as options de realm para v4 e
 fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
@@ -155,7 +153,7 @@ nenhuma seleção de código OAuth.
 ### 2.1. OpenID Connect Session Management e Check Session
 
 **Plano criado:** [plan-oidc-session-management.md](plan-oidc-session-management.md)
-(RASCUNHO — 0/7 fases; bloqueado pela conclusão do plano OAuth 2.1)
+(RASCUNHO — 0/7 fases; predecessor OAuth 2.1 concluído, pronto para iniciar)
 
 Implementa o OP side do OpenID Connect Session Management 1.0 sem portar a infraestrutura de sessão legada do
 IS4. O plano cria um OP User Agent State opaco e realm-scoped, corrige `prompt=none`, move `session_state` para
