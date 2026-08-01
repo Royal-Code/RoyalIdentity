@@ -1,4 +1,4 @@
-﻿// Ignore Spelling: Pkce
+// Ignore Spelling: Pkce
 
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Extensions;
@@ -9,6 +9,16 @@ using RoyalIdentity.Utils;
 
 namespace RoyalIdentity.Contexts.Validators;
 
+/// <summary>
+/// Matches the presented <c>code_verifier</c> against the <c>code_challenge</c> stored with the authorization
+/// code.
+/// </summary>
+/// <remarks>
+/// The classification follows OAuth 2.1 draft-15 §§3.2.4/4.1.3 and RFC 7636 §4.6, and turns on which question
+/// failed. Verifier and challenge disagreeing about <b>presence</b> is a malformed request: either the client
+/// sent a verifier for a code that has no challenge, or it omitted the verifier a code with a challenge
+/// requires. Only a verifier that was presented and does not <b>match</b> is an invalid grant.
+/// </remarks>
 public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
 {
     private readonly ILogger logger;
@@ -23,15 +33,29 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         context.CodeParameters.AssertHasCode();
         var code = context.CodeParameters.AuthorizationCode;
 
-        if (code.CodeChallenge.IsMissing())
-            return default;
+        var hasChallenge = code.CodeChallenge.IsPresent();
+        var hasVerifier = context.CodeVerifier.IsPresent();
 
-        if (context.CodeVerifier.IsMissing())
+        if (hasChallenge != hasVerifier)
         {
-            logger.LogError(context, "Client is missing code challenge or code challenge method");
-            context.Error(Oidc.Token.Errors.InvalidGrant, "Code verifier required");
+            // Draft-15 §3.2.4 added the first direction explicitly: a code_verifier sent for a code that was
+            // never bound to a challenge used to be accepted in silence, which is the PKCE downgrade.
+            logger.LogError(
+                context,
+                hasVerifier
+                    ? "A code_verifier was presented for an authorization code without a code_challenge"
+                    : "The authorization code requires a code_verifier and none was presented");
+
+            context.Error(
+                Oidc.Token.Errors.InvalidRequest,
+                "code_verifier is required if, and only if, the authorization code has a code_challenge");
+
             return default;
         }
+
+        // No PKCE on either side: nothing to match.
+        if (!hasChallenge)
+            return default;
 
         bool equals;
         switch (code.CodeChallengeMethod)
@@ -43,7 +67,7 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
                     code.CodeChallenge);
 
                 if (!equals)
-                    context.Error(Oidc.Token.Errors.InvalidGrant, "Code verifier does not match code challenge");
+                    RefuseTheCode(context, "The code_verifier does not match the stored code_challenge");
 
                 break;
 
@@ -52,21 +76,40 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
                 var transformedCodeVerifier = PkceHelper.GenerateStoredS256CodeChallengeHash(context.CodeVerifier);
 
                 equals = FixedTimeComparer.IsEqualUtf8(
-                    transformedCodeVerifier, 
+                    transformedCodeVerifier,
                     code.CodeChallenge);
 
                 if (!equals)
                 {
-                    context.Error(Oidc.Token.Errors.InvalidGrant, "Code verifier does not match code challenge");
+                    RefuseTheCode(context, "The code_verifier does not match the stored code_challenge");
                 }
 
                 break;
 
             default:
-                context.Error(Oidc.Token.Errors.InvalidGrant, "Code challenge method is not supported");
+
+                // DF18: the client presented an artifact this server cannot honour, and that is a protocol
+                // answer, not a 5xx — HTTP 5xx belongs to bugs and outages, never to data a request carried.
+                // The method reaching this branch means a corrupted record or a bad seed, so it is worth
+                // knowing; it is logged and kept out of the response, whose wording must stay identical to
+                // every other refusal so a caller cannot tell a wrong verifier from a server it broke.
+                RefuseTheCode(
+                    context,
+                    $"The stored code_challenge_method '{code.CodeChallengeMethod}' is not supported");
+
                 break;
         }
 
         return default;
+    }
+
+    /// <summary>
+    /// Refuses the presented code with the shared, indistinguishable answer, keeping the reason in the log.
+    /// </summary>
+    private void RefuseTheCode(AuthorizationCodeContext context, string reason)
+    {
+        logger.LogError(context, reason);
+
+        context.Error(Oidc.Token.Errors.InvalidGrant, AuthorizationCodeRefusal.Description);
     }
 }

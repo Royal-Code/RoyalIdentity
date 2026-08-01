@@ -29,17 +29,20 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
         var restrictions = context.Options.InputLengthRestrictions;
         var code = context.Code;
 
+        // A required parameter that is absent or malformed never became a grant, so it is a malformed request
+        // and not an invalid one (DF9). Nothing was presented that the server could refuse as a credential —
+        // which is also why these two carry a description of their own instead of the generic refusal below.
         if (code.IsMissing())
         {
             logger.LogError(context, "Authorization code is missing");
-            context.Error(Oidc.Token.Errors.InvalidGrant, "Authorization code is missing");
+            context.Error(Oidc.Token.Errors.InvalidRequest, "Authorization code is missing");
             return;
         }
 
         if (code.Length > restrictions.AuthorizationCode)
         {
             logger.LogError(context, "Authorization code is too long");
-            context.Error(Oidc.Token.Errors.InvalidGrant, "Authorization code is too long");
+            context.Error(Oidc.Token.Errors.InvalidRequest, "Authorization code is too long");
             return;
         }
 
@@ -55,7 +58,7 @@ public class LoadCode : IDecorator<AuthorizationCodeContext>
             // must not become an oracle about which codes exist or who they belong to. The OAuth code stays
             // invalid_grant; only the description is now this single generic one (DF11).
             logger.LogError(context, "Authorization code is invalid");
-            context.Error(Oidc.Token.Errors.InvalidGrant, "Authorization code is invalid");
+            context.Error(Oidc.Token.Errors.InvalidGrant, AuthorizationCodeRefusal.Description);
             return;
         }
 

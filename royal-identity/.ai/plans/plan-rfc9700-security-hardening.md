@@ -546,7 +546,8 @@ emissão/anúncio de tokens no front-channel sem opção legada.
 - [ ] Adicionar regression test que prova a ausência do password grant.
 - [ ] Emitir e anunciar `iss` na authorization response conforme RFC 9207, com testes realm-aware.
 - [ ] Atualizar assessment para refletir comportamento removido e dados de configuração residuais.
-- [ ] Reutilizar `Tests.Integration/Endpoints/TokenErrorTests.cs` para downgrade e criar
+- [ ] Reutilizar `Tests.Integration/Endpoints/PkceTokenTests.cs` — onde a Fase 3 do plano de erros entregou as
+  linhas de PKCE, inclusive o downgrade — e `Tests.Integration/Endpoints/TokenErrorTests.cs`, e criar
   `Tests.Integration/Endpoints/AuthorizationCodeOnlyTests.cs` para runtime, metadata, password grant e `iss`;
   manter `Tests.Integration/Endpoints/CodeSingleUseTests.cs` como regressão do consumo.
 

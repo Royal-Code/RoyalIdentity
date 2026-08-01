@@ -1,16 +1,16 @@
 # Plan: Conformidade das respostas de erro do token endpoint com OAuth 2.1 (`plan-oauth21-token-error-responses`)
 
-## Status: EM EXECUÇÃO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; Fases 1-2 concluídas
+## Status: EM EXECUÇÃO - decisões fechadas (DF1-DF20); nenhuma pergunta aberta; Fases 1-3 concluídas
 
 ## Progresso
 
-`██░░` **50%** - 2 de 4 fases
+`███░` **75%** - 3 de 4 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato explícito de erro e asserções exatas | Concluida |
 | Fase 2 - Forma da requisição e autenticação do client | Concluida |
-| Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Pendente |
+| Fase 3 - Taxonomia dos grants, scopes, resources e PKCE | Concluida |
 | Fase 4 - Auditoria transversal, regressão e fechamento | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -826,23 +826,23 @@ apresentado e inválido. Corrigir PKCE sem enfraquecer consumo single-use ou com
 
 **Tarefas:**
 
-- [ ] Retornar `unauthorized_client` quando o client autenticado não permite o grant.
-- [ ] Preservar `unsupported_grant_type` para grant não implementado.
-- [ ] Corrigir `LoadCode` para `invalid_request` quando `code` estiver ausente ou acima do limite e preservar a
+- [x] Retornar `unauthorized_client` quando o client autenticado não permite o grant.
+- [x] Preservar `unsupported_grant_type` para grant não implementado.
+- [x] Corrigir `LoadCode` para `invalid_request` quando `code` estiver ausente ou acima do limite e preservar a
   classificação já correta de `LoadRefreshToken` para refresh ausente/acima do limite.
-- [ ] Preservar `invalid_grant` para code/refresh apresentado, mas inválido, expirado, revogado ou com binding
+- [x] Preservar `invalid_grant` para code/refresh apresentado, mas inválido, expirado, revogado ou com binding
   divergente.
-- [ ] Preservar equivalência anti-oracle dos cenários recusados de authorization code.
-- [ ] Verificar que `invalid_scope` permanece no campo correto em client credentials e refresh/downscope depois
+- [x] Preservar equivalência anti-oracle dos cenários recusados de authorization code.
+- [x] Verificar que `invalid_scope` permanece no campo correto em client credentials e refresh/downscope depois
   da migração única da Fase 1.
-- [ ] Verificar que `invalid_target` permanece no campo correto para RFC 8707 depois da migração única da Fase 1.
-- [ ] Rejeitar verifier sem challenge e challenge sem verifier com `invalid_request`.
-- [ ] Preservar `invalid_grant` para verifier incorreto contra challenge existente.
-- [ ] Responder `invalid_grant` 400 genérico no branch `default` de `PkceMatchValidator` conforme DF18,
+- [x] Verificar que `invalid_target` permanece no campo correto para RFC 8707 depois da migração única da Fase 1.
+- [x] Rejeitar verifier sem challenge e challenge sem verifier com `invalid_request`.
+- [x] Preservar `invalid_grant` para verifier incorreto contra challenge existente.
+- [x] Responder `invalid_grant` 400 genérico no branch `default` de `PkceMatchValidator` conforme DF18,
   registrando o método recusado somente em log e mantendo a descrição indistinguível das demais recusas de code.
-- [ ] Confirmar que falha PKCE após consumo não torna authorization code reutilizável.
-- [ ] Auditar extension grants para que usem código core ou de extensão documentado.
-- [ ] Adicionar testes table-driven para cada linha da matriz normativa alvo nos três grants suportados.
+- [x] Confirmar que falha PKCE após consumo não torna authorization code reutilizável.
+- [x] Auditar extension grants para que usem código core ou de extensão documentado.
+- [x] Adicionar testes table-driven para cada linha da matriz normativa alvo nos três grants suportados.
 
 **Critérios de aceite:** cada condição da matriz, inclusive o método persistido desconhecido, tem ao menos um
 teste que verifica `error`/status exato; ausência e valor inválido não são confundidos; client sem autorização usa
@@ -854,12 +854,66 @@ downgrade existe no plano RFC 9700.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~CodeToken|FullyQualifiedName~CodeSingleUse|FullyQualifiedName~RefreshToken|FullyQualifiedName~ClientToken"
+dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|FullyQualifiedName~PkceTokenTests|FullyQualifiedName~CodeToken|FullyQualifiedName~CodeSingleUse|FullyQualifiedName~RefreshToken|FullyQualifiedName~ClientToken"
 ```
+
+> `PkceTokenTests` entrou no filtro nesta fase: as linhas de PKCE exigem semear authorization codes com
+> challenge/método arbitrários e capturar log, o que nenhuma fixture existente fazia. O nome não contém
+> `CodeToken` nem `CodeSingleUse`, então precisa constar explicitamente — um filtro que não o selecionasse seria
+> verde sem verificar critério nenhum (DF16).
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluída em 2026-07-31.** Build e suíte completa verdes: **1349 aprovados, 50 ignorados** (opt-in
+PostgreSQL/Aspire), **0 falhas**. Comando da fase: 129 aprovados. `git diff --check` limpo.
+
+**As três correções de taxonomia.** `GrantTypeValidator` passou a responder `unauthorized_client`: o client
+autenticou, o servidor implementa o grant, e o que falha é a autorização para usá-lo — `invalid_grant` fala da
+credencial apresentada, não de quem pode apresentá-la. `LoadCode` passou a responder `invalid_request` para
+`code` ausente ou acima do limite, alinhando-se a `LoadRefreshToken`, que já estava certo: um parâmetro
+obrigatório que não veio nunca chegou a ser um grant. E `PkceMatchValidator` foi reescrito em torno da pergunta
+que falhou.
+
+Os dois testes marcados `_UntilFase3` na Fase 1 falharam nesta fase, que era exatamente o efeito pretendido ao
+nomeá-los assim: a mudança de comportamento apareceu como edição obrigatória de um arquivo, não como
+silêncio.
+
+**PKCE por condição (DF11).** A validação antiga saía cedo quando o code não tinha challenge, o que aceitava em
+silêncio um `code_verifier` apresentado para um code sem binding — o downgrade que o draft-15 §3.2.4 passou a
+nomear explicitamente. Agora presença divergente nos dois sentidos é `invalid_request`, com a mesma descrição
+para as duas direções, e só um verifier apresentado e diferente do challenge é `invalid_grant` (RFC 7636 §4.6).
+Esta última é a única linha que um code roubado alcança.
+
+**Equivalência anti-oracle (DF13/DF18).** A descrição das recusas de um code apresentado virou uma constante
+única, `AuthorizationCodeRefusal.Description`, compartilhada por três sítios: o code não encontrado/consumido/com
+binding divergente em `LoadCode`, o verifier que não bate e o `code_challenge_method` armazenado que o servidor
+não sabe processar. Era literal repetido; duas chamadas com a mesma intenção e redações diferentes recriariam o
+oráculo sem teste nenhum perceber. Expiração continua sendo a exceção deliberada de
+`plan-data-operational-storage` DF11 — contada uma vez, na troca que consome o code.
+
+O branch `default` responde `invalid_grant` 400 e registra o método recusado **somente em log**: sem isso, um
+registro corrompido ou um seed ruim seria indistinguível de tráfego comum de verifier errado e nunca seria
+diagnosticado. Um teste prova os dois lados — o método aparece no log e não aparece na descrição.
+
+**Auditoria de extension grants.** Não há nenhum em produção: `DefaultExtensionsGrantsProvider` recebe um
+`IEnumerable<IExtensionGrant>` que nasce vazio. A costura não fixa nem corrompe código de erro — o extension
+grant registra seu próprio pipeline e sinaliza por `context.Error`, com o mesmo writer e o mesmo contrato de
+string aberta de DF3. `CreateContextAsync` lança quando não acha handler, mas o `TokenEndpoint` só a chama
+depois de `GetAvailableGrantTypes().Contains(grantType)`, então nenhum dado de client alcança esse caminho. O
+teste de extensibilidade com código próprio pertence à Fase 4.
+
+**Testes.** `Tests.Integration/Endpoints/PkceTokenTests.cs` (10 casos) semeia authorization codes com
+challenge/método arbitrários sobre `LogCapturingAppFactory`: verifier sem challenge, challenge sem verifier, a
+igualdade entre as duas direções, verifier errado, método não suportado sem 5xx, a igualdade entre as três
+recusas de `invalid_grant`, o método no log e fora da resposta, o consumo preservado após falha de presença, e
+o controle provando que o verifier certo continua funcionando. `TokenErrorTests` foi para 57 casos, incluindo o
+contraste entre `unauthorized_client` e `unsupported_grant_type` — que respondem perguntas diferentes e não
+podem colapsar — e a igualdade entre code ausente e refresh ausente.
+
+**Handoff corrigido.** A Fase 3 do `plan-rfc9700-security-hardening.md` dizia reutilizar apenas
+`TokenErrorTests` para o downgrade de PKCE; as linhas de PKCE ficaram em `PkceTokenTests`, e a tarefa lá foi
+atualizada para apontar as duas fixtures. DF17 continua valendo: o hardening consome esta baseline e não tem
+segunda implementação do downgrade.
 
 ---
 
@@ -987,11 +1041,11 @@ git diff --check
 | Certificado TLS é contado indevidamente | conexão possui certificado usado para outro fim | request Basic válido é recusado | detectar somente mecanismos que a composição trata como client auth | Mitigado na Fase 2 — o certificado não é fonte apresentada; só decide em `Source.None` |
 | Validação de duplicidade bloqueia RFC 8707 | regra genérica rejeita `resource` repetido | quebra de resource indicators | allowlist DF8 + regressão multiresource | Fechado na Fase 2 — `resource` fora da lista single-valued, com regressão própria e a multiresource de `ClientTokenTests` verde |
 | Enum fecha erros | tipo aceita somente seis valores | extension grants/RFC 8707 quebram | strings + teste de extensão DF3 | Aberto |
-| Correção revela detalhes de code | descrições divergem por causa | oracle de existência/binding | preservar igualdade Operational + DF13 | Aberto |
+| Correção revela detalhes de code | descrições divergem por causa | oracle de existência/binding | preservar igualdade Operational + DF13 | Fechado na Fase 3 — descrição única em `AuthorizationCodeRefusal`, com teste de igualdade entre as três recusas |
 | Correção revela existência do client | assertion inválida e client desconhecido recebem códigos/descrições distintos | oracle de client e violação RFC 7523 | DF15 + matriz indistinguível | Fechado na Fase 2 — descrição única em `EvaluateClient` e três testes de convergência |
 | Correção do validator vaza para além do campo `error` | edição do `ResourcesValidator` altera condição, ordem ou transporte no authorize | regressão OIDC fora do escopo declarado | DF20 limita a mudança ao campo `error` + regressão `CodeAuthorize` na Fase 1 | Mitigado na Fase 1 — suíte completa verde e as duas regressões de authorize passam |
-| Método PKCE desconhecido some da observabilidade | `invalid_grant` genérico é emitido sem log do método recusado | corrupção de dado ou bug de seed passa despercebido | DF18 exige log do método + teste que prova descrição indistinguível | Aberto |
-| Recusa de dado do client vira 5xx | branch novo lança em vez de responder `invalid_grant` | erro de protocolo aparece como indisponibilidade e polui alerta | DF18 + invariante 10 + teste de status exato | Aberto |
+| Método PKCE desconhecido some da observabilidade | `invalid_grant` genérico é emitido sem log do método recusado | corrupção de dado ou bug de seed passa despercebido | DF18 exige log do método + teste que prova descrição indistinguível | Fechado na Fase 3 — `AnUnsupportedStoredMethod_IsNamedInTheLog_AndNowhereInTheResponse` prova os dois lados |
+| Recusa de dado do client vira 5xx | branch novo lança em vez de responder `invalid_grant` | erro de protocolo aparece como indisponibilidade e polui alerta | DF18 + invariante 10 + teste de status exato | Fechado na Fase 3 — o branch responde 400 e o teste assevera `NotEqual(InternalServerError)` |
 | Testes continuam falsos positivos | assertion busca texto no body | regressão passa sem conformidade | helper único e auditoria Fase 4 | Aberto |
 | Filtro obrigatório executa zero testes | arquivo/classe planejado não foi criado ou nome divergiu | comando verde sem verificar critério | DF16 + nomes de classe explícitos | Aberto |
 | Falha de backing vira erro OAuth | catch amplo em evaluator/handler | indisponibilidade mascarada como credencial inválida | teste 5xx e invariant 9 | Aberto |

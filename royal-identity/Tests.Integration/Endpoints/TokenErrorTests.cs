@@ -588,25 +588,63 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
         await response.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
     }
 
-    // Fase 1 baseline, corrected by Fase 3: a missing required parameter belongs to invalid_request, but the
-    // server still classifies it as invalid_grant today (LoadCode). Asserting the current value keeps the
-    // change visible instead of silent.
+    // DF9: a required parameter that is absent never became a grant, so it is a malformed request rather than
+    // an invalid one. This answered invalid_grant until Fase 3.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task Post_WithoutAuthorizationCode_Must_AnswerInvalidRequest(string? code)
+    {
+        await SeedClientAsync();
+
+        KeyValuePair<string, string>[] extra = code is null
+            ? [Field("grant_type", "authorization_code"), Field("redirect_uri", "http://localhost:5000/callback")]
+            : [
+                Field("grant_type", "authorization_code"),
+                Field("code", code),
+                Field("redirect_uri", "http://localhost:5000/callback")
+            ];
+
+        var response = await PostAsync(Authenticated(extra));
+
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
+    }
+
     [Fact]
-    public async Task Post_WithoutAuthorizationCode_Must_AnswerInvalidGrant_UntilFase3()
+    public async Task Post_WithATooLongAuthorizationCode_Must_AnswerInvalidRequest()
     {
         await SeedClientAsync();
 
         var response = await PostAsync(Authenticated(
             Field("grant_type", "authorization_code"),
+            Field("code", new string('c', 1024)),
             Field("redirect_uri", "http://localhost:5000/callback")));
 
-        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
     }
 
-    // Fase 1 baseline, corrected by Fase 3: an authenticated client that may not use the grant belongs to
-    // unauthorized_client (GrantTypeValidator).
     [Fact]
-    public async Task Post_WithGrantNotAllowedForTheClient_Must_AnswerInvalidGrant_UntilFase3()
+    public async Task Post_WithoutRefreshToken_Must_AnswerInvalidRequest_LikeAMissingCode()
+    {
+        // The two grants classify a missing required parameter the same way. LoadRefreshToken was already
+        // right; LoadCode is what Fase 3 brought into line, and this pins them together.
+        await SeedClientAsync();
+
+        var missingCode = await (await PostAsync(Authenticated(
+            Field("grant_type", "authorization_code"),
+            Field("redirect_uri", "http://localhost:5000/callback")))).ReadErrorAsync();
+
+        var missingRefresh = await (await PostAsync(Authenticated(
+            Field("grant_type", "refresh_token")))).ReadErrorAsync();
+
+        Assert.Equal(Oidc.Token.Errors.InvalidRequest, missingCode.Error);
+        Assert.Equal(missingCode.Error, missingRefresh.Error);
+    }
+
+    // DF10: the client authenticated fine and the server implements the grant; what fails is the client's
+    // authorization to use it. This answered invalid_grant until Fase 3.
+    [Fact]
+    public async Task Post_WithGrantNotAllowedForTheClient_Must_AnswerUnauthorizedClient()
     {
         var clientId = $"single-grant-client-{CryptoRandom.CreateUniqueId(6)}";
         var clientSecret = CryptoRandom.CreateUniqueId();
@@ -629,7 +667,43 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
             Field("client_id", clientId),
             Field("client_secret", clientSecret));
 
-        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
+        await response.AssertErrorAsync(Oidc.Token.Errors.UnauthorizedClient);
+    }
+
+    [Fact]
+    public async Task Post_WithGrantNotAllowed_Must_NotBeConfusedWithAnUnimplementedGrant()
+    {
+        // unauthorized_client and unsupported_grant_type answer different questions: "you may not use this"
+        // versus "this server does not have it". Collapsing them would hide a misconfigured client behind a
+        // message about the server's capabilities.
+        var clientId = $"single-grant-client-{CryptoRandom.CreateUniqueId(6)}";
+        var clientSecret = CryptoRandom.CreateUniqueId();
+        await factory.SaveClientAsync(
+            factory.Handles.Demo,
+            clientId,
+            configured =>
+            {
+                configured.Name = "Single Grant Client";
+                configured.ClientType = ClientType.Confidential;
+                configured.RequireClientSecret = true;
+                configured.AllowedGrantTypes.Clear();
+                configured.AllowedGrantTypes.Add("client_credentials");
+                configured.Secrets.Add(new ClientSecret(clientSecret.Sha512()));
+            });
+
+        var notAllowed = await PostAsync(
+            Field("grant_type", "refresh_token"),
+            Field("refresh_token", "whatever"),
+            Field("client_id", clientId),
+            Field("client_secret", clientSecret));
+
+        var notImplemented = await PostAsync(
+            Field("grant_type", "urn:example:no-such-grant"),
+            Field("client_id", clientId),
+            Field("client_secret", clientSecret));
+
+        await notAllowed.AssertErrorAsync(Oidc.Token.Errors.UnauthorizedClient);
+        await notImplemented.AssertErrorAsync(Oidc.Token.Errors.UnsupportedGrantType);
     }
 
     // ---------------------------------------------------------------------------------------------------
