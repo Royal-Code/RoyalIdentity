@@ -695,8 +695,11 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|Fully
 
 **Concluída em 2026-07-31**, com uma segunda rodada no mesmo dia respondendo a uma revisão externa da
 implementação. Os três achados procederam; o primeiro era um defeito funcional real, reproduzido antes de
-qualquer correção. Build e suíte completa verdes: **1334 aprovados, 50 ignorados** (opt-in PostgreSQL/Aspire),
-**0 falhas**. Comando da fase: 118 aprovados, 2 ignorados. `git diff --check` limpo.
+qualquer correção. Build e suíte completa verdes: **1336 aprovados, 50 ignorados** (opt-in PostgreSQL/Aspire),
+**0 falhas**. Comando da fase: 120 aprovados, 2 ignorados. `git diff --check` limpo.
+
+Uma terceira rodada, também no mesmo dia, fechou três resíduos apontados por uma segunda revisão: a decisão do
+header ainda olhava o valor, faltava o 404 do JWKS e a contagem de revocation estava errada.
 
 **Preflight.** `RoyalIdentity/Endpoints/DirectRequestPreflight.cs` roda sobre a `NameValueCollection` original,
 antes de qualquer leitura escalar, da criação do context e de qualquer efeito. Ele decide três coisas:
@@ -732,9 +735,14 @@ evaluators, que barravam qualquer header presente, tinham acabado de ser removid
 antes de corrigido: os quatro esquemas falharam o teste novo, e o controle com client público sem header
 passou.
 
-A fonte passou a ser `AuthorizationHeader`, decidida por **presença**, não por esquema: um header que o
-endpoint não sabe usar continua sendo um client tentando autenticar, e classificá-lo como "nada apresentado" é
-que era o erro. `BasicSecretEvaluator` responde por todo o header e devolve `null` para qualquer esquema que
+A fonte passou a ser `AuthorizationHeader`, decidida por **presença da chave**, não pelo esquema nem pelo
+conteúdo: um header que o endpoint não sabe usar continua sendo um client tentando autenticar, e classificá-lo
+como "nada apresentado" é que era o erro. A primeira correção ainda testava o valor com `IsPresent()`, e a
+segunda revisão mostrou que isso deixava passar `Authorization: "   "` — reproduzido antes de corrigido. A
+lição é a mesma do defeito original: qualquer teste baseado em conteúdo tem uma forma que ele não reconhece, e
+a resposta para forma não reconhecida tem de ser recusar, nunca supor que nada foi apresentado. Um header de
+valor inteiramente vazio não tem caso de teste porque não é transmissível — o `HttpClient` não o envia, a
+requisição chega sem a chave e é, corretamente, um pedido comum de client público. `BasicSecretEvaluator` responde por todo o header e devolve `null` para qualquer esquema que
 não seja Basic, de modo que a recusa sai por um caminho único — `EvaluateClient` com 401 e challenge. Mais de
 um header `Authorization` é `invalid_request`, pela mesma razão de cardinalidade dos parâmetros: escolher um
 entre vários deixaria a credencial que autentica diferente da que foi inspecionada.
@@ -766,7 +774,7 @@ reaparecem nem no core nem em Pipelines. `ProtocolErrorBoundaryTests` foi de 8 p
 token endpoint, embora a fase tivesse alterado dez endpoints e tornado revocation estruturalmente dependente do
 preflight.
 
-`RevocationTests` ganhou nove casos — parâmetro repetido em teoria de quatro, dois mecanismos, par de assertion
+`RevocationTests` ganhou dez casos em seis métodos — parâmetro repetido em teoria de quatro, dois mecanismos, par de assertion
 incompleto, Basic inválido com 401 e challenge, ausência do segredo exigido, e o header inutilizável nas duas
 formas. Revocation é onde a falha do achado 1 mordia mais fundo: `demo_client` é público, então um header
 `Authorization` classificado como "nada apresentado" revogava com sucesso. RFC 7009 §2.2 torna token
@@ -777,15 +785,19 @@ valor exato de `Allow` por endpoint (`POST`, `GET`, `GET, POST`), `application/p
 campos `error`/`error_description` em 405, 415 e 404. O guard arquitetural prova que os pseudocódigos não
 voltaram; esta suíte prova o contrato que os substituiu.
 
+Os três callers de `EndpointErrors.NotFound` estão cobertos, cada um com o interruptor que de fato o desliga:
+discovery e protected resource metadata por `Endpoints.EnableDiscoveryEndpoint`, e o JWKS por
+`Discovery.ShowKeySet`. Um interruptor único deixaria o JWKS respondendo 200 e o caso não provaria nada.
+
 Escrever essa suíte revelou que **`CheckSessionEndpoint` não tem rota**: `MapOpenIdConnectProviderEndpoints`
 não o mapeia, e um método não suportado responde 404 por ausência de rota, não 405. Não é defeito desta fase —
 mapeá-lo pertence a [plan-oidc-session-management.md](plan-oidc-session-management.md) — e a exclusão está
 anotada na própria tabela de casos para não parecer esquecimento.
 
-**Testes.** `TokenErrorTests` foi de 19 para 49 casos: dez parâmetros core repetidos em teoria, `resource`
+**Testes.** `TokenErrorTests` foi de 19 para 50 casos: dez parâmetros core repetidos em teoria, `resource`
 repetido que precisa continuar funcionando, os três pares de mecanismos simultâneos, par de assertion incompleto
 nos dois sentidos, tipo de assertion não suportado, Basic inválido e Basic malformado com challenge, secret de
-body sem challenge, as três convergências anti-oracle, os quatro esquemas de header inutilizável, header
+body sem challenge, as três convergências anti-oracle, os cinco esquemas de header inutilizável, header
 duplicado, o controle provando que client público sem header continua funcionando, `Allow` no 405 e a prova de
 que 405/415 não têm campo
 `error`. Em `PrivateKeyJwtReplayProtectionTests`, um teste novo apresenta a mesma assertion primeiro junto de um

@@ -102,14 +102,25 @@ public class HttpFailureTests : IClassFixture<PersistentStorageAppFactory>
         await AssertProblemDetailsAsync(response);
     }
 
-    [Theory]
-    [InlineData("discovery")]
-    [InlineData("protected-resource-metadata")]
-    public async Task ADisabledEndpoint_Must_Answer404AsProblemDetails(string endpoint)
+    /// <summary>
+    /// The three callers of <c>EndpointErrors.NotFound</c>, each with the switch that actually turns it off.
+    /// Discovery and the protected resource metadata are gated by <c>Endpoints.EnableDiscoveryEndpoint</c>; the
+    /// key set has its own switch, <c>Discovery.ShowKeySet</c>, so a single toggle would leave JWKS answering
+    /// 200 and the case would prove nothing.
+    /// </summary>
+    public static TheoryData<string, bool> NotFoundCases => new()
     {
-        await factory.UpdateRealmAsync(
-            factory.Handles.Demo,
-            options => options.Endpoints.EnableDiscoveryEndpoint = false);
+        // endpoint, gated by Endpoints.EnableDiscoveryEndpoint (false means Discovery.ShowKeySet)
+        { "discovery", true },
+        { "protected-resource-metadata", true },
+        { "jwks", false },
+    };
+
+    [Theory]
+    [MemberData(nameof(NotFoundCases))]
+    public async Task ADisabledEndpoint_Must_Answer404AsProblemDetails(string endpoint, bool gatedByDiscoveryEndpoint)
+    {
+        await SetGateAsync(gatedByDiscoveryEndpoint, enabled: false);
         try
         {
             var response = await factory.CreateClient().GetAsync(UrlOf(endpoint));
@@ -119,9 +130,20 @@ public class HttpFailureTests : IClassFixture<PersistentStorageAppFactory>
         }
         finally
         {
-            await factory.UpdateRealmAsync(
-                factory.Handles.Demo,
-                options => options.Endpoints.EnableDiscoveryEndpoint = true);
+            await SetGateAsync(gatedByDiscoveryEndpoint, enabled: true);
         }
+    }
+
+    private Task SetGateAsync(bool gatedByDiscoveryEndpoint, bool enabled)
+    {
+        return factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options =>
+            {
+                if (gatedByDiscoveryEndpoint)
+                    options.Endpoints.EnableDiscoveryEndpoint = enabled;
+                else
+                    options.Discovery.ShowKeySet = enabled;
+            });
     }
 }

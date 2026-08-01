@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
@@ -116,8 +117,11 @@ internal static class DirectRequestPreflight
             return false;
         }
 
-        var hasAuthorizationHeader = authorizationHeaders.Count is 1
-            && authorizationHeaders[0].IsPresent();
+        // The key existing is the whole decision. Looking at the value — even only to reject empty or
+        // whitespace — is how the previous version let unusable headers through: any content-based test has a
+        // shape it does not recognise, and the answer for an unrecognised shape must be "refuse", never
+        // "assume nothing was presented".
+        var hasAuthorizationHeader = httpContext.Request.Headers.ContainsKey(HeaderNames.Authorization);
         var hasPostSecret = IsPresent(raw, Oidc.Token.Request.ClientSecret);
 
         var mechanisms = (hasAuthorizationHeader ? 1 : 0) + (hasPostSecret ? 1 : 0) + (hasAssertion ? 1 : 0);

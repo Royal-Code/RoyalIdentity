@@ -398,6 +398,11 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
     [InlineData("Basic")]
     [InlineData("Negotiate abc")]
     [InlineData("Digest username=\"x\"")]
+    [InlineData("   ")]
+    // A header with an entirely empty value has no case here: HttpClient does not transmit one, so the request
+    // arrives with no Authorization key at all and is — correctly — an ordinary public client request. The
+    // whitespace variant above is the reachable form of the same idea, and it did fall through until the
+    // decision stopped looking at the value.
     public async Task Post_WithAnUnusableAuthorizationHeader_Must_NotFallBackToNoSecret(string authorization)
     {
         var clientId = await SeedPublicClientAsync();
