@@ -4,6 +4,26 @@ Itens identificados como válidos mas diferidos do planejamento ativo. Cada item
 
 ---
 
+## OpenID Connect Session Management / Check Session — ✅ CONCLUÍDO
+
+**Identificador:** `BL-OIDC-SESSION-MANAGEMENT`
+
+**Área:** OpenID Connect / Sessão / Logout / Browser
+
+**Status:** Promovido e concluído em 2026-08-01.
+
+**Plano:** [plan-oidc-session-management.md](../plans/plan-oidc-session-management.md).
+
+**Roadmap:** item “OpenID Connect Session Management e Check Session” de
+[plans-roadmap-02.md](../plans/plans-roadmap-02.md).
+
+**Resultado:** OP User Agent State opaco e realm-scoped, `session_state` origin-bound, `prompt=none` sem UI,
+endpoint/discovery sob o mesmo gate HTTPS, iframe com Web Crypto/CSP por nonce e aceite Chromium cross-site
+opt-in. A distribuição também preserva AGPLv3 para a obra combinada e as atribuições Apache-2.0 do material
+derivado de IS4/IdentityModel.
+
+---
+
 ## Aderência RFC 9700 e assessment de clients
 
 **Identificador:** `BL-SEC-RFC9700`

@@ -77,17 +77,17 @@ definida em `../analisys/`.
   `WWW-Authenticate` para tentativa via header; taxonomia corrigida em `unauthorized_client`, `invalid_request`
   e PKCE; recusas de authorization code indistinguíveis por construção; 405/415/404 como Problem Details, sem
   códigos OAuth inventados. Guard arquitetural com códigos derivados por reflexão impede regressão.
+- [plan-oidc-session-management.md](plan-oidc-session-management.md) — CONCLUÍDO (2026-08-01), 7/7 fases.
+  OP User Agent State opaco/realm-scoped, `session_state` origin-bound, `prompt=none` sem UI, payloads v2,
+  endpoint/discovery HTTPS, iframe Web Crypto frameable e aceites Node/Chromium cross-site. O fechamento adicionou
+  documentação operacional e a distribuição AGPLv3 + Apache-2.0 com notice, 80 candidatos de proveniência
+  classificados e gate reproduzível.
 
 ## Próxima execução
 
-A próxima execução é a Fase 7 de [plan-oidc-session-management.md](plan-oidc-session-management.md); as Fases 1-6
-já fixaram estado opaco, formato v1, payloads Configuration v2, ciclo ticket/cookie/logout, Authentication
-Responses, `prompt=none`, authorization-code payload operacional v2, rota/discovery HTTPS realm-scoped, o OP
-iframe moderno com Web Crypto/CSP por nonce e os aceites Playwright opt-in com Kestrel HTTPS, origins distintos
-e isolamento multi-realm sobre a baseline protocolar concluída por `plan-oauth21-token-error-responses.md`.
-Depois, executar
-[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), para que os payloads Configuration sejam
-promovidos deterministicamente de v2 para v3. Em seguida, executar
+A próxima execução é [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), que consome os payloads
+Configuration v2 e a factory de Authentication Response do Session Management concluído e os promove
+deterministicamente para v3. Em seguida, executar
 [plan-localization.md](plan-localization.md), que consome a baseline v3, promove as options de realm para v4 e
 fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
@@ -156,8 +156,8 @@ nenhuma seleção de código OAuth.
 
 ### 2.1. OpenID Connect Session Management e Check Session
 
-**Plano criado:** [plan-oidc-session-management.md](plan-oidc-session-management.md)
-(EM EXECUÇÃO — Fases 1-6 concluídas; Fase 7 é a próxima; 6/7 fases concluídas)
+**Plano concluído:** [plan-oidc-session-management.md](plan-oidc-session-management.md)
+(CONCLUÍDO em 2026-08-01 — 7/7 fases)
 
 Implementa o OP side do OpenID Connect Session Management 1.0 sem portar a infraestrutura de sessão legada do
 IS4. O plano cria um OP User Agent State opaco e realm-scoped, corrige `prompt=none`, move `session_state` para

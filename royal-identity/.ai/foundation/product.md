@@ -69,6 +69,22 @@ A middleware (`RealmDiscoveryMiddleware`) identifies the realm from the route be
 - `AllowPlainTextPkce = false` by default (plain method is insecure, must be explicitly enabled)
 - S256 is the expected default method
 
+### OpenID Connect Session Management
+
+- `/{realm}/connect/checksession` is implemented and advertised as `check_session_iframe` only when enabled and
+  reached through effective HTTPS.
+- Each realm owns an opaque OP User Agent State stored in the protected authentication ticket and mirrored in a
+  realm-qualified, host-only, `Secure`, `SameSite=None`, JavaScript-readable cookie.
+- `session_state` is bound to client and browser origin and is emitted by the centralized Authentication Response
+  factory; it is not persisted in the authorization code and contains neither `sid` nor user claims.
+- `CheckSessionStateManager` synchronizes login, ticket validation, rotation and logout per request. Cookie or
+  realm options are never captured in the cached named-options delegate.
+- Check Session complements RP-Initiated, Front-Channel and Back-Channel Logout. A missing/blocked third-party
+  cookie returns `changed`; RPs must avoid retry loops and use logout notification when authoritative delivery is
+  required.
+- Chromium/Kestrel acceptance is opt-in through `scripts/Test-CheckSessionBrowser.ps1`; the default solution does
+  not depend on Playwright or an installed browser.
+
 ---
 
 ## Domain Model: Key Entities

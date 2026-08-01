@@ -112,6 +112,24 @@ Pipelines are registered per context type as `IContextPipeline<TContext>` in the
 
 Custom `RealmsAuthenticationSchemeProvider` routes authentication to realm-specific cookie schemes. `RealmAuthenticationHandler` handles authentication per realm. `ConfigureRealmCookieAuthenticationOptions` configures cookie options per realm.
 
+### Check Session lifecycle
+
+`CheckSessionStateManager` owns the per-request lifecycle of the opaque OP User Agent State. The value lives in
+the protected authentication ticket, a realm-qualified JavaScript-readable cookie and the current
+`HttpContext.Items`; it is never a claim or storage handle. `ConfigureRealmCookieAuthenticationOptions` resolves
+the scoped manager from `HttpContext.RequestServices` inside `OnValidatePrincipal`, so cached named options do not
+capture a realm or scoped service.
+
+`AuthorizeResponseFactory` is the only construction boundary that calls `ISessionStateGenerator`. It binds
+`session_state` to the validated redirect origin and supported OIDC Authentication Response. The
+`CheckSessionEndpoint` is mapped at `/{realm}/connect/checksession`, fails closed when disabled/non-HTTPS and is
+advertised by discovery under the same gate. Its iframe uses Web Crypto, exact `event.source`/`event.origin`, a
+nonce CSP and no blocking framing header.
+
+Lifecycle/HTTP coverage lives in `Tests.Integration`, structural guards in `Tests.Architecture`, pure envelope
+vectors in `Tests.Identity`, and real Chromium acceptance in `Tests.Browser`. `Tests.Browser` deliberately remains
+outside `RoyalIdentity.sln`; run it only through `scripts/Test-CheckSessionBrowser.ps1`.
+
 ### DI Registration Entry Points
 
 - `IServiceCollection.AddOpenIdConnectProviderServices()` — registers all core services

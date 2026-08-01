@@ -1,3 +1,8 @@
+// This file contains material derived from IdentityServer4 and/or IdentityModel.
+// Original component copyrights remain with Brock Allen, Dominick Baier, and/or Duende Software.
+// Licensed under Apache License 2.0; see LICENSES/Apache-2.0.txt and THIRD-PARTY-NOTICES.md.
+// Modified by RoyalIdentity contributors for the RoyalIdentity rearchitecture.
+//
 /*
  * The result shape originated in IdentityServer4's Apache-2.0 CheckSessionResult.
  * RoyalIdentity substantially rewrote the HTML and JavaScript in 2026: the bundled third-party SHA-256,

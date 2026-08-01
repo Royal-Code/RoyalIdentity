@@ -1,0 +1,1008 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-01",
+  "scope": {
+    "repositoryRoot": "C:/git/RoyalCode/RoyalIdentity",
+    "upstreamRoots": [
+      "old-is4/src/IdentityServer4/src",
+      "old-is4/src/IdentityModel"
+    ],
+    "productionSelector": "tracked source files under royal-identity/RoyalIdentity* projects",
+    "extensions": [
+      ".cs",
+      ".cshtml",
+      ".razor",
+      ".js"
+    ],
+    "exclusions": [
+      "bin",
+      "obj",
+      "vendored assets such as wwwroot/lib"
+    ],
+    "scannedProductionFiles": 734,
+    "scannedUpstreamFiles": 450,
+    "method": [
+      "Enumerate every eligible file under both upstream roots and every tracked production source file.",
+      "Create candidates by equal basename.",
+      "Review normalized source-line/token similarity to find renamed candidates and false positives.",
+      "Inspect Git introduction/history and relevant completed implementation plans.",
+      "Classify every candidate as derived or independent; pending classifications are forbidden."
+    ]
+  },
+  "summary": {
+    "candidates": 80,
+    "derived": 64,
+    "independent": 16,
+    "pending": 0,
+    "upstreamNoticePresent": false
+  },
+  "entries": [
+    {
+      "production": "royal-identity/RoyalIdentity.Pipelines/Abstractions/IEndpointHandler.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Hosting/IEndpointHandler.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "independent",
+      "evidence": "RoyalIdentity dependency-free pipeline contract with a different result and dispatch model; only the generic endpoint-handler name overlaps.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity.Security/Certificates/X509CertificateExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/X509CertificateExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity.Security/Cryptography/CryptoRandom.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/CryptoRandom.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "independent",
+      "evidence": "Created in the completed RoyalIdentity.Security plan directly over RandomNumberGenerator; name and protocol purpose alone caused the match.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity.Security/Cryptography/HashExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/HashExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "independent",
+      "evidence": "Created in the completed RoyalIdentity.Security plan as delegating helpers over the new Hashing primitive; upstream body is not retained.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity.Security/Encoding/Base64Url.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/Base64Url.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "independent",
+      "evidence": "Created in the completed RoyalIdentity.Security plan as a thin facade over System.Buffers.Text.Base64Url; no upstream implementation body is retained.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity.Storage.EntityFramework/Configuration/Materialization/ConfigurationObjectJsonConverter.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Logging/LogSerializer.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Created by the configuration-storage plan for polymorphic payload materialization; generic serialization statements produced the weak match.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity.Storage.EntityFramework/Operational/Materialization/OperationalPayloadCodec.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Logging/LogSerializer.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Created by the operational-storage plan as a fail-closed versioned codec; generic serialization statements produced the weak match.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity.Storage.EntityFramework/Operational/Materialization/Payloads/AuthorizationCodePayload.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Validation/Models/ValidatedAuthorizeRequest.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Created by the operational-storage plan as a versioned persistence payload; shared authorization fields are protocol vocabulary.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contexts/AuthorizeContext.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/Client/Messages/PushedAuthorizationRequest.cs",
+        "old-is4/src/IdentityServer4/src/Validation/Models/ValidatedAuthorizeRequest.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Pipeline request context independently implements public OAuth/OIDC parameters; similarity is specification vocabulary, not retained upstream code.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contexts/Items/Token.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Events/TokenIssuedSuccessEvent.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Small pipeline context item; exact-line similarity came from generic token properties, not retained event implementation.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contexts/Validators/ResponseTypeEqualityComparer.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Validation/Default/ResponseTypeEqualityComparer.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Defaults/DefaultBackChannelLogoutNotifier.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Services/Default/BackChannelLogoutHttpClient.cs",
+        "old-is4/src/IdentityServer4/src/Services/Default/DefaultBackChannelLogoutService.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Defaults/DefaultBearerTokenLocator.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Validation/Default/BearerTokenUsageValidator.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Defaults/DefaultConsentService.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Services/Default/DefaultConsentService.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Defaults/DefaultJwtFactory.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/TokenExtensions.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Defaults/DefaultProfileService.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Services/Default/DefaultProfileService.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Defaults/DefaultTokenClaimsService.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Services/Default/DefaultClaimsService.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Defaults/ProtectedDataMessageStore.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Stores/Default/ProtectedDataMessageStore.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/IAuthorizeRequestValidator.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Validation/IAuthorizeRequestValidator.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/IConsentService.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Services/IConsentService.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/IProfileService.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Services/IProfileService.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/IRedirectUriValidator.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Validation/IRedirectUriValidator.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/ITokenValidator.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Validation/ITokenValidator.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Models/EvaluatedToken.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Validation/Models/TokenValidationResult.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "RoyalIdentity validation boundary model; weak similarity is limited to standard token-result fields.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Models/Messages/ErrorMessage.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Models/Messages/ErrorMessage.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Models/Messages/LogoutCallbackMessage.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Models/Messages/LogoutRequest.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Models/Messages/Message.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Models/Messages/Message.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Models/RefreshTokenRequest.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/Client/Messages/RefreshTokenRequest.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "independent",
+      "evidence": "Internal refresh-token factory snapshot; unrelated to IdentityModel's outbound HTTP refresh-token request despite the basename.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Contracts/Storage/IMessageStore.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Stores/IMessageStore.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Endpoints/AuthorizeCallbackEndpoint.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/AuthorizeCallbackEndpoint.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Endpoints/AuthorizeEndpoint.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/AuthorizeEndpoint.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Endpoints/CheckSessionEndpoint.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/CheckSessionEndpoint.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Endpoints/DiscoveryEndpoint.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/Client/DiscoveryEndpoint.cs",
+        "old-is4/src/IdentityServer4/src/Endpoints/DiscoveryEndpoint.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Endpoints/EndSessionEndpoint.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/EndSessionEndpoint.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Endpoints/TokenEndpoint.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/TokenEndpoint.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Endpoints/UserInfoEndpoint.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/UserInfoEndpoint.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Events/Event.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Events/Infrastructure/Event.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Events/EventCategories.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Events/Infrastructure/EventCategories.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Events/EventTypes.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Events/Infrastructure/EventType.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Events/UserLoginFailureEvent.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Events/UserLoginFailureEvent.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Events/UserLoginSuccessEvent.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Events/UserLoginSuccessEvent.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Events/UserLogoutSuccessEvent.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Events/UserLogoutSuccessEvent.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/AuthenticationPropertiesExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/AuthenticationPropertiesExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/ClaimsExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/ClaimsExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/ClientExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/ClientExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/CollectionExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/IReadableStringCollectionExtensions.cs",
+        "old-is4/src/IdentityServer4/src/Extensions/NameValueCollectionExtensions.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/DateTimeExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/DateTimeExtensions.cs",
+        "old-is4/src/IdentityServer4/src/Extensions/DateTimeExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/HttpContextExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/HttpContextExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/HttpRequestExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/HttpRequestExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/HttpResponseExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/HttpResponseExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/LoggerExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Logging/LogSerializer.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "RoyalIdentity context redaction/structured logging implementation; weak similarity to LogSerializer is generic JSON serialization vocabulary.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/PrincipalExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Extensions/PrincipalExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Extensions/StringExtensions.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/StringExtensions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Models/Consent.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Models/Grant.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Independent realm-scoped consent model; weak similarity to the upstream grant is generic consent data.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/AuthenticationOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/AuthenticationOptions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/Constants.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Constants.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/CorsOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/CorsOptions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/CspOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/CspOptions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/DiscoveryOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/DiscoveryOptions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/EndpointsOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/EndpointOptions.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/InputLengthRestrictions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/InputLengthRestrictions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/KeyOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/IdentityServerConstants.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Independent key-management options; the weak match consists of standard algorithm/key vocabulary.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/LoggingOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/LoggingOptions.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/MutualTlsOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/MtlsOptions.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Options/ServerOptions.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/DependencyInjection/Options/IdentityServerOptions.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/AuthorizeResponse.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/Client/Messages/AuthorizeResponse.cs",
+        "old-is4/src/IdentityServer4/src/ResponseHandling/Models/AuthorizeResponse.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/HttpResults/CheckSessionResult.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/Results/CheckSessionResult.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/HttpResults/ConsentPageResult.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/Results/ConsentPageResult.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/HttpResults/CustomRedirectResult.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/Results/CustomRedirectResult.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/HttpResults/LoginPageResult.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/Results/LoginPageResult.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/HttpResults/ResponseToFormPostResult.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/Results/AuthorizeResult.cs"
+      ],
+      "discovery": [
+        "content-and-history"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/HttpResults/TokenResult.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/Results/TokenResult.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/HttpResults/UserInfoResult.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Endpoints/Results/UserInfoResult.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/InteractionResponse.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/ResponseHandling/Models/InteractionResponse.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/TokenResponse.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/Client/Messages/TokenResponse.cs",
+        "old-is4/src/IdentityServer4/src/ResponseHandling/Models/TokenResponse.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Responses/UserInfoResponse.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/Client/Messages/UserInfoResponse.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "independent",
+      "evidence": "RoyalIdentity IResponseHandler wrapper around an already materialized dictionary; no IdentityModel response parser/model implementation is retained.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Utils/ClaimComparer.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/ClaimComparer.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Utils/CryptoHelper.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Configuration/CryptoHelper.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Utils/Json.cs",
+      "upstream": [
+        "old-is4/src/IdentityServer4/src/Logging/LogSerializer.cs"
+      ],
+      "discovery": [
+        "similarity-review"
+      ],
+      "classification": "independent",
+      "evidence": "Independent System.Text.Json helper; generic serialization statements produced the weak match.",
+      "action": "No Apache-derived-file header; retain this evidence in the inventory."
+    },
+    {
+      "production": "royal-identity/RoyalIdentity/Utils/X509.cs",
+      "upstream": [
+        "old-is4/src/IdentityModel/X509Certificates/X509.cs"
+      ],
+      "discovery": [
+        "basename"
+      ],
+      "classification": "derived",
+      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
+      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
+    }
+  ]
+}

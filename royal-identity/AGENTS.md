@@ -59,9 +59,14 @@ acceptable at that instant. `Authentication.ClientAssertionMaxLifetime` (default
 hour) makes retention a server value. `RoyalIdentity.Server` uses the durable backing, `RoyalIdentity.Demo` the
 in-memory one, and `Tests.Architecture` guards which one each resolves.
 
-`.ai/plans/plan-oauth21-token-error-responses.md` is completed (4/4 phases). The active plan is
-`.ai/plans/plan-oidc-session-management.md`: Fases 1-3 of 7 are complete and Fase 4 (route, HTTPS discovery and
-realm isolation) is next. Resources/scopes remain volatile per baseline DF22. The production
+`.ai/plans/plan-oauth21-token-error-responses.md` is **completed (4/4 phases)** and is the error baseline for
+direct OAuth endpoints. `.ai/plans/plan-oidc-session-management.md` is **completed (7/7 phases)** — opaque
+realm-scoped OP User Agent State, centralized origin-bound `session_state`, `prompt=none` without UI,
+Check Session route/discovery under an HTTPS gate, Web Crypto iframe, opt-in Node/Chromium acceptances, and the
+AGPLv3 + Apache-2.0 provenance/notice gate. Future framing hardening must preserve the iframe exception recorded
+in that plan and in `plan-rfc9700-security-hardening.md` DF19.
+
+No implementation plan is currently active. Resources/scopes remain volatile per baseline DF22. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
 migrates or seeds. `RoyalIdentity.Demo` is a self-provisioned, ephemeral SQLite in-memory executable.
 `Tests.Host` is storage-agnostic, and the default `Tests.Integration` composition uses

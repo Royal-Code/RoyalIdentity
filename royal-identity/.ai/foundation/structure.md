@@ -23,6 +23,7 @@ royal-identity/
 ├── Tests.Storage/           ← Provider-neutral storage contracts and provider acceptances
 ├── Tests.UserAccounts/      ← Module contracts/use cases/provider acceptances
 ├── Tests.Architecture/      ← Project/composition boundary guards
+├── Tests.Browser/           ← Opt-in Chromium/Kestrel Session Management acceptance; outside the solution
 ├── Tests.Host/              ← Storage-agnostic WebApplicationFactory target
 ├── Tests.WebApp/            ← Web UI tests
 ├── Tests.Identity/          ← Identity/user tests
@@ -112,10 +113,12 @@ Mapping/
 
 ```
 Authentication/
+  CheckSessionStateManager.cs           ← Realm-scoped OP User Agent State ticket/cookie lifecycle
+  SessionStateFormat.cs                 ← Origin-bound opaque session_state envelope
+  ConfigureRealmCookieAuthenticationOptions.cs ← Per-request synchronization via RequestServices
   RealmDiscoveryMiddleware.cs            ← Extracts realm from route, populates HttpContext
   RealmsAuthenticationSchemeProvider.cs  ← Routes auth to per-realm cookie scheme
   RealmAuthenticationHandler.cs         ← Per-realm auth handler
-  ConfigureRealmCookieAuthenticationOptions.cs
 
 Contexts/                               ← One context class per endpoint operation
   EndpointContextBase.cs                ← Base: Raw (NameValueCollection), Realm, Options
@@ -143,7 +146,8 @@ Contexts/                               ← One context class per endpoint opera
     ClientResourceDecorator.cs          ← Enriches with client's allowed resources
     ConsentDecorator.cs                 ← Consent flow intercept
     PromptLoginDecorator.cs             ← Handles prompt=login
-    StateHashDecorator.cs               ← Calculates session state hash
+    StateHashDecorator.cs               ← Calculates the OIDC state hash claim for token-bearing responses
+    PromptNoneInteractionDecorator.cs   ← Converts surviving prompt=none interaction to interaction_required
     EndSessionDecorator.cs              ← End-session flow enrichment
     ProcessRequestObject.cs             ← Handles JAR (Request Object)
 
@@ -311,15 +315,18 @@ Extensions/                             ← Extension methods on framework types
   DateTimeExtensions.cs
   WildcardExtensions.cs
 
-Responses/HttpResults/                  ← IResult implementations for OIDC responses
-  TokenResult.cs
-  TokenEndpointParameters.cs
-  UserInfoResult.cs
-  JwkResult.cs
-  CheckSessionResult.cs
-  ResponseToQueryResult.cs
-  ResponseToFragmentResult.cs
-  ResponseToFormPostResult.cs
+Responses/
+  AuthorizeResponseFactory.cs           ← Single construction boundary for OIDC Authentication Responses/session_state
+  CheckSessionResponse.cs               ← Pipeline response that delegates to the OP iframe result
+  HttpResults/                          ← IResult implementations for OIDC responses
+    TokenResult.cs
+    TokenEndpointParameters.cs
+    UserInfoResult.cs
+    JwkResult.cs
+    CheckSessionResult.cs
+    ResponseToQueryResult.cs
+    ResponseToFragmentResult.cs
+    ResponseToFormPostResult.cs
 
 Users/                                  ← Edge (borda) facades + lean session model (ADR-013/014)
   Contracts/

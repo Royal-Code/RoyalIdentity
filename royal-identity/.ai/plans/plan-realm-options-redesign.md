@@ -8,6 +8,12 @@
 
 **Andamento atual:** plano concluido. Todas as fases foram implementadas e validadas; `RealmOptions` cobre os grupos promovidos, CORS por realm/client esta conectado ao pipeline, e os testes finais de isolamento/regressao foram executados.
 
+**Follow-up concluído em 2026-08-01:** a dívida histórica de `CheckSessionEndpoint` registrado porém inalcançável
+foi encerrada por `plan-oidc-session-management.md`. A rota está mapeada, `CheckSessionResult` resolve opções pelo
+realm corrente, discovery e runtime compartilham o gate HTTPS/feature, e os testes HTTP/multi-realm/Chromium
+substituem o antigo item futuro. As menções abaixo a “dívida inalcançável” permanecem apenas como registro da
+decisão e do escopo executado por este plano concluído; não descrevem o estado atual.
+
 | Fase | Estado |
 |---|---|
 | Fase 1 - Auditoria Final e Decisao de Modelo | Concluida |

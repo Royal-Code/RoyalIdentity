@@ -1,10 +1,10 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: EM EXECUÇÃO - Fases 1-6 concluídas; Fase 7 é a próxima; 6 de 7 fases concluídas
+## Status: CONCLUÍDO - 7 de 7 fases concluídas em 2026-08-01
 
 ## Progresso
 
-`██████░` **86%** - 6 de 7 fases
+`███████` **100%** - 7 de 7 fases
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - Rota, discovery HTTPS e isolamento por realm | Concluida |
 | Fase 5 - OP iframe moderno e hardening HTTP | Concluida |
 | Fase 6 - Aceites HTTP, multi-realm e navegador real | Concluida |
-| Fase 7 - Licenças, atribuições, documentação e fechamento | Pendente |
+| Fase 7 - Licenças, atribuições, documentação e fechamento | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -1075,35 +1075,35 @@ documentar o recurso e fechar rastreabilidade/testes.
 
 **Tarefas:**
 
-- [ ] Criar `C:/git/RoyalCode/RoyalIdentity/LICENSES/Apache-2.0.txt` com cópia integral de
+- [x] Criar `C:/git/RoyalCode/RoyalIdentity/LICENSES/Apache-2.0.txt` com cópia integral de
   `old-is4/LICENSE`.
-- [ ] Criar `C:/git/RoyalCode/RoyalIdentity/THIRD-PARTY-NOTICES.md` com IS4, IdentityModel, autores/origens,
+- [x] Criar `C:/git/RoyalCode/RoyalIdentity/THIRD-PARTY-NOTICES.md` com IS4, IdentityModel, autores/origens,
   licença e escopo de material incorporado.
-- [ ] Atualizar o README para declarar AGPLv3 para a obra combinada e apontar para `LICENSE`,
+- [x] Atualizar o README para declarar AGPLv3 para a obra combinada e apontar para `LICENSE`,
   `LICENSES/Apache-2.0.txt` e `THIRD-PARTY-NOTICES.md`.
-- [ ] Remover referências enganosas de arquivos Apache ao `LICENSE` AGPL da raiz.
-- [ ] Criar inventário versionado com cada candidato, upstream, evidência, classificação
+- [x] Remover referências enganosas de arquivos Apache ao `LICENSE` AGPL da raiz.
+- [x] Criar inventário versionado com cada candidato, upstream, evidência, classificação
   (`derivado`, `independente` ou `a confirmar`) e ação; nenhum item `a confirmar` pode permanecer no fechamento.
-- [ ] Inventariar candidatos dentro dos roots delimitados por DF26 usando basename, histórico e comparação de
+- [x] Inventariar candidatos dentro dos roots delimitados por DF26 usando basename, histórico e comparação de
   conteúdo; registrar proveniência no notice ou no próprio arquivo quando derivado.
-- [ ] Preservar copyrights/atribuições pertinentes e marcar de forma proeminente os arquivos modificados.
-- [ ] Não aplicar cabeçalho Apache a arquivos comprovadamente escritos de forma independente apenas com base em
+- [x] Preservar copyrights/atribuições pertinentes e marcar de forma proeminente os arquivos modificados.
+- [x] Não aplicar cabeçalho Apache a arquivos comprovadamente escritos de forma independente apenas com base em
   especificações públicas.
-- [ ] Verificar novamente se a distribuição upstream local possui `NOTICE`; se surgir, transportar os notices
+- [x] Verificar novamente se a distribuição upstream local possui `NOTICE`; se surgir, transportar os notices
   pertinentes conforme Apache-2.0 §4(d).
-- [ ] Documentar Session Management, limitações de third-party cookie, relação com os três logout specs e
+- [x] Documentar Session Management, limitações de third-party cookie, relação com os três logout specs e
   configuração por realm.
-- [ ] Atualizar `product.md`, `tech.md` e `structure.md` para refletir endpoint realmente implementado,
+- [x] Atualizar `product.md`, `tech.md` e `structure.md` para refletir endpoint realmente implementado,
   manager e testes opt-in.
-- [ ] Atualizar `plan-realm-options-redesign.md` removendo a dívida de endpoint inalcançável sem reescrever seu
+- [x] Atualizar `plan-realm-options-redesign.md` removendo a dívida de endpoint inalcançável sem reescrever seu
   histórico concluído.
-- [ ] Confirmar que `plan-rfc9700-security-hardening.md` exclui nominalmente o OP iframe do hardening de framing
+- [x] Confirmar que `plan-rfc9700-security-hardening.md` exclui nominalmente o OP iframe do hardening de framing
   e exige regressão de ausência dos headers bloqueadores; não aceitar apenas o verbo “reconciliar”.
-- [ ] Registrar este plano no roadmap/backlog vigente se ainda não estiver relacionado no início da fase.
-- [ ] Executar busca por `SessionState` no authorization code, opções removidas, cache/script IS4 e URLs HTTP.
-- [ ] Criar `scripts/Test-ThirdPartyNotices.ps1` para validar licença Apache, notice, paths do inventário,
+- [x] Registrar este plano no roadmap/backlog vigente se ainda não estiver relacionado no início da fase.
+- [x] Executar busca por `SessionState` no authorization code, opções removidas, cache/script IS4 e URLs HTTP.
+- [x] Criar `scripts/Test-ThirdPartyNotices.ps1` para validar licença Apache, notice, paths do inventário,
   ausência de candidatos pendentes e referências de licença dos arquivos classificados como derivados.
-- [ ] Executar build e suíte integral.
+- [x] Executar build e suíte integral.
 
 **Critérios de aceite:** raiz mantém AGPLv3 e inclui cópia Apache-2.0 + notices; inventário cobre integralmente os
 roots delimitados e não contém classificação pendente; README explica a combinação sem relicenciar copyright
@@ -1126,7 +1126,27 @@ dotnet test RoyalIdentity.sln
 
 ### Resultado da Fase 7
 
-*a preencher*
+- A raiz Git preserva o `LICENSE` AGPLv3 e agora distribui a cópia textual integral Apache-2.0 em
+  `LICENSES/Apache-2.0.txt` e `THIRD-PARTY-NOTICES.md`, com origens, copyrights, escopo de incorporação e vínculo
+  para o inventário. A distribuição upstream local foi revista e continua sem `NOTICE` de raiz.
+- O inventário versionado `an-oidc-session-management-provenance.json` varreu 734 arquivos-fonte produtivos
+  rastreados e 450 fontes nos dois roots upstream. O review por basename, similaridade e histórico fechou 80
+  candidatos: 64
+  derivados e 16 independentes, nenhum `a confirmar`. Os derivados receberam aviso proeminente Apache/modificação;
+  os independentes mantiveram somente a evidência, sem cabeçalho Apache artificial.
+- `scripts/Test-ThirdPartyNotices.ps1` valida AGPL, cópia Apache normalizada, notice central, ausência/aparição de
+  `NOTICE`, todos os paths/classificações, cobertura de candidatos por basename, cabeçalhos dos derivados e
+  ausência desses cabeçalhos nos independentes. O gate passou com os mesmos 734/450 fontes e 64/16 classificações.
+- `docs/openid-connect-session-management.md` documenta configuração realm-scoped, protocolo do iframe,
+  `SameSite=None`, limitações de third-party cookie e a relação complementar com RP-Initiated, Front-Channel e
+  Back-Channel Logout. README, fundações, backlog e o plano de RealmOptions foram alinhados; o plano RFC 9700 já
+  continha a exceção nominal e a regressão explícita exigidas para framing, portanto não precisou ser reescrito.
+- A auditoria transversal confirmou ausência em produção das options removidas, de `SessionState` no payload de
+  authorization code, do cache/SHA-256 JavaScript legado do IS4 e de URL HTTP de check-session. As únicas menções
+  aos nomes de options removidas são assertions negativas de compatibilidade em `Tests.Storage`.
+- Verificação final: `dotnet build RoyalIdentity.sln --no-restore` passou com 0 erros; a suíte default passou com
+  1.470 aprovados, 51 opt-in ignorados e 0 falhas; o probe Node reproduziu todos os nove outcomes; o aceite
+  Chromium cross-site passou 5/5; `git diff --check` ficou limpo.
 
 ---
 
@@ -1199,18 +1219,18 @@ dotnet test RoyalIdentity.sln
 | Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | CSP própria frameable + testes HTTP/Chromium entregues; reexecução pelo RFC 9700 permanece | Mitigado |
 | Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host; confiança permanece configurada pelo host | Mitigado |
 | Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única/validação entregues na Fase 1; lifecycle multi-realm na Fase 2 | Mitigado |
-| Estado vaza em token/log | principal/telemetria copia propriedade/cookie | correlação ou exposição | propriedade protegida, não claim; filtros e testes de log/token | Aberto |
+| Estado vaza em token/log | principal/telemetria copia propriedade/cookie | correlação ou exposição | propriedade protegida, não claim; filtros, auditoria e testes de log/token entregues | Fechado |
 | Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6, vetor UTF-8 independente e probe Node opt-in reproduzível; Chromium real na Fase 6 | Mitigado |
 | Payload v1 permanece em banco dev | serializer sobe para v2 com artefato antigo | falha fechada temporária | breaking aceito; codes efêmeros; reprovisionar seeds/config | Aceito |
 | Playwright entra na suíte default | projeto baixa/exige Chromium | CI/local deixa de ser autocontido | projeto fora da solution, script opt-in e guardas arquiteturais; suíte default verificada sem browser | Fechado |
-| Auditoria de licença incompleta | arquivo derivado perdeu header/notice | não conformidade de redistribuição | inventário de similaridade/histórico + notice central + revisão manual | Aberto |
-| `session_state` grande | origem longa + envelope v1 | callback/URL cresce | limites/testes e formato Base64Url compacto | Aberto |
+| Auditoria de licença incompleta | arquivo derivado perdeu header/notice | não conformidade de redistribuição | inventário de similaridade/histórico + notice central + revisão manual + gate reproduzível entregues | Fechado |
+| `session_state` grande | origem longa + envelope v1 | callback/URL cresce | limites de origem, vetores de tamanho e formato Base64Url compacto entregues | Mitigado |
 | Planos concorrentes recriam helpers | Session Management inicia antes do plano OAuth 2.1 | conflito em `ConsentDecorator`/respostas | gate DF21 satisfeito antes da Fase 1 | Fechado |
 | Callback captura scoped/realm | manager ou nome do cookie é fechado no delegate de named options | captive dependency ou realm congelado | DF23 + lifecycle/browser multi-realm + guarda sobre dependências e closure do callback | Fechado |
-| Erro enumerado perde `session_state` | cálculo fica somente no `AuthorizeHandler` | Authentication Error Response incompleta | factory delimitada DF24 + testes por caller | Aberto |
+| Erro enumerado perde `session_state` | cálculo fica somente no `AuthorizeHandler` | Authentication Error Response incompleta | factory delimitada DF24 + testes por caller entregues | Fechado |
 | Prompt silencioso cai em UI/código genérico | classificação continua espalhada | loop/interoperabilidade incorreta | matriz DF25 + rede sobre produtores posteriores + testes HTTP/customização terminal | Mitigado |
 | Filtro executa zero testes | classe planejada não é criada ou nome diverge | fase fecha em falso verde | DF22 + nomes exatos; todos os cinco comandos da Fase 6 selecionam testes | Fechado |
-| Factory amplia silenciosamente o transporte do authorize | terminadores fora de DF24 passam a usar redirect | mudança de contrato fora do escopo | callers enumerados + regressão dos terminadores excluídos | Aberto |
+| Factory amplia silenciosamente o transporte do authorize | terminadores fora de DF24 passam a usar redirect | mudança de contrato fora do escopo | callers enumerados + regressão dos terminadores excluídos entregues | Fechado |
 
 ---
 
