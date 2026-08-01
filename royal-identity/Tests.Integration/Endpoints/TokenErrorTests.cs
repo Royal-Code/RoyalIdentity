@@ -563,6 +563,34 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
         await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Post_WithAnEmptyRefreshToken_Must_AnswerInvalidRequest(string refreshToken)
+    {
+        await SeedClientAsync();
+
+        var response = await PostAsync(Authenticated(
+            Field("grant_type", "refresh_token"),
+            Field("refresh_token", refreshToken)));
+
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
+    }
+
+    [Fact]
+    public async Task Post_WithATooLongRefreshToken_Must_AnswerInvalidRequest()
+    {
+        // The counterpart of the too-long authorization code: both are malformed parameters, not grants that
+        // were presented and refused, and LoadRefreshToken had this branch uncovered.
+        await SeedClientAsync();
+
+        var response = await PostAsync(Authenticated(
+            Field("grant_type", "refresh_token"),
+            Field("refresh_token", new string('r', 1024))));
+
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
+    }
+
     [Fact]
     public async Task Post_WithUnknownRefreshToken_Must_AnswerInvalidGrant()
     {

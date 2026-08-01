@@ -87,6 +87,21 @@ public class PkceTokenTests : IClassFixture<LogCapturingAppFactory>
         await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
     }
 
+    // DF9/DF11: presenting the parameter is the key being there, not the value being usable. An empty or blank
+    // code_verifier was sent, so verifier and challenge still disagree about presence and the request is
+    // malformed — deciding it by the value would let a code without challenge be exchanged in silence.
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task AnEmptyVerifierPresentedForACodeWithoutChallenge_IsRefusedAsMalformed(string verifier)
+    {
+        var code = await SeedCodeAsync();
+
+        var response = await ExchangeAsync(code.Code, verifier);
+
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
+    }
+
     [Fact]
     public async Task ACodeWithChallengeExchangedWithoutVerifier_IsRefusedAsMalformed()
     {

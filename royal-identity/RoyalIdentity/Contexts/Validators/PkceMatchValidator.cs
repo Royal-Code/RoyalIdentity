@@ -33,8 +33,12 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         context.CodeParameters.AssertHasCode();
         var code = context.CodeParameters.AuthorizationCode;
 
+        // The challenge is server state: stored or not. The verifier is a request parameter, and there
+        // "presented" means the key is there — an empty or blank code_verifier was still sent, and reading it
+        // as absence would let a code with no challenge be exchanged in silence, which is the very downgrade
+        // this check exists to refuse. The preflight already guarantees the parameter appears at most once.
         var hasChallenge = code.CodeChallenge.IsPresent();
-        var hasVerifier = context.CodeVerifier.IsPresent();
+        var hasVerifier = context.Raw.GetValues(Oidc.Token.Request.CodeVerifier) is not null;
 
         if (hasChallenge != hasVerifier)
         {
