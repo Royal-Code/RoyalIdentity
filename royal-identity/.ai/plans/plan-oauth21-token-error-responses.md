@@ -981,7 +981,9 @@ endpoint, validar extensibilidade e registrar a versão do draft efetivamente im
 - [x] Confirmar que `error_description` e logs não contêm secret, assertion, code, verifier, refresh token ou
   replay handle.
 - [x] Confirmar que falhas de backing/infraestrutura continuam 5xx e não viram `invalid_client`/`invalid_grant`.
-- [x] Confirmar que discovery anuncia somente métodos de autenticação realmente testados.
+- [x] Confirmar que, na configuração padrão, discovery anuncia somente métodos de autenticação realmente
+  testados; fixar separadamente a composição quando mTLS está habilitado e entregar a prova funcional de
+  `tls_client_auth`/`self_signed_tls_client_auth` ao `plan-rfc9700-security-hardening.md`.
 - [x] Validar extension grant de teste com código de erro próprio para provar que o contrato não foi fechado.
 - [x] Comparar o draft OAuth 2.1 vigente no início da fase com `draft-15` e registrar qualquer delta.
 - [x] Atualizar roadmap e o status do plano RFC 9700, confirmando que a sobreposição executável já foi removida
@@ -1044,6 +1046,12 @@ obrigatório do que é configurável — `LoggingOptions.AlwaysRedacted` é um p
 e evita um bump v1→v2 que colidiria com a cadeia de versões reservada pelos planos seguintes.
 `ConfigurationModelPayloadTests` ganhou dois casos: um payload com a lista antiga e um com a lista esvaziada, os
 dois ainda redigindo os nomes obrigatórios.
+
+Uma revisão posterior encontrou um resíduo dessa separação: a propriedade calculada `RedactedParameterNames`
+era pública e, sem exclusão explícita, o serializer do grafo a gravava nos payloads v1 de Server e Realm. O piso
+continuava sendo aplicado pelo código, mas sua projeção derivada havia entrado acidentalmente no contrato
+persistido. A propriedade agora usa `JsonIgnore`, e os dois serializers têm regressão provando que o nome não
+aparece no JSON sem exigir bump de versão.
 
 **Achado: o código emitido era gravado no log pelo factory.** `DefaultCodeFactory` escrevia
 `"Code issued for {ClientId} / {SubjectId}: {Code}"`. Nenhum teste desta fase podia pegar isso: os de PKCE

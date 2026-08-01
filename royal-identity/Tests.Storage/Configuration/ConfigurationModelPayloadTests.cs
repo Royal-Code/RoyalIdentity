@@ -32,6 +32,7 @@ public class ConfigurationModelPayloadTests
         var (_, reserialized) = serverSerializer.Serialize(restored);
 
         Assert.Equal(ServerOptionsPayloadSerializer.CurrentVersion, version);
+        Assert.DoesNotContain(nameof(LoggingOptions.RedactedParameterNames), json, StringComparison.Ordinal);
         Assert.Equal(json, reserialized);
         Assert.Equal("https://issuer.example", restored.IssuerUri);
         Assert.True(restored.DispatchEvents);
@@ -106,6 +107,7 @@ public class ConfigurationModelPayloadTests
         var (_, json) = realmSerializer.Serialize(realmOptions);
 
         Assert.DoesNotContain("ServerOptions", json);
+        Assert.DoesNotContain(nameof(LoggingOptions.RedactedParameterNames), json, StringComparison.Ordinal);
         Assert.DoesNotContain("https://server.example", json);
         Assert.Contains("https://realm.example", json);
     }

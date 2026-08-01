@@ -159,7 +159,8 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
 
         var methods = document![Oidc.Discovery.TokenEndpointAuthenticationMethodsSupported]
             .EnumerateArray()
-            .Select(value => value.GetString())
+            .Select(value => value.GetString()
+                ?? throw new JsonException("Discovery returned a null token endpoint authentication method."))
             .ToArray();
 
         Assert.Equal(
@@ -198,7 +199,8 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
 
             var methods = document![Oidc.Discovery.TokenEndpointAuthenticationMethodsSupported]
                 .EnumerateArray()
-                .Select(value => value.GetString())
+                .Select(value => value.GetString()
+                    ?? throw new JsonException("Discovery returned a null token endpoint authentication method."))
                 .ToArray();
 
             Assert.Equal(

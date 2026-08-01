@@ -1,4 +1,5 @@
 ﻿using System.Collections.Frozen;
+using System.Text.Json.Serialization;
 
 namespace RoyalIdentity.Options;
 
@@ -61,6 +62,7 @@ public class LoggingOptions
     /// <summary>
     /// Every parameter name redacted for this realm: the mandatory floor plus whatever configuration added.
     /// </summary>
+    [JsonIgnore]
     public IEnumerable<string> RedactedParameterNames => AlwaysRedacted.Concat(SensitiveValuesFilter);
 
     /// <summary>
