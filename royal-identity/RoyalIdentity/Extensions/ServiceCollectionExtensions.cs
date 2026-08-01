@@ -67,6 +67,7 @@ public static class ServiceCollectionExtensions
         // ReplayProtectionStartupValidator refuses to start a host that declared none, two, or one that does not
         // match the store actually resolved. A default here is what previously let a no-op pass for protection.
         services.AddTransient<ISessionStateGenerator, DefaultSessionStateGenerator>();
+        services.AddScoped<CheckSessionStateManager>();
         services.AddTransient<ITokenClaimsService, DefaultTokenClaimsService>();
         services.AddTransient<ITokenFactory, DefaultTokenFactory>();
         services.AddTransient<ITokenValidator, DefaultTokenValidator>();

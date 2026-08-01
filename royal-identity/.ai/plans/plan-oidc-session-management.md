@@ -1,14 +1,14 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: RASCUNHO - depende da conclusão de `plan-oauth21-token-error-responses.md`; 0 de 7 fases executadas
+## Status: EM EXECUÇÃO - Fase 1 concluída; Fase 2 é a próxima; 1 de 7 fases concluídas
 
 ## Progresso
 
-`░░░░░░░` **0%** - 0 de 7 fases
+`█░░░░░░` **14%** - 1 de 7 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Contrato de estado do User Agent e opções | Bloqueada pelo plano OAuth 2.1 |
+| Fase 1 - Contrato de estado do User Agent e opções | Concluida |
 | Fase 2 - Ciclo de vida do estado no login, cookie e logout | Pendente |
 | Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Pendente |
 | Fase 4 - Rota, discovery HTTPS e isolamento por realm | Pendente |
@@ -223,8 +223,10 @@
 - **DF8 — Resposta, não code:** `session_state` é calculado na construção da Authentication Response OIDC;
   `AuthorizationCode.SessionState` e o campo correspondente do payload operacional são removidos. Fonte:
   especificação + desenho IS4 + breaking changes aceitos.
-- **DF9 — Somente OIDC:** requisição OAuth sem identity scope `openid`, feature desabilitada ou redirect ainda
-  não validado não recebe `session_state`. Fonte: OpenID Connect Core + desenho IS4.
+- **DF9 — Somente OIDC e com origem de navegador:** requisição OAuth sem identity scope `openid`, feature
+  desabilitada, redirect ainda não validado ou redirect sem origem HTTP(S) de navegador não recebe
+  `session_state`. Redirects de app nativo continuam recebendo o authorization code sem erro. Fonte: OpenID
+  Connect Core + desenho IS4 + regressão verificada na Fase 1.
 - **DF10 — Formato versionado e origin-bound:** usar formato sem espaços
   `v1.<origin-base64url>.<hash-base64url>.<salt-base64url>`; o hash usa codificação canônica e sem ambiguidades de
   versão, client id, origem exata, OP User Agent State e salt aleatório. O RP trata o valor como opaco.
@@ -297,6 +299,9 @@
   solução, excluindo `bin`, `obj` e assets de dependências. Candidatos, evidência e classificação são registrados
   em inventário versionado e validados por script; a análise humana inicial continua necessária. Fonte:
   Apache-2.0 §4 + escopo local verificável.
+- **DF27 — Test seam interno delimitado:** `SessionStateFormat` permanece `internal`; o assembly concede
+  `InternalsVisibleTo` somente a `Tests.Identity` para vetores e parser puros, sem tornar o formato API pública e
+  sem conceder acesso aos demais projetos. Fonte: topologia DF22 + implementação da Fase 1.
 
 ---
 
@@ -432,6 +437,8 @@ Check-session cookie
 session_state v1
   v1.<origin-base64url>.<hash-base64url>.<salt-base64url>
   hash = SHA-256(canonical(version, client_id, exact_origin, opuas, salt))
+  canonical = cada campo em UTF-8, na ordem acima, precedido por comprimento Int32 big-endian;
+              salt entra como 32 bytes crus, também precedidos pelo comprimento
   nenhuma parte contém espaço
 
 AuthorizationCodePayload v2
@@ -549,8 +556,8 @@ permanecer ignorados sem opt-in explícito e nunca baixar Chromium durante `dotn
 
 ## Ordem de execução
 
-**Gate global:** concluir `plan-oauth21-token-error-responses.md` antes da Fase 1; consumir seus helpers e writer
-finais durante toda a execução.
+**Gate global:** satisfeito em 2026-08-01 — `plan-oauth21-token-error-responses.md` está concluído. Consumir seus
+helpers e writer finais durante toda a execução.
 
 1. **Fase 1 (contrato/options)** — fixa o valor canônico, formato e configuração antes de tocar login/respostas.
 2. **Fase 2 (ciclo de vida)** — torna o estado real e sincronizado antes de gerar `session_state`.
@@ -571,29 +578,31 @@ dotnet test RoyalIdentity.sln
 
 ## Fase 1 - Contrato de estado do User Agent e opções
 
-**Depende de:** conclusão de `plan-oauth21-token-error-responses.md`, DF1-DF5, DF8-DF10, DF18, DF20-DF22.
+**Depende de:** conclusão de `plan-oauth21-token-error-responses.md`, DF1-DF5, DF8-DF10, DF18, DF20-DF22, DF27.
 
 **Escopo:** `RoyalIdentity/Authentication`, `RoyalIdentity/Contracts`, `RoyalIdentity/Options`,
-serializers Configuration, `Tests.Identity`, `Tests.Storage`.
+snapshot/serializers Configuration, `Tests.Identity`, `Tests.Integration`, `Tests.Storage`.
 
 **O que/como:** introduzir o manager concreto/scoped, constantes internas e formato v1; simplificar
 `AuthenticationOptions`; versionar payloads de server/realm e fixar vetores C#/JavaScript antes da integração.
 
 **Tarefas:**
 
-- [ ] Criar `CheckSessionStateManager` no core sem interface pública, storage ou dependência de módulo.
-- [ ] Definir chaves internas de `AuthenticationProperties` e `HttpContext.Items` em `Constants.Server`.
-- [ ] Implementar geração criptográfica de OP User Agent State com pelo menos 256 bits.
-- [ ] Implementar derivação única do nome/path do cookie a partir de `AuthenticationOptions` e realm.
-- [ ] Remover `CheckSessionCookieDomain` e `CheckSessionCookieSameSiteMode`.
-- [ ] Validar nome-base vazio, caracteres de controle, separadores de cookie e colisões previsíveis.
-- [ ] Implementar parser/formatter do `session_state` v1 sem espaço e com origem Base64Url.
-- [ ] Implementar codificação canônica compartilhável com JavaScript e vetores determinísticos.
-- [ ] Criar `Tests.Identity/Authentication/SessionStateFormatTests.cs` para formato, parser, gates e vetores
+- [x] Criar `CheckSessionStateManager` no core sem interface pública, storage ou dependência de módulo.
+- [x] Definir chaves internas de `AuthenticationProperties` e `HttpContext.Items` em `Constants.Server`.
+- [x] Implementar geração criptográfica de OP User Agent State com pelo menos 256 bits.
+- [x] Implementar derivação única do nome/path do cookie a partir de `AuthenticationOptions` e realm.
+- [x] Remover `CheckSessionCookieDomain` e `CheckSessionCookieSameSiteMode`.
+- [x] Validar nome-base vazio, caracteres de controle, separadores de cookie e colisões previsíveis.
+- [x] Implementar parser/formatter do `session_state` v1 sem espaço e com origem Base64Url.
+- [x] Implementar codificação canônica compartilhável com JavaScript e vetores determinísticos.
+- [x] Criar `Tests.Identity/Authentication/SessionStateFormatTests.cs` para formato, parser, gates e vetores
   puros; não montar `AuthorizeContext`/HTTP artificial nesse projeto para testar pipeline.
-- [ ] Alterar `ISessionStateGenerator`/default para retorno anulável e gates DF2/DF9.
-- [ ] Incrementar `ServerOptionsPayloadSerializer` e `RealmOptionsPayloadSerializer` para versão 2.
-- [ ] Atualizar copy constructors, materialização, seeds e testes de property coverage das options.
+- [x] Alterar `ISessionStateGenerator`/default para retorno anulável e gates DF2/DF9.
+- [x] Incrementar `ServerOptionsPayloadSerializer` e `RealmOptionsPayloadSerializer` para versão 2.
+- [x] Atualizar copy constructors, materialização, seeds e testes de property coverage das options.
+- [x] Rejeitar configuração inválida antes da publicação do snapshot, inclusive colisão do nome efetivo.
+- [x] Cobrir redirects HTTP, custom-scheme e URN: somente o primeiro recebe `session_state`; todos emitem code.
 
 **Critérios de aceite:** estado contém entropia suficiente e nenhum dado de usuário/sessão persistida; cookie
 derivado é host-only/realm-scoped; options removidas não aparecem no JSON v2; parser rejeita versões, segmentos,
@@ -603,12 +612,36 @@ Base64Url e espaços inválidos; um mesmo vetor produz exatamente o mesmo hash e
 
 ```powershell
 dotnet test Tests.Identity --filter "FullyQualifiedName~SessionStateFormatTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~Get_Signed_WithAValidatedRedirectWithoutBrowserOrigin"
 dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationSnapshotTests"
 ```
 
 ### Resultado da Fase 1
 
-*a preencher*
+- Criado `CheckSessionStateManager` concreto e `scoped`, sem store/módulo/interface adicional. O manager gera
+  32 bytes criptográficos, mantém as chaves internas de ticket/request, deriva nome `<base>.<realm>` e
+  `Path=/<realm>` e centraliza as flags fixas host-only/`Secure`/`SameSite=None`/JavaScript-readable.
+- Substituído o hash legado de `sid + claims` por envelope
+  `v1.<origin-base64url>.<hash-base64url>.<salt-base64url>`. A entrada do SHA-256 usa cinco campos
+  length-prefixed em Int32 big-endian, UTF-8 para os textos e salt cru de 32 bytes; parser, origem canônica,
+  Base64Url sem padding e tamanhos de hash/salt falham fechados. O vetor fixo é diretamente reproduzível em JS.
+- `ISessionStateGenerator` agora é anulável e aplica os gates de endpoint, `openid` e redirect validado. Até a
+  retirada de `SessionState` do authorization code na Fase 3, o slot legado não anulável recebe string vazia
+  somente nas requisições inelegíveis; o valor não é exposto na response.
+- Removidas `CheckSessionCookieDomain` e `CheckSessionCookieSameSiteMode`; o contrato específico do cookie de
+  check-session recusa nome-base inválido ou igual ao cookie de autenticação antes da publicação do snapshot, e
+  a derivação também recusa colisão entre o nome efetivo e o cookie-base. O gate não antecipou validações
+  vizinhas de `AuthenticationOptions`, que continuam com seus donos atuais. Server/Realm Configuration passaram
+  de v1 para v2, rejeitam v1 e preservam/copiam o único setting restante. Não havia migration relacional nem
+  versão de seed hardcoded fora dos serializers.
+- Revisão externa: redirects custom-scheme/URN deixaram de lançar e agora omitem `session_state`; redirects HTTP
+  continuam emitindo-o. A origem canônica usa `IdnHost`/punycode e serialização estável de IPv6. O risco C#/JS
+  permanece aberto até as Fases 5-6 executarem o mesmo vetor no navegador.
+- `InternalsVisibleTo` foi delimitado a `Tests.Identity` por DF27; não expõe o formato como contrato público.
+- Verificação: `SessionStateFormatTests` 35/35; `ConfigurationModelPayloadTests` 20/20;
+  `ConfigurationSnapshotTests` 13/13; regressão de redirects 3/3; build sem erros; suíte completa com 1.411
+  aprovados, 51 ignorados por opt-in e nenhuma falha.
 
 ---
 
@@ -624,7 +657,6 @@ registro DI, testes de sessão/cookie.
 
 **Tarefas:**
 
-- [ ] Registrar `CheckSessionStateManager` como scoped e provar seu lifetime na composição.
 - [ ] Criar OP User Agent State ao preparar `AuthenticationProperties` no login bem-sucedido.
 - [ ] Gravar o check-session cookie com as flags fixas de DF5 no mesmo response do sign-in.
 - [ ] Preservar o estado em sliding/renovação do mesmo ticket.
@@ -634,6 +666,8 @@ registro DI, testes de sessão/cookie.
 - [ ] Derivar realm, opções, nome e path do check-session cookie dentro do manager por request; não fechar esses
   valores no delegate cacheado.
 - [ ] Publicar o valor canônico do ticket em `HttpContext.Items` durante `OnValidatePrincipal`.
+- [ ] Remover o fallback transitório de `GetOrCreateRequestState` na geração: depois da integração, o generator
+  deve consumir somente o valor publicado pelo ticket; testar igualdade ticket → item → cookie → `session_state`.
 - [ ] Sobrescrever cookie ausente/divergente a partir do ticket protegido.
 - [ ] Limpar o cookie quando `OnValidatePrincipal` rejeitar sessão expirada, encerrada ou invalidada por estado.
 - [ ] Limpar o cookie no `DefaultSignOutManager` usando exatamente o nome/path de emissão.
@@ -649,7 +683,8 @@ enviado nem aceito em realm B; nenhum valor aparece em logs.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionCookieLifecycleTests|FullyQualifiedName~SessionLifecycleTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionCookieLifecycleTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~SessionLifecycleTests"
 ```
 
 ### Resultado da Fase 2
@@ -718,8 +753,11 @@ atômico do code permanece verde.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalPayloadTests|FullyQualifiedName~SqliteOperationalAuthorizationCodeTests"
-dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizeSessionStateTests|FullyQualifiedName~CodeAuthorizeTests|FullyQualifiedName~PromptInteractionCharacterizationTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~OperationalPayloadTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~SqliteOperationalAuthorizationCodeTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizeSessionStateTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CodeAuthorizeTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PromptInteractionCharacterizationTests"
 ```
 
 ### Resultado da Fase 3
@@ -760,7 +798,8 @@ somente quando a rota está efetivamente disponível.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests|FullyQualifiedName~DiscoveryTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~DiscoveryTests"
 ```
 
 ### Resultado da Fase 4
@@ -850,7 +889,9 @@ silencioso correto.
 **Testes:**
 
 ```powershell
-dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests|FullyQualifiedName~AuthorizeSessionStateTests|FullyQualifiedName~CheckSessionCookieLifecycleTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionEndpointTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizeSessionStateTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CheckSessionCookieLifecycleTests"
 dotnet test Tests.Architecture --filter "FullyQualifiedName~CheckSessionBoundaryTests"
 ./scripts/Test-CheckSessionBrowser.ps1
 ```
@@ -996,14 +1037,14 @@ dotnet test RoyalIdentity.sln
 | Bloqueio de third-party cookie | iframe não vê cookie presente no first-party OP | falsos `changed`/loop no RP | DF14, harness defensivo, documentação e Back-Channel Logout | Aberto |
 | Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | exceção exata por endpoint + teste browser/header | Aberto |
 | Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host | Aberto |
-| Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única, host-only, path e testes ADR-009 | Aberto |
+| Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única/validação entregues na Fase 1; lifecycle multi-realm na Fase 2 | Mitigado |
 | Estado vaza em token/log | principal/telemetria copia propriedade/cookie | correlação ou exposição | propriedade protegida, não claim; filtros e testes de log/token | Aberto |
-| Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | vetores compartilhados e browser real | Aberto |
+| Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6 e vetor C# entregues; comparação JS/browser nas Fases 5-6 | Aberto |
 | Payload v1 permanece em banco dev | serializer sobe para v2 com artefato antigo | falha fechada temporária | breaking aceito; codes efêmeros; reprovisionar seeds/config | Aceito |
 | Playwright entra na suíte default | projeto baixa/exige Chromium | CI/local deixa de ser autocontido | projeto/script opt-in + arquitetura test | Aberto |
 | Auditoria de licença incompleta | arquivo derivado perdeu header/notice | não conformidade de redistribuição | inventário de similaridade/histórico + notice central + revisão manual | Aberto |
 | `session_state` grande | origem longa + envelope v1 | callback/URL cresce | limites/testes e formato Base64Url compacto | Aberto |
-| Planos concorrentes recriam helpers | Session Management inicia antes do plano OAuth 2.1 | conflito em `ConsentDecorator`/respostas | gate DF21 | Aberto |
+| Planos concorrentes recriam helpers | Session Management inicia antes do plano OAuth 2.1 | conflito em `ConsentDecorator`/respostas | gate DF21 satisfeito antes da Fase 1 | Fechado |
 | Callback captura scoped/realm | manager ou nome do cookie é fechado no delegate de named options | captive dependency ou realm congelado | DF23 + lifecycle multi-realm | Aberto |
 | Erro enumerado perde `session_state` | cálculo fica somente no `AuthorizeHandler` | Authentication Error Response incompleta | factory delimitada DF24 + testes por caller | Aberto |
 | Prompt silencioso cai em UI/código genérico | classificação continua espalhada | loop/interoperabilidade incorreta | matriz DF25 + teste table-driven | Aberto |

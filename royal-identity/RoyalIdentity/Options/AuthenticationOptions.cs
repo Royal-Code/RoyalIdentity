@@ -25,8 +25,6 @@ public class AuthenticationOptions
         CookieSlidingExpiration = other.CookieSlidingExpiration;
         CookieSameSiteMode = other.CookieSameSiteMode;
         CheckSessionCookieName = other.CheckSessionCookieName;
-        CheckSessionCookieDomain = other.CheckSessionCookieDomain;
-        CheckSessionCookieSameSiteMode = other.CheckSessionCookieSameSiteMode;
         RequireCspFrameSrcForSignOut = other.RequireCspFrameSrcForSignOut;
         AuthorizationInteractionLifetime = other.AuthorizationInteractionLifetime;
         ClientAssertionMaxLifetime = other.ClientAssertionMaxLifetime;
@@ -56,17 +54,6 @@ public class AuthenticationOptions
     /// Gets or sets the name of the cookie used for the check session endpoint.
     /// </summary>
     public string CheckSessionCookieName { get; set; } = Server.DefaultCheckSessionCookieName;
-
-    /// <summary>
-    /// Gets or sets the domain of the cookie used for the check session endpoint. Defaults to null.
-    /// </summary>
-    [Redesign("Check in IS4 if this is still needed")]
-    public string? CheckSessionCookieDomain { get; set; }
-
-    /// <summary>
-    /// Gets or sets the SameSite mode of the cookie used for the check session endpoint. Defaults to SameSiteMode.None.
-    /// </summary>
-    public SameSiteMode CheckSessionCookieSameSiteMode { get; set; } = SameSiteMode.None;
 
     /// <summary>
     /// If set, will require frame-src CSP headers being emitting on the end session callback endpoint which renders iframes to clients for front-channel sign out notification.
@@ -113,7 +100,7 @@ public class AuthenticationOptions
     /// <returns>A list of configuration errors. Empty means valid.</returns>
     public IReadOnlyList<string> Validate()
     {
-        List<string> errors = [];
+        List<string> errors = [.. ValidateCheckSessionCookie()];
 
         if (AuthorizationInteractionLifetime <= 0)
         {
@@ -130,4 +117,35 @@ public class AuthenticationOptions
 
         return errors;
     }
+
+    internal IReadOnlyList<string> ValidateCheckSessionCookie()
+    {
+        List<string> errors = [];
+
+        if (!CookieNameValidation.IsValid(CheckSessionCookieName))
+        {
+            errors.Add(
+                "Authentication.CheckSessionCookieName must be a non-empty ASCII cookie token without " +
+                "control characters or separators.");
+        }
+
+        if (string.Equals(CheckSessionCookieName, CookieName, StringComparison.Ordinal))
+        {
+            errors.Add(
+                "Authentication.CheckSessionCookieName must differ from Authentication.CookieName to avoid " +
+                "a predictable realm cookie collision.");
+        }
+
+        return errors;
+    }
+}
+
+internal static class CookieNameValidation
+{
+    private const string Separators = "()<>@,;:\\\"/[]?={} ";
+
+    internal static bool IsValid(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && value.All(character => character is >= (char)0x21 and <= (char)0x7e
+                && !Separators.Contains(character));
 }

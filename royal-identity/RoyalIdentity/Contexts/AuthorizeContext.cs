@@ -288,6 +288,8 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
 
     public void RedirectUriValidated() => redirectUriValidated = true;
 
+    internal bool HasValidatedRedirectUri => redirectUriValidated && RedirectUri is not null;
+
     public void ResourcesValidated() => resourcesValidated = true;
 
     public void AssertResourcesValidated()

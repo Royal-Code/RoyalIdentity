@@ -35,7 +35,9 @@ public class DefaultCodeFactory : ICodeFactory
 
         var sid = context.Subject.GetSessionId();
 
-        var sessionState = sessionStateGenerator.GenerateSessionStateValue(context);
+        // SessionState leaves the authorization-code payload in Fase 3 of plan-oidc-session-management. Until
+        // that schema cut lands, an ineligible OAuth request uses the old non-null slot as an empty transport.
+        var sessionState = sessionStateGenerator.GenerateSessionStateValue(context) ?? string.Empty;
 
         var code = new AuthorizationCode(
             context.ClientParameters.Client.Id,

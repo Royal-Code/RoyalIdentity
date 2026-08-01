@@ -11,4 +11,8 @@
 		<PackageReference Include="Microsoft.Extensions.Http.Polly" Version="$(ExtVer)" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="Tests.Identity" />
+	</ItemGroup>
+
 </Project>

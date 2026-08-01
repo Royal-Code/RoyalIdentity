@@ -26,12 +26,16 @@ public class ConfigurationModelPayloadTests
         };
         options.Keys.MainSigningCredentialsAlgorithm = "RS512";
         options.Cors.AllowedOrigins.Add("https://a.example");
+        options.Authentication.CheckSessionCookieName = ".custom.check-session";
 
         var (version, json) = serverSerializer.Serialize(options);
         var restored = serverSerializer.Deserialize(version, json);
         var (_, reserialized) = serverSerializer.Serialize(restored);
 
         Assert.Equal(ServerOptionsPayloadSerializer.CurrentVersion, version);
+        Assert.Equal(2, version);
+        Assert.DoesNotContain("CheckSessionCookieDomain", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("CheckSessionCookieSameSiteMode", json, StringComparison.Ordinal);
         Assert.DoesNotContain(nameof(LoggingOptions.RedactedParameterNames), json, StringComparison.Ordinal);
         Assert.Equal(json, reserialized);
         Assert.Equal("https://issuer.example", restored.IssuerUri);
@@ -39,6 +43,7 @@ public class ConfigurationModelPayloadTests
         Assert.Equal("custom+jwt", restored.AccessTokenJwtType);
         Assert.Equal("RS512", restored.Keys.MainSigningCredentialsAlgorithm);
         Assert.Contains("https://a.example", restored.Cors.AllowedOrigins);
+        Assert.Equal(".custom.check-session", restored.Authentication.CheckSessionCookieName);
         // The case-insensitive CORS comparer survives because the get-only collection is repopulated in place.
         Assert.Contains("HTTPS://A.EXAMPLE", restored.Cors.AllowedOrigins);
     }
@@ -83,6 +88,14 @@ public class ConfigurationModelPayloadTests
     }
 
     [Fact]
+    public void ServerOptions_PreviousVersion_FailsClosedAfterTheCheckSessionSchemaCut()
+    {
+        var (_, json) = serverSerializer.Serialize(new ServerOptions());
+
+        Assert.Throws<ConfigurationPayloadException>(() => serverSerializer.Deserialize(1, json));
+    }
+
+    [Fact]
     public void ServerOptions_MalformedJson_FailsClosed()
     {
         Assert.Throws<ConfigurationPayloadException>(
@@ -122,6 +135,7 @@ public class ConfigurationModelPayloadTests
             StoreAuthorizationParameters = false,
             IncludeRealmPathToIssuerUri = false,
         };
+        realmOptions.Authentication.CheckSessionCookieName = ".realm.check-session";
 
         var (version, json) = realmSerializer.Serialize(realmOptions);
 
@@ -131,16 +145,19 @@ public class ConfigurationModelPayloadTests
         var (_, reserialized) = realmSerializer.Serialize(restored);
 
         Assert.Equal(RealmOptionsPayloadSerializer.CurrentVersion, version);
+        Assert.Equal(2, version);
+        Assert.DoesNotContain("CheckSessionCookieDomain", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("CheckSessionCookieSameSiteMode", json, StringComparison.Ordinal);
         Assert.Equal(json, reserialized);
         Assert.Same(authoritativeServer, restored.ServerOptions);
         Assert.Equal("https://realm.example", restored.IssuerUri);
         Assert.False(restored.StoreAuthorizationParameters);
         Assert.False(restored.IncludeRealmPathToIssuerUri);
+        Assert.Equal(".realm.check-session", restored.Authentication.CheckSessionCookieName);
     }
 
-    // plan-data-operational-storage DF29/DF40: the operational options are an additive change to the
-    // Configuration family. A payload written before they existed must materialize the closed defaults —
-    // without a relational migration and without bumping the payload version.
+    // A sparse payload written at the current schema version still materializes closed defaults. Version 1 is
+    // deliberately rejected after the breaking Check Session options cut, so this is not a compatibility shim.
     [Fact]
     public void RealmOptions_PayloadWithoutTheOperationalOptions_MaterializesTheClosedDefaults()
     {
@@ -150,7 +167,7 @@ public class ConfigurationModelPayloadTests
         var restored = realmSerializer.Deserialize(
             RealmOptionsPayloadSerializer.CurrentVersion, legacyPayload, serverOptions);
 
-        Assert.Equal(1, RealmOptionsPayloadSerializer.CurrentVersion);
+        Assert.Equal(2, RealmOptionsPayloadSerializer.CurrentVersion);
         Assert.Equal(600, restored.Authentication.AuthorizationInteractionLifetime);
         Assert.Equal(
             OperationalStorageOptions.DefaultPayloadProtectionProfile,
@@ -188,6 +205,7 @@ public class ConfigurationModelPayloadTests
     {
         var original = new RealmOptions(new ServerOptions());
         original.Authentication.AuthorizationInteractionLifetime = 90;
+        original.Authentication.CheckSessionCookieName = ".original.check-session";
         original.OperationalStorage.PayloadProtectionProfile = "vault";
         original.OperationalStorage.JwtAccessTokenPersistence = JwtAccessTokenPersistenceMode.Metadata;
         original.RefreshTokens.ClaimsMode = RefreshTokenClaimsMode.Snapshot;
@@ -196,6 +214,7 @@ public class ConfigurationModelPayloadTests
         copy.OperationalStorage.PayloadProtectionProfile = "other";
         copy.RefreshTokens.ClaimsMode = RefreshTokenClaimsMode.Current;
         copy.Authentication.AuthorizationInteractionLifetime = 30;
+        copy.Authentication.CheckSessionCookieName = ".copy.check-session";
 
         Assert.NotSame(original.OperationalStorage, copy.OperationalStorage);
         Assert.NotSame(original.RefreshTokens, copy.RefreshTokens);
@@ -203,6 +222,8 @@ public class ConfigurationModelPayloadTests
         Assert.Equal(JwtAccessTokenPersistenceMode.Metadata, copy.OperationalStorage.JwtAccessTokenPersistence);
         Assert.Equal(RefreshTokenClaimsMode.Snapshot, original.RefreshTokens.ClaimsMode);
         Assert.Equal(90, original.Authentication.AuthorizationInteractionLifetime);
+        Assert.Equal(".original.check-session", original.Authentication.CheckSessionCookieName);
+        Assert.Equal(".copy.check-session", copy.Authentication.CheckSessionCookieName);
     }
 
     // DF40: the lifetime is expressed in seconds and must be positive.
@@ -239,6 +260,15 @@ public class ConfigurationModelPayloadTests
 
         Assert.Throws<ConfigurationPayloadException>(
             () => realmSerializer.Deserialize(RealmOptionsPayloadSerializer.CurrentVersion + 1, json, serverOptions));
+    }
+
+    [Fact]
+    public void RealmOptions_PreviousVersion_FailsClosedAfterTheCheckSessionSchemaCut()
+    {
+        var serverOptions = new ServerOptions();
+        var (_, json) = realmSerializer.Serialize(new RealmOptions(serverOptions));
+
+        Assert.Throws<ConfigurationPayloadException>(() => realmSerializer.Deserialize(1, json, serverOptions));
     }
 
     [Fact]

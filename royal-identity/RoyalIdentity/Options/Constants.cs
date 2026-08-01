@@ -18,6 +18,8 @@ public static partial class Constants
         public const string RealmAuthenticationNamePrefix = "Realm:";
         public const string RealmRouteKey = "realm";
         public const string RealmCurrentKey = "realm.current";
+        internal const string CheckSessionStateAuthenticationProperty = ".roid.check_session.opuas";
+        internal const string CheckSessionStateHttpContextItem = ".roid.check_session.opuas.current";
 
         public const string DefaultCookieAuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
         public const string ExternalAuthenticationMethod = "external";

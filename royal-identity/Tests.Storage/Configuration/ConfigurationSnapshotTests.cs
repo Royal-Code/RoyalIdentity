@@ -49,6 +49,37 @@ public class ConfigurationSnapshotTests
     }
 
     [Fact]
+    public async Task Refresh_WithAnInvalidCheckSessionCookieName_FailsBeforePublication()
+    {
+        using var harness = new SnapshotTestHarness();
+        var options = new ServerOptions();
+        options.Authentication.CheckSessionCookieName = "invalid/name";
+        harness.Source.Data = SnapshotTestHarness.BuildData(options, "alpha");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("CheckSessionCookieName", exception.Message, StringComparison.Ordinal);
+        Assert.False(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
+    public async Task Refresh_WhenTheEffectiveCheckSessionNameCollidesWithTheBaseAuthenticationCookie_Fails()
+    {
+        using var harness = new SnapshotTestHarness();
+        var options = new ServerOptions();
+        options.Authentication.CookieName = ".roid.user";
+        options.Authentication.CheckSessionCookieName = ".roid";
+        harness.Source.Data = SnapshotTestHarness.BuildData(options, "user");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("collides", exception.Message, StringComparison.Ordinal);
+        Assert.False(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
     public async Task ServerOptions_And_Realm_AreDefensiveCopies()
     {
         using var harness = new SnapshotTestHarness();

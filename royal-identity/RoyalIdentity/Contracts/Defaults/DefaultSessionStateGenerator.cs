@@ -1,56 +1,36 @@
-﻿// Ignore Spelling: Opuas
-
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Contexts;
-using RoyalIdentity.Security.Cryptography;
-using RoyalIdentity.Utils;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using Base64Url = RoyalIdentity.Security.Encoding.Base64Url;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
-public class DefaultSessionStateGenerator : ISessionStateGenerator
+public sealed class DefaultSessionStateGenerator(CheckSessionStateManager stateManager) : ISessionStateGenerator
 {
-    public string GenerateSessionStateValue(AuthorizeContext context)
+    public string? GenerateSessionStateValue(AuthorizeContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (!ShouldGenerate(
+            context.Options.Endpoints.EnableCheckSessionEndpoint,
+            context.Scopes.IsOpenId,
+            context.HasValidatedRedirectUri))
+        {
+            return null;
+        }
+
         context.AssertHasRedirectUri();
+        context.ClientParameters.AssertHasClient();
 
-        var principal = context.Subject;
-        var clientId = context.ClientId;
-        var sessionId = context.SessionId!;
-        var uri = new Uri(context.RedirectUri);
-        var origin = uri.Scheme + "://" + uri.Host;
+        if (!SessionStateFormat.TryGetOrigin(context.RedirectUri, out var origin))
+            return null;
 
-        if (!uri.IsDefaultPort)
-            origin += ":" + uri.Port;
+        var userAgentState = stateManager.GetOrCreateRequestState(context.HttpContext);
 
-        var opuas = GenerateOpuas(sessionId, principal);
-        var salt = CryptoRandom.CreateUniqueId(16, OutputFormat.Hex);
-
-        var bytes = Encoding.UTF8.GetBytes(clientId + origin + opuas + salt);
-        byte[] hash;
-        hash = SHA256.HashData(bytes);
-
-        return Base64Url.Encode(hash) + "." + salt;
+        return SessionStateFormat.Create(context.ClientParameters.Client.Id, origin, userAgentState);
     }
 
-    /// <summary>
-    /// Generate OpenID Provider User Agent State
-    /// </summary>
-    /// <param name="sessionId"></param>
-    /// <param name="principal"></param>
-    /// <returns></returns>
-    public static string GenerateOpuas(string sessionId, ClaimsPrincipal principal)
-    {
-        var claims = string.Join("", principal.Claims.Select(c => $"{c.Type}{c.Value}"));
-        if (string.IsNullOrEmpty(claims))
-            return sessionId;
-
-        var bytes = Encoding.UTF8.GetBytes(sessionId + claims);
-        var hash = SHA256.HashData(bytes)!;
-
-        return Base64Url.Encode(hash);
-    }
+    internal static bool ShouldGenerate(
+        bool checkSessionEndpointEnabled,
+        bool isOpenIdRequest,
+        bool hasValidatedRedirectUri)
+        => checkSessionEndpointEnabled && isOpenIdRequest && hasValidatedRedirectUri;
 }
-

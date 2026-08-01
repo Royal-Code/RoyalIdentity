@@ -1,3 +1,4 @@
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 
@@ -22,6 +23,7 @@ internal sealed class PublishedConfigurationSnapshot
 
         // Take ownership of a fully independent graph. A source may retain its returned objects, but mutating
         // them after publication must never alter the current snapshot.
+        ValidateCheckSessionCookie("ServerOptions", data.ServerOptions.Authentication);
         serverOptions = new ServerOptions(data.ServerOptions);
         realmsByPath = data.Realms
             .Select(realm => Clone(realm, serverOptions))
@@ -41,9 +43,27 @@ internal sealed class PublishedConfigurationSnapshot
             : null;
 
     private static Realm Clone(Realm realm, ServerOptions authoritativeServerOptions)
-        => new(realm.Id, realm.Domain, realm.Path, realm.DisplayName, realm.Internal,
+    {
+        var clone = new Realm(realm.Id, realm.Domain, realm.Path, realm.DisplayName, realm.Internal,
             new RealmOptions(realm.Options, authoritativeServerOptions))
         {
             Enabled = realm.Enabled,
         };
+
+        ValidateCheckSessionCookie($"Realm '{clone.Path}'", clone.Options.Authentication);
+        _ = CheckSessionStateManager.GetCookieName(clone.Options.Authentication, clone);
+        _ = CheckSessionStateManager.GetCookiePath(clone);
+
+        return clone;
+    }
+
+    private static void ValidateCheckSessionCookie(string owner, AuthenticationOptions authentication)
+    {
+        var errors = authentication.ValidateCheckSessionCookie();
+        if (errors.Count is not 0)
+        {
+            throw new InvalidOperationException(
+                $"{owner} has invalid authentication options: {string.Join(" ", errors)}");
+        }
+    }
 }
