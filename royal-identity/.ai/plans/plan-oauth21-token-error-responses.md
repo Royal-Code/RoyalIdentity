@@ -523,8 +523,9 @@ Comandos da fase: `ErrorResponseResultTests` 21/21, o filtro de integração 103
 `ProtocolErrorBoundaryTests` 8/8. `git diff --check` limpo.
 
 **Inventário (tarefa 1).** Contado contra o commit anterior à fase (`0c0eb22`), excluindo a fiação interna do
-próprio helper (a auto-delegação em `ResponseHandlerExtensions` e a chamada de `EndpointErrorResults.InvalidRequest`
-para `BadRequest`): **104 call sites**.
+próprio helper: a auto-delegação em `ResponseHandlerExtensions`; a chamada interna de
+`EndpointErrorResults.InvalidRequest` para `BadRequest` já não integra a busca qualificada por callers:
+**105 call sites**.
 
 | API | Sites | Situação |
 |---|---|---|
@@ -533,7 +534,7 @@ para `BadRequest`): **104 call sites**.
 | `context.InvalidClient(...)` | 6 | idem |
 | `context.Error(...)` | 6 | já explícitos |
 | `ResponseHandler.Error(...)` direto | 1 | `RevocationHandler` |
-| `EndpointErrorResults.*` | 23 | fronteira DF19 |
+| `EndpointErrorResults.*` | 24 | fronteira DF19 |
 
 Dos 27 que passavam constante, **25 tinham classificação efetivamente diferente**: `AuthorizeMainValidator:76` e
 `RedirectUriValidator:60` passavam a própria `Errors.InvalidRequest`, então o campo `error` já saía correto e

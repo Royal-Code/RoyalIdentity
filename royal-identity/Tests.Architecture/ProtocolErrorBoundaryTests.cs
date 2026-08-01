@@ -16,14 +16,16 @@ public class ProtocolErrorBoundaryTests
     private static readonly Assembly PipelinesLibrary = typeof(IContextBase).Assembly;  // RoyalIdentity.Pipelines
 
     private const string CoreName = "RoyalIdentity";
+    private const string OidcErrorConstantPattern =
+        @"Oidc(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.Errors(?:\.[A-Za-z_][A-Za-z0-9_]*)+";
 
     /// <summary>
-    /// Matches an <c>Oidc.*.Errors.*</c> constant sitting where a description belongs — either as the second
-    /// positional argument of <c>.Error(</c>, or bound by name to <c>errorDescription</c>. The first positional
-    /// argument is where a code belongs and is deliberately not matched.
+    /// Matches an <c>Oidc.*.Errors.*</c> or <c>Oidc.Errors.*</c> constant sitting where a description belongs —
+    /// either as the second positional argument of <c>.Error(</c>, or bound by name to <c>errorDescription</c>.
+    /// The first positional argument is where a code belongs and is deliberately not matched.
     /// </summary>
     private static readonly Regex ErrorConstantInDescriptionPosition = new(
-        @"\.Error\(\s*[^,)]+,\s*Oidc\.[A-Za-z]+\.Errors\.|errorDescription\s*:\s*Oidc\.[A-Za-z]+\.Errors\.",
+        $@"\.Error\(\s*[^,)]+,\s*{OidcErrorConstantPattern}|errorDescription\s*:\s*{OidcErrorConstantPattern}",
         RegexOptions.Compiled);
 
     /// <summary>
@@ -207,6 +209,12 @@ public class ProtocolErrorBoundaryTests
         Assert.Matches(
             ErrorConstantInDescriptionPosition,
             "context.Error(errorDescription: Oidc.Token.Errors.InvalidScope, error: Oidc.Token.Errors.InvalidGrant);");
+        Assert.Matches(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(Oidc.Token.Errors.InvalidGrant, Oidc.Errors.Revocation.UnsupportedTokenType);");
+        Assert.Matches(
+            ErrorConstantInDescriptionPosition,
+            "context.Error(error: Oidc.Token.Errors.InvalidGrant, errorDescription: Oidc.Errors.Revocation.UnsupportedTokenType);");
 
         // The supported shapes: the code first, the description second, on one line or several.
         Assert.DoesNotMatch(
