@@ -390,6 +390,10 @@
   `.GenerateSessionStateValue(` e continua limitado à factory.
 - **Construtores de resposta:** o estreitamento foi mantido, mas deixou de ser efeito colateral: DF24 registra a
   decisão e um guard por reflexão prova que nenhuma construção pública contorna a factory.
+- **Posição da rede no pipe:** a segunda revisão identificou corretamente que o teste direto provava a semântica
+  do wrapper, mas não sua composição. Um guard sobre o bloco específico de `AuthorizeContext` agora exige uma
+  única rede depois de `RedirectUriValidator` e antes de `PromptLoginDecorator`, `ConsentDecorator` e
+  `CustomizeAuthorizeContext`; apagar ou deslocar a linha quebra a suíte.
 
 ---
 
@@ -845,8 +849,8 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~PipelineComponentCon
   recentemente estreitado; corrigiu ainda a inconsistência antiga de `RedirectUriValidator`, agora público como
   os demais componentes. Um guard arquitetural fixa essas decisões (DF28).
 - Verificação final: aceites focados com 13 `AuthorizeSessionStateTests`, 32 regressões authorize/UI, 67 testes
-  diretos de payload/authorization code, 4 guards da factory e 13 guards de contratos/visibilidade do pipeline;
-  build sem erros; suíte completa com 1.453
+  diretos de payload/authorization code, 5 guards da factory/composição e 13 guards de contratos/visibilidade do
+  pipeline; build sem erros; suíte completa com 1.454
   aprovados, 51 ignorados por opt-in e nenhuma falha; `git diff --check` limpo.
 
 ---
