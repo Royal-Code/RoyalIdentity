@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Models;
+using RoyalIdentity.Authentication;
 
 namespace RoyalIdentity.Users.Defaults;
 
@@ -18,6 +19,7 @@ public class DefaultSignOutManager : ISignOutManager
     private readonly IEventDispatcher eventDispatcher;
     private readonly IBackChannelLogoutNotifier backChannelNotifier;
     private readonly IMessageStore messageStore;
+    private readonly CheckSessionStateManager checkSessionStateManager;
     private readonly ILogger logger;
 
     public DefaultSignOutManager(
@@ -26,6 +28,7 @@ public class DefaultSignOutManager : ISignOutManager
         IEventDispatcher eventDispatcher,
         IBackChannelLogoutNotifier backChannelNotifier,
         IMessageStore messageStore,
+        CheckSessionStateManager checkSessionStateManager,
         ILogger<DefaultSignOutManager> logger)
     {
         this.httpContextAccessor = httpContextAccessor;
@@ -33,6 +36,7 @@ public class DefaultSignOutManager : ISignOutManager
         this.eventDispatcher = eventDispatcher;
         this.backChannelNotifier = backChannelNotifier;
         this.messageStore = messageStore;
+        this.checkSessionStateManager = checkSessionStateManager;
         this.logger = logger;
     }
 
@@ -85,6 +89,7 @@ public class DefaultSignOutManager : ISignOutManager
             // delete local realm authentication cookie
             var authenticationScheme = httpContext.GetRealmAuthenticationScheme();
             await httpContext.SignOutAsync(authenticationScheme);
+            checkSessionStateManager.RemoveCookie(httpContext, realm);
 
             // raise the logout event
             await eventDispatcher.DispatchAsync(

@@ -1,15 +1,15 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: EM EXECUÇÃO - Fase 1 concluída; Fase 2 é a próxima; 1 de 7 fases concluídas
+## Status: EM EXECUÇÃO - Fases 1-2 concluídas; Fase 3 é a próxima; 2 de 7 fases concluídas
 
 ## Progresso
 
-`█░░░░░░` **14%** - 1 de 7 fases
+`██░░░░░` **29%** - 2 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato de estado do User Agent e opções | Concluida |
-| Fase 2 - Ciclo de vida do estado no login, cookie e logout | Pendente |
+| Fase 2 - Ciclo de vida do estado no login, cookie e logout | Concluida |
 | Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Pendente |
 | Fase 4 - Rota, discovery HTTPS e isolamento por realm | Pendente |
 | Fase 5 - OP iframe moderno e hardening HTTP | Pendente |
@@ -657,23 +657,23 @@ registro DI, testes de sessão/cookie.
 
 **Tarefas:**
 
-- [ ] Criar OP User Agent State ao preparar `AuthenticationProperties` no login bem-sucedido.
-- [ ] Gravar o check-session cookie com as flags fixas de DF5 no mesmo response do sign-in.
-- [ ] Preservar o estado em sliding/renovação do mesmo ticket.
-- [ ] Gerar estado e marcar `ShouldRenew=true` quando um ticket autenticado válido ainda não possuir a propriedade.
-- [ ] Resolver `CheckSessionStateManager` por `context.HttpContext.RequestServices` dentro de cada invocação de
+- [x] Criar OP User Agent State ao preparar `AuthenticationProperties` no login bem-sucedido.
+- [x] Gravar o check-session cookie com as flags fixas de DF5 no mesmo response do sign-in.
+- [x] Preservar o estado em sliding/renovação do mesmo ticket.
+- [x] Gerar estado e marcar `ShouldRenew=true` quando um ticket autenticado válido ainda não possuir a propriedade.
+- [x] Resolver `CheckSessionStateManager` por `context.HttpContext.RequestServices` dentro de cada invocação de
   `OnValidatePrincipal`; não injetar/capturar o scoped no configurador de named options.
-- [ ] Derivar realm, opções, nome e path do check-session cookie dentro do manager por request; não fechar esses
+- [x] Derivar realm, opções, nome e path do check-session cookie dentro do manager por request; não fechar esses
   valores no delegate cacheado.
-- [ ] Publicar o valor canônico do ticket em `HttpContext.Items` durante `OnValidatePrincipal`.
-- [ ] Remover o fallback transitório de `GetOrCreateRequestState` na geração: depois da integração, o generator
+- [x] Publicar o valor canônico do ticket em `HttpContext.Items` durante `OnValidatePrincipal`.
+- [x] Remover o fallback transitório de `GetOrCreateRequestState` na geração: depois da integração, o generator
   deve consumir somente o valor publicado pelo ticket; testar igualdade ticket → item → cookie → `session_state`.
-- [ ] Sobrescrever cookie ausente/divergente a partir do ticket protegido.
-- [ ] Limpar o cookie quando `OnValidatePrincipal` rejeitar sessão expirada, encerrada ou invalidada por estado.
-- [ ] Limpar o cookie no `DefaultSignOutManager` usando exatamente o nome/path de emissão.
-- [ ] Não gravar check-session cookie quando o endpoint estiver desabilitado para o realm; remover valor residual.
-- [ ] Cobrir login repetido do mesmo usuário, troca de usuário, logout e dois realms.
-- [ ] Criar `Tests.Integration/Users/CheckSessionCookieLifecycleTests.cs` cobrindo login, sliding,
+- [x] Sobrescrever cookie ausente/divergente a partir do ticket protegido.
+- [x] Limpar o cookie quando `OnValidatePrincipal` rejeitar sessão expirada, encerrada ou invalidada por estado.
+- [x] Limpar o cookie no `DefaultSignOutManager` usando exatamente o nome/path de emissão.
+- [x] Não gravar check-session cookie quando o endpoint estiver desabilitado para o realm; remover valor residual.
+- [x] Cobrir login repetido do mesmo usuário, troca de usuário, logout e dois realms.
+- [x] Criar `Tests.Integration/Users/CheckSessionCookieLifecycleTests.cs` cobrindo login, sliding,
   `OnValidatePrincipal`, rejeição, logout e isolamento entre realms.
 
 **Critérios de aceite:** login válido produz ticket + cookie com o mesmo estado opaco; sliding não produz
@@ -689,7 +689,24 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~SessionLifecycleTests
 
 ### Resultado da Fase 2
 
-*a preencher*
+- `LoginFlowService` prepara o OP User Agent State dentro de `AuthenticationProperties` antes do sign-in e emite,
+  no mesmo response, a cópia JavaScript-readable com nome/path realm-scoped e as flags fixas de DF5. Cada novo
+  login cria estado independente, inclusive login repetido do mesmo usuário e troca de usuário.
+- `OnValidatePrincipal` resolve `CheckSessionStateManager` scoped por `RequestServices` em cada request, sem
+  capturá-lo no delegate de named options. Sessão válida publica o valor do ticket em `HttpContext.Items` e
+  repara cookie ausente/divergente; ticket legado/sem estado recebe novo valor e `ShouldRenew=true`; sliding
+  preserva o estado existente. Sessão rejeitada remove o cookie legível.
+- O fallback aleatório de request foi removido: `DefaultSessionStateGenerator` retorna `null` sem estado publicado
+  pelo ticket. Um teste black-box percorre login → ticket → request → cookie → Authentication Response e
+  recomputa independentemente o hash anunciado em `session_state`.
+- `DefaultSignOutManager` remove o cookie com o mesmo nome/path usados na emissão. Feature desabilitada remove
+  estado residual do ticket/cookie e não emite novo valor. Dois realms usam nomes, paths, tickets e estados
+  distintos; cookie/ticket de um não autentica o outro.
+- O valor opaco não entra em claims, storage ou logs. A implementação permanece no core e não altera
+  `IUserSessionStore` nem o módulo `UserAccounts`.
+- Verificação: `CheckSessionCookieLifecycleTests` 11/11; `SessionLifecycleTests` 12/12;
+  `SessionStateFormatTests` 35/35; build sem erros; suíte completa com 1.422 aprovados, 51 ignorados por opt-in e
+  nenhuma falha; `git diff --check` limpo.
 
 ---
 

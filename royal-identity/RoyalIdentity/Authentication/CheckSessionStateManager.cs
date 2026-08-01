@@ -3,13 +3,14 @@ using RoyalIdentity.Models;
 using RoyalIdentity.Options;
 using RoyalIdentity.Security.Cryptography;
 using RoyalIdentity.Security.Encoding;
+using RoyalIdentity.Extensions;
 using AuthenticationProperties = Microsoft.AspNetCore.Authentication.AuthenticationProperties;
 
 namespace RoyalIdentity.Authentication;
 
 /// <summary>
-/// Owns the request-local and protected-ticket representation of the opaque OP User Agent State.
-/// Cookie I/O is added by the lifecycle phase; this type remains independent from storage and user modules.
+/// Owns the protected-ticket, request-local and browser-cookie representations of the opaque OP User Agent State.
+/// This type remains independent from storage and user modules.
 /// </summary>
 public sealed class CheckSessionStateManager
 {
@@ -32,16 +33,65 @@ public sealed class CheckSessionStateManager
         return created;
     }
 
-    internal string GetOrCreateRequestState(HttpContext httpContext)
+    internal void PrepareSignIn(HttpContext httpContext, AuthenticationProperties properties)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        ArgumentNullException.ThrowIfNull(properties);
+
+        var realm = httpContext.GetCurrentRealm();
+        if (!realm.Options.Endpoints.EnableCheckSessionEndpoint)
+        {
+            properties.Items.Remove(Server.CheckSessionStateAuthenticationProperty);
+            ClearRequestState(httpContext);
+            DeleteCookieIfPresent(httpContext, realm);
+            return;
+        }
+
+        var state = GetOrCreateState(properties);
+        PublishRequestState(httpContext, state);
+        IssueCookieIfRequired(httpContext, realm, state);
+    }
+
+    internal bool SynchronizeAuthenticatedRequest(
+        HttpContext httpContext,
+        AuthenticationProperties properties)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        ArgumentNullException.ThrowIfNull(properties);
+
+        var realm = httpContext.GetCurrentRealm();
+        if (!realm.Options.Endpoints.EnableCheckSessionEndpoint)
+        {
+            var removedTicketState = properties.Items.Remove(Server.CheckSessionStateAuthenticationProperty);
+            ClearRequestState(httpContext);
+            DeleteCookieIfPresent(httpContext, realm);
+            return removedTicketState;
+        }
+
+        var ticketChanged = !TryGetState(properties, out var state);
+        if (ticketChanged)
+            state = GetOrCreateState(properties);
+
+        PublishRequestState(httpContext, state);
+        IssueCookieIfRequired(httpContext, realm, state);
+        return ticketChanged;
+    }
+
+    internal void RemoveCookie(HttpContext httpContext)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
 
-        if (TryGetRequestState(httpContext, out var current))
-            return current;
+        ClearRequestState(httpContext);
+        DeleteCookieIfPresent(httpContext, httpContext.GetCurrentRealm());
+    }
 
-        var created = CreateState();
-        PublishRequestState(httpContext, created);
-        return created;
+    internal void RemoveCookie(HttpContext httpContext, Realm realm)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        ArgumentNullException.ThrowIfNull(realm);
+
+        ClearRequestState(httpContext);
+        DeleteCookieIfPresent(httpContext, realm);
     }
 
     internal void PublishRequestState(HttpContext httpContext, string state)
@@ -72,6 +122,36 @@ public sealed class CheckSessionStateManager
 
         state = string.Empty;
         return false;
+    }
+
+    private static bool TryGetState(AuthenticationProperties properties, out string state)
+    {
+        if (properties.Items.TryGetValue(Server.CheckSessionStateAuthenticationProperty, out var current)
+            && IsValidState(current))
+        {
+            state = current!;
+            return true;
+        }
+
+        state = string.Empty;
+        return false;
+    }
+
+    private static void ClearRequestState(HttpContext httpContext)
+        => httpContext.Items.Remove(Server.CheckSessionStateHttpContextItem);
+
+    private static void IssueCookieIfRequired(HttpContext httpContext, Realm realm, string state)
+    {
+        var name = GetCookieName(realm.Options.Authentication, realm);
+        if (!string.Equals(httpContext.Request.Cookies[name], state, StringComparison.Ordinal))
+            httpContext.Response.Cookies.Append(name, state, CreateCookieOptions(realm));
+    }
+
+    private static void DeleteCookieIfPresent(HttpContext httpContext, Realm realm)
+    {
+        var name = GetCookieName(realm.Options.Authentication, realm);
+        if (httpContext.Request.Cookies.ContainsKey(name))
+            httpContext.Response.Cookies.Delete(name, CreateCookieOptions(realm));
     }
 
     internal static string GetCookieName(AuthenticationOptions options, Realm realm)

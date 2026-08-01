@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Configuration;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
@@ -60,17 +61,24 @@ public class ConfigureRealmCookieAuthenticationOptions : IConfigureNamedOptions<
             options.AccessDeniedPath = realm.Routes.AccessDeniedPath;
             options.ReturnUrlParameter = realm.Options.UI.LoginParameter;
         }
-        
+
         options.Events.OnValidatePrincipal = async context =>
         {
             if (context.Principal is null)
                 return;
 
+            var checkSessionStateManager = context.HttpContext.RequestServices
+                .GetRequiredService<CheckSessionStateManager>();
             var isSessionActive = await context.HttpContext.ValidateUserSessionAsync(context.Principal);
             if (!isSessionActive)
             {
                 context.RejectPrincipal();
+                checkSessionStateManager.RemoveCookie(context.HttpContext);
+                return;
             }
+
+            if (checkSessionStateManager.SynchronizeAuthenticatedRequest(context.HttpContext, context.Properties))
+                context.ShouldRenew = true;
         };
     }
 

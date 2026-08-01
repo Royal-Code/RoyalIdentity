@@ -175,13 +175,12 @@ public class SessionStateFormatTests
     {
         var manager = new CheckSessionStateManager();
         var context = new DefaultHttpContext();
+        var state = manager.CreateState();
 
-        var first = manager.GetOrCreateRequestState(context);
-        var second = manager.GetOrCreateRequestState(context);
+        manager.PublishRequestState(context, state);
 
-        Assert.Equal(first, second);
         Assert.True(CheckSessionStateManager.TryGetRequestState(context, out var published));
-        Assert.Equal(first, published);
+        Assert.Equal(state, published);
     }
 
     [Fact]

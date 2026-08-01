@@ -60,8 +60,8 @@ hour) makes retention a server value. `RoyalIdentity.Server` uses the durable ba
 in-memory one, and `Tests.Architecture` guards which one each resolves.
 
 `.ai/plans/plan-oauth21-token-error-responses.md` is completed (4/4 phases). The active plan is
-`.ai/plans/plan-oidc-session-management.md`: Fase 1 of 7 is complete and Fase 2 (ticket/cookie/logout lifecycle)
-is next. Resources/scopes remain volatile per baseline DF22. The production
+`.ai/plans/plan-oidc-session-management.md`: Fases 1-2 of 7 are complete and Fase 3 (Authentication Responses,
+`prompt=none` and the operational payload) is next. Resources/scopes remain volatile per baseline DF22. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
 migrates or seeds. `RoyalIdentity.Demo` is a self-provisioned, ephemeral SQLite in-memory executable.
 `Tests.Host` is storage-agnostic, and the default `Tests.Integration` composition uses

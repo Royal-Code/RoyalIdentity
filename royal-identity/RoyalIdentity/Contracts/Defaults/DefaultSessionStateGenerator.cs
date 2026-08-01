@@ -3,7 +3,7 @@ using RoyalIdentity.Contexts;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
-public sealed class DefaultSessionStateGenerator(CheckSessionStateManager stateManager) : ISessionStateGenerator
+public sealed class DefaultSessionStateGenerator : ISessionStateGenerator
 {
     public string? GenerateSessionStateValue(AuthorizeContext context)
     {
@@ -23,7 +23,8 @@ public sealed class DefaultSessionStateGenerator(CheckSessionStateManager stateM
         if (!SessionStateFormat.TryGetOrigin(context.RedirectUri, out var origin))
             return null;
 
-        var userAgentState = stateManager.GetOrCreateRequestState(context.HttpContext);
+        if (!CheckSessionStateManager.TryGetRequestState(context.HttpContext, out var userAgentState))
+            return null;
 
         return SessionStateFormat.Create(context.ClientParameters.Client.Id, origin, userAgentState);
     }

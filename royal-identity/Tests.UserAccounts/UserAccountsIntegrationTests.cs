@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Contracts;
 using RoyalIdentity.Events;
 using RoyalIdentity.Models;
@@ -183,6 +184,7 @@ public class UserAccountsIntegrationTests
             new FixedCurrentRealmAccessor(realm),
             events,
             new HttpContextAccessor(),
+            new CheckSessionStateManager(),
             NullLogger<LoginFlowService>.Instance);
 
         var result = await flow.LoginAsync(new LoginRequest("alice", "secret", ReturnUrl: null, RememberLogin: false), default);
@@ -240,6 +242,7 @@ public class UserAccountsIntegrationTests
             new FixedCurrentRealmAccessor(realm),
             events,
             new HttpContextAccessor(),
+            new CheckSessionStateManager(),
             NullLogger<LoginFlowService>.Instance);
 
         var result = await flow.LoginAsync(new LoginRequest("alice", "secret", ReturnUrl: null, RememberLogin: false), default);

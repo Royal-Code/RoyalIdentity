@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contracts;
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Events;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
@@ -27,6 +28,7 @@ public sealed class LoginFlowService(
     ICurrentRealmAccessor realmAccessor,
     IEventDispatcher eventDispatcher,
     IHttpContextAccessor httpContextAccessor,
+    CheckSessionStateManager checkSessionStateManager,
     ILogger<LoginFlowService> logger)
 {
     public async Task<LoginFlowResult> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -118,6 +120,7 @@ public sealed class LoginFlowService(
 
         props ??= new AuthenticationProperties();
         props.Items[JwtRegisteredClaimNames.Sid] = sid.Value;
+        checkSessionStateManager.PrepareSignIn(httpContext, props);
 
         var scheme = httpContext.GetRealmAuthenticationScheme();
         await httpContext.SignInAsync(scheme, principal, props);
