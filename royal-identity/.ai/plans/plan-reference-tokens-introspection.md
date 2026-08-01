@@ -27,6 +27,8 @@
 
 ### Fontes verificadas
 
+- [ADR-020](../../adrs/ADR-020.md) — payloads Configuration/Operational permanecem em v1 durante o pre-release;
+  mudanças incompatíveis exigem reprovisionamento, não bumps.
 - [backlog-001.md](../backlogs/backlog-001.md) — emissão de reference token continua pendente; store e bearer
   já possuem suporte parcial.
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — entrega a baseline de
@@ -34,11 +36,11 @@
   `WWW-Authenticate`) que o endpoint direto de introspection deve consumir sem reutilizar a identidade
   `EvaluatedClient`.
 - [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — remove metadata falsa de introspection
-  e `EnableIntrospectionEndpoint` nos payloads v3; este plano reintroduz o gate somente junto do endpoint real.
-- [plan-localization.md](plan-localization.md) — executa antes deste plano e deixa
-  `ServerOptionsPayload` em v3 e `RealmOptionsPayload` em v4.
-- [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — predecessor imediato; promove
-  `ServerOptionsPayload` de v3 para v4 e `RealmOptionsPayload` de v4 para v5. A reintrodução de
+  e `EnableIntrospectionEndpoint` no payload pré-release v1; este plano reintroduz o gate somente junto do endpoint real.
+- [plan-localization.md](plan-localization.md) — executa antes deste plano e mantém
+  `ServerOptionsPayload` e `RealmOptionsPayload` em v1.
+- [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — predecessor imediato; mantém ambos os
+  payloads em v1. A reintrodução de
   `EndpointsOptions.EnableIntrospectionEndpoint` parte obrigatoriamente dessa baseline.
 - [plan-data-operational-storage.md](plan-data-operational-storage.md) e
   [plan-data-storage-matrix.md](plan-data-storage-matrix.md) — semânticas AT-01..AT-04, digest de lookup,
@@ -82,9 +84,9 @@
   relacionados ao revogar refresh token; faltam aceites com tokens realmente emitidos.
 - **Introspection inexistente:** há constantes protocolares e metadata legada, mas nenhum endpoint, context,
   pipeline ou response RFC 7662. O plano predecessor remove a option/metadata falsa antes desta execução.
-- **Gate removido pelo predecessor:** `EnableIntrospectionEndpoint` deixa de existir no payload v3 e deve voltar
-  somente quando rota/pipeline estiverem reais; após Localization e RFC 9700, a baseline obrigatória deste plano
-  é `ServerOptionsPayload` v4 e `RealmOptionsPayload` v5.
+- **Gate removido pelo predecessor:** `EnableIntrospectionEndpoint` deixa de existir no payload v1 corrente e deve
+  voltar somente quando rota/pipeline estiverem reais; após Localization e RFC 9700, a baseline obrigatória deste
+  plano permanece `ServerOptionsPayload`/`RealmOptionsPayload` v1 conforme ADR-020.
 - **ResourceServer já modela credenciais:** `ResourceServer.Secrets` existe, mas `IResourceStore` não oferece
   lookup direto por nome e os evaluators atuais autenticam `Client`, não `ResourceServer`.
 - **Configuration relacional:** cada scalar público de `Client` deve possuir coluna e decisão no
@@ -238,10 +240,8 @@
 - **DF21 — Gate restaurado com runtime:** reintroduzir `EnableIntrospectionEndpoint` em `EndpointsOptions` com
   default `true` somente no mesmo corte em que rota/pipeline RFC 7662 existirem. O gate controla runtime e
   discovery por realm; desabilitado significa 404 e metadata/aliases ausentes. A Fase 5 falha antes de editar se
-  `ServerOptionsPayloadSerializer.CurrentVersion != 4` ou
-  `RealmOptionsPayloadSerializer.CurrentVersion != 5`, e então promove respectivamente v4 → v5 e v5 → v6.
-  Serializers rejeitam versões anteriores, seeds/fixtures são reprovisionados e não há migration relacional.
-  Fonte: handoff sequencial Debt Closure → Localization → RFC 9700 + padrão fail-closed dos payloads.
+  qualquer serializer Configuration não estiver em v1 e preserva v1 após atualizar seeds/fixtures e reprovisionar
+  dados antigos, sem migration relacional/JSON. Fonte: ADR-020 + handoff funcional dos predecessores.
 - **DF22 — Topologia verificável de testes:** algoritmo puro de geração/formato do handle fica em
   `Tests.Identity/Tokens/ReferenceTokenHandleTests.cs`; factory e fluxos que exigem composição ficam em
   `Tests.Integration` nas classes `ReferenceTokenFactoryTests`, `ReferenceTokenGrantIssuanceTests`,
@@ -286,8 +286,7 @@
   composição. Conclusão: DF22.
 - **Fato verificado:** RFC 7662 exige autenticação/autorização do endpoint e remete falhas de credenciais OAuth ao
   `401` aplicável; a identidade do caller continua sendo `ResourceServer`. Conclusão: DF23.
-- **Fato verificado:** o predecessor RFC 9700 deixa Server v4/Realm v5. Conclusão: versões concretas e gate
-  incorporados à DF21.
+- **Fato verificado:** ADR-020 e os predecessores deixam Server/Realm v1. Conclusão: gate v1 incorporado à DF21.
 
 ---
 
@@ -328,10 +327,10 @@ operation.protocol_artifacts [existente]
 
 - Não criar tabela de introspection, cache ou sessão adicional.
 - Não duplicar o handle opaco em `Client`, refresh token ou outra entidade.
-- `AccessTokenPayloadSerializer` só muda de versão se a remoção do claim/novo dado realmente alterar seu
-  contrato; não fazer bump mecânico.
-- Os payloads Configuration que serializam `EndpointsOptions` partem da baseline comprovada Server v4/Realm v5
-  e são promovidos para Server v5/Realm v6, sem fallback de leitura.
+- `AccessTokenPayloadSerializer` permanece em v1 mesmo se a remoção do claim/novo dado alterar o shape corrente;
+  atualizar fixtures e reprovisionar dados pré-release, sem leitor legado ou bump, conforme ADR-020.
+- Os payloads Configuration que serializam `EndpointsOptions` partem e terminam em Server/Realm v1, sem leitor
+  legado para shapes pré-release anteriores.
 
 ### Arquitetura alvo
 
@@ -375,8 +374,8 @@ RoyalIdentity.Storage.EntityFramework.Sqlite|PostgreSql/
 - Executar depois de `plan-rfc9700-security-hardening.md` para não disputar remoção do front-channel ou rotação
   de refresh.
 - Confirmar antes da Fase 1 que `plan-refactoring-debt-closure.md` removeu a metadata/option falsa.
-- Ao reintroduzir a option na Fase 5, exigir Server v4/Realm v5, promover para Server v5/Realm v6, atualizar
-  seeds/fixtures e reprovisionar sem fallback de versões antigas.
+- Ao reintroduzir a option na Fase 5, exigir e preservar Server/Realm v1, atualizar seeds/fixtures e reprovisionar
+  payloads antigos sem leitor legado.
 - Migration de Configuration converte clientes existentes para `Jwt`; não alterar tokens já emitidos.
 - Server continua externamente migrado; Demo continua self-provisioned SQLite.
 - Ativar `Reference` somente nos seeds/testes específicos; não trocar silenciosamente todos os clients.
@@ -618,11 +617,11 @@ decididos em Q2 e retornar `active=false` como resposta indistinguível para qua
 - [ ] Produzir resposta ativa mínima conforme DF15, sem `jti`, username ou custom claims.
 - [ ] Aplicar no-cache e redaction integral de token/credencial.
 - [ ] Registrar endpoint/context/handler/pipeline/DI seguindo o padrão do repositório.
-- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 4` ou
-  `RealmOptionsPayloadSerializer.CurrentVersion != 5`.
+- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 1` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 1`.
 - [ ] Reintroduzir `EnableIntrospectionEndpoint` conforme DF21 e aplicar o gate à rota/runtime.
-- [ ] Promover `ServerOptionsPayload` v4 → v5 e `RealmOptionsPayload` v5 → v6, atualizando seeds, fixtures e
-  testes de versão sem migration relacional ou fallback.
+- [ ] Preservar `ServerOptionsPayload`/`RealmOptionsPayload` v1, atualizando seeds, fixtures e testes sem migration
+  relacional/JSON ou leitor legado.
 - [ ] Criar `Tests.Integration/Endpoints/IntrospectionEndpointTests.cs` para a matriz
   request × token × audience × realm e `IntrospectionAuthenticationTests.cs` para cardinalidade, precedência,
   `401` e `WWW-Authenticate`; estender `ResourceStoreTests` e `ConfigurationModelPayloadTests` para o lookup/gate.
@@ -630,7 +629,7 @@ decididos em Q2 e retornar `active=false` como resposta indistinguível para qua
 **Critérios de aceite:** endpoint anônimo/HTTP não processa tokens; auth inválida é 401; token inválido ou fora da
 audiência é `active=false`; token reference ativo e autorizado retorna somente campos permitidos; nenhum erro
 revela existência, motivo ou outro realm; gate desabilitado produz 404; payloads Configuration registram a nova
-option em Server v5/Realm v6 a partir da baseline exata v4/v5.
+option em Server/Realm v1 a partir da baseline funcional dos predecessores.
 
 **Testes:**
 
@@ -751,7 +750,7 @@ dotnet test RoyalIdentity.sln
 | Handle opaco seguro | 2, 4 | DF3-DF5, DF8-DF10, DF22 | 256 bits; sem signer/raw handle/jti | ReferenceTokenHandle; ReferenceTokenFactory; OperationalPayload; AccessTokenStore |
 | Todos os grants respeitam o tipo | 3 | DF2, DF6, DF7, DF22 | code/client_credentials/refresh usam factory | ReferenceTokenGrantIssuanceTests |
 | Lifecycle e revogação | 4 | DF8-DF11 | expiração/revogação/realm/client fail-closed | ReferenceTokenBearer; Revocation; cleanup |
-| Introspection autenticado | 5 | DF12-DF18, DF21-DF23, Q1, Q2 | 401/challenge para auth; false indistinguível; resposta mínima; gate 404; Server v5/Realm v6 | IntrospectionEndpoint; IntrospectionAuthentication; payload |
+| Introspection autenticado | 5 | DF12-DF18, DF21-DF23, Q1, Q2 | 401/challenge para auth; false indistinguível; resposta mínima; gate 404; Server/Realm v1 | IntrospectionEndpoint; IntrospectionAuthentication; payload |
 | Metadata e providers fiéis | 6 | DF17-DF23 | discovery exato; gate; dois realms; SQLite/PostgreSQL | IntrospectionDiscovery; ReferenceTokenIntrospection; provider scripts |
 | Fechar dívida/documentação | 7 | DF1-DF23 | backlog/roadmap/foundations alinhados | guards de construção; build; solution test |
 
@@ -778,7 +777,7 @@ dotnet test RoyalIdentity.sln
 17. Introspection desabilitado por realm responde 404 e não aparece em discovery/aliases.
 18. Autenticação de introspection preserva a baseline HTTP do OAuth 2.1, mas sua identidade e seu preflight são
     próprios de `ResourceServer`; nenhum caminho aceita `EvaluatedClient`.
-19. A Fase 5 só parte de Server v4/Realm v5 e termina com Server v5/Realm v6; versões anteriores falham fechadas.
+19. A Fase 5 parte e termina com Server/Realm v1; versões diferentes falham fechadas e shapes antigos são reprovisionados.
 20. Nenhum comando obrigatório com filtro pode concluir tendo selecionado zero testes.
 
 ---
@@ -793,7 +792,7 @@ dotnet test RoyalIdentity.sln
 - Introspection cumpre Q1/Q2, RFC 7662 e minimização por ResourceServer.
 - Discovery anuncia endpoint/métodos reais e URLs HTTPS realm-scoped.
 - Gate realm-scoped desabilitado produz 404 e omite toda metadata/alias de introspection.
-- Payloads Configuration partem de Server v4/Realm v5 e terminam em Server v5/Realm v6, sem fallback.
+- Payloads Configuration permanecem em Server/Realm v1, sem fallback para shapes pré-release anteriores.
 - Dois realms e dois ResourceServers permanecem isolados.
 - Migrations incrementais e SQL dos providers estão atualizados.
 - Todas as fixtures nomeadas na DF22 existem e nenhum comando obrigatório seleciona zero testes.
@@ -817,7 +816,7 @@ dotnet test RoyalIdentity.sln
 | HTTP aceita secrets/tokens | endpoint ignora scheme efetivo | interceptação de credenciais | DF18 + testes ForwardedHeaders | Aberto |
 | Introspection diverge da baseline HTTP | autenticação de ResourceServer reimplementa ordem/status/header ad hoc | credenciais múltiplas geram efeito ou challenge incorreto | DF23 + IntrospectionAuthenticationTests | Aberto |
 | Hint restringe busca | implementação confia em hint errado | token ativo responde false incorretamente | fallback entre tipos Q2 | Aberto |
-| Cadeia Configuration parte da versão errada | executor ignora predecessores | option perdida ou payload incompatível | DF21 + gate Server v4/Realm v5 | Aberto |
+| Payload pré-release parte da baseline errada | executor ignora predecessores ou ADR-020 | option perdida ou bump indevido | DF21 + gate Server/Realm v1 | Aberto |
 | Filtro obrigatório seleciona zero testes | classe planejada não existe ou filtro amplo mascara ausência | fase fecha sem provar o aceite | DF22 + classes/comandos explícitos | Aberto |
 | Resource catalog volátil limita produção | secrets só em bridge | restart/configuração externa necessária | documentar limite; persistência em plano próprio | Aceito |
 | Mudança de tipo no refresh surpreende | admin altera Client durante grant | novo formato após renovação | DF2 + documentação/teste | Aberto |

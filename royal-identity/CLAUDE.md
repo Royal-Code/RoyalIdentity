@@ -58,7 +58,7 @@ Roadmap of the plans that come after the ones above: [.ai/plans/plans-roadmap-02
 
 Architectural Decision Records (accepted decisions; read before changing the affected area):
 
-- [adrs/](adrs/) — ADR-001..019 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**, **ADR-016 shared technical library `RoyalIdentity.Security` (leaf technical lib in the product namespace — not the external `RoyalCode.*` ecosystem); amends ADR-013**, **ADR-017 account security lifecycle — `RequiredAction`, `SecurityStamp` + `SessionsValidAfter`, `IUserSecurityStateProvider`/`ISessionRevocationService` seams, per-realm `SecurityLifecycleOptions`; amends ADR-014/015**, **ADR-018 in-memory storage fake was transitional and its removal is recorded in §4; amends ADR-013/014/015**)
+- [adrs/](adrs/) — ADR-001..020 (rearchitecture, realms, tests, Razor SSR, users, constants, IRealmManager, multi-realm isolation, resources/scopes model, client type / full scope allowed, resource indicators / protected resource metadata, **ADR-013 modular architecture & boundaries**, **ADR-014 users edge + session redesign — refines ADR-005**, **ADR-015 `UserAccounts` module — `.Integration` adapter + claims seam `IUserClaimsProvider`; amends ADR-013/014**, **ADR-016 shared technical library `RoyalIdentity.Security` (leaf technical lib in the product namespace — not the external `RoyalCode.*` ecosystem); amends ADR-013**, **ADR-017 account security lifecycle — `RequiredAction`, `SecurityStamp` + `SessionsValidAfter`, `IUserSecurityStateProvider`/`ISessionRevocationService` seams, per-realm `SecurityLifecycleOptions`; amends ADR-014/015**, **ADR-018 in-memory storage fake was transitional and its removal is recorded in §4; amends ADR-013/014/015**, **ADR-020 keeps internal persisted Configuration/Operational payload schemas at v1 throughout pre-release and requires reprovisioning after incompatible changes**)
 
 Backlog (deferred items with design notes):
 
@@ -102,6 +102,11 @@ The system is an OpenID Connect / OAuth2 authorization server. Every HTTP reques
 The middleware order in `Program.cs` is significant: `UseRealmDiscovery` must run before `UseAuthentication`. It extracts the `{realm}` route segment and loads `RealmOptions` into `HttpContext` — everything downstream depends on this.
 
 ## Key Conventions
+
+**Pre-release persisted payloads** — per ADR-020, Configuration/Operational JSON payload serializers remain at
+`CurrentVersion = 1` until the first supported release. Breaking payload changes update seeds/fixtures and require
+reprovisioning development data; do not create pre-release version chains, legacy readers, upcasters or JSON
+migrations. Cryptographic and protocol formats keep their independent versioning.
 
 **`[Redesign]` attribute** — appears on members marked for future removal or restructuring. Do not model new code after these patterns; do not stabilize or extend them.
 

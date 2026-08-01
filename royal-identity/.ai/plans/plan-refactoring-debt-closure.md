@@ -10,7 +10,7 @@
 |---|---|
 | Fase 1 - Decisões encerradas e documentação de resources | Pendente |
 | Fase 2 - Marcadores antigos e código obsoleto | Pendente |
-| Fase 3 - Superfícies protocolares inativas, logging e options v3 | Pendente |
+| Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release | Pendente |
 | Fase 4 - Contrato explícito de `acr_values` | Pendente |
 | Fase 5 - Aceites transversais e fechamento | Pendente |
 
@@ -27,6 +27,8 @@
 
 - [template-ai-implementation-plan.md](../references/template-plan/template-ai-implementation-plan.md) — shape,
   rastreabilidade e regras de manutenção deste plano.
+- [ADR-020](../../adrs/ADR-020.md) — payloads persistidos internos permanecem em v1 durante o pre-release;
+  mudanças incompatíveis exigem reprovisionamento, não bumps ou leitores legados.
 - [plan-contexts-redesign.md](plan-contexts-redesign.md) — plano concluído que ainda descreve a herança de
   `IWith*` e a remoção de `Contexts.Items.Token` como adiadas.
 - [plan-resources-redesign.md](plan-resources-redesign.md) — redesign concluído; `AllowedScopes` foi
@@ -34,15 +36,16 @@
   eixos são `AllowedIdentityScopes`, `AllowedResourceServers` e `AllowAllResourceServers`.
 - [plan-data-storage-matrix.md](plan-data-storage-matrix.md) e [plan-data-macro.md](plan-data-macro.md) — ainda
   tratam a persistência do catálogo de resources/scopes como bloqueada pelo redesign já concluído.
-- [plan-oidc-session-management.md](plan-oidc-session-management.md) — remove opções do check-session cookie e
-  promove `ServerOptionsPayload`/`RealmOptionsPayload` para v2; este plano deve executar depois dele.
+- [plan-oidc-session-management.md](plan-oidc-session-management.md) — remove opções do check-session cookie; seu
+  registro histórico entregou v2 antes de ADR-020 fixar todos os payloads internos pré-release em v1. Este plano
+  deve executar depois dele sem reescrever o plano concluído.
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) — caracteriza forma,
   autenticação e erros do token endpoint antes deste plano remover branches vazios.
 - [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — verificará metadata e logs depois que
   as superfícies inativas e o switch de logging forem removidos.
 - [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md) — reintroduzirá introspection
-  somente junto da rota/pipeline reais; deve consumir a remoção da option feita aqui e a versão Configuration
-  vigente depois dos planos intermediários, sem assumir v3.
+  somente junto da rota/pipeline reais; deve consumir a remoção da option feita aqui e manter os payloads
+  Configuration pré-release em v1 conforme ADR-020.
 - [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md) — é o dono da separação entre a
   referência PAR e Request Object/JAR e removerá a metadata `request_parameter_supported=true` enquanto
   `ProcessRequestObject` continuar sem implementação.
@@ -93,8 +96,8 @@
   redesign terminou e apenas a persistência do catálogo continua diferida.
 - **Bridge ainda volátil:** `ConfigurationResourceBridgeOptions`/`IConfigurationResourceSource` fornecem
   identity scopes e resource servers por realm sem persistir o catálogo.
-- **Payloads atuais:** `ServerOptionsPayloadSerializer` e `RealmOptionsPayloadSerializer` estão em v1 no código
-  atual; o plano de Session Management é o dono da passagem para v2.
+- **Payloads atuais:** `ServerOptionsPayloadSerializer` e `RealmOptionsPayloadSerializer` estão em v1 conforme a
+  política pré-release do ADR-020; mudanças incompatíveis exigem reprovisionamento, não bump.
 - **Projeto de teste órfão:** `Tests.Endpoints` não está em `RoyalIdentity.sln` e seu único teste duplica
   `Tests.Pipelines/ServerEndpointTests.cs`; discovery já pertence a `Tests.Integration`.
 - **Breaking changes permitidos:** não há clientes de produção; opções, payloads, APIs e defaults podem mudar
@@ -102,8 +105,8 @@
 
 ### Lacunas, conflitos e restrições
 
-- **Planos concorrendo pela versão de payload:** remover opções neste plano antes de Session Management faria
-  ambos reivindicarem v2; a ordem e a versão precisam ser determinísticas.
+- **Ordem sem cadeia de versões:** Session Management continua predecessor funcional, mas ADR-020 elimina a
+  reserva de versões entre planos; serializers, seeds e fixtures permanecem em v1 durante o pre-release.
 - **Constante não é suporte:** manter constantes de protocolos futuros não autoriza anunciá-los no discovery.
 - **Grant extension não cria endpoint:** `IExtensionsGrantsProvider` pode tratar um grant no token endpoint, mas
   não implementa o Device Authorization Endpoint do RFC 8628.
@@ -114,9 +117,9 @@
   migrations ou CRUD do catálogo.
 - **Auditoria não nasce de um boolean morto:** remover `UseLogService` não autoriza criar sink, outbox ou store.
 - **Localization permanece ativa:** os `[Redesign("Usar Resource")]` de `AccountOptions` não entram nesta limpeza.
-- **Handoff de introspection:** a remoção de `EnableIntrospectionEndpoint` e seu payload v3 é temporária até o
-  endpoint real. O plano de Reference Tokens/Introspection precisa restaurar gate, runtime e discovery no mesmo
-  corte e versionar a partir dos payloads Configuration vigentes então, não da v3 deste plano.
+- **Handoff de introspection:** a remoção de `EnableIntrospectionEndpoint` no payload pré-release v1 é temporária
+  até o endpoint real. O plano de Reference Tokens/Introspection precisa restaurar gate, runtime e discovery no
+  mesmo corte, preservando v1 e exigindo reprovisionamento conforme ADR-020.
 - **Filtros vazios são falsos verdes:** `dotnet test --filter` retorna sucesso neste SDK mesmo quando nenhuma
   fixture corresponde; classes e filtros novos precisam ser nomeados explicitamente.
 
@@ -133,7 +136,7 @@
 - `LoggingOptions`, `LoggerExtensions` — remoção do switch sem implementação.
 - `IWithAcr`, `AuthorizeContext`, `AuthorizeMainValidator`, `AuthorizationContext`, claims/discovery — semântica e
   ordem de `acr_values`.
-- serializers Configuration, seeds e `Tests.Storage` — payload v3 após Session Management.
+- serializers Configuration, seeds e `Tests.Storage` — formato corrente do payload pré-release v1.
 - `Tests.Identity`, `Tests.Integration`, `Tests.Storage`, `Tests.Architecture`, `Tests.Pipelines` e o projeto órfão
   `Tests.Endpoints` — regressão, guardas e remoção de duplicata fora da solution.
 
@@ -157,7 +160,7 @@
 - Redesenhar eventos, auditoria, sinks, outbox ou persistência de eventos.
 - Remover a herança de `IWith*` ou o wrapper `Contexts.Items.Token`.
 - Implementar localização; os marcadores de `AccountOptions` permanecem ativos.
-- Implementar Check Session; pertence a `plan-oidc-session-management.md`.
+- Alterar ou reimplementar Check Session; a feature já foi concluída por `plan-oidc-session-management.md`.
 - Implementar o catálogo persistente de resources/scopes ou criar seu plano executável neste corte.
 - Implementar MFA, federação, autenticação por ACR ou publicar `acr_values_supported`.
 - Alterar taxonomia OAuth 2.1 ou hardening RFC 9700 já pertencentes aos planos próprios.
@@ -203,21 +206,22 @@
   vigente. Fonte: `plan-resources-redesign.md` concluído.
 - **DF13 — Persistência diferida em plano próprio:** reclassificar a bridge como transição de persistência
   desbloqueada; não criar entidades/migrations nem o plano do catálogo nesta execução. Fonte: decisão humana.
-- **DF14 — Payload v3 sequencial:** executar a Fase 3 somente após Session Management concluir options v2; este
-  plano remove as options restantes e grava v3 sem ler v1/v2. Fonte: ordem entre planos + breaking changes aceitos.
+- **DF14 — Payload pré-release v1:** executar a Fase 3 somente após Session Management por dependência funcional;
+  remover as options restantes sem incrementar `CurrentVersion`, atualizar seeds/fixtures e reprovisionar dados de
+  desenvolvimento. Serializers continuam aceitando somente v1. Fonte: ADR-020 + breaking changes aceitos.
 - **DF15 — Localization preservada:** não remover os três `[Redesign]` de mensagens em `AccountOptions`; a dívida
   já documentada permanece. Fonte: decisão humana.
-- **DF16 — Realm e providers:** alterações de options/discovery devem cobrir dois realms; payload v3 deve manter
-  paridade SQLite/PostgreSQL sem migration relacional desnecessária. Fonte: ADR-009 + baseline de storage.
+- **DF16 — Realm e providers:** alterações de options/discovery devem cobrir dois realms; o payload v1 corrente
+  deve manter paridade SQLite/PostgreSQL sem migration relacional ou JSON pré-release. Fonte: ADR-009 + ADR-020.
 - **DF17 — Topologia verificável de testes:** payloads ficam em `Tests.Storage`; discovery, aliases mTLS, extension
   grants e ACR ficam em fixtures nomeadas de `Tests.Integration`; ausência de superfícies removidas fica em
   `Tests.Architecture`. Nenhum comando obrigatório pode selecionar zero testes. A execução deste plano também
   promove essa regra para a orientação persistente do repositório. Fonte: infraestrutura e execução empírica dos
   filtros atuais.
-- **DF18 — Handoff explícito de introspection:** este plano remove `EnableIntrospectionEndpoint` nos payloads v3.
+- **DF18 — Handoff explícito de introspection:** este plano remove `EnableIntrospectionEndpoint` dos payloads v1.
   `plan-reference-tokens-introspection.md` restaura a option realm-scoped somente junto do endpoint real, com
-  runtime/discovery coerentes, e incrementa cada payload Configuration afetado a partir de sua versão vigente
-  depois de Localization/RFC 9700, sem assumir que ambos ainda estão em v3. Fonte: ordem do roadmap + DF7/DF14.
+  runtime/discovery coerentes, mantendo v1 e reprovisionando dados pré-release. Fonte: ordem do roadmap +
+  ADR-020 + DF7/DF14.
 - **DF19 — Projeto de teste órfão removido:** excluir `Tests.Endpoints`, sem movê-lo para a solution, depois de
   confirmar que seu único teste é duplicado por `Tests.Pipelines`; discovery permanece em `Tests.Integration`.
   Fonte: inventário da solution durante a revisão de `plan-localization.md`.
@@ -288,13 +292,13 @@
 ### Modelo, dados e persistência
 
 ```text
-ServerOptionsPayload v3
+ServerOptionsPayload v1 (formato pré-release corrente)
   remove Endpoints.EnableIntrospectionEndpoint
   remove Endpoints.EnableDeviceAuthorizationEndpoint
   remove InputLengthRestrictions.DeviceCode
   remove Logging.UseLogService
 
-RealmOptionsPayload v3
+RealmOptionsPayload v1 (formato pré-release corrente)
   mesmas remoções
   preserva referência aos ServerOptions efetivos conforme materializador atual
 
@@ -304,8 +308,8 @@ Resource catalog
   persistência EF diferida para plan-data-resource-catalog-storage futuro
 ```
 
-Não criar migration relacional apenas pela remoção de propriedades JSON. Seeds, fixtures e payload coverage passam
-a escrever v3; payloads v1/v2 falham fechados após o corte.
+Não criar migration relacional ou JSON apenas pela remoção de propriedades. Seeds, fixtures e payload coverage
+passam a escrever o novo formato ainda identificado como v1; dados pré-release anteriores são reprovisionados.
 
 ### Arquitetura alvo
 
@@ -326,7 +330,7 @@ RoyalIdentity/
 
 RoyalIdentity.Storage.EntityFramework/
   Configuration/Materialization/
-    options payload v3
+    options payload pré-release v1
 
 .ai/
   decisões canceladas encerradas
@@ -345,15 +349,15 @@ RoyalIdentity.Storage.EntityFramework/
 
 ### Compatibilidade, migração e rollout
 
-- Ordem obrigatória: OAuth 2.1 Token Errors → OIDC Session Management (options v2) → este plano (options v3) →
+- Ordem obrigatória: OAuth 2.1 Token Errors → OIDC Session Management → este plano →
   RFC 9700.
 - Não fornecer shims para membros obsoletos ou options removidas.
-- Reprovisionar configuração de desenvolvimento após o bump para v3; não materializar payload v1/v2.
+- Reprovisionar configuração de desenvolvimento após o corte incompatível; manter `CurrentVersion = 1`.
 - Manter constantes de protocolos futuros quando não produzem comportamento/metadata; removê-las somente se
   estiverem sem uso e fora de contratos compartilhados.
 - Atualizar plans/foundations sem reescrever o registro histórico das fases já executadas.
-- O futuro plano de Reference Tokens/Introspection não reutiliza a v3 como baseline fixa: ele parte das versões
-  Configuration vigentes após os planos intermediários e restaura o gate somente com runtime real.
+- O futuro plano de Reference Tokens/Introspection preserva a v1 pré-release e restaura o gate somente com runtime
+  real, atualizando seeds/fixtures e exigindo reprovisionamento.
 
 ---
 
@@ -361,7 +365,7 @@ RoyalIdentity.Storage.EntityFramework/
 
 1. **Fase 1 (decisões/documentação)** — elimina falsos pendentes e fecha o estado do modelo de resources.
 2. **Fase 2 (código obsoleto)** — remove apenas símbolos comprovadamente mortos ou markers satisfeitos.
-3. **Fase 3 (superfícies/options)** — depende de OIDC Session Management v2 e faz um único corte v3.
+3. **Fase 3 (superfícies/options)** — depende de OIDC Session Management e altera o formato pré-release ainda v1.
 4. **Fase 4 (`acr_values`)** — fixa comportamento e testes sem introduzir policy.
 5. **Fase 5 (aceites)** — confirma metadata, payload, realms, arquitetura e documentação.
 
@@ -450,7 +454,8 @@ eventos, client authentication ou algoritmo PKCE vigente.
 - [ ] Remover `PkceHelper.GenerateCodeChallengeS256`.
 - [ ] Manter `GenerateS256CodeChallenge`, `GenerateStoredS256CodeChallengeHash` e
   `HashCodeChallengeForStorage` com seus significados distintos.
-- [ ] Não remover os `[Redesign]` de Localization ou do check-session cookie pertencente ao plano OIDC.
+- [ ] Não remover os `[Redesign]` de Localization; os antigos markers do check-session já foram consumidos pelo
+  plano OIDC concluído e não devem ser recriados.
 - [ ] Confirmar que `Tests.Endpoints/ServerEndpointTests.cs` duplica o teste vigente de `Tests.Pipelines` e
   excluir o projeto órfão inteiro, sem adicioná-lo à solution.
 - [ ] Adicionar guardas de arquitetura ou busca documental contra a reintrodução dos símbolos removidos.
@@ -476,7 +481,7 @@ dotnet test Tests.Architecture
 
 ---
 
-## Fase 3 - Superfícies protocolares inativas, logging e options v3
+## Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release
 
 **Depende de:** Fases 1-2, conclusão de `plan-oauth21-token-error-responses.md`, conclusão de
 `plan-oidc-session-management.md`, DF7-DF10, DF14, DF16-DF18.
@@ -486,7 +491,7 @@ dotnet test Tests.Architecture
 `Tests.Storage`, `Tests.Architecture`.
 
 **O que/como:** remover flags e metadata de features inexistentes, deixar grants especiais seguirem para o
-extension provider, retirar logging sem efeito e fazer um único bump de options v2 para v3.
+extension provider, retirar logging sem efeito e atualizar o formato corrente sem incrementar a v1 pré-release.
 
 **Tarefas:**
 
@@ -505,9 +510,10 @@ extension provider, retirar logging sem efeito e fazer um único bump de options
 - [ ] Garantir `unsupported_grant_type` exato quando nenhuma extensão possuir o grant.
 - [ ] Remover `LoggingOptions.UseLogService` e sua cópia.
 - [ ] Remover os três blocos TODO de `LoggerExtensions` sem alterar filtros/redaction.
-- [ ] Promover `ServerOptionsPayloadSerializer` e `RealmOptionsPayloadSerializer` de v2 para v3.
+- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion` for diferente de 1; preservar v1 após o corte.
 - [ ] Atualizar seeds, fixtures, payload coverage e testes de versões não suportadas.
-- [ ] Não criar migration relacional; documentar reprovisionamento/fail-closed de payload v1/v2.
+- [ ] Não criar migration relacional ou JSON; documentar o reprovisionamento obrigatório dos payloads v1 antigos.
 - [ ] Testar dois realms com discovery sem endpoints mortos.
 - [ ] Testar extension grant registrado e não registrado sem duplicar a taxonomia do plano OAuth 2.1.
 - [ ] Estender `Tests.Integration/Endpoints/DiscoveryTests.cs` com omissões exatas e alias mTLS de revocation.
@@ -517,7 +523,7 @@ extension provider, retirar logging sem efeito e fazer um único bump de options
 
 **Critérios de aceite:** discovery não contém introspection/Device Authorization nem os anuncia em mTLS/grants;
 o alias mTLS de revocation aponta exatamente para a rota mTLS de revocation e o de token permanece correto;
-options e JSON v3 não contêm as propriedades removidas; extension grants alcançam o provider; ausência responde
+options e JSON v1 corrente não contêm as propriedades removidas; extension grants alcançam o provider; ausência responde
 conforme OAuth 2.1; não há branch de logging sem efeito; filtros sensíveis permanecem; payloads antigos falham
 fechados; cada filtro obrigatório seleciona ao menos um teste.
 
@@ -595,10 +601,10 @@ rastreabilidade e diferidos.
 
 - [ ] Executar busca final por markers, TODOs, options e metadata removidos.
 - [ ] Confirmar que os únicos `[Redesign]` restantes têm destino ativo documentado.
-- [ ] Confirmar que o plano OIDC continua dono de check-session e options v2.
+- [ ] Confirmar que o plano OIDC continua dono de check-session sem tratar seu bump histórico como baseline atual.
 - [ ] Confirmar que o plano RFC 9700 verifica metadata/logging já simplificados sem reintroduzir options.
 - [ ] Confirmar que o plano OAuth 2.1 continua dono dos códigos/status/headers de token errors.
-- [ ] Confirmar que `plan-reference-tokens-introspection.md` consome a remoção da option/payload v3, restaura o
+- [ ] Confirmar que `plan-reference-tokens-introspection.md` consome a remoção da option no payload v1, restaura o
   gate somente com runtime real e não reutiliza `BuildMtlsTokenUrl` para introspection.
 - [ ] Confirmar que `plan-pushed-authorization-requests.md` possui nominalmente a remoção da metadata JAR falsa e
   seu guard depois de separar a referência PAR.
@@ -608,7 +614,7 @@ rastreabilidade e diferidos.
 - [ ] Atualizar Status, Progresso, resultados das fases e matriz.
 
 **Critérios de aceite:** nenhuma referência ativa contradiz as decisões; nenhuma metadata aponta para endpoint
-inexistente; todos os payloads/options usam v3; resources são descritos como modelo concluído/bridge transitória;
+inexistente; todos os payloads Configuration permanecem em v1; resources são descritos como modelo concluído/bridge transitória;
 testes integrais passam; todos os comandos filtrados obrigatórios selecionam testes; o plano não deixa pergunta ou
 tarefa implícita.
 
@@ -635,7 +641,7 @@ dotnet test RoyalIdentity.sln
 | Corrigir resources docs | 1, 5 | DF12-DF13 | modelo concluído; só persistência diferida | buscas documentais |
 | Remover metadata morta | 3, 5 | DF7, DF9, DF16-DF18 | discovery sem endpoints/grants inexistentes; revocation mTLS exata | Discovery multi-realm |
 | Preservar extension grants | 3 | DF8 | provider alcançado; ausência padronizada | TokenEndpoint/Integration |
-| Remover logging sem efeito | 3 | DF10, DF14 | option/branches ausentes; redaction preservada | Logging + payload v3 |
+| Remover logging sem efeito | 3 | DF10, DF14 | option/branches ausentes; redaction preservada | Logging + payload v1 |
 | Fechar `acr_values` | 4-5 | DF6, DF11, DF17 | lista ordenada/distinta sem claim/metadata fictícia | AcrValues integration |
 | Preservar planos ativos | 3, 5 | DF1, DF14-DF15 | sem duplicação/version conflict | revisão + suíte integral |
 | Testes sem falso verde | 1, 3-5 | DF17 | classes nomeadas; nenhum filtro vazio | Integration + Storage + Architecture |
@@ -657,7 +663,7 @@ dotnet test RoyalIdentity.sln
 9. O core não passa a depender de providers, hosts, UI ou módulos.
 10. Resources permanecem realm-scoped e voláteis até o plano de persistência próprio.
 11. Localization e Check Session não são apagados como dívida por esta limpeza.
-12. Payload v3 só é introduzido depois que v2 de Session Management estiver concluído.
+12. Payloads internos permanecem em v1 durante o pre-release; cortes incompatíveis exigem reprovisionamento.
 13. Alias mTLS de endpoint vivo usa sempre seu próprio route builder; revocation nunca aponta para token.
 14. `acr_values` preserva ordem de preferência e unicidade pela primeira ocorrência; não usa `HashSet` na borda.
 15. Nenhum comando filtrado obrigatório pode fechar fase selecionando zero testes.
@@ -672,7 +678,7 @@ dotnet test RoyalIdentity.sln
 - Discovery omite introspection e Device Authorization em todos os realms.
 - Extension grants registrados alcançam `IExtensionsGrantsProvider`.
 - `UseLogService` e seus blocos vazios não existem.
-- Options Configuration são v3 e não contêm propriedades removidas.
+- Options Configuration permanecem em v1 e não contêm propriedades removidas.
 - `acr_values` tem comportamento e testes explícitos, sem catálogo/metadata/claim fictícia.
 - Foundations/matriz descrevem corretamente o redesign concluído de resources.
 - Alias mTLS de revocation aponta para a rota correta e o handoff de introspection parte da baseline Configuration
@@ -688,7 +694,7 @@ dotnet test RoyalIdentity.sln
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Payload version conflita com OIDC | este plano usa v2 ou roda primeiro | serializers/fixtures incompatíveis | DF14 + dependência explícita | Aberto |
+| Payload v1 antigo sobrevive ao corte | ambiente não é reprovisionado | JSON pré-release incompatível | ADR-020 + DF14 + reprovisionamento explícito | Aberto |
 | Extension grant muda erro | remoção do `case` alcança provider inesperado | comportamento diferente | concluir OAuth 2.1 antes + testes registrado/ausente | Aberto |
 | Metadata futura some sem registro | consumidor esperava feature inexistente | descoberta deixa de anunciar falso suporte | breaking aceito; plano futuro reintroduz conjunto completo | Aceito |
 | Remoção obsoleta quebra caller oculto | reflection/source externo | build/consumer falha | `rg`, build integral; sem consumidores de produção | Aceito |
@@ -698,7 +704,7 @@ dotnet test RoyalIdentity.sln
 | Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + guard documental/arquitetural | Aberto |
 | Alias mTLS sobrevivente aponta para token | remoção apaga branches mortos, mas não corrige revocation | metadata conduz ao endpoint errado | DF7 + teste exato de URL | Aberto |
 | Filtro executa zero testes | classe planejada não existe ou filtro é amplo/incorreto | fase fecha em falso verde | DF17 + fixtures e filtros nomeados | Aberto |
-| Introspection futura assume payload v3 | plano ignora Localization/planos intermediários | colisão de versão ou option perdida | DF18 + handoff bilateral | Aberto |
+| Introspection futura recria cadeia pré-release | plano ignora ADR-020 | bumps sem contrato publicado | DF18 + handoff bilateral | Aberto |
 | Exceção JAR vira precedente | DF7 é lida como se metadata falsa fosse aceitável em geral | novas capabilities sem runtime | delimitação de DF7 + handoff nominal ao plano PAR | Aberto |
 
 ---

@@ -26,6 +26,8 @@
 
 ### Fontes verificadas
 
+- [ADR-020](../../adrs/ADR-020.md) — payloads Configuration permanecem em v1 durante o pre-release; mudanças de
+  shape atualizam fixtures/seeds e exigem reprovisionamento.
 - [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) — BCP 240: redirect exato, PKCE e downgrade,
   desuso do implicit, proteção contra replay, restrição de privilégios, proibição do password grant,
   client authentication, TLS/proxy, refresh tokens e clickjacking.
@@ -48,10 +50,10 @@
 - [plan-oidc-session-management.md](plan-oidc-session-management.md) — predecessor que implementa o OP iframe e
   fixa a exceção protocolar de framing; a Fase 5 deve preservar seus testes de ausência de headers bloqueadores.
 - [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — predecessor que remove
-  `LoggingOptions.UseLogService`, fixa os payloads Configuration v3 e corrige o alias mTLS de revocation; este
+  `LoggingOptions.UseLogService`, mantém os payloads Configuration pré-release em v1 e corrige o alias mTLS de revocation; este
   plano consome essa superfície simplificada sem reintroduzir option/branch ou a rota incorreta.
-- [plan-localization.md](plan-localization.md) — predecessor que mantém Server Options em v3 e promove Realm
-  Options para v4; é a baseline imediata para adicionar `RedirectUriValidation` aos dois grafos.
+- [plan-localization.md](plan-localization.md) — predecessor que adiciona localization ao grafo de realm mantendo
+  Server e Realm Options em v1; é a baseline funcional imediata para adicionar `RedirectUriValidation`.
 - [plans-roadmap-02.md](plans-roadmap-02.md) e [backlog-001.md](../backlogs/backlog-001.md) — API/UI
   administrativa ainda não existem; este plano deve entregar um contrato puro que o futuro Admin consuma.
 
@@ -90,8 +92,8 @@
   administrativas continuam no roadmap/backlog.
 - **Persistência vigente:** clients têm projeção relacional e property-coverage test; opções de server/realm são
   payloads JSON versionados; Operational tem migrations SQLite/PostgreSQL e contracts provider-neutral.
-- **Cadeia reservada de payloads:** após os predecessores, Server Options estará em v3 e Realm Options em v4;
-  adicionar `RedirectUriValidation` a ambos exige Server v4 e Realm v5, com leitura fail-closed das versões antigas.
+- **Payloads pré-release:** após os predecessores, Server e Realm Options permanecem em v1 conforme ADR-020;
+  adicionar `RedirectUriValidation` altera o shape corrente, exige reprovisionamento e não incrementa a versão.
 
 ### Lacunas, conflitos e restrições
 
@@ -234,10 +236,9 @@
   exclusivamente a rota `check_session_iframe`; preservar por teste a ausência de `X-Frame-Options: DENY` e de
   `frame-ancestors 'none'` nessa resposta, sem relaxar login/consent/logout/error. Fonte:
   `plan-oidc-session-management.md` DF16 + requisito funcional do OP iframe.
-- **DF20 — Payloads sequenciais e fail-closed:** executar após Debt Closure e Localization. A nova option em ambos
-  os grafos promove `ServerOptionsPayload` de v3 para v4 e `RealmOptionsPayload` de v4 para v5; serializers aceitam
-  somente a versão corrente, seeds/fixtures são reprovisionados e não há migration relacional para os JSONs.
-  Fonte: ordem do roadmap + comportamento real dos serializers.
+- **DF20 — Payloads pré-release v1:** executar após Debt Closure e Localization. A nova option altera ambos os
+  grafos, mas `ServerOptionsPayload` e `RealmOptionsPayload` permanecem em v1; serializers aceitam somente v1,
+  seeds/fixtures são reprovisionados e não há migration relacional ou JSON. Fonte: ADR-020 + ordem do roadmap.
 - **DF21 — Topologia verificável de testes:** factory/validators puros ficam em classes nomeadas de
   `Tests.Identity`; HTTP/metadata/logging/headers ficam em classes nomeadas de `Tests.Integration`; payload/client
   Configuration e família Operational ficam em classes nomeadas de `Tests.Storage`; boundaries ficam em
@@ -320,8 +321,8 @@ RedirectUriValidationOptions
   AllowWildcards bool = false
 
 Configuration payloads após os predecessores
-  ServerOptionsPayload v3 -> v4
-  RealmOptionsPayload  v4 -> v5
+  ServerOptionsPayload v1 -> v1 (shape corrente reprovisionado)
+  RealmOptionsPayload  v1 -> v1 (shape corrente reprovisionado)
 
 RefreshToken
   FamilyId string                  obrigatório, opaco e realm-bound
@@ -394,8 +395,8 @@ Futuro Admin/
 - Atualizar seeds e fixtures diretamente para o novo estado válido.
 - Criar migrations incrementais Operational dos providers para famílias de refresh; não criar migration
   relacional para os payloads Configuration nem executar migrations nos hosts.
-- Promover Server v3→v4 e Realm v4→v5; payloads anteriores/futuros falham fechados, seeds/fixtures são
-  reprovisionados e não se criam modos de compatibilidade nem migration relacional para o JSON.
+- Preservar Server/Realm v1; versões diferentes falham fechadas, shapes v1 antigos são reprovisionados e não se
+  criam modos de compatibilidade nem migration relacional/JSON.
 - Configurações relaxadas de redirect permanecem possíveis por decisão explícita e aparecem como
   `NonCompliant`.
 - Findings/RuleIds são contrato para o futuro Admin; renomeá-los depois exige atualização coordenada de UI,
@@ -406,7 +407,7 @@ Futuro Admin/
 ## Ordem de execução
 
 **Pré-condição do plano:** concluir Debt Closure e Localization; iniciar sobre Logging/mTLS simplificados e
-payloads Server v3/Realm v4.
+payloads Server/Realm v1.
 
 1. **Fase 1 (assessment)** — fixa o vocabulário e torna cada correção observável.
 2. **Fase 2 (redirect)** — introduz a única compatibilidade configurável decidida.
@@ -474,7 +475,7 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~Rfc9700BoundaryTests
 
 **Depende de:** Fase 1, DF7-DF9, DF15, DF20-DF21 e conclusão de
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) e
-[plan-localization.md](plan-localization.md), com Server Options v3 e Realm Options v4.
+[plan-localization.md](plan-localization.md), com Server e Realm Options v1.
 
 **Escopo:** `ServerOptions`, `RealmOptions`, nova option, `IRedirectUriValidator`,
 `DefaultRedirectUriValidator`, validators authorize/code/end-session, serializers/materializers Configuration,
@@ -489,10 +490,10 @@ diagnosticados.
 - [ ] Criar `RedirectUriComparison` fechado em `Ordinal` e `OrdinalIgnoreCase`.
 - [ ] Criar `RedirectUriValidationOptions`, copy constructor e `Validate()`.
 - [ ] Adicionar a option a `ServerOptions` e `RealmOptions`, incluindo todos os copy constructors.
-- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 3` ou
-  `RealmOptionsPayloadSerializer.CurrentVersion != 4`.
-- [ ] Promover Server Options v3→v4 e Realm Options v4→v5, mantendo leitura fail-closed e reprovisionando
-  seeds/fixtures sem migration relacional.
+- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 1` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 1`.
+- [ ] Preservar Server/Realm Options v1, mantendo leitura fail-closed de outras versões e reprovisionando
+  seeds/fixtures do shape anterior sem migration relacional/JSON.
 - [ ] Evoluir `IRedirectUriValidator` para receber options efetivas e `CancellationToken`.
 - [ ] Reescrever o default validator para não inspecionar wildcard quando a flag estiver desligada.
 - [ ] Aplicar a mesma política a authorize, code redemption e post-logout redirect.
@@ -503,11 +504,11 @@ diagnosticados.
 - [ ] Adicionar testes de case, wildcard, fragment, esquema, open redirect, cópia e isolamento entre realms.
 - [ ] Criar `Tests.Identity/Validators/RedirectUriValidationTests.cs` e
   `Tests.Integration/Endpoints/RedirectUriPolicyTests.cs`; estender
-  `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs` para Server v4/Realm v5.
+  `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs` para Server/Realm v1.
 
 **Critérios de aceite:** o default só aceita string idêntica em comparação ordinal; alterar case falha; wildcard
 só funciona quando explicitamente habilitado; nenhum fragment/HTTP é aceito; dois realms podem ter políticas
-distintas sem compartilhar instâncias; Server v4/Realm v5 preservam a option e outras versões falham fechadas;
+distintas sem compartilhar instâncias; Server/Realm v1 preservam a option e outras versões falham fechadas;
 cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
@@ -733,8 +734,7 @@ estável e documentado.
   `Compliant`/`Warning`/`NonCompliant` e nunca persistir o resultado.
 - [ ] Atualizar roadmap e backlog para marcar a entrega do core e manter somente a apresentação UI no plano Admin.
 - [ ] Atualizar a matriz de storage com contratos/migrations finais de refresh.
-- [ ] Confirmar a cadeia final Server Options v4/Realm Options v5 e que nenhum plano posterior assumiu v3/v4
-  antigos como baseline fixa.
+- [ ] Confirmar Server/Realm Options v1 e que nenhum plano posterior recriou uma cadeia numérica pré-release.
 - [ ] Confirmar que todas as classes de teste nomeadas foram criadas e cada filtro obrigatório seleciona testes.
 - [ ] Executar migrations/aceites SQLite e PostgreSQL de Configuration e Operational.
 - [ ] Executar solução completa e registrar warnings/desvios no resultado da fase.
@@ -743,7 +743,7 @@ estável e documentado.
 
 **Critérios de aceite:** todas as fases estão concluídas; Q1 está fechada; assessment possui documentação
 consumível pelo Admin; nenhum status derivado é persistido; roadmap/backlog/plano têm links bidirecionais;
-matriz reflete os contratos; payloads finais são Server v4/Realm v5; nenhuma classe/filtro obrigatório está vazio;
+matriz reflete os contratos; payloads finais permanecem Server/Realm v1; nenhuma classe/filtro obrigatório está vazio;
 suites e aceites obrigatórios estão verdes.
 
 **Testes:**
@@ -769,7 +769,7 @@ dotnet test RoyalIdentity.sln
 | Defaults/runtime RFC 9700 | 2-5 | DF7-DF15, DF18-DF22 | redirects, PKCE, front-channel, refresh e HTTP seguros | classes nomeadas Identity/Integration/Storage |
 | Assessment puro | 1 | DF1-DF6, DF21 | determinístico, sem DI/I/O/persistência | `ClientSecurityAssessmentTests` |
 | Findings estáveis | 1, 6 | DF5, DF16 | RuleIds únicos e documentados | unitários + auditoria Fase 6 |
-| Redirect configurável | 2 | DF7-DF9, DF20-DF21 | Ordinal/sem wildcard; Server v4/Realm v5 fail-closed | `RedirectUriValidationTests`; `RedirectUriPolicyTests`; payload |
+| Redirect configurável | 2 | DF7-DF9, DF20-DF21 | Ordinal/sem wildcard; Server/Realm v1 fail-closed | `RedirectUriValidationTests`; `RedirectUriPolicyTests`; payload |
 | Replay de refresh | 4 | DF13, DF18, DF21 + resposta Q1 | sucessor único; família revogada; default Configuration | `RefreshTokenFamilyStoreContractTests`; `RefreshTokenRotationTests` |
 | Handoff ao Admin | 6 | DF16 | contrato/documentação e links, sem snapshot | revisão documental + solução |
 | Framing com exceção protocolar | 5 | DF10, DF19 | páginas sensíveis bloqueadas; OP iframe frameable | CheckSessionEndpoint + browser/header tests |
@@ -794,7 +794,7 @@ dotnet test RoyalIdentity.sln
 12. Não criar `OAuthSecurityProfile`, assessor DI ou snapshot persistido.
 13. O hardening de clickjacking não bloqueia `check_session_iframe` e não amplia essa exceção a outra rota.
 14. Debt Closure não é revertido: `UseLogService` permanece ausente e revocation mTLS usa sua rota própria.
-15. Server Options termina em v4 e Realm Options em v5; serializers continuam aceitando somente a versão corrente.
+15. Server e Realm Options permanecem em v1 durante o pre-release; serializers rejeitam outras versões.
 16. Enquanto o runtime aceitar PKCE `plain` por opt-in, a metadata o anuncia e o assessment o diagnostica.
 17. Nenhum comando filtrado obrigatório pode fechar fase selecionando zero testes.
 
@@ -808,8 +808,8 @@ dotnet test RoyalIdentity.sln
 - Authorization flow não emite tokens no front-channel e fecha PKCE downgrade.
 - Refresh tokens usam rotação/família com replay detection e retry sem ramificação.
 - Browser/host/logs/metadata passam os critérios da Fase 5.
-- Payloads Configuration terminam em Server v4/Realm v5, falham fechados para outras versões e não ganham
-  migration relacional.
+- Payloads Configuration permanecem em Server/Realm v1, falham fechados para outras versões e não ganham
+  migration relacional/JSON.
 - `code_challenge_methods_supported` reflete o runtime conforme DF22; `plain` não é apresentado como preferência.
 - Assessment é puro, não persistido e consumível pelo futuro Admin.
 - Todas as classes nomeadas existem e cada filtro obrigatório seleciona ao menos um teste.
@@ -832,7 +832,7 @@ dotnet test RoyalIdentity.sln
 | Hardening duplica replay protection concluída | novo cache/check-add contorna `IReplayProtectionStore` | duas semânticas de replay e backing inconsistente | DF17 + guards existentes do plano concluído | Aberto |
 | Fase 3 duplica a taxonomia OAuth 2.1 | helpers/códigos são recriados no hardening | contratos divergentes para o mesmo erro | DF18; consumir o plano de erros concluído | Aberto |
 | Hardening bloqueia o OP iframe | regra global trata todo resultado browser-facing igualmente | Session Management anunciado deixa de funcionar | DF19 + regressão `CheckSessionEndpointTests` | Aberto |
-| Cadeia Configuration parte da versão errada | executor ignora Debt Closure/Localization | colisão ou perda de options anteriores | DF20 + gate Server v3/Realm v4 antes do bump | Aberto |
+| Payload pré-release parte da baseline errada | executor ignora Debt Closure/Localization ou ADR-020 | perda de options ou bump indevido | DF20 + gate Server/Realm v1 | Aberto |
 | Filtro amplo mascara teste ausente | OR ou nome incidental seleciona outra fixture | fase fecha sem provar o hardening | DF21 + classes/comandos separados | Aberto |
 | Metadata omite capacidade PKCE ativa | `plain` continua runtime, mas some de discovery | metadata deixa de representar o servidor | DF22 + teste exato de metadata/runtime | Aberto |
 

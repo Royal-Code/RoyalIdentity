@@ -78,17 +78,17 @@ definida em `../analisys/`.
   e PKCE; recusas de authorization code indistinguíveis por construção; 405/415/404 como Problem Details, sem
   códigos OAuth inventados. Guard arquitetural com códigos derivados por reflexão impede regressão.
 - [plan-oidc-session-management.md](plan-oidc-session-management.md) — CONCLUÍDO (2026-08-01), 7/7 fases.
-  OP User Agent State opaco/realm-scoped, `session_state` origin-bound, `prompt=none` sem UI, payloads v2,
+  OP User Agent State opaco/realm-scoped, `session_state` origin-bound, `prompt=none` sem UI,
   endpoint/discovery HTTPS, iframe Web Crypto frameable e aceites Node/Chromium cross-site. O fechamento adicionou
   documentação operacional e a distribuição AGPLv3 + Apache-2.0 com notice, 80 candidatos de proveniência
   classificados e gate reproduzível.
 
 ## Próxima execução
 
-A próxima execução é [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), que consome os payloads
-Configuration v2 e a factory de Authentication Response do Session Management concluído e os promove
-deterministicamente para v3. Em seguida, executar
-[plan-localization.md](plan-localization.md), que consome a baseline v3, promove as options de realm para v4 e
+A próxima execução é [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), que consome a factory
+de Authentication Response do Session Management concluído e mantém os payloads Configuration pré-release em v1
+conforme ADR-020. Em seguida, executar
+[plan-localization.md](plan-localization.md), que mantém v1 ao adicionar as options de realm e
 fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
@@ -114,11 +114,11 @@ que nenhum deles fique grande demais:
 
 | Ordem | Sub-plano | Propósito | Status |
 |---|---|---|---|
-| 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | Concluído (ver acima) |
-| 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | Concluído (ver acima) |
-| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; resources/scopes continuam voláteis) | Concluído (2026-07-22, 7/7) |
-| 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | Concluído (2026-07-26, 8/8) |
-| 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | Concluído (2026-07-29, 9/9) |
+| 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | **Concluído** (ver acima) |
+| 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | **Concluído** (ver acima) |
+| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; resources/scopes continuam voláteis) | **Concluído** (2026-07-22, 7/7) |
+| 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | **Concluído** (2026-07-26, 8/8) |
+| 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | **Concluído** (2026-07-29, 9/9) |
 | 5 | `plan-data-caching.md` | Cache sobre os stores EF, quando a semântica estiver estável | Não criado (pode ficar fora do primeiro corte) |
 | 6 | `plan-data-audit-outbox.md` | Store durável de auditoria e outbox seletivo, se ainda fizer sentido | Não criado (pode ficar fora do primeiro corte) |
 
@@ -179,7 +179,7 @@ O plano consome os helpers/writer finais de `plan-oauth21-token-error-responses.
 
 O plano deve executar depois de
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md), para não disputar os contratos de
-erro, e antes de `plan-refactoring-debt-closure.md`, que depende de seus payloads de options v2. O hardening RFC
+erro, e antes de `plan-refactoring-debt-closure.md`, que depende de sua baseline funcional. O hardening RFC
 9700 executa depois e preserva a exceção de framing exclusiva do OP iframe.
 
 ### 2.2. Fechamento de dívidas de refatoração e superfícies inativas
@@ -199,7 +199,7 @@ Escopo principal:
 - Remover branches vazios que impedem `IExtensionsGrantsProvider` de tratar grants registrados.
 - Remover `UseLogService` e blocos TODO sem criar auditoria antecipada.
 - Fixar `acr_values` como lista de preferência sem catálogo/claim/metadata fictícia.
-- Promover options Configuration de v2 para v3 e validar realms/providers.
+- Atualizar o shape corrente das options Configuration mantendo v1 e validar realms/providers.
 - Atualizar foundations/matriz para registrar que somente a persistência do catálogo de resources está diferida.
 
 Este plano depende da conclusão do plano OAuth 2.1 e de
@@ -221,7 +221,7 @@ continua podendo desabilitar a negociação explicitamente.
 
 Escopo principal:
 
-- `RealmOptions.Internationalization` com validação BCP 47, cópia profunda e payload Configuration v4.
+- `RealmOptions.Internationalization` com validação BCP 47, cópia profunda e payload Configuration v1 corrente.
 - `IStringLocalizer<T>` sobre `.resx`, catálogos com 62 chaves semânticas por cultura e paridade de
   chaves/placeholders.
 - Precedência cookie realm-scoped → `ui_locales` validado → `Accept-Language` → default do realm → neutro.
@@ -234,7 +234,7 @@ Escopo principal:
 
 O plano depende da conclusão de
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), para não disputar a remoção de options e a
-sequência do payload v3. Não depende do RFC 9700, mas executa antes dele na ordem recomendada para deixar a
+baseline funcional do predecessor. Não depende do RFC 9700, mas executa antes dele na ordem recomendada para deixar a
 infraestrutura que o futuro Admin reutilizará ao localizar findings por `RuleId`. Overrides de tradução por
 realm, claims localizados e conteúdo multilíngue cadastrado pelo tenant permanecem fora deste corte.
 

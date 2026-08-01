@@ -56,3 +56,4 @@ Descrição das decisões levantadas e tomadas durante a implementação.
 - [ADR-017: Ciclo de segurança de contas](./adrs/ADR-017.md)
 - [ADR-018: Storage fake in-memory transitório](./adrs/ADR-018.md)
 - [ADR-019: Hosts Server e Demo são composition roots independentes](./adrs/ADR-019.md)
+- [ADR-020: Versionamento de payloads persistidos durante o pre-release](./adrs/ADR-020.md)

@@ -13,7 +13,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 public sealed class ServerOptionsPayloadSerializer
 {
     /// <summary>Current payload schema version written by <see cref="Serialize"/>.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 1;
 
     private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.General)
     {

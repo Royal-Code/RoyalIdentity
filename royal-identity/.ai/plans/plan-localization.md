@@ -8,7 +8,7 @@
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Contrato realm-scoped e payload Configuration v4 | Pendente |
+| Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Pendente |
 | Fase 2 - Catálogos RESX e infraestrutura de localização | Pendente |
 | Fase 3 - Seleção de cultura por request e preferência do usuário | Pendente |
 | Fase 4 - Códigos de apresentação e remoção de textos do core | Pendente |
@@ -33,6 +33,8 @@
   [ADR-009](../../adrs/ADR-009.md), [ADR-013](../../adrs/ADR-013.md) e
   [ADR-019](../../adrs/ADR-019.md) — configuração, SSR estático, isolamento multi-realm, limites entre projetos
   e composition roots independentes.
+- [ADR-020](../../adrs/ADR-020.md) — payloads Configuration permanecem em v1 durante o pre-release e mudanças de
+  shape exigem reprovisionamento.
 - [product.md](../foundation/product.md), [tech.md](../foundation/tech.md) e
   [structure.md](../foundation/structure.md) — UI em Razor Components, realm descoberto antes da autenticação,
   options efetivas em `RealmOptions` e dependência proibida do core para a UI.
@@ -42,8 +44,8 @@
   deduplicado de 62 chaves por idioma, dois catálogos lógicos e seis arquivos `.resx` para `en`, `pt-BR` e
   `es-419`.
 - [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — preserva explicitamente os três
-  `[Redesign("Usar Resource")]` de `AccountOptions` para um plano específico; promove
-  `RealmOptionsPayload` para v3 antes deste plano.
+  `[Redesign("Usar Resource")]` de `AccountOptions` para um plano específico e mantém
+  `RealmOptionsPayload` pré-release em v1 conforme ADR-020.
 - [plan-data-configuration-storage.md](plan-data-configuration-storage.md) e
   [plan-data-storage-matrix.md](plan-data-storage-matrix.md) — options de realm são Configuration, serializadas
   em payload JSON versionado, materializadas pelo adapter EF e publicadas em snapshot assíncrono.
@@ -81,8 +83,8 @@
 - **Page services ainda devolvem frases:** `ConsentPageService`, `EndSessionPageService` e
   `LoginPageService` criam mensagens inglesas para validação/erro.
 - **Persistência vigente:** `ServerOptionsPayloadSerializer.CurrentVersion` e
-  `RealmOptionsPayloadSerializer.CurrentVersion` ainda são 1 no código verificado; os planos predecessores
-  reservam v2 para Session Management e v3 para o fechamento das refatorações.
+  `RealmOptionsPayloadSerializer.CurrentVersion` são 1 e permanecem assim durante o pre-release conforme ADR-020;
+  mudanças incompatíveis exigem reprovisionamento, não reserva de versões entre planos.
 - **Testes reutilizáveis:** `Tests.Integration/UI` já cobre login e consentimento sobre
   `PersistentStorageAppFactory`; `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs` cobre
   roundtrip, versão, defaults ausentes e cópia das options.
@@ -108,8 +110,8 @@
   interoperabilidade; somente apresentação humana entra nos catálogos.
 - **SSR estático:** GET e POST são instâncias diferentes e scoped services têm lifetime de request; seleção de
   cultura e validação precisam estar corretas antes da renderização de cada request.
-- **Sequência de payloads:** esta execução só inicia após o payload v3 do plano predecessor; não saltar
-  diretamente de uma base divergente para v4.
+- **Sequência funcional sem bumps:** esta execução só inicia após o plano predecessor, mas ambos os serializers
+  devem entrar e sair em v1; não criar cadeia numérica pré-release.
 
 ### Superfícies impactadas a mapear
 
@@ -117,7 +119,7 @@
   `RoyalIdentity/Users` — options, validação de snapshot, metadata e códigos do login.
 - `RoyalIdentity.Razor` — catálogos, providers, page services, view models, components, validação e seletor de
   idioma.
-- `RoyalIdentity.Storage.EntityFramework` e providers Configuration — payload v4, materialização, seeds e
+- `RoyalIdentity.Storage.EntityFramework` e providers Configuration — payload v1 corrente, materialização, seeds e
   contracts sem migration relacional.
 - `RoyalIdentity.Server`, `RoyalIdentity.Demo` e `Tests.Host` — registro, middleware e atributos `lang`/`dir`.
 - `Tests.Integration`, `Tests.Storage`, `Tests.Architecture` e `Tests.UserAccounts` — options, fluxos,
@@ -212,10 +214,10 @@
 - **DF16 — Documento cultural:** shells do OP derivam `lang` da cultura efetiva e `dir` de
   `CultureInfo.TextInfo.IsRightToLeft`; o primeiro catálogo pode ser LTR sem bloquear RTL futuro. Fonte: análise
   aprovada.
-- **DF17 — Payload v4 direto:** após os predecessores entregarem v2/v3, remover os textos de `AccountOptions` e
-  adicionar `Internationalization` promove somente `RealmOptionsPayload` para v4; versões anteriores falham
-  fechadas e ambientes de desenvolvimento são reprovisionados. Não criar migration relacional. Fonte:
-  sequenciamento dos planos + breaking changes aceitos.
+- **DF17 — Payload pré-release v1:** após os predecessores, remover os textos de `AccountOptions` e adicionar
+  `Internationalization` altera somente o formato corrente de `RealmOptionsPayload`, preservando
+  `CurrentVersion = 1`; ambientes de desenvolvimento são reprovisionados e não há migration relacional ou JSON.
+  Fonte: ADR-020 + sequenciamento dos planos + breaking changes aceitos.
 - **DF18 — Validação moderna do .NET 10:** formulários SSR usam a integração
   `Microsoft.Extensions.Validation`/validation localization do .NET 10 com catálogo compartilhado; não adicionar
   o pacote experimental antigo de DataAnnotations para Blazor. Fonte: documentação .NET 10.
@@ -312,7 +314,7 @@
 ### Modelo, dados e persistência
 
 ```text
-RealmOptionsPayload v4 (JSON Configuration)
+RealmOptionsPayload v1 corrente (JSON Configuration)
   Internationalization
     Enabled bool
     DefaultLocale string
@@ -324,14 +326,14 @@ RealmOptionsPayload v4 (JSON Configuration)
     remove BlockedUserErrorMessage
 
 configuration_realms
-  payload_version = 4
+  payload_version = 1
   payload_json inclui Internationalization
   nenhuma coluna/tabela/index novo
 ```
 
 - O serializer continua omitindo `ServerOptions` e recebe o grafo autoritativo na materialização.
-- Payload ausente ou versão diferente da v4 falha fechada após os planos predecessores; seeds/fixtures são
-  regravados.
+- Payload ausente ou versão diferente de v1 falha fechada; payload v1 pré-release antigo exige
+  reprovisionamento de seeds/fixtures.
 - `SupportedLocales` é `List<string>` get-only nas options, serializa na ordem configurada normalizada e usa
   comparação ordinal case-insensitive para deduplicação/lookup; valores materializados são nomes canônicos de
   `CultureInfo`. Discovery move o default para a frente e preserva a ordem relativa dos demais.
@@ -374,7 +376,7 @@ RoyalIdentity.Razor/
     somente IStringLocalizer<T>/códigos; sem texto apresentável fixo
 
 RoyalIdentity.Storage.EntityFramework/
-  RealmOptionsPayloadSerializer v4
+  RealmOptionsPayloadSerializer v1
 
 RoyalIdentity.Server|Demo|Tests.Host/
   html lang/dir derivados da cultura efetiva
@@ -418,8 +420,8 @@ request roteado
 ### Compatibilidade, migração e rollout
 
 - Não criar shim para as três propriedades removidas de `AccountOptions`.
-- Não ler payload v1/v2/v3 após v4; executar os planos predecessores e reprovisionar bancos/seeds de
-  desenvolvimento.
+- Não criar leitor legado para shapes v1 anteriores; executar os planos predecessores e reprovisionar bancos/seeds
+  de desenvolvimento após cortes incompatíveis.
 - Não criar migration EF para mudança interna do JSON; atualizar serializers, fixtures, seed e scripts de
   verificação.
 - Server, Demo e Tests.Host registram a mesma infraestrutura e aplicam os defaults definidos em DF21.
@@ -448,31 +450,32 @@ dotnet test RoyalIdentity.sln
 
 ---
 
-## Fase 1 - Contrato realm-scoped e payload Configuration v4
+## Fase 1 - Contrato realm-scoped e payload Configuration pré-release
 
 **Depende de:** DF1, DF17, DF21-DF23,
 [plan-oidc-session-management.md](plan-oidc-session-management.md) concluído e
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) concluído com
-`ServerOptionsPayloadSerializer.CurrentVersion == 3` e
-`RealmOptionsPayloadSerializer.CurrentVersion == 3`.
+`ServerOptionsPayloadSerializer.CurrentVersion == 1` e
+`RealmOptionsPayloadSerializer.CurrentVersion == 1`.
 
 **Escopo:** `InternationalizationOptions`, `RealmOptions`, materializador/payload Configuration, seeds,
 fixtures, `Tests.Storage`, `Tests.Integration`.
 
-**O que/como:** transformar o scaffold em option realm-scoped válida e independente; promover o payload JSON
-para v4 sem migration relacional; falhar antes de editar se a sequência v2/v3 não estiver implementada.
+**O que/como:** transformar o scaffold em option realm-scoped válida e independente; alterar o payload JSON
+corrente sem incrementar v1 nem criar migration relacional/JSON; falhar antes de editar se qualquer serializer
+não estiver em v1.
 
 **Tarefas:**
 
 - [ ] Falhar antes de editar se os planos predecessores não terminaram ou se os serializers de server e realm
-  não escreverem v3.
+  não escreverem v1.
 - [ ] Incorporar `InternationalizationOptions` a todos os construtores/cópias de `RealmOptions`.
 - [ ] Trocar `SupportedLocales` para `List<string>` get-only e implementar a normalização, deduplicação, ordem e
   comparação fechadas em DF22.
 - [ ] Implementar validação de tags, default, conjunto não vazio e pertencimento do default.
 - [ ] Aplicar os defaults decididos a novos realms e aos seeds de Server/Demo/testes.
-- [ ] Promover `RealmOptionsPayloadSerializer` de v3 para v4 e preservar a exclusão de `ServerOptions`.
-- [ ] Atualizar fixtures/scripts que gravam payload e remover artefatos v1/v2/v3 de desenvolvimento.
+- [ ] Preservar `RealmOptionsPayloadSerializer.CurrentVersion = 1` e a exclusão de `ServerOptions`.
+- [ ] Atualizar fixtures/scripts que gravam payload e reprovisionar artefatos v1 antigos de desenvolvimento.
 - [ ] Provar roundtrip estável, ordem determinística, cópia profunda, defaults e falha fechada.
 - [ ] Confirmar que nenhuma migration relacional SQLite/PostgreSQL foi criada.
 - [ ] Criar `Tests.Integration/Options/InternationalizationOptionsTests.cs` e estender
@@ -481,7 +484,7 @@ para v4 sem migration relacional; falhar antes de editar se a sequência v2/v3 n
 **Critérios de aceite:** todo realm materializado contém options válidas e independentes; novos realms e seeds
 nascem com `Enabled=true`, default `en` e suporte a `en`/`pt-BR`/`es-419`; tags duplicadas apenas por casing são
 deduplicadas pela primeira ocorrência; ordem configurada e casing canônico sobrevivem a cópia/roundtrip; default
-pertence ao conjunto; Server permanece em v3, Realm passa a v4, v1-v3/versão futura de Realm falham e nenhuma
+pertence ao conjunto; Server e Realm permanecem em v1, versões diferentes falham e nenhuma
 coluna/tabela mudou; cada filtro obrigatório seleciona ao menos um teste.
 
 **Testes:**
@@ -706,7 +709,7 @@ fallback, isolamento, persistência e UI.
 - [ ] Cobrir cookie > `ui_locales` > `Accept-Language` > default > neutro.
 - [ ] Cobrir dois realms com options/cookies diferentes e impedir vazamento entre eles.
 - [ ] Cobrir refresh inválido preservando snapshot/metadata anterior.
-- [ ] Validar payload v4 e paridade Configuration em SQLite e PostgreSQL opt-in.
+- [ ] Validar o payload v1 corrente e a paridade Configuration em SQLite e PostgreSQL opt-in.
 - [ ] Verificar Server, Demo e Tests.Host com a mesma ordem de middleware/registro.
 - [ ] Criar `Tests.Integration/Endpoints/LocalizationDiscoveryTests.cs` e concentrar nele os casos de metadata;
   não adicionar dependência a `Tests.Endpoints`.
@@ -782,7 +785,7 @@ dotnet test RoyalIdentity.sln
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Options validadas/persistidas por realm | 1-2 | DF1, DF8, DF17, DF21-DF23 | Server v3/Realm v4; ordem/cópia/validação; snapshot pré-validado | `InternationalizationOptionsTests`; `ConfigurationModelPayloadTests`; `ConfigurationSnapshotTests` |
+| Options validadas/persistidas por realm | 1-2 | DF1, DF8, DF17, DF21-DF23 | Server/Realm v1; ordem/cópia/validação; snapshot pré-validado | `InternationalizationOptionsTests`; `ConfigurationModelPayloadTests`; `ConfigurationSnapshotTests` |
 | Seleção determinística por request | 3, 6 | DF5, DF6, DF9, DF10, DF20 | precedência exata; fallback espanhol não ambíguo; hints ignoráveis; cookies isolados | `RequestCulture`; `CulturePreference`; `Localization` |
 | Catálogos RESX íntegros | 2, 5 | DF2-DF4, DF15, DF18, DF20 | 62 chaves por cultura; 6 arquivos; paridade de chaves/placeholders; nenhum missing resource | `LocalizationCatalog`; `LocalizedAccountUi` |
 | Remover textos do core e preservar segurança | 4 | DF11-DF13 | códigos estáveis; falha genérica; motivo interno preservado | `LoginFlow`; `LoginEventCharacterizationTests` |
@@ -805,7 +808,7 @@ dotnet test RoyalIdentity.sln
 9. UI localiza texto, nunca HTML; argumentos continuam encoded.
 10. Conteúdo configurado pelo tenant não é confundido com recurso estático do produto.
 11. Server nunca migra/seed; Demo continua self-provisioned; migrations/seeds externos preservam seus papéis.
-12. Payload v4 só nasce depois de v2/v3; nenhuma migration relacional é criada para a troca do JSON.
+12. Payloads pré-release permanecem em v1; nenhuma migration relacional/JSON é criada e dados antigos são reprovisionados.
 13. Authorization codes continuam single-use, PKCE default-on e sessões/consents continuam realm-scoped.
 14. SSR estático mantém GET/POST independentes e validação correta em ambas as requisições.
 15. `SupportedLocales` preserva ordem configurada e elimina duplicatas case-insensitive pela primeira ocorrência.
@@ -815,8 +818,8 @@ dotnet test RoyalIdentity.sln
 
 ## Critérios globais de conclusão
 
-- `InternationalizationOptions` está integrada, copiada, validada e persistida por realm no payload v4.
-- `ServerOptionsPayload` permanece em v3; `RealmOptionsPayload` parte de v3 e passa a v4 sem saltar predecessor.
+- `InternationalizationOptions` está integrada, copiada, validada e persistida por realm no payload v1 corrente.
+- `ServerOptionsPayload` e `RealmOptionsPayload` permanecem em v1 conforme ADR-020.
 - Os seis catálogos físicos — 62 chaves por cultura em neutro/inglês, `pt-BR` e `es-419` — têm paridade
   completa de chaves/placeholders.
 - Precedência cookie > `ui_locales` > `Accept-Language` > default > neutro está provada.
@@ -847,7 +850,7 @@ dotnet test RoyalIdentity.sln
 | Texto do core reaparece | service retorna frase por conveniência | boundary volta a misturar domínio/UI | códigos tipados + guards de source | Aberto |
 | Tradução revela estado da conta | chaves diferentes por motivo | enumeração de usuário | um código/recurso para três motivos + testes | Aberto |
 | Culture afeta protocolo | formatter/comparer usa cultura corrente | interoperabilidade ou vulnerabilidade | comparações ordinais/invariant + regressão protocolar | Aberto |
-| Payload executado fora de ordem | Server ou Realm ainda é v1/v2 | salto de schema e planos inconsistentes | gate explícito de ambos em `CurrentVersion == 3` na Fase 1 | Aberto |
+| Payload executado fora de ordem | predecessor funcional não foi concluído ou serializer não está em v1 | shape inconsistente | dependência explícita + gate de ambos em `CurrentVersion == 1` | Aberto |
 | Coleção perde ordem/canonicalização | `HashSet` ou sort implícito reaparece | metadata e preferência ficam instáveis | DF22 + roundtrip/ordem/duplicata por casing | Aberto |
 | Filtro executa zero testes | classe planejada não existe ou projeto está fora da solution | fase fecha em falso verde | DF23 + classes/arquivos nomeados | Aberto |
 | Validação SSR fica em inglês | apenas component text usa localizer | experiência parcialmente localizada | API .NET 10 + testes client/server | Aberto |

@@ -14,7 +14,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 public sealed class RealmOptionsPayloadSerializer
 {
     /// <summary>Current payload schema version written by <see cref="Serialize"/>.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 1;
 
     // The ServerOptions navigation is dropped on both read and write, so the payload is identical regardless
     // of which server graph a realm is bound to.

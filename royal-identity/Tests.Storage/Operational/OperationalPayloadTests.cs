@@ -23,6 +23,16 @@ public class OperationalPayloadTests
     private readonly AuthorizeParametersPayloadSerializer authorizeParameters = new();
 
     [Fact]
+    public void OperationalPayloadSerializers_RemainAtVersionOneDuringPreRelease()
+    {
+        Assert.Equal(1, AccessTokenPayloadSerializer.CurrentVersion);
+        Assert.Equal(1, RefreshTokenPayloadSerializer.CurrentVersion);
+        Assert.Equal(1, AuthorizationCodePayloadSerializer.CurrentVersion);
+        Assert.Equal(1, ConsentPayloadSerializer.CurrentVersion);
+        Assert.Equal(1, AuthorizeParametersPayloadSerializer.CurrentVersion);
+    }
+
+    [Fact]
     public void AccessToken_RoundTrip_IsCompleteAndStable()
     {
         var token = OperationalTestData.NewReferenceAccessToken();
@@ -210,15 +220,17 @@ public class OperationalPayloadTests
         Assert.Equal("session-one", restored.SessionId);
     }
 
-    [Fact]
-    public void RefreshToken_VersionOne_FailsClosed_InsteadOfMixingTokenClaimProvenance()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void RefreshToken_NonCurrentVersion_FailsClosed_InsteadOfMixingTokenClaimProvenance(int version)
     {
         var token = OperationalTestData.NewRefreshToken();
         var (_, json) = refreshTokens.Serialize(token);
 
-        Assert.Equal(2, RefreshTokenPayloadSerializer.CurrentVersion);
+        Assert.Equal(1, RefreshTokenPayloadSerializer.CurrentVersion);
         Assert.Throws<OperationalPayloadException>(() => refreshTokens.Deserialize(
-            1, json, OperationalTestData.IdentityOf(token)));
+            version, json, OperationalTestData.IdentityOf(token)));
     }
 
     [Theory]
@@ -293,15 +305,17 @@ public class OperationalPayloadTests
         Assert.Equal("code-handle-value", restored.Code);
     }
 
-    [Fact]
-    public void AuthorizationCode_VersionOnePayload_FailsClosed()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void AuthorizationCode_NonCurrentVersionPayload_FailsClosed(int version)
     {
         var code = OperationalTestData.NewAuthorizationCode();
         var (_, json) = authorizationCodes.Serialize(code);
 
-        Assert.Equal(2, AuthorizationCodePayloadSerializer.CurrentVersion);
+        Assert.Equal(1, AuthorizationCodePayloadSerializer.CurrentVersion);
         Assert.Throws<OperationalPayloadException>(() => authorizationCodes.Deserialize(
-            1,
+            version,
             json,
             OperationalTestData.IdentityOf(code)));
     }

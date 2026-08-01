@@ -27,6 +27,8 @@
 
 ### Fontes verificadas
 
+- [ADR-020](../../adrs/ADR-020.md) — payloads Configuration/Operational permanecem em v1 durante o pre-release;
+  novos shapes exigem reprovisionamento, não cadeias de versões.
 - [an-par-rfc-9126.md](../analisys/an-par-rfc-9126.md) — inventário exploratório dos requisitos de PAR e das
   alternativas de armazenamento; não constitui decisão arquitetural.
 - [plan-data-storage-matrix.md](plan-data-storage-matrix.md) — contratos Operational vigentes, incluindo
@@ -46,7 +48,7 @@
 - [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — baseline de redirect URI, PKCE,
   remoção de front-channel token e política de segurança executada antes de PAR.
 - [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md) — predecessor imediato na
-  ordem do roadmap; deixa `ServerOptionsPayload` em v5 e `RealmOptionsPayload` em v6, além de alterar `Client`,
+  ordem do roadmap; mantém `ServerOptionsPayload` e `RealmOptionsPayload` em v1, além de alterar `Client`,
   endpoints e discovery.
 - `RoyalIdentity/Contracts/Storage/IAuthorizeParametersStore.cs` e
   `RoyalIdentity.Storage.EntityFramework/Operational/Stores/EntityFrameworkAuthorizeParametersStore.cs` —
@@ -271,13 +273,11 @@
   exato e cleanup periódico remove abandonados sem ser condição de segurança. Fonte: baseline Operational.
 - **DF19 — Breaking change direto:** atualizar contexts, pipelines, options, serializers, migrations, seeds e
   testes sem shim; não há consumidor de produção a preservar. Fonte: AGENTS.md.
-- **DF20 — Cadeia Configuration fechada:** a Fase 1 falha antes de editar se
-  `ServerOptionsPayloadSerializer.CurrentVersion != 5` ou
-  `RealmOptionsPayloadSerializer.CurrentVersion != 6`. `PushedAuthorizationRequestOptions` e
-  `EnablePushedAuthorizationRequestEndpoint` entram nos dois grafos e promovem respectivamente Server v5 → v6
-  e Realm v6 → v7. Serializers rejeitam versões anteriores, seeds/fixtures são reprovisionados e não há fallback
-  de leitura nem migration relacional para os payloads. Fonte: DF21 de Reference Tokens/Introspection + padrão
-  fail-closed da cadeia Configuration.
+- **DF20 — Payloads pré-release v1:** a Fase 1 falha antes de editar se qualquer serializer Configuration não
+  estiver em v1. `PushedAuthorizationRequestOptions` e `EnablePushedAuthorizationRequestEndpoint` entram nos dois
+  grafos sem incrementar a versão; serializers rejeitam versões diferentes de v1, seeds/fixtures são
+  reprovisionados e não há leitor legado nem migration relacional/JSON. Fonte: ADR-020 + DF21 de Reference
+  Tokens/Introspection.
 - **DF21 — Topologia verificável de testes:** algoritmo/contratos Operational ficam em classes nomeadas de
   `Tests.Storage`; options/snapshot, endpoint HTTP, autenticação, resolução no authorize, policy, discovery e
   fluxos externos ficam em `Tests.Integration`; boundaries ficam em
@@ -330,8 +330,8 @@
   replay entre endpoints.
 - **Confirmado:** os filtros das Fases 3-5 em `Tests.Identity` são vazios ou verdes por teste incidental e o
   projeto não possui composição HTTP. Conclusão: DF21.
-- **Confirmado:** Reference Tokens/Introspection deixa Server v5/Realm v6 e PAR altera ambos os grafos.
-  Conclusão: gate e promoção concreta em DF20.
+- **Confirmado:** Reference Tokens/Introspection deixa Server/Realm v1 e PAR altera ambos os grafos sem bump.
+  Conclusão: gate v1 em DF20.
 - **Confirmado:** ausência de `require_pushed_authorization_requests` equivale a `false` e segue a convenção do
   discovery atual. Conclusão: omissão explícita em DF22.
 
@@ -407,8 +407,8 @@ operational.pushed_authorization_requests
 - O payload protegido não contém o `request_uri`, credenciais de autenticação, client secret/assertion ou
   headers.
 - Registrar novas operações PAR-01 (create), PAR-02 (consume) e PAR-03 (cleanup) na matriz antes do adapter.
-- Payloads Configuration partem de Server v5/Realm v6 e terminam em Server v6/Realm v7; versões anteriores são
-  rejeitadas e reprovisionadas.
+- Payloads Configuration partem e terminam em Server/Realm v1; versões diferentes são rejeitadas e shapes antigos
+  de desenvolvimento são reprovisionados.
 
 ### Arquitetura alvo
 
@@ -485,8 +485,8 @@ GET|POST /{realm}/connect/authorize?client_id=...&request_uri=...
 ### Compatibilidade, migração e rollout
 
 - Executar somente depois de todos os predecessores de DF1 estarem concluídos e de Q1/Q2/Q3 fechadas.
-- Antes da Fase 1, exigir `ServerOptionsPayload` v5 e `RealmOptionsPayload` v6; promover uma única vez para
-  Server v6/Realm v7, atualizar seeds/fixtures e reprovisionar sem fallback de versões antigas.
+- Antes da Fase 1, exigir e preservar `ServerOptionsPayload`/`RealmOptionsPayload` v1; atualizar seeds/fixtures e
+  reprovisionar sem fallback de shapes antigos.
 - Gerar migrations Configuration e Operational separadas para SQLite/PostgreSQL e atualizar scripts SQL.
 - `RoyalIdentity.Server` continua PostgreSQL e externamente provisionado; `RoyalIdentity.Demo` continua SQLite
   in-memory self-provisioned.
@@ -531,8 +531,8 @@ versionado vigente.
 
 - [ ] Registrar as respostas Q1/Q2/Q3 no histórico e criar DFs correspondentes.
 - [ ] Remover os trechos condicionais do design, fases e critérios depois das respostas.
-- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 5` ou
-  `RealmOptionsPayloadSerializer.CurrentVersion != 6`.
+- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 1` ou
+  `RealmOptionsPayloadSerializer.CurrentVersion != 1`.
 - [ ] Criar o contrato de storage escolhido em Q1 com `CancellationToken` obrigatório.
 - [ ] Definir create/consume e seus resultados sem expor motivo de falha à camada HTTP.
 - [ ] Adicionar `Client.RequirePushedAuthorizationRequests=false`.
@@ -541,7 +541,7 @@ versionado vigente.
 - [ ] Adicionar `EnablePushedAuthorizationRequestEndpoint=true` e seu copy constructor.
 - [ ] Validar lifetime e incompatibilidade entre `Required=true` e endpoint desabilitado.
 - [ ] Adicionar o scalar a `ClientEntity`, model builder e `ClientMaterializer`.
-- [ ] Promover `ServerOptionsPayload` v5 → v6 e `RealmOptionsPayload` v6 → v7, sem leitor legado ou fallback.
+- [ ] Preservar `ServerOptionsPayload`/`RealmOptionsPayload` v1, sem leitor legado ou fallback para shapes antigos.
 - [ ] Gerar migrations Configuration SQLite/PostgreSQL e SQL revisável.
 - [ ] Atualizar seeds/fixtures e coverage tests de scalars do client.
 - [ ] Estender `ConfigurationModelClientCoverageTests`, `ConfigurationMaterializationClientTests`,
@@ -553,7 +553,7 @@ versionado vigente.
 
 **Critérios de aceite:** Q1/Q2/Q3 estão fechadas; contrato não conflita com
 `IAuthorizeParametersStore`; client anterior materializa `false`; payload legado falha fechado e os seeds são
-reprovisionados em Server v6/Realm v7; configuração inválida não é publicada; providers não possuem pending
+reprovisionados em Server/Realm v1; configuração inválida não é publicada; providers não possuem pending
 model changes; cada filtro obrigatório seleciona testes.
 
 **Testes:**
@@ -902,7 +902,7 @@ dotnet test RoyalIdentity.sln
 | Endpoint PAR autenticado | 1, 3 | DF2-DF4, DF9, DF21, Q3 | POST/HTTPS/form; 201; audience contextual; replay único; erros diretos | PushedAuthorizationRequestEndpoint; Authentication; PrivateKeyJwtEndpointAudience |
 | Handle seguro e consumível | 2, 4 | DF5, DF6, DF11-DF13, Q1, Q2 | digest-only; binding; decisão atômica | storage contracts; concorrência HTTP |
 | Validação vigente e handoffs pré-Load | 3, 4 | DF7, DF8 | valida no push/authorize; prompt bruto e ACR ordenado preservados | Authorize; PKCE; resources; redirect; RequestCulture |
-| Policy realm/client | 1, 5 | DF14, DF15, DF20-DF22 | direct rejeitada apenas quando exigida; Server v6/Realm v7 | PushedAuthorizationRequestPolicy; options; snapshot |
+| Policy realm/client | 1, 5 | DF14, DF15, DF20-DF22 | direct rejeitada apenas quando exigida; Server/Realm v1 | PushedAuthorizationRequestPolicy; options; snapshot |
 | Metadata fiel e JAR separado | 5 | DF10, DF17, DF22 | endpoint/policy reais; `false` e alias mTLS PAR omitidos; sem capability falsa | PushedAuthorizationRequestDiscovery; RequestObjectSeparation |
 | Providers e isolamento | 2, 6 | DF16, DF18-DF21 | SQLite/PostgreSQL; realm/client fail-closed | storage; provider scripts; end-to-end |
 | Fechamento documental | 7 | DF1-DF22 | backlog/roadmap/matriz alinhados | `rg`; build; solution test |
@@ -931,7 +931,7 @@ dotnet test RoyalIdentity.sln
 17. Resources/scopes permanecem no owner vigente; PAR não cria persistência incidental do catálogo.
 18. Audience de `private_key_jwt` é contextual: PAR aceita issuer/token/PAR; token não aceita URL de PAR.
 19. O `purpose` de replay de `private_key_jwt` permanece único entre endpoints.
-20. A Fase 1 parte somente de Server v5/Realm v6 e termina em Server v6/Realm v7, sem fallback.
+20. A Fase 1 parte e termina em Server/Realm v1, sem fallback para shapes pré-release antigos.
 21. Policy global `false` é omitida do discovery; policy somente por client nunca aparece como global.
 22. Nenhum comando obrigatório com filtro pode concluir selecionando zero testes ou teste incidental.
 23. A validação do `prompt` bruto final ocorre antes de `Load`, e `acr_values` mantém ordem e deduplicação dos
@@ -956,7 +956,7 @@ dotnet test RoyalIdentity.sln
 - Discovery anuncia PAR real, omite policy global `false` e alias mTLS inexistente, e não anuncia JAR inexistente.
 - `private_key_jwt` aceita no PAR as três audiences do RFC, não amplia o token endpoint com a URL de PAR e
   preserva replay cross-endpoint.
-- Payloads Configuration partem de Server v5/Realm v6 e terminam em Server v6/Realm v7, sem fallback.
+- Payloads Configuration permanecem em Server/Realm v1, sem fallback para shapes pré-release antigos.
 - Migrations Configuration/Operational e SQL dos dois providers estão atualizados.
 - SQLite/PostgreSQL, clients público/confidencial e dois realms estão cobertos.
 - Todas as classes nomeadas na DF21 existem e nenhum filtro obrigatório seleciona zero testes.
@@ -982,7 +982,7 @@ dotnet test RoyalIdentity.sln
 | Migration diverge por provider | tabela/índice/default diferem | comportamento distinto em produção | contracts + scripts PostgreSQL | Aberto |
 | Audience PAR vaza para o token endpoint | evaluator ganha lista global com issuer/token/PAR | assertion destinada apenas a PAR autentica no token | DF3 + policy contextual + matriz cross-endpoint | Aberto |
 | Replay é particionado por endpoint | implementação troca o `purpose` conforme rota | mesmo `jti` é aceito uma vez em PAR e outra no token | purpose único + teste nas duas ordens | Aberto |
-| Cadeia Configuration parte da versão errada | executor ignora predecessor de introspection | options perdidas ou payload incompatível | DF20 + gate Server v5/Realm v6 | Aberto |
+| Payload pré-release parte da baseline errada | executor ignora predecessor de introspection ou ADR-020 | options perdidas ou bump indevido | DF20 + gate Server/Realm v1 | Aberto |
 | Filtro amplo fica verde por teste incidental | nome como `ClientAssertion` seleciona option alheia a PAR | fase fecha sem provar endpoint | DF21 + classes/comandos explícitos | Aberto |
 | Metadata afirma JAR | stub continua com flag true | clientes enviam formato não processado | correção/guard da Fase 5 | Aberto |
 | Validação pré-Load se perde | mover `Load` sem consumir Session Management/Debt Closure | prompt inválido aceito ou ACR reordenado | handoffs nominais + regressões direct/PAR | Aberto |

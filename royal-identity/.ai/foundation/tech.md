@@ -172,6 +172,13 @@ Configuration, Operational and UserAccounts externally, with one explicit connec
 `RoyalIdentity.Demo` and `Tests.Integration` use isolated SQLite in-memory databases; resources/scopes remain a
 deliberately volatile bridge pending their redesign.
 
+During pre-release, the JSON payload version columns and strict serializers remain in place, but every internal
+Configuration/Operational payload schema stays at version 1. Incompatible shape changes require reprovisioning
+development data and updating seeds/fixtures, not a version bump, legacy reader, upcaster or JSON migration. The
+format current at the first supported release becomes the public v1 baseline; subsequent incompatible changes
+must define an upgrade policy. This ADR-020 rule does not cover cryptographic or protocol formats with independent
+versioning.
+
 **Constraint**: Every adapter must satisfy the complete core contracts it exposes. Add persistence behavior to the
 owning store/module and its provider-neutral contract suite, never directly to domain services or handlers.
 

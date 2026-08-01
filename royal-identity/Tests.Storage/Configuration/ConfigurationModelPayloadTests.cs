@@ -15,6 +15,13 @@ public class ConfigurationModelPayloadTests
     private readonly RealmOptionsPayloadSerializer realmSerializer = new();
 
     [Fact]
+    public void ConfigurationPayloadSerializers_RemainAtVersionOneDuringPreRelease()
+    {
+        Assert.Equal(1, ServerOptionsPayloadSerializer.CurrentVersion);
+        Assert.Equal(1, RealmOptionsPayloadSerializer.CurrentVersion);
+    }
+
+    [Fact]
     public void ServerOptions_RoundTrip_IsStableAndFaithful()
     {
         var options = new ServerOptions
@@ -33,7 +40,7 @@ public class ConfigurationModelPayloadTests
         var (_, reserialized) = serverSerializer.Serialize(restored);
 
         Assert.Equal(ServerOptionsPayloadSerializer.CurrentVersion, version);
-        Assert.Equal(2, version);
+        Assert.Equal(1, version);
         Assert.DoesNotContain("CheckSessionCookieDomain", json, StringComparison.Ordinal);
         Assert.DoesNotContain("CheckSessionCookieSameSiteMode", json, StringComparison.Ordinal);
         Assert.DoesNotContain(nameof(LoggingOptions.RedactedParameterNames), json, StringComparison.Ordinal);
@@ -78,21 +85,15 @@ public class ConfigurationModelPayloadTests
         Assert.False(Assert.IsType<bool>(items[2]));
     }
 
-    [Fact]
-    public void ServerOptions_UnknownVersion_FailsClosed()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void ServerOptions_NonCurrentVersion_FailsClosed(int version)
     {
         var (_, json) = serverSerializer.Serialize(new ServerOptions());
 
         Assert.Throws<ConfigurationPayloadException>(
-            () => serverSerializer.Deserialize(ServerOptionsPayloadSerializer.CurrentVersion + 1, json));
-    }
-
-    [Fact]
-    public void ServerOptions_PreviousVersion_FailsClosedAfterTheCheckSessionSchemaCut()
-    {
-        var (_, json) = serverSerializer.Serialize(new ServerOptions());
-
-        Assert.Throws<ConfigurationPayloadException>(() => serverSerializer.Deserialize(1, json));
+            () => serverSerializer.Deserialize(version, json));
     }
 
     [Fact]
@@ -145,7 +146,7 @@ public class ConfigurationModelPayloadTests
         var (_, reserialized) = realmSerializer.Serialize(restored);
 
         Assert.Equal(RealmOptionsPayloadSerializer.CurrentVersion, version);
-        Assert.Equal(2, version);
+        Assert.Equal(1, version);
         Assert.DoesNotContain("CheckSessionCookieDomain", json, StringComparison.Ordinal);
         Assert.DoesNotContain("CheckSessionCookieSameSiteMode", json, StringComparison.Ordinal);
         Assert.Equal(json, reserialized);
@@ -156,8 +157,8 @@ public class ConfigurationModelPayloadTests
         Assert.Equal(".realm.check-session", restored.Authentication.CheckSessionCookieName);
     }
 
-    // A sparse payload written at the current schema version still materializes closed defaults. Version 1 is
-    // deliberately rejected after the breaking Check Session options cut, so this is not a compatibility shim.
+    // A sparse payload written at the current pre-release schema version still materializes closed defaults.
+    // This is current-shape behavior, not compatibility with a previously released schema.
     [Fact]
     public void RealmOptions_PayloadWithoutTheOperationalOptions_MaterializesTheClosedDefaults()
     {
@@ -167,7 +168,7 @@ public class ConfigurationModelPayloadTests
         var restored = realmSerializer.Deserialize(
             RealmOptionsPayloadSerializer.CurrentVersion, legacyPayload, serverOptions);
 
-        Assert.Equal(2, RealmOptionsPayloadSerializer.CurrentVersion);
+        Assert.Equal(1, RealmOptionsPayloadSerializer.CurrentVersion);
         Assert.Equal(600, restored.Authentication.AuthorizationInteractionLifetime);
         Assert.Equal(
             OperationalStorageOptions.DefaultPayloadProtectionProfile,
@@ -252,23 +253,16 @@ public class ConfigurationModelPayloadTests
             error => error.Contains("PayloadProtectionProfile", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void RealmOptions_UnknownVersion_FailsClosed()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void RealmOptions_NonCurrentVersion_FailsClosed(int version)
     {
         var serverOptions = new ServerOptions();
         var (_, json) = realmSerializer.Serialize(new RealmOptions(serverOptions));
 
         Assert.Throws<ConfigurationPayloadException>(
-            () => realmSerializer.Deserialize(RealmOptionsPayloadSerializer.CurrentVersion + 1, json, serverOptions));
-    }
-
-    [Fact]
-    public void RealmOptions_PreviousVersion_FailsClosedAfterTheCheckSessionSchemaCut()
-    {
-        var serverOptions = new ServerOptions();
-        var (_, json) = realmSerializer.Serialize(new RealmOptions(serverOptions));
-
-        Assert.Throws<ConfigurationPayloadException>(() => realmSerializer.Deserialize(1, json, serverOptions));
+            () => realmSerializer.Deserialize(version, json, serverOptions));
     }
 
     [Fact]

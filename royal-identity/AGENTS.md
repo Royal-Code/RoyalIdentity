@@ -75,7 +75,7 @@ PostgreSQL opt-in for contracts, parity, concurrency, migrations and gateway sui
 consumers/fallbacks and storage fake no longer exist. New work must consume
 `.ai/plans/plan-data-storage-matrix.md` without re-inferring its closed semantics.
 
-Accepted architectural decisions live in `adrs/` (ADR-001..019). Read the relevant
+Accepted architectural decisions live in `adrs/` (ADR-001..020). Read the relevant
 ADR before changing the affected area. Notably for the users/session area:
 `ADR-013` (modular architecture & boundaries — storages as facades) and `ADR-014`
 (users edge + session redesign, which **refines** `ADR-005`), implemented by
@@ -89,6 +89,11 @@ lifecycle — `RequiredAction`, `SecurityStamp`/`SessionsValidAfter`,
 `ADR-014`/`ADR-015`; and `ADR-018` (the in-memory storage fake was transitional —
 its convergence to module + SQLite and removal are now recorded in §4), which
 **amends** `ADR-013`/`ADR-014`/`ADR-015`.
+
+`ADR-020` defines the pre-release policy for persisted Configuration/Operational payloads: keep every internal
+payload schema at version 1 until the first supported release, reprovision development data after an incompatible
+format change, and do not add pre-release readers, upcasters or JSON migrations. This does not apply to
+cryptographic or protocol formats with their own versioning.
 
 ## Commands
 
@@ -202,6 +207,10 @@ When adding storage operations:
 3. Implement it in the owning EF adapter/module and supported providers.
 4. Add or update provider-neutral contract tests in `Tests.Storage`; default scenarios use isolated SQLite and
    PostgreSQL-specific acceptances remain local/opt-in.
+
+Before the first supported release, persisted Configuration/Operational payload serializers remain at
+`CurrentVersion = 1` per `ADR-020`. Incompatible payload changes update seeds/fixtures and require reprovisioning
+development data; they do not reserve or increment pre-release versions.
 
 Cross-realm data access is an architectural bug. Preserve these invariants:
 

@@ -13,7 +13,7 @@ namespace RoyalIdentity.Storage.EntityFramework.Operational.Materialization;
 public sealed class RefreshTokenPayloadSerializer
 {
     /// <summary>Current payload schema version.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 1;
 
     private readonly OperationalPayloadCodec<RefreshTokenPayload> codec =
         new(nameof(RefreshToken), CurrentVersion);
