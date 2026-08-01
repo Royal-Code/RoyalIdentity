@@ -1,17 +1,17 @@
 # Plan: OpenID Connect Session Management, Check Session e atribuições Apache (`plan-oidc-session-management`)
 
-## Status: EM EXECUÇÃO - Fases 1-3 concluídas; Fase 4 é a próxima; 3 de 7 fases concluídas
+## Status: EM EXECUÇÃO - Fases 1-4 concluídas; Fase 5 é a próxima; 4 de 7 fases concluídas
 
 ## Progresso
 
-`███░░░░` **43%** - 3 de 7 fases
+`████░░░` **57%** - 4 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato de estado do User Agent e opções | Concluida |
 | Fase 2 - Ciclo de vida do estado no login, cookie e logout | Concluida |
 | Fase 3 - Authentication Responses, `prompt=none` e payload operacional | Concluida |
-| Fase 4 - Rota, discovery HTTPS e isolamento por realm | Pendente |
+| Fase 4 - Rota, discovery HTTPS e isolamento por realm | Concluida |
 | Fase 5 - OP iframe moderno e hardening HTTP | Pendente |
 | Fase 6 - Aceites HTTP, multi-realm e navegador real | Pendente |
 | Fase 7 - Licenças, atribuições, documentação e fechamento | Pendente |
@@ -867,17 +867,17 @@ usar apenas opções do realm corrente.
 
 **Tarefas:**
 
-- [ ] Mapear `CheckSessionEndpoint` em `MapOpenIdConnectProviderEndpoints`.
-- [ ] Retornar 404 quando o endpoint estiver desabilitado no realm.
-- [ ] Preservar GET como único método e retornar 405 para métodos diferentes quando habilitado/HTTPS.
-- [ ] Recusar servir o iframe quando a origem pública efetiva não for HTTPS.
-- [ ] Publicar `check_session_iframe` somente quando endpoint e HTTPS forem efetivos.
-- [ ] Construir URL com path do realm e esquema/host/port externos após forwarded headers.
-- [ ] Resolver nome do cookie e CSP por `HttpContext.GetCurrentRealm()`, não por `ServerOptions` global.
-- [ ] Remover cache estático cross-realm do resultado.
-- [ ] Adicionar testes com dois realms: habilitado/desabilitado e nomes de cookie diferentes.
-- [ ] Adicionar regressão garantindo que discovery nunca anuncie URL HTTP ou morta.
-- [ ] Criar `Tests.Integration/Endpoints/CheckSessionEndpointTests.cs` para rota, métodos, feature gate, HTTPS,
+- [x] Mapear `CheckSessionEndpoint` em `MapOpenIdConnectProviderEndpoints`.
+- [x] Retornar 404 quando o endpoint estiver desabilitado no realm.
+- [x] Preservar GET como único método e retornar 405 para métodos diferentes quando habilitado/HTTPS.
+- [x] Recusar servir o iframe quando a origem pública efetiva não for HTTPS.
+- [x] Publicar `check_session_iframe` somente quando endpoint e HTTPS forem efetivos.
+- [x] Construir URL com path do realm e esquema/host/port externos após forwarded headers.
+- [x] Resolver nome do cookie e CSP por `HttpContext.GetCurrentRealm()`, não por `ServerOptions` global.
+- [x] Remover cache estático cross-realm do resultado.
+- [x] Adicionar testes com dois realms: habilitado/desabilitado e nomes de cookie diferentes.
+- [x] Adicionar regressão garantindo que discovery nunca anuncie URL HTTP ou morta.
+- [x] Criar `Tests.Integration/Endpoints/CheckSessionEndpointTests.cs` para rota, métodos, feature gate, HTTPS,
   metadata, headers e isolamento de realm.
 
 **Critérios de aceite:** discovery HTTPS aponta para GET 200 no mesmo realm; desabilitado produz ausência de
@@ -893,7 +893,25 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~DiscoveryTests"
 
 ### Resultado da Fase 4
 
-*a preencher*
+- `CheckSessionEndpoint` foi mapeado na rota realm-scoped existente. O gate é avaliado antes do método: realm
+  desabilitado ou origem pública não HTTPS responde 404 para qualquer verbo; somente o endpoint efetivamente
+  disponível aceita GET e responde 405 + `Allow: GET` aos demais métodos.
+- `DiscoveryHandler` publica `check_session_iframe` apenas quando a mesma opção efetiva está habilitada e a
+  requisição é HTTPS. `UseRoyalIdentityProtocol` aplica forwarded headers antes da descoberta de realm e a DI
+  habilita `X-Forwarded-Proto`/`X-Forwarded-Host`, preservando as listas seguras de proxies/redes conhecidas para
+  configuração do host. Os testes carimbam o peer do `TestServer`: loopback confiável prova scheme, host, porta
+  e path de realm externos; um peer não confiável não consegue liberar o endpoint nem alterar a metadata. A
+  documentação do pipeline alerta ainda contra limpar as listas via `ASPNETCORE_FORWARDEDHEADERS_ENABLED` e
+  contra posicionar middleware dependente de scheme/host/IP antes do processamento.
+- `CheckSessionResult` deixou de ler `ServerOptions` global: nome efetivo do cookie e CSP vêm do realm corrente,
+  com a mesma derivação usada pelo lifecycle. O cache estático de HTML/cookie foi removido, eliminando estado
+  cross-realm. O antigo teste de snapshot global, que exigia o comportamento removido, foi retirado e substituído
+  pelo aceite HTTP com dois realms e opções divergentes.
+- `CheckSessionEndpointTests` cobre GET/POST, feature gate, HTTP, metadata viva, forwarded headers confiáveis e
+  não confiáveis e isolamento simultâneo de cookie/CSP/gate entre dois realms. `HttpFailureTests` passou a
+  incluir a rota no contrato geral de 405/Problem Details.
+- Verificação final: 7 `CheckSessionEndpointTests`, 7 `DiscoveryTests` e 27 `HttpFailureTests` aprovados; suíte
+  completa com 1.462 aprovados, 51 ignorados por opt-in e nenhuma falha; `git diff --check` limpo.
 
 ---
 
@@ -908,7 +926,8 @@ validar parent/origin/formato; aplicar headers sem bloquear framing.
 
 **Tarefas:**
 
-- [ ] Remover SHA-256 manual, cache estático e substituição textual de `{cookieName}`.
+- [ ] Manter ausente o cache estático cross-realm removido na Fase 4 e remover SHA-256 manual e substituição
+  textual de `{cookieName}`.
 - [ ] Implementar hash assíncrono com `crypto.subtle.digest`.
 - [ ] Serializar nome do cookie e constantes do formato com encoder JSON/HTML.
 - [ ] Gerar nonce CSP criptográfico por response e aplicá-lo ao único script inline.
@@ -1125,7 +1144,7 @@ dotnet test RoyalIdentity.sln
 |---|---|---|---|---|
 | Bloqueio de third-party cookie | iframe não vê cookie presente no first-party OP | falsos `changed`/loop no RP | DF14, harness defensivo, documentação e Back-Channel Logout | Aberto |
 | Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | exceção exata por endpoint + teste browser/header | Aberto |
-| Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host | Aberto |
+| Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host; confiança permanece configurada pelo host | Mitigado |
 | Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única/validação entregues na Fase 1; lifecycle multi-realm na Fase 2 | Mitigado |
 | Estado vaza em token/log | principal/telemetria copia propriedade/cookie | correlação ou exposição | propriedade protegida, não claim; filtros e testes de log/token | Aberto |
 | Hash diverge entre C# e JS | canonicalização/Unicode/porta diferentes | sempre `changed` | punycode/IPv6 e vetor C# entregues; comparação JS/browser nas Fases 5-6 | Aberto |

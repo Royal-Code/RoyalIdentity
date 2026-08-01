@@ -677,8 +677,10 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
   `MutualTls.Enabled`, e `DiscoveryTests.Get_WithMutualTlsEnabled_Must_AnnounceTheTwoMtlsMethodsOnTop` fixa a
   composição, mas nenhum teste exercita a autenticação — o test server in-memory não apresenta certificado de
   cliente. Os outros três métodos anunciados já têm caso de sucesso.
-- [ ] Adicionar validação de startup para issuer/forwarded headers/trusted proxy necessária ao host, sem alegar
-  que `ClientSecurityAssessment` prova o deployment.
+- [ ] Adicionar validação de startup para issuer, `AllowedHosts`/host filtering,
+  `ForwardedHeadersOptions.AllowedHosts` e trusted proxies/networks necessários ao host; diagnosticar o uso de
+  `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` sem uma fronteira de rede equivalente e não alegar que
+  `ClientSecurityAssessment` prova o deployment.
 - [ ] Atualizar findings de client authentication assimétrica e sender constraint como recomendações.
 - [ ] Criar `Tests.Integration/Security/BrowserSecurityHeadersTests.cs`,
   `Tests.Integration/Security/SensitiveLoggingTests.cs` e

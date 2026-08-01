@@ -1,47 +1,25 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using RoyalIdentity.Configuration;
+using RoyalIdentity.Authentication;
 using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Responses.HttpResults;
 
 public class CheckSessionResult : IResult, IStatusCodeHttpResult
 {
-    private static readonly object locker = new();
-    private static volatile string? formattedHtml;
-    private static volatile string? lastCheckSessionCookieName;
-
     public int? StatusCode => StatusCodes.Status200OK;
 
     public async Task ExecuteAsync(HttpContext httpContext)
     {
-        // Read at the point of use: CheckSessionResponse is a singleton, so retaining this copy in a field
-        // would pin the first published configuration for every later request.
-        var options = httpContext.RequestServices.GetRequiredService<IConfigurationSnapshot>().ServerOptions;
+        var realm = httpContext.GetCurrentRealm();
+        var options = realm.Options;
 
         // add CSP headers
         httpContext.Response.AddScriptCspHeaders(options.Csp, "sha256-fa5rxHhZ799izGRP38+h4ud5QXNT0SFaFlh4eqDumBI=");
 
-        var html = GetHtml(options.Authentication.CheckSessionCookieName);
+        var cookieName = CheckSessionStateManager.GetCookieName(options.Authentication, realm);
+        var html = Html.Replace("{cookieName}", cookieName, StringComparison.Ordinal);
 
         await httpContext.Response.WriteHtmlAsync(html);
-    }
-
-    private static string GetHtml(string cookieName)
-    {
-        if (cookieName != lastCheckSessionCookieName) // why ???
-        {
-            lock (locker)
-            {
-                if (cookieName != lastCheckSessionCookieName)
-                {
-                    formattedHtml = Html.Replace("{cookieName}", cookieName);
-                    lastCheckSessionCookieName = cookieName;
-                }
-            }
-        }
-
-        return formattedHtml!;
     }
 
     private const string Html = @"

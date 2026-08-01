@@ -1,7 +1,4 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Options;
-using RoyalIdentity.Responses.HttpResults;
 using Tests.Storage.Configuration.Support;
 
 namespace Tests.Storage.Configuration;
@@ -245,45 +242,4 @@ public class ConfigurationSnapshotTests
         Assert.Equal(3, harness.Source.LoadCount);
     }
 
-    [Fact]
-    public async Task CheckSessionResult_ReadsLatestSnapshotOnEveryExecution()
-    {
-        using var harness = new SnapshotTestHarness();
-        var firstOptions = new ServerOptions();
-        firstOptions.Authentication.CheckSessionCookieName = "check.first";
-        harness.Source.Data = SnapshotTestHarness.BuildData(firstOptions, "server");
-        await harness.Refresher.RefreshAsync();
-
-        var result = new CheckSessionResult();
-        var firstHtml = await ExecuteCheckSessionAsync(result, harness.Snapshot);
-
-        var secondOptions = new ServerOptions();
-        secondOptions.Authentication.CheckSessionCookieName = "check.second";
-        harness.Source.Data = SnapshotTestHarness.BuildData(secondOptions, "server");
-        await harness.Refresher.RefreshAsync();
-        var secondHtml = await ExecuteCheckSessionAsync(result, harness.Snapshot);
-
-        Assert.Contains("check.first", firstHtml);
-        Assert.Contains("check.second", secondHtml);
-        Assert.DoesNotContain("check.first", secondHtml);
-    }
-
-    private static async Task<string> ExecuteCheckSessionAsync(
-        CheckSessionResult result, RoyalIdentity.Configuration.IConfigurationSnapshot snapshot)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(snapshot);
-        await using var provider = services.BuildServiceProvider();
-        await using var body = new MemoryStream();
-        var context = new DefaultHttpContext
-        {
-            RequestServices = provider,
-        };
-        context.Response.Body = body;
-
-        await result.ExecuteAsync(context);
-        body.Position = 0;
-        using var reader = new StreamReader(body);
-        return await reader.ReadToEndAsync();
-    }
 }

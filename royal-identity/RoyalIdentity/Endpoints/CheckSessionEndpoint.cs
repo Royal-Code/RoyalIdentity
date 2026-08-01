@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Responses;
 
@@ -17,6 +18,20 @@ public class CheckSessionEndpoint : IEndpointHandler
     public ValueTask<EndpointCreationResult> TryCreateContextAsync(HttpContext httpContext)
     {
         logger.LogDebug("Processing CheckSession request.");
+
+        var options = httpContext.GetRealmOptions();
+        if (!options.Endpoints.EnableCheckSessionEndpoint || !httpContext.Request.IsHttps)
+        {
+            logger.LogInformation(
+                "Check session endpoint unavailable for realm {Realm}: enabled={Enabled}, https={Https}.",
+                httpContext.GetCurrentRealm().Path,
+                options.Endpoints.EnableCheckSessionEndpoint,
+                httpContext.Request.IsHttps);
+
+            return ValueTask.FromResult(EndpointErrors.NotFound(
+                httpContext,
+                "Check session endpoint is unavailable"));
+        }
 
         if (!HttpMethods.IsGet(httpContext.Request.Method))
         {

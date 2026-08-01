@@ -20,5 +20,6 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapPipeline<UserInfoEndpoint>(Oidc.Routes.UserInfo);
         endpoints.MapPipeline<RevocationEndpoint>(Oidc.Routes.Revocation);
         endpoints.MapPipeline<EndSessionEndpoint>(Oidc.Routes.EndSession);
+        endpoints.MapPipeline<CheckSessionEndpoint>(Oidc.Routes.CheckSession);
     }
 }

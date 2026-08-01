@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using RoyalIdentity.Authentication;
 
 namespace RoyalIdentity.Extensions;
@@ -8,11 +9,16 @@ public static class ApplicationBuilderExtensions
 {
     /// <summary>
     /// <para>
-    /// Adds realm discovery, realm CORS, authentication and authorization in their required order, then maps
-    /// the OpenID Connect and OAuth 2.0 endpoints.
+    /// Applies forwarded headers, then adds realm discovery, realm CORS, authentication and authorization in
+    /// their required order before mapping the OpenID Connect and OAuth 2.0 endpoints.
     /// </para>
     /// <para>
     /// The caller must invoke <c>UseRouting()</c> before this method so realm discovery can read route values.
+    /// A host behind a proxy must also configure the trusted proxies or networks used by forwarded headers.
+    /// It must not enable <c>ASPNETCORE_FORWARDEDHEADERS_ENABLED</c> unless an equivalent trusted-ingress
+    /// boundary exists, because that compatibility setting clears the middleware's proxy/network trust lists.
+    /// Because this method owns forwarded-header processing, the host must not place middleware that depends on
+    /// the effective scheme, host or remote IP (such as HTTPS redirection) before this call.
     /// UI, static files, error handling and antiforgery are deliberately not installed here. A web host adds
     /// those concerns itself and installs antiforgery after this protocol pipeline and before mapping its UI.
     /// </para>
@@ -23,6 +29,7 @@ public static class ApplicationBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(app);
 
+        app.UseForwardedHeaders();
         app.UseRealmDiscovery();
         app.UseRealmCors();
         app.UseAuthentication();

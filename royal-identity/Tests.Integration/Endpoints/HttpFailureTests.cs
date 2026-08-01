@@ -35,9 +35,7 @@ public class HttpFailureTests : IClassFixture<PersistentStorageAppFactory>
         { "userinfo", "GET, POST" },
         { "end-session", "GET, POST" },
         { "authorize", "GET, POST" },
-
-        // CheckSessionEndpoint is deliberately absent: MapOpenIdConnectProviderEndpoints does not map it, so
-        // it has no route to answer 405 from. Mapping it belongs to plan-oidc-session-management.
+        { "check-session", "GET" },
     };
 
     private string UrlOf(string endpoint) => endpoint switch
@@ -51,12 +49,19 @@ public class HttpFailureTests : IClassFixture<PersistentStorageAppFactory>
         "userinfo" => Oidc.Routes.BuildUserInfoUrl(Realm),
         "end-session" => Oidc.Routes.BuildEndSessionUrl(Realm),
         "authorize" => Oidc.Routes.BuildAuthorizeUrl(Realm),
+        "check-session" => Oidc.Routes.BuildCheckSessionUrl(Realm),
         _ => throw new ArgumentOutOfRangeException(nameof(endpoint), endpoint, "Unknown endpoint")
     };
 
     /// <summary>A method no endpoint under test serves, so every one of them answers 405.</summary>
     private Task<HttpResponseMessage> SendDeleteAsync(string endpoint)
-        => factory.CreateClient().SendAsync(new HttpRequestMessage(HttpMethod.Delete, UrlOf(endpoint)));
+    {
+        var client = factory.CreateClient();
+        if (endpoint == "check-session")
+            client.BaseAddress = new Uri("https://localhost");
+
+        return client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, UrlOf(endpoint)));
+    }
 
     private static async Task AssertProblemDetailsAsync(HttpResponseMessage response)
     {

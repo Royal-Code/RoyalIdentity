@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -29,6 +31,12 @@ public static class ServiceCollectionExtensions
         Action<CustomOptions>? customization = null)
     {
         services.AddHttpContextAccessor();
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            // Keep the framework's trusted loopback defaults. Hosts add their real proxy/network addresses;
+            // clearing both trust lists would let an arbitrary peer forge the effective HTTPS origin.
+            options.ForwardedHeaders |= ForwardedHeaders.XForwardedHost | ForwardedHeaders.XForwardedProto;
+        });
         services.AddRoyalIdentityAuthentication();
 
         // Default Pipelines

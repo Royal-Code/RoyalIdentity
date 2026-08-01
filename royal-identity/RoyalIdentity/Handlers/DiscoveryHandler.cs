@@ -76,7 +76,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 entries.Add(Oidc.Discovery.EndSessionEndpoint, baseUrl + Oidc.Routes.BuildEndSessionUrl(realmPath));
             }
 
-            if (options.Endpoints.EnableCheckSessionEndpoint)
+            if (options.Endpoints.EnableCheckSessionEndpoint && context.HttpContext.Request.IsHttps)
             {
                 entries.Add(Oidc.Discovery.CheckSessionIframe, baseUrl + Oidc.Routes.BuildCheckSessionUrl(realmPath));
             }
