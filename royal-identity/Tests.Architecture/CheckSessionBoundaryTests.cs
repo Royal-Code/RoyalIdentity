@@ -15,12 +15,13 @@ namespace Tests.Architecture;
 public class CheckSessionBoundaryTests
 {
     [Fact]
-    public void RuntimeProjects_DoNotReferencePlaywrightOrTheBrowserHarness()
+    public void ProjectsOutsideBrowserHarness_DoNotReferencePlaywrightOrTheBrowserHarness()
     {
         var root = ProjectReferenceReader.FindRepositoryRoot();
         var offenders = Directory
-            .EnumerateFiles(root, "RoyalIdentity*.csproj", SearchOption.AllDirectories)
+            .EnumerateFiles(root, "*.csproj", SearchOption.AllDirectories)
             .Where(IsTrackedProjectFile)
+            .Where(project => !IsBrowserHarnessProject(root, project))
             .SelectMany(project => ReadReferences(project)
                 .Where(reference => reference.Contains("Playwright", StringComparison.OrdinalIgnoreCase)
                     || reference.Contains("Tests.Browser", StringComparison.OrdinalIgnoreCase))
@@ -115,6 +116,11 @@ public class CheckSessionBoundaryTests
         => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
             && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
             && !path.Contains($"{Path.DirectorySeparatorChar}old-is4{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+
+    private static bool IsBrowserHarnessProject(string root, string path)
+        => Path.GetRelativePath(root, path).StartsWith(
+            $"Tests.Browser{Path.DirectorySeparatorChar}",
+            StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<string> ReadReferences(string project)
     {

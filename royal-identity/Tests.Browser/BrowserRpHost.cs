@@ -31,7 +31,9 @@ internal sealed class BrowserRpHost : IAsyncDisposable
 
     public Uri Origin { get; }
 
-    public static async Task<BrowserRpHost> StartAsync(X509Certificate2 certificate)
+    public static async Task<BrowserRpHost> StartAsync(
+        X509Certificate2 certificate,
+        string publicHost)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -63,7 +65,7 @@ internal sealed class BrowserRpHost : IAsyncDisposable
             .Features.Get<IServerAddressesFeature>()?.Addresses
             ?? throw new InvalidOperationException("The RP did not publish a Kestrel address.");
         var address = Assert.Single(addresses, value => value.StartsWith("https://", StringComparison.Ordinal));
-        return new BrowserRpHost(app, new Uri(address));
+        return new BrowserRpHost(app, BrowserTopology.ToPublicOrigin(address, publicHost));
     }
 
     public string BuildLoginUrl(Uri opOrigin, string realm, string username, string password)

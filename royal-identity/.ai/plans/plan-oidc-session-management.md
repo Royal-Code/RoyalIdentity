@@ -998,7 +998,8 @@ browser fora da suíte default e fornecer um comando reprodutível.
 **Tarefas:**
 
 - [x] Criar projeto/harness xUnit de browser sem dependência de runtime dos produtos.
-- [x] Subir OP e RP reais em Kestrel HTTPS com certificado efêmero e ports/origins distintos.
+- [x] Subir OP e RPs reais em Kestrel HTTPS com certificado efêmero e sites/origins/ports distintos, resolvidos
+  deterministicamente pelo Chromium para loopback sem DNS externo.
 - [x] Criar página RP mínima que carrega o OP iframe oculto e usa `postMessage` com target origin exato.
 - [x] Instalar Chromium somente pelo script opt-in `scripts/Test-CheckSessionBrowser.ps1`.
 - [x] Testar estado corrente retornando `unchanged`.
@@ -1012,12 +1013,13 @@ browser fora da suíte default e fornecer um comando reprodutível.
 - [x] Simular cookie indisponível e verificar `changed` sem loop infinito no harness RP.
 - [x] Garantir que `dotnet test RoyalIdentity.sln` não baixe nem exija browser.
 - [x] Criar `Tests.Architecture/CheckSessionBoundaryTests.cs` e adicionar guardas contra referência de
-  Playwright nos projetos de runtime e contra captura de serviços scoped no configurador de cookie.
+  Playwright/`Tests.Browser` em qualquer projeto externo ao harness e contra captura de serviços scoped no
+  configurador de cookie.
 - [x] Nomear a fixture opt-in `Tests.Browser/CheckSessionBrowserTests.cs`.
 
-**Critérios de aceite:** script opt-in passa todos os cenários em Chromium; suite default passa sem browser
-instalado; nenhum teste usa target origin `*`; dois realms não compartilham estado; `changed` conduz ao fluxo
-silencioso correto.
+**Critérios de aceite:** script opt-in passa todos os cenários em Chromium com OP e RPs cross-site; suite default
+passa sem browser instalado; nenhum teste usa target origin `*`; o caminho `unchanged` prova a entrega cross-site
+do cookie fixo `SameSite=None`; dois realms não compartilham estado; `changed` conduz ao fluxo silencioso correto.
 
 **Testes:**
 
@@ -1033,8 +1035,9 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~CheckSessionBoundary
 
 - Criado `Tests.Browser`, deliberadamente fora de `RoyalIdentity.sln`, com Playwright 1.61.0 e uma fixture
   `CheckSessionBrowserTests` que reutiliza o `Tests.Host` real sobre Kestrel HTTPS, sobe dois RPs mínimos em
-  origins/ports distintos e usa certificado efêmero; nenhum projeto de runtime referencia Playwright ou o
-  harness.
+  sites/origins/ports distintos e usa certificado efêmero. Os nomes `.test`, `.example` e `.invalid` são
+  resolvidos diretamente para loopback pelo Chromium, sem DNS externo; nenhum projeto fora do harness referencia
+  Playwright ou `Tests.Browser`.
 - O RP de aceite carrega o OP iframe oculto, usa somente target origins exatos e executa uma verificação
   delimitada por página, sem polling/retry automático. Chromium prova `unchanged`, `changed` por rotação do
   mesmo usuário, troca de usuário e logout, `error` para mensagem/origin inválidos, client divergente nunca
@@ -1043,12 +1046,14 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~CheckSessionBoundary
   ausente recebe `login_required`; consentimento ausente recebe `consent_required`. O aceite multi-realm usa
   `demo` e `account`, verifica nomes, paths e valores de cookies diferentes e prova que logout em um realm não
   altera o estado do outro.
-- Cookie indisponível é simulado no boundary JavaScript do iframe: o resultado é um único `changed`, e o RP não
-  entra em loop. `scripts/Test-CheckSessionBrowser.ps1` é o único comando que instala Chromium e executa os cinco
-  aceites opt-in.
-- `CheckSessionBoundaryTests` entrega quatro guardas: Playwright ausente do runtime, projeto browser fora da
-  solution default, nenhuma captura de manager scoped/realm/options no callback de cookie e nenhum wildcard em
-  `postMessage` no harness.
+- A topologia cross-site torna os aceites `unchanged` sensíveis à entrega do cookie `SameSite=None`, cujo atributo
+  também é verificado. Cookie indisponível é simulado separadamente no boundary JavaScript do iframe: o resultado
+  é um único `changed`, e o RP não entra em loop. Essa simulação não pretende reproduzir todas as políticas nativas
+  de bloqueio de third-party cookies. `scripts/Test-CheckSessionBrowser.ps1` é o único comando que instala Chromium
+  e executa os cinco aceites opt-in.
+- `CheckSessionBoundaryTests` entrega quatro guardas: Playwright/harness ausentes de todo projeto externo ao
+  `Tests.Browser`, projeto browser fora da solution default, nenhuma captura de manager scoped/realm/options no
+  callback de cookie e nenhum wildcard em `postMessage` no harness.
 - Verificação final: filtros obrigatórios selecionaram 8 `CheckSessionEndpointTests`, 13
   `AuthorizeSessionStateTests`, 11 `CheckSessionCookieLifecycleTests` e 4 `CheckSessionBoundaryTests`; o script
   opt-in aprovou 5 cenários Chromium. A suíte default, sem construir/exigir browser, aprovou 1.470 testes, ignorou
@@ -1190,7 +1195,7 @@ dotnet test RoyalIdentity.sln
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Bloqueio de third-party cookie | iframe não vê cookie presente no first-party OP | falsos `changed`/loop no RP | DF14, harness defensivo sem retry automático e aceite Chromium de cookie indisponível; documentação/Back-Channel Logout permanecem | Mitigado |
+| Bloqueio de third-party cookie | iframe não vê cookie presente no first-party OP | falsos `changed`/loop no RP | DF14; topologia cross-site prova `SameSite=None`; indisponibilidade simulada no boundary JavaScript prova um único `changed` sem loop, mas não pretende reproduzir toda política nativa do navegador; documentação/Back-Channel Logout permanecem | Mitigado |
 | Framing bloqueado pelo RFC 9700 | header global injeta DENY/`frame-ancestors 'none'` | endpoint publicado não carrega | CSP própria frameable + testes HTTP/Chromium entregues; reexecução pelo RFC 9700 permanece | Mitigado |
 | Esquema externo incorreto atrás de proxy | discovery vê HTTP | metadata não aderente ou ausente | forwarded headers antes do protocolo + teste de host; confiança permanece configurada pelo host | Mitigado |
 | Cookie de realm colide | nomes/path não incluem realm corretamente | vazamento ou `changed` entre tenants | derivação única/validação entregues na Fase 1; lifecycle multi-realm na Fase 2 | Mitigado |

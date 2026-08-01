@@ -22,6 +22,9 @@ internal static class EphemeralHttpsCertificate
 
         var names = new SubjectAlternativeNameBuilder();
         names.AddDnsName("localhost");
+        names.AddDnsName(BrowserTopology.OpHost);
+        names.AddDnsName(BrowserTopology.PrimaryRpHost);
+        names.AddDnsName(BrowserTopology.AlternateRpHost);
         names.AddIpAddress(IPAddress.Loopback);
         request.CertificateExtensions.Add(names.Build());
 

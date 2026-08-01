@@ -19,6 +19,10 @@ public class CheckSessionBrowserTests : IClassFixture<CheckSessionBrowserFixture
     [Fact]
     public async Task CurrentStateAndUserSwitch_ProduceUnchangedChangedAndSilentRenewal()
     {
+        Assert.Equal(BrowserTopology.OpHost, fixture.OpOrigin.Host);
+        Assert.Equal(BrowserTopology.PrimaryRpHost, fixture.PrimaryRp.Origin.Host);
+        Assert.Equal(BrowserTopology.AlternateRpHost, fixture.AlternateRp.Origin.Host);
+
         var context = await CreateContextAsync();
         try
         {
@@ -177,6 +181,8 @@ public class CheckSessionBrowserTests : IClassFixture<CheckSessionBrowserFixture
             Assert.NotEqual(demoCookie.Value, secondCookie.Value);
             Assert.Equal($"/{fixture.DemoRealm.Path}", demoCookie.Path);
             Assert.Equal($"/{fixture.SecondRealm.Path}", secondCookie.Path);
+            Assert.Equal(SameSiteAttribute.None, demoCookie.SameSite);
+            Assert.Equal(SameSiteAttribute.None, secondCookie.SameSite);
             Assert.Equal("unchanged", await CheckAsync(
                 page,
                 fixture.PrimaryRp,

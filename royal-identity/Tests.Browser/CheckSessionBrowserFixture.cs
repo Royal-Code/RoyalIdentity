@@ -41,8 +41,8 @@ public sealed class CheckSessionBrowserFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         certificate = EphemeralHttpsCertificate.Create();
-        PrimaryRp = await BrowserRpHost.StartAsync(certificate);
-        AlternateRp = await BrowserRpHost.StartAsync(certificate);
+        PrimaryRp = await BrowserRpHost.StartAsync(certificate, BrowserTopology.PrimaryRpHost);
+        AlternateRp = await BrowserRpHost.StartAsync(certificate, BrowserTopology.AlternateRpHost);
 
         opFactory = new BrowserOpFactory();
         opFactory.UseKestrel(options => options.Listen(
@@ -57,9 +57,10 @@ public sealed class CheckSessionBrowserFixture : IAsyncLifetime
         var addresses = opFactory.Services.GetRequiredService<IServer>()
             .Features.Get<IServerAddressesFeature>()?.Addresses
             ?? throw new InvalidOperationException("The OP did not publish a Kestrel address.");
-        OpOrigin = new Uri(Assert.Single(
+        var opAddress = Assert.Single(
             addresses,
-            value => value.StartsWith("https://", StringComparison.Ordinal)));
+            value => value.StartsWith("https://", StringComparison.Ordinal));
+        OpOrigin = BrowserTopology.ToPublicOrigin(opAddress, BrowserTopology.OpHost);
 
         await ConfigureDemoRealmAsync();
         SecondRealm = await ConfigureSecondRealmAsync();
@@ -68,6 +69,11 @@ public sealed class CheckSessionBrowserFixture : IAsyncLifetime
         Browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = true,
+            Args =
+            [
+                $"--host-resolver-rules={BrowserTopology.HostResolverRules}",
+                "--no-proxy-server",
+            ],
         });
     }
 
