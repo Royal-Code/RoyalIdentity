@@ -1,8 +1,16 @@
+using System.Collections.Specialized;
 using System.Net;
 using System.Web;
 using HtmlAgilityPack;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using RoyalIdentity.Contexts;
+using RoyalIdentity.Contexts.Decorators;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Responses;
 using RoyalIdentity.Utils;
 using Tests.Integration.Prepare;
 
@@ -103,6 +111,23 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
         Assert.DoesNotContain("account/login", response.Headers.Location!.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("demo_client", "https://attacker.example/callback")]
+    [InlineData("demo_client", "http://localhost:5999/callback")]
+    [InlineData("unknown-client", "http://localhost:5000/callback")]
+    public async Task PromptNone_WithUntrustedClientOrRedirect_DoesNotRedirect(
+        string clientId,
+        string redirectUri)
+    {
+        var response = await CreateClient().GetAsync(BuildAuthorizeUrlWithBinding(
+            clientId,
+            redirectUri,
+            ("prompt", "none")));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+    }
+
     [Fact]
     public async Task PromptNone_WhenAuthenticationIsTooOld_RedirectsLoginRequiredWithSessionState()
     {
@@ -166,6 +191,49 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
     }
 
     [Fact]
+    public async Task PromptNone_CustomTerminalInteraction_IsConvertedToInteractionRequired()
+    {
+        using var scope = factory.Services.CreateScope();
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var client = await scope.ServiceProvider.GetRequiredService<IStorage>()
+            .GetClientStore(realm)
+            .FindEnabledClientByIdAsync(factory.Handles.DemoClient.ClientId, default);
+        Assert.NotNull(client);
+
+        var httpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        httpContext.Items[Server.RealmCurrentKey] = realm;
+        var raw = new NameValueCollection
+        {
+            { Oidc.Authorize.Request.Prompt, Oidc.PromptModes.None },
+            { Oidc.Authorize.Request.Scope, Server.StandardScopes.OpenId },
+        };
+        var context = new AuthorizeContext(httpContext, raw);
+        context.Load(NullLogger.Instance);
+        context.ClientParameters.SetClient(client);
+        context.RedirectUri = "http://localhost:5000/callback";
+        context.RedirectUriValidated();
+
+        var decorator = scope.ServiceProvider.GetRequiredService<PromptNoneInteractionDecorator>();
+        await decorator.Decorate(
+            context,
+            () =>
+            {
+                // Models a terminal component appended through CustomizeAuthorizeContext: it deliberately
+                // produces UI and does not invoke another continuation.
+                context.Response = new InteractionResponse(context)
+                {
+                    RedirectUrl = "/custom-interaction",
+                };
+                return Task.CompletedTask;
+            },
+            default);
+
+        var response = Assert.IsType<AuthorizeErrorResponse>(context.Response);
+        Assert.Equal(Oidc.Authorize.Errors.InteractionRequired, response.Error);
+        Assert.Equal("The request requires user interaction.", response.ErrorDescription);
+    }
+
+    [Fact]
     public async Task NewAuthenticatedSession_ChangesSessionState_AndPromptNoneStillSucceeds()
     {
         factory.ResetClock();
@@ -196,6 +264,19 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
         string clientId,
         string scope,
         params (string Key, string Value)[] extra)
+        => BuildAuthorizeUrlCore(clientId, scope, "http://localhost:5000/callback", extra);
+
+    private string BuildAuthorizeUrlWithBinding(
+        string clientId,
+        string redirectUri,
+        params (string Key, string Value)[] extra)
+        => BuildAuthorizeUrlCore(clientId, "openid profile", redirectUri, extra);
+
+    private string BuildAuthorizeUrlCore(
+        string clientId,
+        string scope,
+        string redirectUri,
+        (string Key, string Value)[] extra)
     {
         var responseMode = extra
             .FirstOrDefault(parameter => parameter.Key == "response_mode")
@@ -205,7 +286,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", responseMode)
             .AddQueryString("scope", scope)
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", redirectUri)
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
 

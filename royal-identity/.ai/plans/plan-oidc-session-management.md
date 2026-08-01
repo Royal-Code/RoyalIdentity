@@ -279,7 +279,11 @@
   `AuthorizeErrorResponse` e redirect somente depois da validação de client/redirect URI, preservando `state` e
   response mode. `RedirectUriValidator`, `ResourcesDecorator`, `ResourcesValidator`,
   `AuthorizationResourcesValidator` e os demais terminadores não enumerados não são migrados para a factory; seu
-  transporte permanece diferido. Os response objects apenas transportam o valor imutável. O alvo final do
+  transporte permanece diferido. Os response objects apenas transportam o valor imutável. Seus construtores são
+  deliberadamente `internal`: extensões adicionadas por `CustomizeAuthorizeContext` continuam podendo produzir
+  `InteractionResponse` ou os erros genéricos públicos, mas não constroem diretamente uma Authentication Response
+  nem contornam a validação de redirect e o cálculo centralizado. Não há consumidor externo de produção e o
+  projeto não possui compromisso de compatibilidade nessa superfície. O alvo final do
   roadmap é somente authorization code, conforme DF12 de `plan-rfc9700-security-hardening.md`; esta fase não cria
   branches nem fixtures exclusivas para implicit/hybrid que o sucessor removerá, embora o caminho genérico de
   sucesso permaneça correto enquanto esses response types ainda forem alcançáveis. Fonte: decorators encerram
@@ -292,8 +296,10 @@
   inalcançável. Como decisão de produto, quando a autenticação atual usa IdP/método vedado pelas restrições do
   client, usar `login_required`: a sessão corrente não satisfaz a Authentication Request e seria necessária nova
   autenticação por um método permitido. Reservar `interaction_required` para interação adicional que não seja
-  autenticação, consentimento ou seleção de conta. Fonte: OpenID Connect Core §§3.1.2.1/3.1.2.6 + comportamento
-  legado do IS4.
+  autenticação, consentimento ou seleção de conta. Um decorator anterior aos produtores de interação envolve toda
+  a continuação e converte qualquer `InteractionResponse` sobrevivente sob `prompt=none`; isso inclui decorators
+  terminais adicionados por `CustomizeAuthorizeContext`, mesmo quando não chamam `next()`. Fonte: OpenID Connect
+  Core §§3.1.2.1/3.1.2.6 + comportamento legado do IS4.
 - **DF26 — Proveniência delimitada e reproduzível:** a auditoria compara os roots upstream locais
   `old-is4/src/IdentityServer4/src` e `old-is4/src/IdentityModel` com arquivos-fonte de produção rastreados da
   solução, excluindo `bin`, `obj` e assets de dependências. Candidatos, evidência e classificação são registrados
@@ -371,6 +377,19 @@
   por teste vazio. O mapeamento de IdP/método incompatível para `login_required` foi mantido como decisão de
   produto justificada, e não apresentado como única leitura possível da especificação.
   - **Conclusão:** DF25.
+
+**Revisão externa da implementação da Fase 3 em 2026-08-01:**
+
+- **Redirect confiável:** a afirmação foi confirmada pela flag de validação, pela ordem dos dois pipes e por três
+  regressões HTTP: host atacante, porta não registrada e client inexistente nunca recebem `Location`.
+- **Fallback `interaction_required`:** o relatório identificou corretamente que o enum existia, mas não havia uma
+  rede capaz de observar produtores presentes ou futuros. `PromptNoneInteractionDecorator` passou a envolver toda
+  a continuação posterior, inclusive customizações terminais, e há regressão que tenta produzir custom redirect
+  sem chamar `next()`. O caso agora é executável, não um braço morto.
+- **Guard do gerador:** aceita a crítica ao nome fixo do receptor; o scan usa qualquer invocação de
+  `.GenerateSessionStateValue(` e continua limitado à factory.
+- **Construtores de resposta:** o estreitamento foi mantido, mas deixou de ser efeito colateral: DF24 registra a
+  decisão e um guard por reflexão prova que nenhuma construção pública contorna a factory.
 
 ---
 
@@ -760,6 +779,8 @@ redirect URI; remover o estado do authorization code e versionar seu payload sem
 - [x] Implementar todas as linhas atualmente alcançáveis da matriz de `prompt=none`; manter
   `interaction_required` como fallback para interação não classificada e documentar a não aplicabilidade atual de
   `account_selection_required` sem inventar estado multi-account ou teste de ausência.
+- [x] Envolver todos os produtores posteriores de interação, inclusive customizações terminais, e converter sob
+  `prompt=none` qualquer `InteractionResponse` sobrevivente em `interaction_required`, sem renderizar UI.
 - [x] Preservar `select_account` sem `none` como fluxo interativo; não convertê-lo automaticamente em
   `account_selection_required`.
 - [x] Preservar `state`, response mode e redirect URI validado nos erros; assumir nesta fase o transporte por
@@ -796,21 +817,25 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~PipelineComponentCon
   atômico single-use continuam verdes. A matriz de storage registra explicitamente que o valor pertence à
   Authentication Response, não ao code.
 - `AuthorizeResponseFactory` é interna/estática e o único ponto que invoca `ISessionStateGenerator` ou constrói
-  `AuthorizeResponse`/`AuthorizeErrorResponse`. Guards arquiteturais fixam também os quatro consumidores
-  permitidos: sucesso do handler, `access_denied`, erros de `prompt=none` e combinação inválida de prompts. Os
-  terminadores anteriores à confiança em client/redirect permanecem no transporte JSON existente.
+  `AuthorizeResponse`/`AuthorizeErrorResponse`. Guards arquiteturais fixam também os cinco consumidores
+  permitidos: `AuthorizeHandler`, `ConsentDecorator`, `PromptLoginDecorator`,
+  `PromptNoneInteractionDecorator` e `AuthorizeMainValidator`. Os construtores das duas respostas são
+  deliberadamente internos e cobertos por reflexão; terminadores anteriores à confiança em client/redirect
+  permanecem no transporte JSON existente.
 - O caminho genérico de sucesso emite estado apenas para OIDC elegível. OAuth sem `openid` não recebe o parâmetro;
   redirect sem origem de browser e request sem estado autenticado continuam fail-closed. `AuthorizeErrorResponse`
   preserva `state`, query/form_post e inclui o estado quando ele pode ser calculado.
 - A lista bruta distinta de prompts é preservada antes do filtro de suporte: `none` com `login` ou mesmo com valor
   desconhecido responde `invalid_request`. Usuário anônimo, reautenticação (`max_age`), restrições de método/IdP e
   SSO vencido convergem em `login_required`; consentimento necessário responde `consent_required`; interação não
-  classificada tem fallback `interaction_required`. O modelo atual não possui seleção multi-account, portanto
+  classificada tem fallback executável `interaction_required`: `PromptNoneInteractionDecorator` envolve os
+  produtores posteriores, inclusive customizações terminais, e impede que um `InteractionResponse` sobreviva. O
+  modelo atual não possui seleção multi-account, portanto
   `account_selection_required` permanece explicitamente sem condição alcançável e sem teste vazio;
   `select_account` isolado continua interativo.
 - `AuthorizeSessionStateTests` cobre sucesso OIDC/OAuth, erros silenciosos, ausência de UI, query/form_post,
-  preservação de `state`, consentimento, sessão trocada e novo `prompt=none`. O fluxo real de negação de
-  consentimento prova `access_denied` com `session_state`.
+  preservação de `state`, consentimento, sessão trocada, novo `prompt=none` e uma customização terminal que tenta
+  produzir redirect interativo. O fluxo real de negação de consentimento prova `access_denied` com `session_state`.
 - A primeira suíte transversal detectou que o nome inicial `responseFactory.Error(context, code, ...)` recriava a
   forma posicional ambígua proibida pelo plano OAuth 2.1. A operação foi renomeada para `CreateError`, e o guard
   protocolar voltou a ficar verde.
@@ -819,9 +844,9 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~PipelineComponentCon
   visibilidade pública. A auditoria de todos os decorators, validators e handlers não encontrou outro contrato
   recentemente estreitado; corrigiu ainda a inconsistência antiga de `RedirectUriValidator`, agora público como
   os demais componentes. Um guard arquitetural fixa essas decisões (DF28).
-- Verificação final: aceites focados com 9 `AuthorizeSessionStateTests`, 32 regressões authorize/UI, 67 testes
-  diretos de payload/authorization code, 3 guards da factory e 13 guards de contratos/visibilidade do pipeline;
-  build sem erros; suíte completa com 1.448
+- Verificação final: aceites focados com 13 `AuthorizeSessionStateTests`, 32 regressões authorize/UI, 67 testes
+  diretos de payload/authorization code, 4 guards da factory e 13 guards de contratos/visibilidade do pipeline;
+  build sem erros; suíte completa com 1.453
   aprovados, 51 ignorados por opt-in e nenhuma falha; `git diff --check` limpo.
 
 ---
@@ -1107,7 +1132,7 @@ dotnet test RoyalIdentity.sln
 | Planos concorrentes recriam helpers | Session Management inicia antes do plano OAuth 2.1 | conflito em `ConsentDecorator`/respostas | gate DF21 satisfeito antes da Fase 1 | Fechado |
 | Callback captura scoped/realm | manager ou nome do cookie é fechado no delegate de named options | captive dependency ou realm congelado | DF23 + lifecycle multi-realm | Aberto |
 | Erro enumerado perde `session_state` | cálculo fica somente no `AuthorizeHandler` | Authentication Error Response incompleta | factory delimitada DF24 + testes por caller | Aberto |
-| Prompt silencioso cai em UI/código genérico | classificação continua espalhada | loop/interoperabilidade incorreta | matriz DF25 + teste table-driven | Aberto |
+| Prompt silencioso cai em UI/código genérico | classificação continua espalhada | loop/interoperabilidade incorreta | matriz DF25 + rede sobre produtores posteriores + testes HTTP/customização terminal | Mitigado |
 | Filtro executa zero testes | classe planejada não é criada ou nome diverge | fase fecha em falso verde | DF22 + nomes exatos | Aberto |
 | Factory amplia silenciosamente o transporte do authorize | terminadores fora de DF24 passam a usar redirect | mudança de contrato fora do escopo | callers enumerados + regressão dos terminadores excluídos | Aberto |
 

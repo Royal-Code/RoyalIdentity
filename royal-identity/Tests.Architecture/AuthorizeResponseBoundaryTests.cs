@@ -1,3 +1,6 @@
+using System.Reflection;
+using RoyalIdentity.Responses;
+
 namespace Tests.Architecture;
 
 /// <summary>
@@ -23,12 +26,19 @@ public class AuthorizeResponseBoundaryTests
     {
         var invocations = SourceFiles()
             .Where(file => file.Text.Contains(
-                "sessionStateGenerator.GenerateSessionStateValue(",
+                ".GenerateSessionStateValue(",
                 StringComparison.Ordinal))
             .Select(file => file.Path)
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
         Assert.Equal(["Responses/AuthorizeResponseFactory.cs"], invocations);
+    }
+
+    [Fact]
+    public void AuthenticationResponseConstructors_AreNotPublic()
+    {
+        Assert.Empty(typeof(AuthorizeResponse).GetConstructors(BindingFlags.Public | BindingFlags.Instance));
+        Assert.Empty(typeof(AuthorizeErrorResponse).GetConstructors(BindingFlags.Public | BindingFlags.Instance));
     }
 
     [Fact]
@@ -45,6 +55,7 @@ public class AuthorizeResponseBoundaryTests
             [
                 "Contexts/Decorators/ConsentDecorator.cs",
                 "Contexts/Decorators/PromptLoginDecorator.cs",
+                "Contexts/Decorators/PromptNoneInteractionDecorator.cs",
                 "Contexts/Validators/AuthorizeMainValidator.cs",
                 "Handlers/AuthorizeHandler.cs",
             ],

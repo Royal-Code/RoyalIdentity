@@ -97,6 +97,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ClientResourceDecorator>();
         services.AddTransient<ConsentDecorator>();
         services.AddTransient<EndSessionDecorator>();
+        services.AddTransient<PromptNoneInteractionDecorator>();
         services.AddTransient<EvaluateBearerToken>();
         services.AddTransient<EvaluateClient>();
         services.AddTransient<LoadClient>();

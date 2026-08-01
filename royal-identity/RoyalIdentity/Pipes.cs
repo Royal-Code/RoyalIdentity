@@ -61,6 +61,7 @@ public static class Pipes
                 .UseValidator<AuthorizeMainValidator>()
                 .UseValidator<PkceValidator>()
                 .UseValidator<AuthorizationResourcesValidator>()
+                .UseDecorator<PromptNoneInteractionDecorator>()
                 .UseDecorator<PromptLoginDecorator>()
                 .UseDecorator<ConsentDecorator>()
                 .UseDecorator<StateHashDecorator>();
