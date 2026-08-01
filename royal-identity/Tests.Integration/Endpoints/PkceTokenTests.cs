@@ -130,6 +130,49 @@ public class PkceTokenTests : IClassFixture<LogCapturingAppFactory>
         Assert.Equal(verifierWithoutChallenge.Answer, challengeWithoutVerifier.Answer);
     }
 
+    // DF9 plus RFC 7636 §4.1: a verifier whose syntax is wrong never became a comparable value, so it is a
+    // malformed request rather than a failed grant. Every other core parameter already worked this way; the
+    // verifier was the one that compared first and never checked, turning "you sent three characters" into
+    // "your grant is invalid".
+    [Theory]
+    [InlineData("", "empty")]
+    [InlineData("   ", "whitespace")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "42 characters, one below the minimum")]
+    [InlineData(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "129 characters, one above the maximum")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa+", "a character outside the unreserved set")]
+    public async Task AMalformedVerifier_IsRefusedAsMalformed_NotAsAFailedGrant(string verifier, string _)
+    {
+        var storedVerifier = CryptoRandom.CreateUniqueId();
+        var code = await SeedCodeAsync(
+            PkceHelper.GenerateStoredS256CodeChallengeHash(storedVerifier), "S256");
+
+        var response = await ExchangeAsync(code.Code, verifier);
+
+        await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
+    }
+
+    [Fact]
+    public async Task AVerifierOfExactlyTheMinimumAndMaximumLength_IsAccepted_AsSyntax()
+    {
+        // The bounds are inclusive, so 43 and 128 must reach the comparison and fail there, not at the syntax
+        // check — otherwise a legitimate client at the edge of the range would be told its request is
+        // malformed.
+        var storedVerifier = CryptoRandom.CreateUniqueId();
+        var atMinimum = await SeedCodeAsync(
+            PkceHelper.GenerateStoredS256CodeChallengeHash(storedVerifier), "S256");
+        var atMaximum = await SeedCodeAsync(
+            PkceHelper.GenerateStoredS256CodeChallengeHash(storedVerifier), "S256");
+
+        var minimum = await (await ExchangeAsync(atMinimum.Code, new string('a', 43))).ReadErrorAsync();
+        var maximum = await (await ExchangeAsync(atMaximum.Code, new string('a', 128))).ReadErrorAsync();
+
+        Assert.Equal(Oidc.Token.Errors.InvalidGrant, minimum.Error);
+        Assert.Equal(Oidc.Token.Errors.InvalidGrant, maximum.Error);
+    }
+
     [Fact]
     public async Task AVerifierThatDoesNotMatch_IsRefusedAsAnInvalidGrant()
     {

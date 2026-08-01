@@ -61,6 +61,23 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         if (!hasChallenge)
             return default;
 
+        // DF9: a core parameter whose syntax is wrong is a malformed request, and every other one already gets
+        // this treatment — LoadCode and LoadRefreshToken both check their length before looking anything up.
+        // The code_verifier was the only one comparing first and never checking, which turned "you sent 3
+        // characters" into "your grant is invalid". Nothing is revealed by the distinction: both answers are
+        // about the caller's own input, and its length and alphabet are things it can see for itself.
+        var verifier = context.CodeVerifier ?? string.Empty;
+        if (!IsWellFormed(verifier, context.Options.InputLengthRestrictions))
+        {
+            logger.LogError(context, "The presented code_verifier does not satisfy the syntax of RFC 7636 §4.1");
+
+            context.Error(
+                Oidc.Token.Errors.InvalidRequest,
+                "code_verifier must be 43 to 128 characters of [A-Za-z0-9-._~]");
+
+            return default;
+        }
+
         bool equals;
         switch (code.CodeChallengeMethod)
         {
@@ -105,6 +122,29 @@ public class PkceMatchValidator : IValidator<AuthorizationCodeContext>
         }
 
         return default;
+    }
+
+    /// <summary>
+    /// Whether the verifier satisfies RFC 7636 §4.1: <c>43*128unreserved</c>, where <c>unreserved</c> is
+    /// <c>ALPHA / DIGIT / "-" / "." / "_" / "~"</c>. The bounds come from
+    /// <see cref="InputLengthRestrictions"/>, which had declared them since before this validator existed and
+    /// had never read them.
+    /// </summary>
+    private static bool IsWellFormed(string verifier, InputLengthRestrictions restrictions)
+    {
+        if (verifier.Length < restrictions.CodeVerifierMinLength
+            || verifier.Length > restrictions.CodeVerifierMaxLength)
+        {
+            return false;
+        }
+
+        foreach (var character in verifier)
+        {
+            if (!char.IsAsciiLetterOrDigit(character) && character is not ('-' or '.' or '_' or '~'))
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>

@@ -867,9 +867,9 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests|Fully
 
 ### Resultado da Fase 3
 
-**Concluída em 2026-07-31**, com uma segunda rodada no mesmo dia respondendo a uma revisão externa da
-implementação. Build e suíte completa verdes: **1354 aprovados, 50 ignorados** (opt-in PostgreSQL/Aspire),
-**0 falhas**. Comando da fase: 134 aprovados. `git diff --check` limpo.
+**Concluída em 2026-07-31**, com duas rodadas adicionais no mesmo dia respondendo a revisões externas da
+implementação. Build e suíte completa verdes: **1360 aprovados, 51 ignorados** (opt-in PostgreSQL/Aspire),
+**0 falhas**. Comando da fase: 140 aprovados. `git diff --check` limpo.
 
 **As três correções de taxonomia.** `GrantTypeValidator` passou a responder `unauthorized_client`: o client
 autenticou, o servidor implementa o grant, e o que falha é a autorização para usá-lo — `invalid_grant` fala da
@@ -906,7 +906,7 @@ string aberta de DF3. `CreateContextAsync` lança quando não acha handler, mas 
 depois de `GetAvailableGrantTypes().Contains(grantType)`, então nenhum dado de client alcança esse caminho. O
 teste de extensibilidade com código próprio pertence à Fase 4.
 
-**Testes.** `Tests.Integration/Endpoints/PkceTokenTests.cs` (11 casos) semeia authorization codes com
+**Testes.** `Tests.Integration/Endpoints/PkceTokenTests.cs` (17 casos) semeia authorization codes com
 challenge/método arbitrários sobre `LogCapturingAppFactory`: verifier sem challenge, challenge sem verifier, a
 igualdade entre as duas direções, verifier errado, método não suportado sem 5xx, a igualdade entre as três
 recusas de `invalid_grant`, o método no log e fora da resposta, o consumo preservado após falha de presença, e
@@ -924,9 +924,22 @@ casos falharam antes da correção.
 A presença passou a ser decidida pela existência da chave em `Raw`, separada da validade do valor. É a terceira
 vez neste plano que uma decisão baseada em conteúdo tinha uma forma que não reconhecia, e a regra que sobrou
 vale registrar: **estado do servidor se lê pelo valor, parâmetro de requisição se lê pela chave.** O challenge
-continua em `IsPresent()` porque é estado armazenado; só o verifier mudou. Um verifier vazio junto de um code
-*com* challenge segue por matching e recusa com `invalid_grant`, indistinguível de qualquer outro verifier
-errado — sem caso especial, que é a mesma lição.
+continua em `IsPresent()` porque é estado armazenado; só o verifier mudou.
+
+**Terceira rodada: sintaxe do `code_verifier` (achado externo).** Nesta correção eu deixei o verifier vazio
+junto de um code *com* challenge seguir por matching, virando `invalid_grant`, e justifiquei como "sem caso
+especial". Era a lição errada aplicada ao problema errado: não criar caso especial vale para **detectar
+presença**; validar a sintaxe de um parâmetro é a regra ordinária de DF9, que todo outro parâmetro core já
+recebia — `LoadCode` e `LoadRefreshToken` conferem comprimento antes de consultar qualquer coisa. O
+`code_verifier` era o único que comparava primeiro e nunca verificava, o que transformava "você mandou três
+caracteres" em "seu grant é inválido".
+
+A sintaxe do RFC 7636 §4.1 (`43*128unreserved`) passou a ser validada antes do matching, com os limites vindos
+de `InputLengthRestrictions.CodeVerifierMinLength/MaxLength` — declarados desde antes deste validator existir e
+**nunca lidos até agora**. Nada é revelado pela distinção: as duas respostas falam do input do próprio caller,
+cujo comprimento e alfabeto ele enxerga sozinho. Cobertura: vazio, whitespace, 42, 129, caractere fora do
+conjunto, e o controle de que 43 e 128 exatos chegam à comparação e falham lá, para que um client legítimo na
+borda da faixa não seja informado de que sua requisição é malformada.
 
 **Cobertura completada (achado externo).** `LoadRefreshToken` tinha o branch de refresh acima do limite sem
 regressão, embora a tarefa estivesse marcada como verificada. Foram acrescentados o refresh vazio/whitespace e
@@ -934,9 +947,15 @@ o acima do limite, espelhando os casos já existentes do authorization code.
 
 **Contagens corrigidas.** A revisão apontou três números errados no texto original desta seção: `PkceTokenTests`
 tinha 9 casos e não 10, e `TokenErrorTests` tinha 54 e não 57 — este último passou a 57 justamente com os três
-casos de refresh acrescentados agora. O número de ignorados que a revisão reportou (51) não se reproduziu aqui:
-o runner soma 50 de forma consistente (1 em `Tests.UserAccounts`, 47 em `Tests.Storage`, 2 em
-`Tests.Integration`), o que sugere diferença de ambiente nos opt-in.
+casos de refresh acrescentados na segunda rodada.
+
+O terceiro número, o de ignorados, eu contestei uma vez antes de entender a causa, e a causa era minha: os
+comandos de verificação filtravam as linhas de resultado por `Aprovado!`, e um projeto cujos testes são
+**todos** pulados reporta a linha com prefixo `Ignorado!`. `Aspire.Tests` — um único teste, condicionado a
+`ROYALIDENTITY_ASPIRE_TESTS` — ficava invisível para o próprio comando que eu usava para conferir. São 51
+ignorados: 1 em `Tests.UserAccounts`, 47 em `Tests.Storage`, 2 em `Tests.Integration` e 1 em `Aspire.Tests`.
+A verificação passou a filtrar por `Com falha:`, que aparece em toda linha de resultado independentemente do
+desfecho.
 
 **Handoff corrigido.** A Fase 3 do `plan-rfc9700-security-hardening.md` dizia reutilizar apenas
 `TokenErrorTests` para o downgrade de PKCE; as linhas de PKCE ficaram em `PkceTokenTests`, e a tarefa lá foi
