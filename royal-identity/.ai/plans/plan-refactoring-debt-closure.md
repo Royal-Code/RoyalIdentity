@@ -34,8 +34,10 @@
 - [plan-resources-redesign.md](plan-resources-redesign.md) — redesign concluído; `AllowedScopes` foi
   deliberadamente reaproveitado para scopes individuais, `AllowOfflineAccess` foi mantido como flag e os demais
   eixos são `AllowedIdentityScopes`, `AllowedResourceServers` e `AllowAllResourceServers`.
-- [plan-data-storage-matrix.md](plan-data-storage-matrix.md) e [plan-data-macro.md](plan-data-macro.md) — ainda
-  tratam a persistência do catálogo de resources/scopes como bloqueada pelo redesign já concluído.
+- [plan-data-storage-baseline.md](plan-data-storage-baseline.md),
+  [plan-data-storage-matrix.md](plan-data-storage-matrix.md) e [plan-data-macro.md](plan-data-macro.md) — a definição
+  original de DF22 e seus derivados ainda tratavam a persistência do catálogo como bloqueada pelo redesign já
+  concluído.
 - [plan-oidc-session-management.md](plan-oidc-session-management.md) — remove opções do check-session cookie; seu
   registro histórico entregou v2 antes de ADR-020 fixar todos os payloads internos pré-release em v1. Este plano
   deve executar depois dele sem reescrever o plano concluído.
@@ -382,9 +384,9 @@ dotnet test RoyalIdentity.sln
 
 **Depende de:** DF1-DF4, DF12-DF13, DF15, DF17.
 
-**Escopo:** `plan-contexts-redesign.md`, `plan-resources-redesign.md`, `plan-data-storage-matrix.md`,
-`plan-data-macro.md`, `product.md`, `structure.md`, `tech.md`, `AGENTS.md`, `CLAUDE.md`, `redesign-todo.md`,
-roadmap/backlog.
+**Escopo:** `plan-contexts-redesign.md`, `plan-resources-redesign.md`, `plan-data-storage-baseline.md`,
+`plan-data-storage-matrix.md`, `plan-data-macro.md`, `product.md`, `structure.md`, `tech.md`, `AGENTS.md`,
+`CLAUDE.md`, `redesign-todo.md`, roadmap/backlog.
 
 **O que/como:** transformar decisões adiadas em decisões finais mantidas; corrigir referências que ainda tratam o
 modelo de resources como pendente; deixar somente a persistência do catálogo como diferida.
@@ -407,7 +409,8 @@ modelo de resources como pendente; deixar somente a persistência do catálogo c
   teste não pode fechar uma fase quando seleciona zero testes.
 - [x] Preservar a regra de que o catálogo ainda usa bridge volátil e não deve ganhar persistência fora do plano
   futuro.
-- [x] Atualizar a matriz/macro para trocar “bloqueado pelo redesign” por “modelo concluído; persistência diferida”.
+- [x] Atualizar a definição normativa de DF22, a matriz e o macro para trocar “bloqueado pelo redesign” por
+  “modelo concluído; persistência diferida”, preservando o contexto histórico.
 - [x] Adicionar nota pós-conclusão ao plano de resources sem reescrever resultados históricos.
 - [x] Atualizar `redesign-todo.md` preservando alterações locais e mantendo Localization como item aberto.
 - [x] Não criar ainda `plan-data-resource-catalog-storage.md`; registrar apenas o destino.
@@ -425,6 +428,7 @@ continua aberta.
 if (rg -n "Fase 2 adiada|remoção.*Token.*adiada" .ai/plans/plan-contexts-redesign.md) { throw "Decisão antiga de contexts encontrada." }
 if (rg -n "scope hierarchy redesign in progress|Planned further redesign|to be replaced by .*AllowedResources|(?:AllowedScopes|AllowOfflineAccess).*pending|AllowedScopes.*need replacement|volatile bridge pending|pending (?:their|the) redesign|ApiScope\.cs|ApiResource\.cs|RequestedScopes\.cs|\*\*ApiScope\*\*|\*\*ApiResource|\*\*RequestedScopes\*\*" .ai/foundation AGENTS.md CLAUDE.md) { throw "Documentação ativa de resources obsoleta encontrada." }
 rg -n "ConfigurationResourceBridgeOptions|persist.ncia.*diferid|Localization" .ai/foundation AGENTS.md CLAUDE.md redesign-todo.md
+rg -n "Atualização pós-conclusão.*2026-08-01|plan-data-resource-catalog-storage" .ai/plans/plan-data-storage-baseline.md
 ```
 
 ### Resultado da Fase 1
@@ -437,9 +441,10 @@ nota pós-conclusão que identifica o modelo vigente e separa domínio de persis
 `product.md`, `structure.md` e `tech.md` passaram a usar `IdentityScope`, `Scope`, `ResourceServer`,
 `ProtectedResource` e `RequestedResources`, com os cinco eixos reais de autorização do client. `AGENTS.md` e
 `CLAUDE.md` registram o redesign concluído, a bridge `ConfigurationResourceBridgeOptions`, o plano ativo e a regra
-contra filtros que selecionem zero testes. A matriz, o macro, o backlog, o roadmap e `redesign-todo.md` agora
-tratam DF22 exclusivamente como diferimento da persistência do catálogo; Localization permanece aberta e
-`plan-data-resource-catalog-storage.md` não foi criado.
+contra filtros que selecionem zero testes. Uma correção pós-revisão registrou junto à própria DF22 que seu
+pré-requisito histórico foi satisfeito sem autorizar persistência automática. O baseline, a matriz, o macro, o
+backlog, o roadmap e `redesign-todo.md` agora tratam DF22 exclusivamente como diferimento da persistência do
+catálogo; Localization permanece aberta e `plan-data-resource-catalog-storage.md` não foi criado.
 
 Os dois guards negativos da fase passaram sem matches; a busca positiva encontrou a bridge, a persistência
 diferida e Localization nas fontes ativas. Mudança exclusivamente documental, portanto build/test não se aplica
@@ -715,7 +720,7 @@ dotnet test RoyalIdentity.sln
 | ACR perde ordem | parse/lista não preserva preferência | interação futura escolhe valor errado | DF11 + teste de ordem/duplicata | Aberto |
 | Logging perde redaction | limpeza remove filtro junto do switch | segredo em log | testes capturando valores sensíveis + RFC 9700 | Aberto |
 | Histórico é reescrito | docs apagam motivo das decisões | perda de rastreabilidade | adendos e cancelamento explícito, sem apagar resultados | Fechado na Fase 1 |
-| Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + orientação persistente + destino nominal sem criar plano | Mitigado na Fase 1 |
+| Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + nota normativa pós-conclusão em DF22 + orientação persistente + destino nominal sem criar plano | Mitigado na Fase 1 |
 | Alias mTLS sobrevivente aponta para token | remoção apaga branches mortos, mas não corrige revocation | metadata conduz ao endpoint errado | DF7 + teste exato de URL | Aberto |
 | Filtro executa zero testes | classe planejada não existe ou filtro é amplo/incorreto | fase fecha em falso verde | DF17 + regra em AGENTS/CLAUDE; fixtures nomeadas nas fases seguintes | Mitigado na Fase 1 |
 | Introspection futura recria cadeia pré-release | plano ignora ADR-020 | bumps sem contrato publicado | DF18 + handoff bilateral | Aberto |
@@ -747,6 +752,7 @@ dotnet test RoyalIdentity.sln
 - [template-ai-implementation-plan.md](../references/template-plan/template-ai-implementation-plan.md).
 - [plan-contexts-redesign.md](plan-contexts-redesign.md).
 - [plan-resources-redesign.md](plan-resources-redesign.md).
+- [plan-data-storage-baseline.md](plan-data-storage-baseline.md).
 - [plan-data-storage-matrix.md](plan-data-storage-matrix.md).
 - [plan-data-macro.md](plan-data-macro.md).
 - [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).

@@ -249,6 +249,11 @@
 - **DF22 — Resources bloqueados até o redesign:** o Plano 2 pode persistir realms/options, clients e keys antes do
   redesign, mas não implementa persistência de resources/scopes enquanto o modelo instável não estiver fechado.
   Fonte: resposta humana Q14.1, product.md, structure.md e DF11.
+  > **Atualização pós-conclusão (2026-08-01):** `plan-resources-redesign.md` fechou o modelo de domínio e satisfez
+  > o pré-requisito histórico acima, mas isso não autoriza persistência automaticamente nem amplia o corte já
+  > concluído do Plano 2. A decisão normativa remanescente de DF22 é manter o catálogo realm-scoped na bridge
+  > volátil até que o mantenedor autorize um `plan-data-resource-catalog-storage.md` próprio, com entidades,
+  > mappings, migrations, seeds e contratos definidos no mesmo corte.
 - **DF23 — I/O assíncrono cancelável:** operações que podem fazer I/O devem ser assíncronas, receber
   `CancellationToken` e encaminhá-lo a toda chamada EF assíncrona. Implementações puramente in-memory não precisam
   simular cancelamento de I/O inexistente. `IRealmStore.GetByPath` síncrono é contrato a substituir antes ou durante o
