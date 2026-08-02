@@ -19,7 +19,7 @@ Completed refactoring plans (useful as historical record and for understanding d
 - [.ai/plans/plan-ui-screens-refactoring.md](.ai/plans/plan-ui-screens-refactoring.md) — COMPLETED
 - [.ai/plans/plan-realm-hardening.md](.ai/plans/plan-realm-hardening.md) — COMPLETED (realm isolation, events, branding, IRealmManager)
 - [.ai/plans/plan-realm-options-redesign.md](.ai/plans/plan-realm-options-redesign.md) — COMPLETED (per-realm RealmOptions, copy-on-create, CORS)
-- [.ai/plans/plan-resources-redesign.md](.ai/plans/plan-resources-redesign.md) — COMPLETED (Resources/Scopes model: IdentityScope, ResourceServer, Scope; client AllowedResources; signing chain; Resource Indicators / Protected Resource Metadata)
+- [.ai/plans/plan-resources-redesign.md](.ai/plans/plan-resources-redesign.md) — COMPLETED (Resources/Scopes model: IdentityScope, ResourceServer, Scope; distinct client authorization axes; signing chain; Resource Indicators / Protected Resource Metadata)
 - [.ai/plans/plan-users-edge-session.md](.ai/plans/plan-users-edge-session.md) — COMPLETED (users edge + session redesign; ADR-013/014; `SubjectId`, `IUserDirectory`, `ICurrentRealmAccessor`, pure session store, `LoginFlowService`)
 - [.ai/plans/plan-users-accounts-module-v2.md](.ai/plans/plan-users-accounts-module-v2.md) — COMPLETED (10/10 fases; camada B: `RoyalIdentity.UserAccounts` module — rich accounts, own persistence, properties-by-scope, `.Integration` adapter; ADR-015)
 - [.ai/plans/plan-users-security-lifecycle.md](.ai/plans/plan-users-security-lifecycle.md) — COMPLETED (account credentials & security lifecycle: password history/expiration enforcement, action tokens, `SecurityStamp` + `SessionsValidAfter` invalidation, lockout/admin block window, email/phone verification, session/refresh revocation, events + audit; ADR-017. Review-006 noted a follow-up: concurrency **retry** decided but not implemented in the real flow — see plan-users-accounts-sqlite-hardening)
@@ -48,7 +48,12 @@ Completed refactoring plans (useful as historical record and for understanding d
 
 Active plans (check status before modifying affected areas):
 
-No implementation plan is currently active. `Tests.Host` is storage-agnostic and `Tests.Integration` uses
+- [.ai/plans/plan-refactoring-debt-closure.md](.ai/plans/plan-refactoring-debt-closure.md) — EM EXECUÇÃO;
+  Fase 1 concluída, Fase 2 é a próxima.
+
+The resources/scopes domain redesign is complete; only persistence of its realm-scoped
+`ConfigurationResourceBridgeOptions` catalog remains deferred to a future dedicated plan. `Tests.Host` is
+storage-agnostic and `Tests.Integration` uses
 `PersistentStorageAppFactory` by default: Configuration + Operational share one isolated SQLite in-memory
 database and UserAccounts owns another. PostgreSQL storage/Aspire acceptances remain local opt-in. The production
 Server is PostgreSQL-only and must be provisioned by `RoyalIdentity.Migrations`; `RoyalIdentity.Demo` is the
@@ -107,6 +112,10 @@ The middleware order in `Program.cs` is significant: `UseRealmDiscovery` must ru
 `CurrentVersion = 1` until the first supported release. Breaking payload changes update seeds/fixtures and require
 reprovisioning development data; do not create pre-release version chains, legacy readers, upcasters or JSON
 migrations. Cryptographic and protocol formats keep their independent versioning.
+
+**Filtered tests must select their intended fixture** — a phase cannot be closed by a `dotnet test --filter`
+command that selects zero tests, even when the SDK exits successfully. Prefer a named test class/fixture and
+report the selected count.
 
 **`[Redesign]` attribute** — appears on members marked for future removal or restructuring. Do not model new code after these patterns; do not stabilize or extend them.
 

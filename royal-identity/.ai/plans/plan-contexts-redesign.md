@@ -4,7 +4,8 @@
 
 ## Progresso
 
-`██████████` **100%** — 5 de 5 fases concluídas (Fase 2 adiada — ver "Decisão"; remoção de `Items/Token.cs` adiada na Fase 5 — ver nota)
+`██████████` **100%** — 5 de 5 fases concluídas. A antiga Fase 2 foi cancelada por decisão final e não integra a
+contagem; `Items/Token.cs` foi mantido deliberadamente como envelope obfuscado dos eventos.
 
 ## Ordem de execução (global)
 
@@ -141,15 +142,17 @@ Ambos marcados `[Redesign("Acredito que o uso destes seja desnecessário")]`. Ve
 
 > **Resultado da execução (Fase 5):**
 > - `Items/Tokens.cs` (a **coleção** de tokens) — **removido**: nenhum caller ativo; era armazenamento morto (escrito em `AuthorizeHandler` via `Items.AddToken`, sem nenhuma leitura). As 3 chamadas de escrita foram removidas junto.
-> - `Items/Token.cs` (o **wrapper** de um único token, com obfuscação) — **mantido (remoção adiada)**. O guard "confirmar zero callers ativos" **falha**: `Token` é usado ativamente pelos eventos de emissão `CodeIssuedEvent`, `AccessTokenIssuedEvent` e `IdentityTokenIssuedEvent` (criados em `AuthorizeHandler`), que carregam o valor obfuscado para auditoria. Removê-lo exige redesenhar o contrato desses eventos — mudança com blast radius no subsistema de eventos, fora do escopo cirúrgico/baixo-risco deste plano. Adiado para um futuro redesign de eventos, na mesma linha da Fase 2.
+> - `Items/Token.cs` (o **wrapper** de um único token, com obfuscação) — **mantido por decisão final**. O guard
+>   "confirmar zero callers ativos" falhou: `Token` é usado pelos eventos de emissão `CodeIssuedEvent`,
+>   `AccessTokenIssuedEvent` e `IdentityTokenIssuedEvent`, que carregam o valor obfuscado. A permanência do wrapper
+>   é o desenho vigente; eventual evolução de eventos/auditoria precisa nascer de requisito e plano novos, não
+>   desta dívida.
 
 ---
 
 ## Estado Alvo
 
-> **Ressalva (Fase 2 adiada)**: a hierarquia "sem herança" abaixo é o alvo *de longo prazo*, condicionado à Fase 2. **Neste ciclo, as `IWith*` mantêm `: IEndpointContextBase`.** O que muda agora é a **remoção dos métodos de estado** das interfaces (Fases 3–5); a estrutura de herança permanece.
-
-### Hierarquia de interfaces limpa (alvo de longo prazo — depende da Fase 2)
+### Hierarquia de interfaces mantida
 
 ```
 IContextBase (Pipelines)
@@ -157,23 +160,20 @@ IContextBase (Pipelines)
         └── ITokenEndpointContextBase
         └── IAuthorizationContextBase
 
-IWithClient           (sem herança — só propriedades)
-IWithResources        (sem herança — só propriedades/dados)
-IWithCodeChallenge    (sem herança)
-IWithRedirectUri      (sem herança — apenas string? RedirectUri)
-IWithPrompt           (sem herança)
-IWithAcr              (sem herança)
-IWithBearerToken      (sem herança)
+IWithAcr              : IEndpointContextBase
+IWithClient           : IEndpointContextBase
+IWithCodeChallenge    : IWithClient
+IWithPrompt           : IWithClient, IWithAcr
+IWithRedirectUri      : IWithClient
+IWithResources        : IWithClient
+IWithBearerToken      : IEndpointContextBase
 IWithRefreshToken     (sem herança)
 IWithAuthorizationCode (sem herança)
 ```
 
-Constraints de decorators usam múltiplos bounds:
-
-```csharp
-public class LoadClient<TContext> : IDecorator<TContext>
-    where TContext : class, IEndpointContextBase, IWithClient
-```
+A herança acima é o contrato final deste redesign: as capabilities são superfícies de endpoint e permitem que os
+decorators permaneçam compostos pelo menor contrato público aplicável. A alternativa de remover essa herança foi
+cancelada; não é backlog implícito nem alvo de reavaliação automática.
 
 ### Contextos concretos implementam interfaces explicitamente
 
@@ -202,14 +202,11 @@ Apenas métodos `Set*()` dentro do objeto alteram estado. Nenhuma propriedade te
 4. Verificar se `Items/Token.cs` e `Items/Tokens.cs` têm callers ativos.
 5. ~~Verificar se `IWithRefreshToken` e `IWithAuthorizationCode` herdam de algo~~ — **já confirmado: nenhum herda; ambos já estão no estado-alvo.**
 
-### Fase 2 — Remover herança de IWith* de IEndpointContextBase — **ADIADA (não executar agora)**
+### Fase 2 — Remover herança de IWith* de IEndpointContextBase — **CANCELADA POR DECISÃO**
 
-> **Decisão**: manter `IWith*` herdando de `IEndpointContextBase` por ora. Justificativa em "Decisão" abaixo. Esta fase fica registrada para o futuro, mas **não entra neste ciclo de trabalho**. As Fases 3–6 são independentes dela.
-
-Se um dia for executada:
-1. Remover `: IEndpointContextBase` de `IWithAcr` e `IWithClient`.
-2. Atualizar todos os decorators para usar múltiplos constraints.
-3. Verificar build.
+Esta alternativa não integra as cinco fases executadas e não permanece como trabalho futuro. `IWith*` continua
+representando capabilities de endpoint; uma mudança futura só pode ser aberta por necessidade nova e decisão
+arquitetural própria.
 
 ### Fase 3 — Remover métodos de estado das interfaces
 
@@ -229,7 +226,8 @@ Se um dia for executada:
 ### Fase 5 — Remover Items/Token e Items/Tokens
 
 1. Confirmar zero callers ativos.
-2. ~~Deletar `RoyalIdentity/Contexts/Items/Token.cs`~~ — **adiado**: tem callers ativos (eventos de emissão de token). Ver nota em "Items/Token.cs e Items/Tokens.cs — remoção".
+2. ~~Deletar `RoyalIdentity/Contexts/Items/Token.cs`~~ — **cancelado por decisão**: há callers ativos nos eventos de
+   emissão e o wrapper obfuscado permanece no desenho vigente.
 3. Deletar `RoyalIdentity/Contexts/Items/Tokens.cs` — **feito** (era armazenamento morto).
 4. Verificar build.
 
@@ -250,13 +248,13 @@ Se um dia for executada:
 | `Contexts/AuthorizationCodeContext.cs` | **Fase 3** — Idem |
 | `Contexts/Parameters/ClientParameters.cs` | **Fase 4** — Remover `ClientClaims` |
 | `Contexts/ClientCredentialsContext.cs` | **Fase 4** — Receber `ClientClaims` como propriedade local |
-| `Contexts/Items/Token.cs` | **Fase 5** — ~~Deletar~~ **adiado**: callers ativos nos eventos de emissão de token (ver nota) |
+| `Contexts/Items/Token.cs` | **Fase 5** — mantido por decisão final: envelope obfuscado dos eventos de emissão |
 | `Contexts/Items/Tokens.cs` | **Fase 5** — Deletar (feito — armazenamento morto) |
-| `Contexts/Withs/IWithAcr.cs` | ~~Remover herança de `IEndpointContextBase`~~ — **Fase 2 adiada** |
-| `Contexts/Withs/IWithClient.cs` | ~~Remover herança de `IEndpointContextBase`~~ — **Fase 2 adiada** |
-| `Contexts/Withs/IWithCodeChallenge.cs` | ~~Remover herança de `IWithClient`~~ — **Fase 2 adiada** |
-| `Contexts/Withs/IWithPrompt.cs` | ~~Remover herança de `IWithClient` e `IWithAcr`~~ — **Fase 2 adiada** |
-| Todos os decorators com constraint `IWith*` | ~~Atualizar constraints~~ — **Fase 2 adiada** |
+| `Contexts/Withs/IWithAcr.cs` | Herança de `IEndpointContextBase` mantida por decisão final |
+| `Contexts/Withs/IWithClient.cs` | Herança de `IEndpointContextBase` mantida por decisão final |
+| `Contexts/Withs/IWithCodeChallenge.cs` | Herança de `IWithClient` mantida por decisão final |
+| `Contexts/Withs/IWithPrompt.cs` | Herança de `IWithClient` e `IWithAcr` mantida por decisão final |
+| Decorators compostos por `IWith*` | Contratos de capability preservados; não estreitar para contexto concreto |
 
 ---
 
@@ -264,18 +262,21 @@ Se um dia for executada:
 
 **Questão central**: `IWith*` deve ou não herdar de `IEndpointContextBase`?
 
-**Decisão: manter a herança (não executar a Fase 2 agora).**
+**Decisão final: manter a herança; a antiga Fase 2 está cancelada e não constitui backlog.**
 
-- **Sim (escolhido)**: Hoje **todas** as `IWith*` são usadas exclusivamente em endpoint contexts, e os decorators dependem dessa herança para o constraint simples (`IDecorator<IWithClient>`). Manter a herança preserva os decorators como estão.
+- **Sim (escolhido)**: todas as `IWith*` são usadas exclusivamente em endpoint contexts, e os decorators dependem dessa herança para o constraint simples (`IDecorator<IWithClient>`). Manter a herança preserva os decorators como estão.
 - **Não (remover herança)**: traria flexibilidade para testes leves, mas adiciona verbosidade em **todos** os decorators (`where TContext : IEndpointContextBase, IWithClient`) em troca de uma testabilidade que ninguém exerce hoje.
 
-**Custo/benefício**: o ganho real do redesign está nas Fases 3–5 (tirar sinalização de estado do contrato público), que são cirúrgicas e de baixo risco. A Fase 2 tem blast radius alto e benefício atualmente teórico → **adiada**. Reavaliar quando/se surgir necessidade de usar `IWith*` fora de endpoint contexts (ex.: testes unitários de decorators sem montar um endpoint context completo).
+**Custo/benefício**: o ganho real do redesign veio das Fases 3–5 (tirar sinalização de estado do contrato público),
+que foram cirúrgicas. Remover a herança teria blast radius alto e benefício teórico; por isso a alternativa foi
+**cancelada**. Uma necessidade futura de capabilities fora de endpoint contexts é uma decisão nova, não a retomada
+automática deste plano.
 
 ---
 
 ## Riscos
 
-- Fase 2 (herança) tem blast radius alto — todos os decorators seriam afetados. **Por isso foi adiada** (ver "Decisão").
+- A alternativa de remover a herança foi cancelada; ela não permanece como risco ou trabalho pendente.
 - Fases 3, 4, 5 são cirúrgicas e de baixo risco — o foco deste ciclo.
 - Nenhuma fase altera comportamento em runtime — apenas contratos de tipo.
 - `[MemberNotNull]` deve permanecer no tipo concreto que declara a propriedade (`RedirectUri`); movê-lo para `Parameters` quebraria a análise de null-state. Ver Fase 3.

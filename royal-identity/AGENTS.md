@@ -66,7 +66,9 @@ Check Session route/discovery under an HTTPS gate, Web Crypto iframe, opt-in Nod
 AGPLv3 + Apache-2.0 provenance/notice gate. Future framing hardening must preserve the iframe exception recorded
 in that plan and in `plan-rfc9700-security-hardening.md` DF19.
 
-No implementation plan is currently active. Resources/scopes remain volatile per baseline DF22. The production
+`.ai/plans/plan-refactoring-debt-closure.md` is the active implementation plan; Fase 1 is complete and Fase 2 is
+next. The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
+`ConfigurationResourceBridgeOptions` per baseline DF22 until a dedicated persistence plan is authorized. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
 migrates or seeds. `RoyalIdentity.Demo` is a self-provisioned, ephemeral SQLite in-memory executable.
 `Tests.Host` is storage-agnostic, and the default `Tests.Integration` composition uses
@@ -115,6 +117,10 @@ migration runner must complete before the web host starts.
 Run the narrowest relevant test project after focused changes. Run
 `dotnet test RoyalIdentity.sln` for cross-cutting pipeline, realm, token, storage,
 or UI flow changes.
+
+A filtered test command may close a phase only when it selects at least one intended test. Use a fixture/class
+name specific enough to prove the target coverage, and treat zero selected tests as a failed verification even if
+`dotnet test --filter` exits successfully.
 
 ## Product And Architecture
 
@@ -245,17 +251,15 @@ Account pages use static server rendering. GET and POST are separate component
 instances, and scoped services have HTTP request lifetime rather than circuit
 lifetime. Be careful with assumptions that only hold in interactive Blazor Server.
 
-## Areas Under Redesign
+## Current Redesign Status
 
 The `[Redesign]` attribute marks code intended for future removal or restructuring.
 Do not model new code after `[Redesign]` members and do not stabilize or extend
 those patterns unless the active plan explicitly requires it.
 
-Known unstable areas include:
+Current status:
 
-- `Client.AllowedScopes` and `Client.AllowOfflineAccess`, pending an
-  `AllowedResources`-style model.
-- The user/session edge under `RoyalIdentity/Users/`, redesigned per `ADR-014`
+- The user/session edge under `RoyalIdentity/Users/` was redesigned per `ADR-014`
   and `.ai/plans/plan-users-edge-session.md`: use `Subject`, `IUserDirectory`,
   `ILocalUserAuthenticator`, `IUserClaimsProvider`, pure `IUserSessionStore`,
   `IUserSessionService`, `ISubjectPrincipalFactory`, and `LoginFlowService`.
@@ -264,9 +268,13 @@ Known unstable areas include:
   Do not reintroduce removed legacy types such as `IdentityUser`, `UserDetails`,
   `IUserStore`, `IUserDetailsStore`, `IdentitySession`, `ISignInManager`, or
   credentials-result structs.
-- Scope/resource hierarchy types such as `ResourceServer` and related models.
-- Realm-specific options and CORS, covered by
-  `.ai/plans/plan-realm-options-redesign.md`.
+- The scope/resource domain redesign is complete. Use `IdentityScope`, `Scope`, `ResourceServer`,
+  `ProtectedResource` and `RequestedResources`; client authorization is expressed by `AllowedIdentityScopes`,
+  `AllowedScopes`, `AllowedResourceServers`, `AllowAllResourceServers` and `AllowOfflineAccess`. Only persistence
+  of the realm-scoped catalog remains deferred; do not add it outside a future
+  `plan-data-resource-catalog-storage.md`.
+- Realm-specific options and CORS were completed by `.ai/plans/plan-realm-options-redesign.md`.
+- Localization messages still marked in `AccountOptions` remain active and belong to `plan-localization.md`.
 
 ## External RoyalCode Libraries (`UserAccounts` module family only)
 

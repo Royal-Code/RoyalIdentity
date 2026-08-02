@@ -94,7 +94,8 @@ A middleware (`RealmDiscoveryMiddleware`) identifies the realm from the route be
 OAuth2 client registered within a realm. Critical properties:
 
 - `Id` (client_id), `Realm` reference
-- `AllowedGrantTypes`, `AllowedResponseTypes`, `AllowedScopes`
+- `AllowedGrantTypes`, `AllowedResponseTypes`
+- `AllowedIdentityScopes`, `AllowedScopes`, `AllowedResourceServers`, `AllowAllResourceServers`
 - `RedirectUris`, `PostLogoutRedirectUris`
 - `RequirePkce`, `AllowPlainTextPkce`
 - `RequireClientSecret`, `ClientSecrets`
@@ -104,9 +105,9 @@ OAuth2 client registered within a realm. Critical properties:
 - `RefreshTokenExpiration` (Absolute or Sliding)
 - `RefreshTokenPostConsumedTimeTolerance` (grace period for refresh token reuse after consumption failure)
 - `AlwaysSendClientClaims = true` by default
-- `AllowOfflineAccess` is marked `[Redesign]` — pending refactor to "AllowedResources" model
+- `AllowOfflineAccess` controls the separate `offline_access` capability
 
-### Scope Hierarchy (post-redesign terminology)
+### Scope and resource model (post-redesign)
 
 The scope model was renamed from IS4 terminology. Mapping:
 
@@ -114,17 +115,24 @@ The scope model was renamed from IS4 terminology. Mapping:
 |---|---|
 | IdentityResources | IdentityScopes |
 | ApiScopes | Scopes |
-| ApiResources | Resources (or ResourceServer) |
+| ApiResources | ResourceServer |
 
 Current model:
 - **IdentityScope** — maps to user claims (e.g., `openid` → `sub`; `profile` → name/email claims)
-- **ApiScope** — fine-grained operation scope (e.g., read, write)
-- **ApiResource / ResourceServer** — a service that exposes resources (e.g., an API)
-- **ScopeBase** — common base for all scope types
-- **ScopeVisibility** — Hidden, Public, Public_Descriptive (controls discovery document exposure)
-- **RequestedScopes** — runtime holder for the space-separated scope string from a request
+- **Scope** — a fine-grained operation exposed by one `ResourceServer` (e.g., read or write)
+- **ResourceServer** — a service/API that owns scopes, audience, secrets and signing constraints
+- **ProtectedResource** — an RFC 8707 audience/resource URI exposed by a `ResourceServer`
+- **RequestedResources** — the realm-scoped request result containing identity scopes, API scopes, resource
+  servers and protected resource indicators
+- **ScopeBase** — common base for `IdentityScope`, `Scope` and `ResourceServer`
+- **ScopeVisibility** — `Public` or `Internal` (controls discovery and which clients may request it)
 
-**Planned further redesign** (from redesign-todo.md): ResourceServer → Resource → Scope hierarchy where requesting a Resource grants all its Scopes, and only the Scope names appear in tokens.
+Client authorization uses distinct axes: `AllowedIdentityScopes` for identity scopes; `AllowedScopes` for
+individual API scopes; `AllowedResourceServers`/`AllowAllResourceServers` to authorize scopes and protected
+resources owned by a server; and `AllowOfflineAccess` for `offline_access`. A `ResourceServer` name is not itself a
+requestable scope. The domain redesign is complete. The catalog still comes from the realm-scoped
+`ConfigurationResourceBridgeOptions`; replacing that volatile source with persisted Configuration data is a
+separate future plan.
 
 ### Tokens
 
@@ -198,7 +206,9 @@ production Server. The former `RoyalIdentity.Storage.InMemory` fake was removed 
 
 From redesign-todo.md and `[Redesign]` attributes in code:
 
-1. **Scope/Resource model**: `Client.AllowedScopes` and `Client.AllowOfflineAccess` need replacement with an `AllowedResources` model following ResourceServer → Resource → Scope hierarchy
-2. **Localization**: Add localization support for all UI text
+1. **Localization**: Add localization support for all UI text.
+
+The scope/resource domain redesign is complete. Persistence of its realm-scoped catalog remains deferred, but is
+storage work rather than another redesign of `AllowedScopes` or `AllowOfflineAccess`.
 
 > **Done:** User/session unification (merge of `IdentityUser`/`UserDetails`/`IUserStore`/`IUserDetailsStore`) — completed by `plan-users-edge-session` (ADR-013/014). Follow-up modules (`UserAccounts`, data persistence, KMS) are tracked in the backlog, not here.

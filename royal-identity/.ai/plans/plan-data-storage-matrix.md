@@ -11,6 +11,10 @@ classificações foram fechadas na seção "Paridade final e ordem de migração
 classe inicial em caso de divergência. As classificações `preservar`, `descartar` e `substituir` possuem fonte
 normativa ou decisão fechada.
 
+> **Atualização pós-baseline (2026-08-01):** `plan-resources-redesign.md` concluiu o modelo de domínio. DF22 agora
+> significa somente que a persistência do catálogo realm-scoped está diferida; a bridge volátil continua vigente
+> até um futuro `plan-data-resource-catalog-storage.md`. As linhas históricas abaixo não reabrem o redesign.
+
 ## Escopo e contagem
 
 | Grupo | Superfícies | Membros inventariados |
@@ -70,7 +74,7 @@ registra `IStorage` transient apontando para essa mesma instância.
 | ST-07 | `GetUserConsentStore(Realm)` | Operational / realm / `UserConsents` | Idem. | `DefaultConsentService` | direta/fluxo: `RealmIsolationTests` e authorize/consent | DF6; binding `preservar`; P3/baseline |
 | ST-08 | `GetKeyStore(Realm)` | Configuration / realm / `KeyParameters` | Idem. | `DefaultKeyManager` | fluxo: signing/JWKS/key jobs | DF6/DF9; binding `preservar`; P2/baseline |
 | ST-09 | `GetClientStore(Realm)` | Configuration / realm / `Clients` | Idem. | middleware, validators, secret evaluators, sign-out | direta: `RealmIsolationTests`; fluxo: endpoints | DF6; binding `preservar`; P2/baseline |
-| ST-10 | `GetResourceStore(Realm)` | Configuration / realm / resources/scopes | Nova facade e novos índices derivados do estado corrente. | discovery, client/resource decorator, code/refresh handlers | direta: `ResourceStoreTests`, `RealmIsolationTests` | DF6/DF22; binding `preservar`, persistência bloqueada; baseline/redesign |
+| ST-10 | `GetResourceStore(Realm)` | Configuration / realm / resources/scopes | Nova facade e novos índices derivados do estado corrente. | discovery, client/resource decorator, code/refresh handlers | direta: `ResourceStoreTests`, `RealmIsolationTests` | DF6/DF22; binding `preservar`, persistência diferida; baseline/catálogo futuro |
 | ST-11 | `GetUserSessionStore(Realm)` | Operational / realm / `UserSessions` | Nova facade ligada ao realm. | session service, code/sign-out/end-session/session revocation | direta/fluxo: suites de sessão/logout | ADR-014/DF6; binding `preservar`; P3/baseline |
 
 ## Configuração
@@ -102,15 +106,16 @@ Implementação: `ClientStore`, sobre `RealmMemoryStore.Clients`.
 ### `IResourceStore` e extensão
 
 Implementação: `ResourceStore`. O construtor cria índices `StringComparer.Ordinal`; lança para scope duplicado, URI
-duplicada e URI inválida. O shape está bloqueado para persistência por DF22.
+duplicada e URI inválida. O modelo de domínio está concluído; somente a persistência do catálogo está diferida por
+DF22.
 
 | ID | Operação | Owner / binding / backing atual | Comportamento atual | Consumidores | Cobertura atual | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|---|
-| RS-01 | `GetAllResourcesAsync(ct)` | Configuration / realm / identity scopes + resource servers | Retorna todos como conjuntos; models são live references. | nenhum caller localizado | lacuna | ordem/live reference `descartar` (DF17/DF24); restante `avaliar`; baseline/redesign |
-| RS-02 | `GetAllEnabledResourcesAsync(ct)` | Configuration / realm / mesmos backings | Filtra identity scopes, servers e scopes enabled; clona cada server para filtrar scopes; conjuntos. | `DiscoveryHandler`, `ClientResourceDecorator` | direta: `ResourceStoreTests`; fluxo: discovery/authorize | filtro enabled `preservar` (ADR-010 e consumers); ordem `descartar`; baseline/redesign |
-| RS-03 | `FindResourcesByScopeAsync(scopes, onlyEnabled, ct)` | Configuration / realm / índices por nome | Delega ao lookup combinado sem resource URI. | `UserInfoHandler`; `Tests.Host/HostEndpoints`; setup e cenários de testes | direta: `ResourceStoreTests`; fluxo: userinfo/code/signing/isolation | semântica atual coberta por ADR-010; API/shape `avaliar`, persistência bloqueada; baseline/redesign |
-| RS-04 | `FindRequestedResourcesAsync(scopes, uris, onlyEnabled, ct)` | Configuration / realm / índices Ordinal | Resolve identity/resource scopes; trata `offline_access`; registra scopes ausentes e targets inválidos/disabled; resource URI deve ser absoluta HTTPS sem fragment, com exceção HTTP localhost; deduplica owners. | `RefreshTokenHandler`, `ProtectedResourceMetadataHandler`, `ResourcesDecorator`, `ClientResourceDecorator` e RS-05 | direta: `ResourceStoreTests`; fluxo: token grants/metadata | validação atual `preservar` enquanto o contrato existir (ADR-010/012); shape bloqueado DF22; baseline/redesign |
-| RS-05 | `ResolveAuthorizedSubsetAsync(...)` | Configuration / realm por receiver / sem backing próprio | Garante subset de resource indicators, downscope coerente e mapeia falhas para `invalid_target`/`invalid_scope`; pode chamar RS-04 até três vezes. | `AuthorizationCodeHandler`, `RefreshTokenHandler` | direta/fluxo: `CodeTokenTests`, `RefreshTokenTests`, `ResourceStoreTests` | semântica `preservar` (ADR-012/RFC 8707 já adotada); baseline/redesign |
+| RS-01 | `GetAllResourcesAsync(ct)` | Configuration / realm / identity scopes + resource servers | Retorna todos como conjuntos; models são live references. | nenhum caller localizado | lacuna | ordem/live reference `descartar` (DF17/DF24); restante `avaliar`; baseline/catálogo futuro |
+| RS-02 | `GetAllEnabledResourcesAsync(ct)` | Configuration / realm / mesmos backings | Filtra identity scopes, servers e scopes enabled; clona cada server para filtrar scopes; conjuntos. | `DiscoveryHandler`, `ClientResourceDecorator` | direta: `ResourceStoreTests`; fluxo: discovery/authorize | filtro enabled `preservar` (ADR-010 e consumers); ordem `descartar`; baseline/catálogo futuro |
+| RS-03 | `FindResourcesByScopeAsync(scopes, onlyEnabled, ct)` | Configuration / realm / índices por nome | Delega ao lookup combinado sem resource URI. | `UserInfoHandler`; `Tests.Host/HostEndpoints`; setup e cenários de testes | direta: `ResourceStoreTests`; fluxo: userinfo/code/signing/isolation | semântica atual coberta por ADR-010; API/shape `avaliar`, persistência diferida; baseline/catálogo futuro |
+| RS-04 | `FindRequestedResourcesAsync(scopes, uris, onlyEnabled, ct)` | Configuration / realm / índices Ordinal | Resolve identity/resource scopes; trata `offline_access`; registra scopes ausentes e targets inválidos/disabled; resource URI deve ser absoluta HTTPS sem fragment, com exceção HTTP localhost; deduplica owners. | `RefreshTokenHandler`, `ProtectedResourceMetadataHandler`, `ResourcesDecorator`, `ClientResourceDecorator` e RS-05 | direta: `ResourceStoreTests`; fluxo: token grants/metadata | validação atual `preservar` (ADR-010/012); persistência diferida por DF22; baseline/catálogo futuro |
+| RS-05 | `ResolveAuthorizedSubsetAsync(...)` | Configuration / realm por receiver / sem backing próprio | Garante subset de resource indicators, downscope coerente e mapeia falhas para `invalid_target`/`invalid_scope`; pode chamar RS-04 até três vezes. | `AuthorizationCodeHandler`, `RefreshTokenHandler` | direta/fluxo: `CodeTokenTests`, `RefreshTokenTests`, `ResourceStoreTests` | semântica `preservar` (ADR-012/RFC 8707 já adotada); baseline/catálogo futuro |
 
 ### `IKeyStore`
 
@@ -244,13 +249,13 @@ Esses membros não persistem dados, mas fazem parte da superfície pública intr
 
 | ID | Membro público | Owner / lifecycle | Semântica atual | Consumidores/cobertura | Fonte, classe inicial e destino |
 |---|---|---|---|---|---|
-| RR-01 | `Resources { get; }` | Configuration / resultado transitório | Resultado resolvido quando há sucesso; `null` em falha. | code/refresh handlers; tests desses grants | ADR-012; `preservar` enquanto RS-05 existir; baseline/redesign |
-| RR-02 | `Error { get; }` | Configuration / resultado transitório | `null` em sucesso; erro OAuth em falha. | idem | ADR-012; `preservar`; baseline/redesign |
-| RR-03 | `ErrorDescription { get; }` | Configuration / resultado transitório | Descrição estável criada pela extensão. | idem | texto exato `avaliar`; baseline/redesign |
-| RR-04 | `Detail { get; }` | Configuration / resultado transitório | Lista/razão opcional para diagnóstico. | idem | conteúdo/formato `avaliar`; baseline/redesign |
-| RR-05 | `IsSuccess { get; }` | Configuration / resultado transitório | Verdadeiro quando `Error is null`. | handlers/testes | coerência do resultado `preservar`; baseline/redesign |
-| RR-06 | `Ok(resources)` | Configuration / resultado transitório | Constrói sucesso sem campos de erro. | RS-05 | coerência do resultado `preservar`; baseline/redesign |
-| RR-07 | `Fail(error, description, detail)` | Configuration / resultado transitório | Constrói falha sem resources. | RS-05 | coerência do resultado `preservar`; baseline/redesign |
+| RR-01 | `Resources { get; }` | Configuration / resultado transitório | Resultado resolvido quando há sucesso; `null` em falha. | code/refresh handlers; tests desses grants | ADR-012; `preservar` enquanto RS-05 existir; baseline/catálogo futuro |
+| RR-02 | `Error { get; }` | Configuration / resultado transitório | `null` em sucesso; erro OAuth em falha. | idem | ADR-012; `preservar`; baseline/catálogo futuro |
+| RR-03 | `ErrorDescription { get; }` | Configuration / resultado transitório | Descrição estável criada pela extensão. | idem | texto exato `avaliar`; baseline/catálogo futuro |
+| RR-04 | `Detail { get; }` | Configuration / resultado transitório | Lista/razão opcional para diagnóstico. | idem | conteúdo/formato `avaliar`; baseline/catálogo futuro |
+| RR-05 | `IsSuccess { get; }` | Configuration / resultado transitório | Verdadeiro quando `Error is null`. | handlers/testes | coerência do resultado `preservar`; baseline/catálogo futuro |
+| RR-06 | `Ok(resources)` | Configuration / resultado transitório | Constrói sucesso sem campos de erro. | RS-05 | coerência do resultado `preservar`; baseline/catálogo futuro |
+| RR-07 | `Fail(error, description, detail)` | Configuration / resultado transitório | Constrói falha sem resources. | RS-05 | coerência do resultado `preservar`; baseline/catálogo futuro |
 
 ## Backings do fake e dependências
 
@@ -261,7 +266,7 @@ Esses membros não persistem dados, mas fazem parte da superfície pública intr
 | `MemoryStorage.realmMemoryStore` | ST-04..ST-11 | por `Realm.Id` | Contém todos os dictionaries config/operational do core; é removido inteiro por RL-07. |
 | `MemoryStorage.authorizeParameters` | ST-03, AP-* | global estático | Não está particionado por realm; o handle aleatório é a fronteira atual. |
 | `RealmMemoryStore.Clients` | `IClientStore` | realm | Configuração. |
-| `RealmMemoryStore.IdentityScopes` / `ResourceServers` | `IResourceStore` | realm | Configuração com shape bloqueado por DF22. |
+| `RealmMemoryStore.IdentityScopes` / `ResourceServers` | `IResourceStore` | realm | Catálogo em memória; domínio concluído e persistência diferida por DF22. |
 | `RealmMemoryStore.KeyParameters` | `IKeyStore` | realm | Configuração temporária até futuro KMS. |
 | `RealmMemoryStore.AccessTokens` | `IAccessTokenStore` | realm | Operacional. |
 | `RealmMemoryStore.RefreshTokens` | `IRefreshTokenStore` | realm | Operacional. |
@@ -280,10 +285,10 @@ adapter implementa o gateway, mas não se torna owner dos registros.
 
 | Owner único | IDs | Lifecycle | Destino arquitetural |
 |---|---|---|---|
-| Configuration | ST-01, ST-02, ST-08..ST-10; RL-01..RL-07; CL-01..CL-02; RS-01..RS-05; KY-01..KY-05 | Durável, baixa rotatividade; tombstones configuracionais sobrevivem à exclusão lógica. Keys ficam aqui temporariamente até existir KMS. | `RoyalIdentity.Data.Configuration`, adaptado somente por `RoyalIdentity.Storage.EntityFramework`; resources permanecem bloqueados por DF22. |
+| Configuration | ST-01, ST-02, ST-08..ST-10; RL-01..RL-07; CL-01..CL-02; RS-01..RS-05; KY-01..KY-05 | Durável, baixa rotatividade; tombstones configuracionais sobrevivem à exclusão lógica. Keys ficam aqui temporariamente até existir KMS. | `RoyalIdentity.Data.Configuration`, adaptado somente por `RoyalIdentity.Storage.EntityFramework`; persistência do catálogo de resources permanece diferida por DF22. |
 | Operational | ST-03..ST-07, ST-11; AT-01..AT-04; RT-01..RT-05; AC-01..AC-03; CN-01..CN-03; SS-01..SS-06; AP-01..AP-03 | Transitório/alta rotatividade; possui consumo, revogação, expiração, retenção e purge próprios por tipo. | `RoyalIdentity.Data.Operational`, adaptado somente por `RoyalIdentity.Storage.EntityFramework`. |
 | Adapter/Infrastructure | MS-01..MS-03; SP-01..SP-03 | Lifetime técnico, criptográfico, cache ou de acesso ao adapter; não constitui registro de `Data.*`. | Implementações/decorators de infraestrutura adjacente e lifecycle do `Storage.EntityFramework`. RC-01/RC-02 saíram desta classificação e são Operational (plan-replay-protection DF16). |
-| Configuration (resultado não persistido) | RR-01..RR-07 | Objetos transitórios de resposta da resolução de configuração; não são entidades. | Construídos pelo adapter/core a partir do resource store; bloqueados com RS-05 pelo redesign. |
+| Configuration (resultado não persistido) | RR-01..RR-07 | Objetos transitórios de resposta da resolução de configuração; não são entidades. | Construídos pelo adapter/core a partir do resource store; o plano futuro do catálogo deve preservar sua semântica. |
 | fora do storage | `IUserDirectory`, `ISubjectStore`, `ILocalUserAuthenticator`, `IUserClaimsProvider`, `IUserSecurityStateProvider` e tipos de conta | Lifecycle próprio do módulo de contas. Nenhuma linha contratual incluída na contagem 62 pertence aqui. | `RoyalIdentity.UserAccounts` e sua `.Integration`; nunca `Data.Configuration`/`Data.Operational`. |
 
 Contagem de controle das 62 linhas contratuais: 24 `Configuration`, 30 `Operational` e 8
@@ -325,7 +330,7 @@ chave, navegação ou estratégia de serialização.
 | Owner | Tipos do core/BCL vistos pelas facades | Responsabilidade futura |
 |---|---|---|
 | Configuration | `ServerOptions`; `Realm` e seu grafo `RealmOptions`/routes; `Client` e seu grafo de secrets, claims, URIs, grants e restrições; `KeyParameters` | P2 cria entidades puras próprias e o adapter faz mapping nos dois sentidos. Referências entre esses grafos não autorizam `Data.Configuration` a referenciar assemblies do core. |
-| Configuration — bloqueado | `ResourceServer`, `IdentityScope`, `Scope`, `ProtectedResource`, containers `AllScopes`/`RequestedResources` e `ResourceResolution` | Os containers/resultados são construídos, não persistidos. Entidades para resources/scopes não serão desenhadas nem implementadas até o redesign fechar o modelo (DF11/DF22). |
+| Configuration — persistência diferida | `ResourceServer`, `IdentityScope`, `Scope`, `ProtectedResource`, containers `AllScopes`/`RequestedResources` e `ResourceResolution` | O modelo de domínio está concluído. Containers/resultados continuam construídos; entidades/mappings do catálogo dependem de um plano próprio (DF22). |
 | Operational | `AccessToken`, `RefreshToken`, `AuthorizationCode` e o grafo comum de token/claims/audiences/scopes; `Consent`/`ConsentedScope`; `UserSession`/`UserSessionClient`; `NameValueCollection` de authorize parameters | P3 define modelos puros e mappings. Claims/collections/tempos exigem projeção explícita, mas o formato físico permanece fora deste baseline. |
 | Adapter/Infrastructure | `Message<T>`, `IStorage`, `IStorageSession`; primitivas de replay (`purpose`, `handle`, `expiration`) | Não gerar entidades de `Data.*`. Message store, replay cache e lifetime são implementações/decorators adjacentes. |
 | fora do storage | `Subject` e tipos/agregados/credenciais/propriedades de `RoyalIdentity.UserAccounts` | Não mapear no `Storage.EntityFramework`; somente a `.Integration` do módulo traduz a borda core-owned para o módulo. |
@@ -335,15 +340,15 @@ transferem ownership da conta ao operacional, não autorizam navegação EF para
 DbContexts. A mesma regra vale para `ClientId` e `RealmId` entre Operational e Configuration: integridade cross-family
 é tratada por validação/orquestração, não por um modelo compartilhado decidido aqui.
 
-## Bloqueios e fronteiras
+## Diferimentos e fronteiras
 
 ### Resources/scopes
 
-RS-01..RS-05 e RR-01..RR-07 têm owner Configuration, mas destino `baseline/redesign`, não P2 implementável. O
-inventário atual pode gerar contract tests do comportamento vigente; não pode gerar entidade, mapping ou migration.
-O desbloqueio exige fechar o redesign de `Client.AllowedScopes`/`AllowOfflineAccess` e da hierarquia de resource
-servers, protected resources, scopes e identity scopes (DF11/DF22). Realms/options, clients e keys não ficam
-bloqueados junto com esse grafo.
+RS-01..RS-05 e RR-01..RR-07 têm owner Configuration, mas a persistência não pertence ao P2. O modelo de domínio e
+os eixos de autorização do client foram concluídos por `plan-resources-redesign.md`; o inventário atual preserva
+seu comportamento, enquanto entidade, mapping e migration aguardam um futuro
+`plan-data-resource-catalog-storage.md` (DF22). Realms/options, clients e keys não ficam diferidos junto com o
+catálogo.
 
 ### Exclusão de realm
 
@@ -373,7 +378,7 @@ ADR-013/015 e DF8.
 |---|---|---|---|
 | Realm/binding | realm discovery, cookie options, `RealmManager`, `FirstKeyJob`, `KeyCacheEntry` | `RealmIsolationTests`, testes de realm options | lookup de domain e provider/session sem teste direto; não há exclusão em produção |
 | Clients | client loader, CORS, validators, secret evaluators, sign-out | `RealmIsolationTests` e fluxos OIDC | comparador/ausência/disabled ainda não formam contrato provider-neutral |
-| Resources | discovery, client decorator, code/refresh grants | `ResourceStoreTests`, `CodeTokenTests`, `RefreshTokenTests` | `GetAllResourcesAsync` sem caller/test; shape bloqueado |
+| Resources | discovery, client decorator, code/refresh grants | `ResourceStoreTests`, `CodeTokenTests`, `RefreshTokenTests` | `GetAllResourcesAsync` sem caller/test; persistência do catálogo diferida |
 | Keys | `DefaultKeyManager`, first-key job, signing/validation | signing/JWKS/jobs incidentalmente | ausência, ordem e bordas `NotBefore`/`Expires` sem testes diretos mapeados |
 | Tokens/codes/consent | factories, loaders, validators, handlers e consent service | token/code/refresh/revocation/realm isolation | concorrência atômica ausente; duplicidade e expiração desiguais |
 | Sessões | session service, code, end-session, sign-out, revocation | `DefaultUserSessionServiceTests`, `SessionLifecycleTests`, `UserSessionCharacterizationTests`, `BackChannelLogoutCharacterizationTests`, active-rule/end-session | faltam cenários provider-neutral por método e identidade materializada |
@@ -491,8 +496,8 @@ Planos 2/3/4.
 | Realms internos | statics `ServerRealm`/`AccountRealm`/`AdminRealm` | 3 realms `Internal = true` | produto: realms internos obrigatórios e não removíveis | seed de produto na composição/migração do P2 |
 | Realm demo | static `DemoRealm` (+ branding no static ctor) | realm comum `demo` | dev/demo do host | seed de dev/demo da composição do host; nunca requisito do provider |
 | Clients iniciais | ctor de `RealmMemoryStore(realm, isServer)` | server → `server_admin`; account/admin/demo → `demo_client`+`demo_consent_client` | `server_admin` é produto/host; demo clients são dev/demo. **Acidente:** o parâmetro binário `isServer` faz account/admin receberem os clients de demo | P2/host seed; o vazamento de demo clients para account/admin **não é comportamento a preservar** |
-| Identity scopes padrão | property initializer de `RealmMemoryStore.IdentityScopes` | openid, profile, email, address, phone em **todo** realm, inclusive os criados por `SaveAsync` | openid é exigência de produto; o conjunto padrão é candidato a seed de criação de realm | decisão do P2/redesign: o que a criação de realm semeia é regra explícita, não initializer escondido |
-| Resource server demo | property initializer de `RealmMemoryStore.ResourceServers` | `apiserver` (api, api:read, api:write; URI `https://api.demo.local/apiserver`) em **todo** realm | dev/demo. **Acidente:** realms novos também o recebem | seed demo da composição; bloqueado por DF22 para persistência |
+| Identity scopes padrão | property initializer de `RealmMemoryStore.IdentityScopes` | openid, profile, email, address, phone em **todo** realm, inclusive os criados por `SaveAsync` | openid é exigência de produto; o conjunto padrão é candidato a seed de criação de realm | o plano futuro do catálogo deve tornar o seed de criação explícito, não um initializer escondido |
+| Resource server demo | property initializer de `RealmMemoryStore.ResourceServers` | `apiserver` (api, api:read, api:write; URI `https://api.demo.local/apiserver`) em **todo** realm | dev/demo. **Acidente:** realms novos também o recebem | seed demo da composição; persistência diferida por DF22 |
 | Contas demo | `DemoUsers()` no ctor (somente demo realm) + constantes `AliceSubjectId`/`BobSubjectId` | alice/bob com hash de senha | fora do storage do IdP (família `UserAccounts`); fake transitório ADR-018 | composição com o módulo real + `UserAccountsModuleSeed` (precedente: `UserAccountsAppFactory`) |
 | Keys | nenhum seed estático | `KeyParameters` nasce vazio; `FirstKeyJob` (job de startup, `IServerJob`) percorre `Realms.GetAllAsync` criando keys — mas **encerra o job inteiro** (`return`) ao encontrar o primeiro realm que já possua key, e `RealmManager.CreateAsync` não provisiona key para realms criados em runtime; o key manager não cria on-demand (lookups retornam `null`/vazio) | produto: todo realm habilitado precisa de key de assinatura utilizável. Hoje o job só cobre todos os realms porque o backing em memória renasce vazio a cada startup | P2 remove o job escritor, persiste keys pelo `AddKeyAsync` legado somente por compatibilidade/testes, semeia uma key utilizável por realm habilitado e valida material/algoritmo no startup; criação/rotação em runtime fica para admin/KMS (DF19/DF27/DF28 do P2) |
 | Authorize parameters | dictionary global vazio | estado transitório por request | Operational; sem seed | n/a |
@@ -545,7 +550,7 @@ Por categoria, com destino de substituição:
 | Categoria | Ocorrências | Destino |
 |---|---:|---|
 | Setup de clients | 36 | write facade de configuração do P2 (quando existir) ou seed test-only do provider; até lá, hook de fixture — nunca API pública criada pelo baseline (DF1) |
-| Setup de resource servers | 14 | **bloqueado por DF22**: permanece hook test-only até o redesign fechar o modelo; o P4 não pode migrar esses testes para write facade inexistente |
+| Setup de resource servers | 14 | **persistência diferida por DF22**: permanece hook test-only até o plano próprio do catálogo entregar uma write facade; o P4 não cria essa superfície |
 | Setup de contas (fake) | 3 (`CharacterizationSeed.SeedUser`, `SigningAlgorithmTests.SeedAlice`, `UserDirectoryContractTests.InMemory.SeedAsync`) | composição com módulo `UserAccounts` + `UserAccountsModuleSeed` (ADR-018); o lado fake do contract test morre com o fake |
 | Inspeção **e mutação** de conta | 1 (`CharacterizationSeed.GetDetails` — lê contadores de falha/lockout e, em `ActiveRuleCharacterizationTests`, **desativa a conta mutando a referência viva** retornada) | leituras viram asserção de comportamento observável (respostas do fluxo) ou superfície do módulo real; a mutação exige uma operação de atualização/desativação pelo módulo `UserAccounts` ou hook test-only da fixture — estado interno de conta não vira contrato do IdP |
 | Inspeção de sessão | 1 (`CharacterizationSeed.FindSession` — scan de `UserSessions` por `SubjectId`) | o contrato não tem consulta por subject (somente `FindByIdAsync`/`EndSessionsForSubjectAsync`); substituir capturando o `sid` no próprio fluxo de teste. Se o P3 julgar necessário um lookup por subject, é mudança pública a listar na Fase 5 — não inferida aqui |
@@ -572,7 +577,7 @@ estado interno, mas é acoplamento de composição ao fake: o P4 deve fornecer e
    nunca pode expor dados (ST-04..ST-11); o fake recusa o binding, enquanto o EF pode materializar um store
    cujas consultas retornam vazio após o purge.
 3. Configuração do realm antes dos fluxos que a consomem: clients (authorize/token), identity
-   scopes/resource servers (discovery/grants; shape bloqueado por DF22), keys (assinatura — via
+   scopes/resource servers (discovery/grants; catálogo ainda na bridge por DF22), keys (assinatura — via
    `AddKeyAsync` ou `FirstKeyJob`).
 4. Dados operacionais (tokens, codes, consents, sessões, authorize parameters) somente com o realm resolvido;
    nos fluxos HTTP exigem também client/scopes existentes. No nível do store, nenhuma operação valida
@@ -597,7 +602,7 @@ cenários DF6 provam dois realms isolados com ids/handles colidentes em todos os
 
 O P4 só migra os testes de fluxo quando: (a) P2 entregar write facade ou seed test-only para clients e
 implementar a persistência do `AddKeyAsync` já existente para keys, com a lacuna de provisão de keys
-resolvida ou contornada pela fixture; (b) resources tiverem rota test-only própria enquanto DF22 vigorar;
+resolvida ou contornada pela fixture; (b) resources tiverem rota test-only própria enquanto a bridge da DF22 vigorar;
 (c) contas forem semeadas pela composição do módulo (`UserAccountsModuleSeed`), já demonstrado por
 `UserAccountsAppFactory`; (d) os handles estáticos (`DemoRealm` etc.) forem substituídos por handles da
 fixture. Os acessos de `CharacterizationSeed` além de seed devem ser resolvidos antes da troca do backing:
@@ -680,8 +685,8 @@ cita a decisão DF e a fonte normativa ou a regra protocolar/negocial que o sust
 | RL-06 | preservar (upsert) / descartar (init de backing do fake; live reference) | DF16 — upsert é a semântica do método | `Save_ExistingRealm…` |
 | RL-07 | preservar (recusa interno; `false` ausente) / substituir (hard delete → tombstone + purge, DF20) | DF25 fechado: ausência → `false` idempotente | testes de delete + aceites P2/P3 |
 | CL-01/CL-02 | preservar | `null`; Ordinal; disabled só na API enabled | `ClientStoreContractTests` |
-| RS-01 | descartar | sem caller de produção ou teste; **candidata a remoção do contrato no redesign** (não requerida pelos Planos 2/3) | justificativa de descarte |
-| RS-02..RS-05 | preservar (comportamento) — persistência bloqueada por DF22 | ADR-010/012, RFC 8707 | `ResourceStoreContractTests` (13 cenários) |
+| RS-01 | descartar | sem caller de produção ou teste; candidata a remoção quando o plano do catálogo definir o contrato persistido (não requerida pelos Planos 2/3) | justificativa de descarte |
+| RS-02..RS-05 | preservar (comportamento) — persistência diferida por DF22 | ADR-010/012, RFC 8707 | `ResourceStoreContractTests` (13 cenários) |
 | RR-01/02/05/06/07 | preservar | coerência do resultado | via cenários RS-05 |
 | RR-03/RR-04 | descartar (texto/conteúdo exato) | mensagens podem evoluir; os **códigos** de erro OAuth são o contrato (RR-02) | não assertar texto |
 | KY-01 | preservar (escrita pela facade) / descartar (replace silencioso) | DF16 create-only; duplicidade → reject (aceite P2) | `AddKey_ThenGetKey…` |
@@ -755,7 +760,7 @@ O fake não recebe TTL/particionamento (ADR-018); os itens 1-5 são testes de ac
 | MP-5 | Authorize parameters: contrato global → realm-bound (accessor por realm), TTL absoluto gravado na escrita com janela configurável por realm (default numérico é decisão de produto documentada pelo P3), leitura fail-closed de expirado, purge de abandonados e regeneração de handle em colisão — semânticas de storage fechadas na seção "Fechamento de `IAuthorizeParametersStore`" | ST-03, AP-01..AP-03 / DF6, DF19 | P3 |
 | MP-6 | Cleanup físico/TTL por tipo Operational (tokens, codes, consents, sessões), separado da leitura lógica | DF19 | P3 |
 | MP-7 | Semântica de exclusão de realm: tombstone Configuration + purge Operational + reserva de path/domain (não muda assinatura de `DeleteAsync`) | RL-07 / DF20 | P2/P3; seam cross-family em ADR própria futura |
-| MP-8 | Candidata (não requerida): remoção de `IResourceStore.GetAllResourcesAsync` sem caller | RS-01 | redesign de resources |
+| MP-8 | Candidata (não requerida): remoção de `IResourceStore.GetAllResourcesAsync` sem caller | RS-01 | plano futuro do catálogo de resources |
 | MP-9 | **Diferida, não requerida pelo P3:** lookup de sessão por subject só será reaberto com caller comprovado; revogação usa a operação em massa existente e os testes capturam o `sid` do fluxo | Fase 4 (`FindSession`) | Plano do caller futuro |
 | MP-10 | Normalização lowercase de `Realm.Domain` no `RealmManager` (escrita) e nas bordas de consulta por domain; o adapter EF rejeita `SaveAsync` direto com domain não canônico; unicidade sobre o valor normalizado — comportamento novo, não paridade | RL-04 / DF18 | P2 |
 
@@ -776,8 +781,8 @@ migração exige transação cross-família (DF21).
 4. Keys (persistência do `AddKeyAsync` legado + reject de duplicidade + seed/validação de DF19/DF27/DF28 do P2; MP-4 superada).
 
 **Resources/scopes não entram no P2** (DF22): o adapter EF compõe uma ponte transitória para RS-*
-(implementação em memória semeada por composição), sem persistir o shape instável; a persistência real
-espera o redesign.
+(implementação em memória semeada por composição). O modelo de domínio já está concluído; a persistência real do
+catálogo espera um plano próprio.
 
 **Plano 3 — Operational (nesta ordem, crescendo em risco):**
 
@@ -817,7 +822,8 @@ Total: 101 cenários verdes contra a fixture `MemoryStorage`.
 ## Handoff para as próximas fases
 
 - **Fase 2:** confirmar exatamente um owner por linha, detalhar dependências Configuration×Operational e manter
-  resources bloqueados; documentar RL-07 sem escolher o seam administrativo cross-family.
+  o catálogo de resources fora do corte de persistência; documentar RL-07 sem escolher o seam administrativo
+  cross-family.
 - **Fase 3 (concluída):** cenários provider-neutral criados em `Tests.Storage`; ver a seção
   "Contract tests provider-neutral — Fase 3" e a tabela de aceites futuros registrados.
 - **Fase 4 (concluída):** seeds, composições e as 56 referências diretas decompostas com destino por

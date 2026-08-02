@@ -104,7 +104,9 @@ Dados alvo:
 - clients;
 - signing keys e metadados de chaves enquanto KMS não existir.
 
-`Resources/scopes` não são persistidos pela DF22 do baseline: permanecem numa bridge volátil até o redesign.
+`Resources/scopes` não são persistidos pela DF22 do baseline: o modelo de domínio já foi concluído por
+`plan-resources-redesign.md`, mas o catálogo permanece numa bridge volátil até um plano específico de
+persistência ser autorizado.
 
 Fases fechadas no plano executor:
 
@@ -201,7 +203,8 @@ coberto pelos Planos 2 e 3, e o caminho quente não bate no banco:
 - **realms, clients e `ServerOptions`:** o snapshot de Configuration é cache em memória com publish atômico,
   intervalo de refresh, last-known-good em falha e reload após write de realm. Discovery lê de lá;
 - **signing keys:** `RealmCaching`/`KeyCache` por realm, com TTL em `RealmOptions.Caching.KeyCacheDuration`;
-- **resources/scopes:** já são memória, pela bridge volátil da DF22 — não há leitura de banco a evitar.
+- **resources/scopes:** o modelo é estável no domínio, mas o catálogo ainda é memória pela bridge volátil da
+  DF22 — não há leitura de banco a evitar até o plano próprio de persistência.
 
 Sobra Operational, e é justamente onde cache é proibido: `ConsumeAuthorizationCodeAsync` (MP-2) e
 `TryConsumeAsync`/`TryUpdateAsync` (MP-3) perdem a atomicidade com leitura stale, e cachear

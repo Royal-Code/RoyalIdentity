@@ -169,8 +169,9 @@ the IdP only through `.Integration`.
 
 `RoyalIdentity.Server` composes PostgreSQL only and never migrates or seeds. `RoyalIdentity.Migrations` provisions
 Configuration, Operational and UserAccounts externally, with one explicit connection per DbContext.
-`RoyalIdentity.Demo` and `Tests.Integration` use isolated SQLite in-memory databases; resources/scopes remain a
-deliberately volatile bridge pending their redesign.
+`RoyalIdentity.Demo` and `Tests.Integration` use isolated SQLite in-memory databases. The resources/scopes domain
+redesign is complete; its realm-scoped catalog still uses the deliberately volatile
+`ConfigurationResourceBridgeOptions` only because catalog persistence is deferred to a dedicated future plan.
 
 During pre-release, the JSON payload version columns and strict serializers remain in place, but every internal
 Configuration/Operational payload schema stays at version 1. Incompatible shape changes require reprovisioning

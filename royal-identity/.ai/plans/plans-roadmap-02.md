@@ -83,11 +83,11 @@ definida em `../analisys/`.
   documentação operacional e a distribuição AGPLv3 + Apache-2.0 com notice, 80 candidatos de proveniência
   classificados e gate reproduzível.
 
-## Próxima execução
+## Execução atual
 
-A próxima execução é [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md), que consome a factory
-de Authentication Response do Session Management concluído e mantém os payloads Configuration pré-release em v1
-conforme ADR-020. Em seguida, executar
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) está em execução: Fase 1 concluída, Fase 2 é
+a próxima. O plano consome a factory de Authentication Response do Session Management concluído e mantém os
+payloads Configuration pré-release em v1 conforme ADR-020. Em seguida, executar
 [plan-localization.md](plan-localization.md), que mantém v1 ao adicionar as options de realm e
 fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
@@ -116,7 +116,7 @@ que nenhum deles fique grande demais:
 |---|---|---|---|
 | 0 | `plan-users-accounts-sqlite-hardening.md` | Retry, migrations e seed do módulo `UserAccounts` | **Concluído** (ver acima) |
 | 1 | `plan-data-storage-baseline.md` | Caracterizar contratos e comportamento atual do `MemoryStorage` | **Concluído** (ver acima) |
-| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; resources/scopes continuam voláteis) | **Concluído** (2026-07-22, 7/7) |
+| 2 | `plan-data-configuration-storage.md` | Persistir dados de configuração (ServerOptions/realms/clients/keys; catálogo de resources/scopes continua na bridge volátil) | **Concluído** (2026-07-22, 7/7) |
 | 3 | `plan-data-operational-storage.md` | Persistir dados operacionais (sessions/tokens/codes/consents) | **Concluído** (2026-07-26, 8/8) |
 | 4 | `plan-data-test-migration.md` | Migrar testes do fake para SQLite/EF + `UserAccounts` real | **Concluído** (2026-07-29, 9/9) |
 | 5 | `plan-data-caching.md` | Cache sobre os stores EF, quando a semântica estiver estável | Não criado (pode ficar fora do primeiro corte) |
@@ -185,7 +185,7 @@ erro, e antes de `plan-refactoring-debt-closure.md`, que depende de sua baseline
 ### 2.2. Fechamento de dívidas de refatoração e superfícies inativas
 
 **Plano criado:** [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md)
-(RASCUNHO — 0/5 fases)
+(EM EXECUÇÃO — 1/5 fases; Fase 1 concluída em 2026-08-01)
 
 Fecha marcadores antigos, decisões que deixaram de ser refatorações ativas e superfícies protocolares anunciadas
 sem implementação. Também corrige a documentação do redesign concluído de resources, sem antecipar sua
@@ -423,8 +423,8 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
    fizerem sentido no momento.
 3. ~~Concluir `plan-replay-protection.md` (Fase 3).~~ CONCLUÍDO.
 4. ~~Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).~~ CONCLUÍDO.
-5. Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).
-6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).
+5. ~~Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).~~ CONCLUÍDO.
+6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — EM EXECUÇÃO (Fase 1/5 concluída).
 7. Executar [plan-localization.md](plan-localization.md).
 8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.

@@ -1,14 +1,14 @@
 # Plan: Fechamento de dívidas de refatoração e superfícies inativas (`plan-refactoring-debt-closure`)
 
-## Status: RASCUNHO - decisões fechadas; 0 de 5 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 1 de 5 fases executadas
 
 ## Progresso
 
-`░░░░░` **0%** - 0 de 5 fases
+`█░░░░` **20%** - 1 de 5 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Decisões encerradas e documentação de resources | Pendente |
+| Fase 1 - Decisões encerradas e documentação de resources | Concluida |
 | Fase 2 - Marcadores antigos e código obsoleto | Pendente |
 | Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release | Pendente |
 | Fase 4 - Contrato explícito de `acr_values` | Pendente |
@@ -391,26 +391,26 @@ modelo de resources como pendente; deixar somente a persistência do catálogo c
 
 **Tarefas:**
 
-- [ ] Atualizar o status/barra do plano de contexts removendo observações de trabalho adiado.
-- [ ] Marcar a antiga Fase 2 de contexts como cancelada por decisão, sem alterar a contagem de fases executadas.
-- [ ] Registrar `Contexts.Items.Token` como desenho mantido, não como remoção futura obrigatória.
-- [ ] Remover do estado alvo/riscos as instruções para reavaliar automaticamente herança e eventos.
-- [ ] Atualizar `product.md` com o modelo real de client/resources e tipos atuais (`Scope`, não `ApiScope`;
+- [x] Atualizar o status/barra do plano de contexts removendo observações de trabalho adiado.
+- [x] Marcar a antiga Fase 2 de contexts como cancelada por decisão, sem alterar a contagem de fases executadas.
+- [x] Registrar `Contexts.Items.Token` como desenho mantido, não como remoção futura obrigatória.
+- [x] Remover do estado alvo/riscos as instruções para reavaliar automaticamente herança e eventos.
+- [x] Atualizar `product.md` com o modelo real de client/resources e tipos atuais (`Scope`, não `ApiScope`;
   `RequestedResources`, não `RequestedScopes`).
-- [ ] Atualizar o mapa de arquivos e a seção de áreas instáveis de `structure.md`: remover `ApiScope.cs`,
+- [x] Atualizar o mapa de arquivos e a seção de áreas instáveis de `structure.md`: remover `ApiScope.cs`,
   `ApiResource.cs` e `RequestedScopes.cs`; registrar `Scope.cs`, `ResourceServer.cs` e `RequestedResources.cs`.
-- [ ] Atualizar `tech.md` trocando “resources/scopes remain a deliberately volatile bridge pending their redesign”
+- [x] Atualizar `tech.md` trocando “resources/scopes remain a deliberately volatile bridge pending their redesign”
   por a causa correta: modelo de domínio concluído e somente a persistência do catálogo diferida.
-- [ ] Atualizar `AGENTS.md` removendo o falso redesign pendente e verificar/ajustar `CLAUDE.md` para que os dois
+- [x] Atualizar `AGENTS.md` removendo o falso redesign pendente e verificar/ajustar `CLAUDE.md` para que os dois
   guias não contradigam o modelo concluído.
-- [ ] Promover para `AGENTS.md` — e espelhar em `CLAUDE.md` quando aplicável — a regra de que comando filtrado de
+- [x] Promover para `AGENTS.md` — e espelhar em `CLAUDE.md` quando aplicável — a regra de que comando filtrado de
   teste não pode fechar uma fase quando seleciona zero testes.
-- [ ] Preservar a regra de que o catálogo ainda usa bridge volátil e não deve ganhar persistência fora do plano
+- [x] Preservar a regra de que o catálogo ainda usa bridge volátil e não deve ganhar persistência fora do plano
   futuro.
-- [ ] Atualizar a matriz/macro para trocar “bloqueado pelo redesign” por “modelo concluído; persistência diferida”.
-- [ ] Adicionar nota pós-conclusão ao plano de resources sem reescrever resultados históricos.
-- [ ] Atualizar `redesign-todo.md` preservando alterações locais e mantendo Localization como item aberto.
-- [ ] Não criar ainda `plan-data-resource-catalog-storage.md`; registrar apenas o destino.
+- [x] Atualizar a matriz/macro para trocar “bloqueado pelo redesign” por “modelo concluído; persistência diferida”.
+- [x] Adicionar nota pós-conclusão ao plano de resources sem reescrever resultados históricos.
+- [x] Atualizar `redesign-todo.md` preservando alterações locais e mantendo Localization como item aberto.
+- [x] Não criar ainda `plan-data-resource-catalog-storage.md`; registrar apenas o destino.
 
 **Critérios de aceite:** nenhuma fonte ativa chama `AllowedScopes`/`AllowOfflineAccess` de modelo antigo; contexts
 não têm fase “adiada” contando como dívida; `Token` é descrito como mantido; resources são estáveis no domínio e
@@ -429,7 +429,21 @@ rg -n "ConfigurationResourceBridgeOptions|persist.ncia.*diferid|Localization" .a
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Concluída em 2026-08-01.** O plano histórico de contexts agora registra a herança de `IWith*` e
+`Contexts.Items.Token` como decisões finais: a antiga Fase 2 foi cancelada sem entrar na contagem das cinco fases
+executadas, e não resta instrução de reavaliação automática. O plano concluído de resources recebeu somente uma
+nota pós-conclusão que identifica o modelo vigente e separa domínio de persistência.
+
+`product.md`, `structure.md` e `tech.md` passaram a usar `IdentityScope`, `Scope`, `ResourceServer`,
+`ProtectedResource` e `RequestedResources`, com os cinco eixos reais de autorização do client. `AGENTS.md` e
+`CLAUDE.md` registram o redesign concluído, a bridge `ConfigurationResourceBridgeOptions`, o plano ativo e a regra
+contra filtros que selecionem zero testes. A matriz, o macro, o backlog, o roadmap e `redesign-todo.md` agora
+tratam DF22 exclusivamente como diferimento da persistência do catálogo; Localization permanece aberta e
+`plan-data-resource-catalog-storage.md` não foi criado.
+
+Os dois guards negativos da fase passaram sem matches; a busca positiva encontrou a bridge, a persistência
+diferida e Localization nas fontes ativas. Mudança exclusivamente documental, portanto build/test não se aplica
+a esta fase; `git diff --check` foi executado no fechamento.
 
 ---
 
@@ -700,10 +714,10 @@ dotnet test RoyalIdentity.sln
 | Remoção obsoleta quebra caller oculto | reflection/source externo | build/consumer falha | `rg`, build integral; sem consumidores de produção | Aceito |
 | ACR perde ordem | parse/lista não preserva preferência | interação futura escolhe valor errado | DF11 + teste de ordem/duplicata | Aberto |
 | Logging perde redaction | limpeza remove filtro junto do switch | segredo em log | testes capturando valores sensíveis + RFC 9700 | Aberto |
-| Histórico é reescrito | docs apagam motivo das decisões | perda de rastreabilidade | adendos e cancelamento explícito, sem apagar resultados | Aberto |
-| Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + guard documental/arquitetural | Aberto |
+| Histórico é reescrito | docs apagam motivo das decisões | perda de rastreabilidade | adendos e cancelamento explícito, sem apagar resultados | Fechado na Fase 1 |
+| Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + orientação persistente + destino nominal sem criar plano | Mitigado na Fase 1 |
 | Alias mTLS sobrevivente aponta para token | remoção apaga branches mortos, mas não corrige revocation | metadata conduz ao endpoint errado | DF7 + teste exato de URL | Aberto |
-| Filtro executa zero testes | classe planejada não existe ou filtro é amplo/incorreto | fase fecha em falso verde | DF17 + fixtures e filtros nomeados | Aberto |
+| Filtro executa zero testes | classe planejada não existe ou filtro é amplo/incorreto | fase fecha em falso verde | DF17 + regra em AGENTS/CLAUDE; fixtures nomeadas nas fases seguintes | Mitigado na Fase 1 |
 | Introspection futura recria cadeia pré-release | plano ignora ADR-020 | bumps sem contrato publicado | DF18 + handoff bilateral | Aberto |
 | Exceção JAR vira precedente | DF7 é lida como se metadata falsa fosse aceitável em geral | novas capabilities sem runtime | delimitação de DF7 + handoff nominal ao plano PAR | Aberto |
 

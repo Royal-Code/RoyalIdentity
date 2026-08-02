@@ -222,8 +222,9 @@ testes default usam EF/SQLite + módulo real. O fake foi removido.
   a suíte provider-neutral usa SQLite por default e mantém aceites PostgreSQL opt-in.
 - Só `Storage.EntityFramework` implementa as facades do IdP; `Data.*` contêm DbContext/entidades/queries.
 
-**Limite do corte:** a persistência do catálogo de resources/scopes continua diferida por DF22 e deve ser tratada
-no plano específico de redesign/persistência desse catálogo. Isso não reabre o primeiro corte concluído.
+**Limite do corte:** o modelo de domínio de resources/scopes está concluído; sua persistência continua diferida
+por DF22 e deve ser tratada no futuro `plan-data-resource-catalog-storage.md`, ainda não criado. Isso não reabre o
+primeiro corte concluído.
 
 ---
 

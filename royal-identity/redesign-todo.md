@@ -58,6 +58,13 @@ Na hora de adicionar os scopes ao token, apenas os *scopes* requeridos serão ad
 
 Para exibir o consentimento, todos os *scopes* do recurso serão exibidos.
 
+**Estado final:** concluído por `.ai/plans/plan-resources-redesign.md`. O modelo vigente usa `IdentityScope`,
+`Scope`, `ResourceServer`, `ProtectedResource` e `RequestedResources`. `ResourceServer` não é solicitado como
+scope; o client autoriza identity scopes, scopes individuais, resource servers e `offline_access` por eixos
+separados. O domínio não está mais em redesign. Somente a persistência do catálogo realm-scoped continua
+diferida para um futuro `plan-data-resource-catalog-storage.md`; até lá, a composição usa
+`ConfigurationResourceBridgeOptions`.
+
 ## Users ✓ DONE (CONCLUÍDO)
 
 Unificar a lógica de usuários.
@@ -87,6 +94,8 @@ Adicionar a funcionalidade de localização.
 Todos os textos e labels estão fixos no código em inglês.
 
 Deverá ser possível adicionar arquivos de localização para cada idioma.
+
+**Aberto:** implementação planejada em `.ai/plans/plan-localization.md`.
 
 ## RFC 9700 (PLANEJADO)
 

@@ -6,6 +6,13 @@
 
 `████████` **100%** - 8 de 8 fases concluidas
 
+> **Nota pós-conclusão (2026-08-01):** o redesign de domínio descrito por este plano é o modelo vigente:
+> `IdentityScope`, `Scope`, `ResourceServer`, `ProtectedResource` e `RequestedResources`, com autorização do client
+> separada entre `AllowedIdentityScopes`, `AllowedScopes`, `AllowedResourceServers`,
+> `AllowAllResourceServers` e `AllowOfflineAccess`. O catálogo continua vindo da bridge realm-scoped
+> `ConfigurationResourceBridgeOptions`; somente sua persistência está diferida para um futuro
+> `plan-data-resource-catalog-storage.md`. Esta nota não reescreve o histórico das oito fases.
+
 ---
 
 ## Contexto

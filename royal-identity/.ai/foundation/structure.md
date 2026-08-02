@@ -275,10 +275,10 @@ Models/
   Scopes/
     ScopeBase.cs
     IdentityScope.cs
-    ApiScope.cs
-    ApiResource.cs
+    Scope.cs
     ResourceServer.cs
-    RequestedScopes.cs
+    ProtectedResource.cs
+    RequestedResources.cs
     AllScopes.cs
     ScopeType.cs
     ScopeVisibility.cs
@@ -555,12 +555,18 @@ Constants: all protocol strings live in the single `Constants` static class (`Ro
 
 ---
 
-## Areas Under Active Redesign (Do Not Stabilize)
+## Current redesign status
 
 From `redesign-todo.md` and `[Redesign]` attributes in code:
 
-- `Client.AllowedScopes` and `Client.AllowOfflineAccess` — to be replaced by `AllowedResources` model
 - `RoyalIdentity/Users/` — user/session edge redesign completed by `plan-users-edge-session`; follow ADR-014
   and do not reintroduce the removed rich user/session types
-- `RoyalIdentity/Models/Scopes/ResourceServer.cs` and related — scope hierarchy redesign in progress
-Do not add heavy logic to these areas without consulting current context on whether redesign is still pending.
+- The scope/resource domain redesign is complete: use `IdentityScope`, `Scope`, `ResourceServer`,
+  `ProtectedResource` and `RequestedResources`, plus the client authorization axes documented in `product.md`.
+  Its catalog remains supplied by `ConfigurationResourceBridgeOptions`; only persistence is deferred to a future
+  `plan-data-resource-catalog-storage.md`.
+- Localization messages in `AccountOptions` remain the active legacy redesign item and are owned by
+  `plan-localization.md`.
+
+Do not infer pending redesign work from historical plan text. Consult the active plan and current `[Redesign]`
+markers before changing a surface.
