@@ -3,9 +3,8 @@ using RoyalIdentity.Extensions;
 namespace RoyalIdentity.Contexts.Items;
 
 /// <summary>
-/// Data structure serializing issued tokens
+/// Represents an issued token in event payloads without retaining its raw value.
 /// </summary>
-[Redesign("Acredito que o uso destes seja desnecessário.")]
 public class Token
 {
     /// <summary>
@@ -28,10 +27,10 @@ public class Token
     public string TokenType { get; }
 
     /// <summary>
-    /// Gets the token value.
+    /// Gets the obfuscated token value safe for event serialization.
     /// </summary>
     /// <value>
-    /// The token value.
+    /// The obfuscated token value.
     /// </value>
     public string TokenValue { get; }
 }

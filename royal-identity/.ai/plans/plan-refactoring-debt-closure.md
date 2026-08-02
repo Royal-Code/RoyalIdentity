@@ -1,15 +1,15 @@
 # Plan: Fechamento de dívidas de refatoração e superfícies inativas (`plan-refactoring-debt-closure`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 1 de 5 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 2 de 5 fases executadas
 
 ## Progresso
 
-`█░░░░` **20%** - 1 de 5 fases
+`██░░░` **40%** - 2 de 5 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Decisões encerradas e documentação de resources | Concluida |
-| Fase 2 - Marcadores antigos e código obsoleto | Pendente |
+| Fase 2 - Marcadores antigos e código obsoleto | Concluida |
 | Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release | Pendente |
 | Fase 4 - Contrato explícito de `acr_values` | Pendente |
 | Fase 5 - Aceites transversais e fechamento | Pendente |
@@ -457,27 +457,29 @@ a esta fase; `git diff --check` foi executado no fechamento.
 **Depende de:** Fase 1, DF3, DF5-DF6, DF15, DF19.
 
 **Escopo:** `IClientSecretChecker`, `Contexts.Items.Token`, `AuthenticationPropertiesExtensions`,
-`AuthorizationContext`, `PkceHelper`, `Tests.Endpoints`, `Tests.Pipelines`, callers e testes.
+`AuthorizationContext`, `PkceHelper`, `Tests.Endpoints`, `Tests.Pipelines`, inventário/gate de proveniência,
+callers e testes.
 
 **O que/como:** remover markers que já não representam trabalho e deletar membros sem consumidores, sem alterar
 eventos, client authentication ou algoritmo PKCE vigente.
 
 **Tarefas:**
 
-- [ ] Confirmar por `rg` e compilação os callers de cada símbolo antes da remoção.
-- [ ] Remover `[Redesign]` de `IClientSecretChecker.EvaluateClientAsync`.
-- [ ] Corrigir XML de `IClientSecretChecker` para `EvaluatedClient`/avaliação de client.
-- [ ] Remover `[Redesign]` de `Contexts.Items.Token` e documentar obfuscação/uso por eventos.
-- [ ] Excluir `AuthenticationPropertiesExtensions.cs` inteiro.
-- [ ] Remover `AuthorizationContext.IdP` e seu XML legado de HRD.
-- [ ] Remover `PkceHelper.GenerateCodeChallengeS256`.
-- [ ] Manter `GenerateS256CodeChallenge`, `GenerateStoredS256CodeChallengeHash` e
+- [x] Confirmar por `rg` e compilação os callers de cada símbolo antes da remoção.
+- [x] Remover `[Redesign]` de `IClientSecretChecker.EvaluateClientAsync`.
+- [x] Corrigir XML de `IClientSecretChecker` para `EvaluatedClient`/avaliação de client.
+- [x] Remover `[Redesign]` de `Contexts.Items.Token` e documentar obfuscação/uso por eventos.
+- [x] Excluir `AuthenticationPropertiesExtensions.cs` inteiro.
+- [x] Remover `AuthorizationContext.IdP` e seu XML legado de HRD.
+- [x] Remover `PkceHelper.GenerateCodeChallengeS256`.
+- [x] Manter `GenerateS256CodeChallenge`, `GenerateStoredS256CodeChallengeHash` e
   `HashCodeChallengeForStorage` com seus significados distintos.
-- [ ] Não remover os `[Redesign]` de Localization; os antigos markers do check-session já foram consumidos pelo
+- [x] Não remover os `[Redesign]` de Localization; os antigos markers do check-session já foram consumidos pelo
   plano OIDC concluído e não devem ser recriados.
-- [ ] Confirmar que `Tests.Endpoints/ServerEndpointTests.cs` duplica o teste vigente de `Tests.Pipelines` e
+- [x] Confirmar que `Tests.Endpoints/ServerEndpointTests.cs` duplica o teste vigente de `Tests.Pipelines` e
   excluir o projeto órfão inteiro, sem adicioná-lo à solution.
-- [ ] Adicionar guardas de arquitetura ou busca documental contra a reintrodução dos símbolos removidos.
+- [x] Remover `AuthenticationPropertiesExtensions.cs` do inventário Apache/IS4 e revalidar o gate de proveniência.
+- [x] Adicionar guardas de arquitetura ou busca documental contra a reintrodução dos símbolos removidos.
 
 **Critérios de aceite:** zero `[Obsolete]`/`[Redesign]` permanece nos símbolos fechados; nenhum shim delegador é
 criado; eventos continuam recebendo tokens obfuscados; PKCE continua usando o helper correto em cada boundary;
@@ -492,11 +494,31 @@ dotnet build RoyalIdentity/RoyalIdentity.csproj
 dotnet test Tests.Pipelines --filter "FullyQualifiedName~EndpointHandler_Must_CreateResponse"
 dotnet test Tests.Identity
 dotnet test Tests.Architecture
+./scripts/Test-ThirdPartyNotices.ps1
 ```
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída em 2026-08-01.** O inventário por `rg` confirmou ausência de callers para
+`AuthenticationPropertiesExtensions`, `AuthorizationContext.IdP` e `PkceHelper.GenerateCodeChallengeS256`;
+o build confirmou o corte sem shims. `IClientSecretChecker.EvaluateClientAsync` e `Contexts.Items.Token` perderam
+somente markers já satisfeitos e receberam documentação alinhada ao contrato vigente. O modelo `Token` continua
+obfuscando o valor no construtor e alimentando os quatro eventos de emissão.
+
+Os três helpers PKCE com semânticas distintas foram preservados. Os três `[Redesign("Usar Resource")]` de
+Localization continuam em `AccountOptions`, e nenhum marker de Check Session foi recriado. O único teste de
+`Tests.Endpoints` era idêntico ao de `Tests.Pipelines`, exceto por namespace/newline; o projeto órfão foi removido
+por inteiro e a cobertura canônica permaneceu em `Tests.Pipelines/ServerEndpointTests.cs`.
+Como `AuthenticationPropertiesExtensions.cs` era classificado como derivado de IS4, o inventário de proveniência
+foi reduzido para 79 candidatos (63 derivados e 16 independentes); o gate voltou a passar sobre 733 arquivos de
+produção e 450 arquivos upstream. O script agora ignora arquivos tracked já ausentes no working tree, enquanto o
+próprio inventário continua falhando se conservar uma entrada cujo arquivo foi removido.
+
+`RefactoringDebtBoundaryTests` fixa por reflexão e inspeção de fonte o contrato de client evaluation, a superfície
+PKCE, o uso do token obfuscado pelos eventos, a ausência dos símbolos fechados e a remoção de `Tests.Endpoints`.
+`TokenTests` prova que o valor bruto não é retido. O guard negativo da fase passou, assim como o build do core e
+os testes focados: `Tests.Pipelines` 1/1, `Tests.Identity` 86/86 e os novos guards de arquitetura 5/5. A suíte
+integral fechou com 1.476 aprovados, 51 ignorados opt-in e zero falhas.
 
 ---
 
@@ -716,7 +738,7 @@ dotnet test RoyalIdentity.sln
 | Payload v1 antigo sobrevive ao corte | ambiente não é reprovisionado | JSON pré-release incompatível | ADR-020 + DF14 + reprovisionamento explícito | Aberto |
 | Extension grant muda erro | remoção do `case` alcança provider inesperado | comportamento diferente | concluir OAuth 2.1 antes + testes registrado/ausente | Aberto |
 | Metadata futura some sem registro | consumidor esperava feature inexistente | descoberta deixa de anunciar falso suporte | breaking aceito; plano futuro reintroduz conjunto completo | Aceito |
-| Remoção obsoleta quebra caller oculto | reflection/source externo | build/consumer falha | `rg`, build integral; sem consumidores de produção | Aceito |
+| Remoção obsoleta quebra caller oculto | reflection/source externo | build/consumer falha | `rg`, build integral; sem consumidores de produção | Fechado na Fase 2 |
 | ACR perde ordem | parse/lista não preserva preferência | interação futura escolhe valor errado | DF11 + teste de ordem/duplicata | Aberto |
 | Logging perde redaction | limpeza remove filtro junto do switch | segredo em log | testes capturando valores sensíveis + RFC 9700 | Aberto |
 | Histórico é reescrito | docs apagam motivo das decisões | perda de rastreabilidade | adendos e cancelamento explícito, sem apagar resultados | Fechado na Fase 1 |

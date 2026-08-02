@@ -19,7 +19,7 @@
       "obj",
       "vendored assets such as wwwroot/lib"
     ],
-    "scannedProductionFiles": 734,
+    "scannedProductionFiles": 733,
     "scannedUpstreamFiles": 450,
     "method": [
       "Enumerate every eligible file under both upstream roots and every tracked production source file.",
@@ -30,8 +30,8 @@
     ]
   },
   "summary": {
-    "candidates": 80,
-    "derived": 64,
+    "candidates": 79,
+    "derived": 63,
     "independent": 16,
     "pending": 0,
     "upstreamNoticePresent": false
@@ -536,18 +536,6 @@
       "production": "royal-identity/RoyalIdentity/Events/UserLogoutSuccessEvent.cs",
       "upstream": [
         "old-is4/src/IdentityServer4/src/Events/UserLogoutSuccessEvent.cs"
-      ],
-      "discovery": [
-        "basename"
-      ],
-      "classification": "derived",
-      "evidence": "Source structure, comments, declarations or implementation expressions remain traceable to the listed Apache-2.0 upstream file(s), in the repository's documented IS4 rearchitecture lineage.",
-      "action": "Preserve upstream attribution and Apache-2.0 reference in the source header; record modifications and central notice."
-    },
-    {
-      "production": "royal-identity/RoyalIdentity/Extensions/AuthenticationPropertiesExtensions.cs",
-      "upstream": [
-        "old-is4/src/IdentityServer4/src/Extensions/AuthenticationPropertiesExtensions.cs"
       ],
       "discovery": [
         "basename"

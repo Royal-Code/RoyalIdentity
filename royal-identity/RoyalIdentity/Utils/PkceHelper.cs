@@ -25,9 +25,4 @@ public static class PkceHelper
         return Hashing.Sha256Base64(codeChallenge);
     }
 
-    [Obsolete("Use GenerateStoredS256CodeChallengeHash for persisted authorization code comparisons.")]
-    public static string GenerateCodeChallengeS256(string codeVerifier)
-    {
-        return GenerateStoredS256CodeChallengeHash(codeVerifier);
-    }
 }

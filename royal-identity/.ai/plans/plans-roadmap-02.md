@@ -85,8 +85,8 @@ definida em `../analisys/`.
 
 ## Execução atual
 
-[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) está em execução: Fase 1 concluída, Fase 2 é
-a próxima. O plano consome a factory de Authentication Response do Session Management concluído e mantém os
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) está em execução: Fases 1-2 concluídas, Fase 3
+é a próxima. O plano consome a factory de Authentication Response do Session Management concluído e mantém os
 payloads Configuration pré-release em v1 conforme ADR-020. Em seguida, executar
 [plan-localization.md](plan-localization.md), que mantém v1 ao adicionar as options de realm e
 fecha a última dívida antiga de `redesign-todo.md`. Depois vem
@@ -424,7 +424,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 3. ~~Concluir `plan-replay-protection.md` (Fase 3).~~ CONCLUÍDO.
 4. ~~Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).~~ CONCLUÍDO.
 5. ~~Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).~~ CONCLUÍDO.
-6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — EM EXECUÇÃO (Fase 1/5 concluída).
+6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — EM EXECUÇÃO (Fases 2/5 concluídas).
 7. Executar [plan-localization.md](plan-localization.md).
 8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.

@@ -138,7 +138,8 @@ $productionFiles = @($tracked |
         $_ -match '^royal-identity/RoyalIdentity[^/]*/.*\.(cs|cshtml|razor|js)$' -and
         $_ -notmatch '/(bin|obj|wwwroot/lib)/'
     } |
-    ForEach-Object { Join-Path $repositoryRoot $_ })
+    ForEach-Object { Join-Path $repositoryRoot $_ } |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
 
 $upstreamFiles = @()
 foreach ($root in $upstreamRoots) {

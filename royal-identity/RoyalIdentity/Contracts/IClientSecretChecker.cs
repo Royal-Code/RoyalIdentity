@@ -4,19 +4,18 @@ using RoyalIdentity.Contracts.Models;
 namespace RoyalIdentity.Contracts;
 
 /// <summary>
-/// Parser for finding the best secret in an Enumerable List
+/// Evaluates the client credentials presented by an endpoint request.
 /// </summary>
 public interface IClientSecretChecker
 {
     /// <summary>
-    /// Tries to find the best secret on the context that can be used for authentication
+    /// Evaluates the request authentication mechanism and resolves the authenticated client.
     /// </summary>
     /// <param name="context">The HTTP context.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>
-    /// A parsed secret
+    /// The evaluated client, or <see langword="null"/> when the credentials cannot authenticate a client.
     /// </returns>
-    [Redesign("Troca o tipo de retorno;")]
     Task<EvaluatedClient?> EvaluateClientAsync(IEndpointContextBase context, CancellationToken ct);
 
     /// <summary>

@@ -96,17 +96,6 @@ public class AuthorizationContext
     public HashSet<string> AcrValues { get; }
 
     /// <summary>
-    /// The external identity provider requested. This is used to bypass home realm 
-    /// discovery (HRD). This is provided via the <c>"idp:"</c> prefix to the <c>acr</c> 
-    /// parameter on the authorize request.
-    /// </summary>
-    /// <value>
-    /// The external identity provider identifier.
-    /// </value>
-    [Obsolete]
-    public string? IdP { get; }
-
-    /// <summary>
     /// Gets the validated contents of the request object (if present)
     /// </summary>
     /// <value>
