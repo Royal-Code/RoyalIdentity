@@ -216,8 +216,10 @@
 - **DF16 — Realm e providers:** alterações de options/discovery devem cobrir dois realms; o payload v1 corrente
   deve manter paridade SQLite/PostgreSQL sem migration relacional ou JSON pré-release. Fonte: ADR-009 + ADR-020.
 - **DF17 — Topologia verificável de testes:** payloads ficam em `Tests.Storage`; discovery, aliases mTLS, extension
-  grants e ACR ficam em fixtures nomeadas de `Tests.Integration`; ausência de superfícies removidas fica em
-  `Tests.Architecture`. Nenhum comando obrigatório pode selecionar zero testes. A execução deste plano também
+  grants e ACR ficam em fixtures nomeadas de `Tests.Integration`; as remoções da Fase 2 ficam em
+  `RefactoringDebtBoundaryTests` e as superfícies inativas removidas na Fase 3 ficam em
+  `InactiveProtocolSurfaceBoundaryTests`, ambas em `Tests.Architecture`. Nenhum comando obrigatório pode selecionar
+  zero testes nem somente testes de uma fase anterior. A execução deste plano também
   promove essa regra para a orientação persistente do repositório. Fonte: infraestrutura e execução empírica dos
   filtros atuais.
 - **DF18 — Handoff explícito de introspection:** este plano remove `EnableIntrospectionEndpoint` dos payloads v1.
@@ -518,7 +520,9 @@ próprio inventário continua falhando se conservar uma entrada cujo arquivo foi
 PKCE, o uso do token obfuscado pelos eventos, a ausência dos símbolos fechados e a remoção de `Tests.Endpoints`.
 `TokenTests` prova que o valor bruto não é retido. O guard negativo da fase passou, assim como o build do core e
 os testes focados: `Tests.Pipelines` 1/1, `Tests.Identity` 86/86 e os novos guards de arquitetura 5/5. A suíte
-integral fechou com 1.476 aprovados, 51 ignorados opt-in e zero falhas.
+integral fechou com 1.480 aprovados, 51 ignorados opt-in e zero falhas. A contagem foi lida da execução por projeto
+— incluindo os 511 testes aprovados de `Tests.Storage` já vigentes na baseline — e não derivada do total do plano
+anterior.
 
 ---
 
@@ -559,8 +563,9 @@ extension provider, retirar logging sem efeito e atualizar o formato corrente se
 - [ ] Testar extension grant registrado e não registrado sem duplicar a taxonomia do plano OAuth 2.1.
 - [ ] Estender `Tests.Integration/Endpoints/DiscoveryTests.cs` com omissões exatas e alias mTLS de revocation.
 - [ ] Criar `Tests.Integration/Endpoints/ExtensionGrantRoutingTests.cs` para grants registrados/não registrados.
-- [ ] Criar `Tests.Architecture/RefactoringDebtBoundaryTests.cs` para ausência de options/branches/markers removidos
-  e preservação dos filtros sensíveis de logging.
+- [ ] Criar `Tests.Architecture/InactiveProtocolSurfaceBoundaryTests.cs` para ausência de
+  options/branches/markers removidos na Fase 3 e preservação dos filtros sensíveis de logging; não reutilizar como
+  aceite as guardas de `RefactoringDebtBoundaryTests` já entregues pela Fase 2.
 
 **Critérios de aceite:** discovery não contém introspection/Device Authorization nem os anuncia em mTLS/grants;
 o alias mTLS de revocation aponta exatamente para a rota mTLS de revocation e o de token permanece correto;
@@ -574,7 +579,7 @@ fechados; cada filtro obrigatório seleciona ao menos um teste.
 dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~DiscoveryTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~ExtensionGrantRoutingTests"
-dotnet test Tests.Architecture --filter "FullyQualifiedName~RefactoringDebtBoundaryTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~InactiveProtocolSurfaceBoundaryTests"
 ```
 
 ### Resultado da Fase 3

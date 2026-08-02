@@ -3,7 +3,7 @@ using RoyalIdentity.Extensions;
 namespace RoyalIdentity.Contexts.Items;
 
 /// <summary>
-/// Represents an issued token in event payloads without retaining its raw value.
+/// Represents an issued token in event payloads without retaining its complete raw value.
 /// </summary>
 public class Token
 {
@@ -27,7 +27,7 @@ public class Token
     public string TokenType { get; }
 
     /// <summary>
-    /// Gets the obfuscated token value safe for event serialization.
+    /// Gets the obfuscated token value used in event payloads.
     /// </summary>
     /// <value>
     /// The obfuscated token value.
