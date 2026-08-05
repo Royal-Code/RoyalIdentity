@@ -24,8 +24,6 @@ public class EndpointsOptions
         EnableEndSessionEndpoint = other.EnableEndSessionEndpoint;
         EnableCheckSessionEndpoint = other.EnableCheckSessionEndpoint;
         EnableTokenRevocationEndpoint = other.EnableTokenRevocationEndpoint;
-        EnableIntrospectionEndpoint = other.EnableIntrospectionEndpoint;
-        EnableDeviceAuthorizationEndpoint = other.EnableDeviceAuthorizationEndpoint;
     }
 
     /// <summary>
@@ -89,20 +87,4 @@ public class EndpointsOptions
     /// </value>
     public bool EnableTokenRevocationEndpoint { get; set; } = true;
 
-    /// <summary>
-    /// Gets or sets a value indicating whether the introspection endpoint is enabled.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if the introspection endpoint is enabled; otherwise, <c>false</c>.
-    /// </value>
-    public bool EnableIntrospectionEndpoint { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets a value indicating whether the device authorization endpoint is enabled.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if the device authorization endpoint is enabled; otherwise, <c>false</c>.
-    /// </value>
-    [Redesign("The Device Authorization must be an extension grant type -- remove this property")]
-    public bool EnableDeviceAuthorizationEndpoint { get; set; } = false;
 }

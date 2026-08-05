@@ -100,12 +100,6 @@ public class TokenEndpoint : IEndpointHandler
             case OpenIdConnectGrantTypes.ClientCredentials:
                 context = new ClientCredentialsContext(httpContext, parameters, items);
                 break;
-            case OpenIdConnectGrantTypes.DeviceCode:
-
-                break;
-            case OpenIdConnectGrantTypes.TokenExchange:
-
-                break;
             default:
                 if (extensionsGrantsProvider.GetAvailableGrantTypes().Contains(grantType))
                 {

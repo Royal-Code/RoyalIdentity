@@ -37,11 +37,6 @@ public static class LoggerExtensions
     {
         var raw = GetRaw(context, options.RedactedParameterNames);
         logger.LogError("{Message}\n{Raw}", message, raw);
-
-        if (options.UseLogService)
-        {
-            // TODO: chamar o log sevice
-        }
     }
 
     internal static void LogError(this ILogger logger,
@@ -52,11 +47,6 @@ public static class LoggerExtensions
     {
         var raw = GetRaw(context, options.RedactedParameterNames);
         logger.LogError("{Message}: {Details}\n{Raw}", message, details, raw);
-
-        if (options.UseLogService)
-        {
-            // TODO: chamar o log sevice
-        }
     }
 
     internal static void LogError(this ILogger logger,
@@ -67,11 +57,6 @@ public static class LoggerExtensions
     {
         var raw = GetRaw(context, options.RedactedParameterNames);
         logger.LogError(ex, "{Message}\n{Raw}", message, raw);
-
-        if (options.UseLogService)
-        {
-            // TODO: chamar o log sevice
-        }
     }
 
     internal static void LogError(this ILogger logger,

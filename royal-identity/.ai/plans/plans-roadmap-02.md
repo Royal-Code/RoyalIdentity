@@ -85,7 +85,7 @@ definida em `../analisys/`.
 
 ## Execução atual
 
-[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) está em execução: Fases 1-2 concluídas, Fase 3
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) está em execução: Fases 1-3 concluídas, Fase 4
 é a próxima. O plano consome a factory de Authentication Response do Session Management concluído e mantém os
 payloads Configuration pré-release em v1 conforme ADR-020. Em seguida, executar
 [plan-localization.md](plan-localization.md), que mantém v1 ao adicionar as options de realm e

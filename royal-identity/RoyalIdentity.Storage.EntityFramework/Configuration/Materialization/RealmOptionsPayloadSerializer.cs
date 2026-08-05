@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using RoyalIdentity.Options;
 
@@ -44,6 +45,7 @@ public sealed class RealmOptionsPayloadSerializer
         // the caller-supplied graph; the dropped navigation is never read from the payload.
         var deserializeOptions = new JsonSerializerOptions(JsonSerializerDefaults.General)
         {
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
             TypeInfoResolver = new DefaultJsonTypeInfoResolver
             {
                 Modifiers =

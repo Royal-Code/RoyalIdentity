@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models.Scopes;
 using RoyalIdentity.Utils;
@@ -51,6 +52,27 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
         Assert.Contains("claims_supported", document);
         Assert.Contains("code_challenge_methods_supported", document);
         Assert.Contains("protected_resources", document);
+    }
+
+    [Fact]
+    public async Task Get_ForTwoRealms_MustNotAdvertiseInactiveProtocolSurface()
+    {
+        var client = factory.CreateClient();
+
+        foreach (var realm in new[] { factory.Handles.Demo, factory.Handles.Server })
+        {
+            var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(realm.Path);
+            using var document = JsonDocument.Parse(await client.GetStringAsync(url));
+            var root = document.RootElement;
+
+            Assert.False(root.TryGetProperty(Oidc.Discovery.IntrospectionEndpoint, out _));
+            Assert.False(root.TryGetProperty(Oidc.Discovery.DeviceAuthorizationEndpoint, out _));
+            Assert.DoesNotContain(
+                OpenIdConnectGrantTypes.DeviceCode,
+                root.GetProperty(Oidc.Discovery.GrantTypesSupported)
+                    .EnumerateArray()
+                    .Select(value => value.GetString()));
+        }
     }
 
     [Fact]
@@ -212,6 +234,42 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
                     Oidc.Endpoint.AuthMethods.SelfSignedTlsClientAuth
                 ],
                 methods);
+        }
+        finally
+        {
+            await factory.UpdateRealmAsync(
+                factory.Handles.Demo,
+                options => options.MutualTls.Enabled = false);
+        }
+    }
+
+    [Fact]
+    public async Task Get_WithMutualTlsEnabled_MustPublishOnlyTheExactLiveEndpointAliases()
+    {
+        await factory.UpdateRealmAsync(
+            factory.Handles.Demo,
+            options => options.MutualTls.Enabled = true);
+        try
+        {
+            var client = factory.CreateClient();
+            var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
+            using var document = JsonDocument.Parse(await client.GetStringAsync(url));
+            var root = document.RootElement;
+            var aliases = root.GetProperty(Oidc.Discovery.MtlsEndpointAliases);
+
+            Assert.Equal(2, aliases.EnumerateObject().Count());
+
+            var tokenEndpoint = root.GetProperty(Oidc.Discovery.TokenEndpoint).GetString()!;
+            var revocationEndpoint = root.GetProperty(Oidc.Discovery.RevocationEndpoint).GetString()!;
+
+            Assert.Equal(
+                tokenEndpoint.Replace("/connect/token", "/connect/mtls/token", StringComparison.Ordinal),
+                aliases.GetProperty(Oidc.Discovery.TokenEndpoint).GetString());
+            Assert.Equal(
+                revocationEndpoint.Replace("/connect/revocation", "/connect/mtls/revocation", StringComparison.Ordinal),
+                aliases.GetProperty(Oidc.Discovery.RevocationEndpoint).GetString());
+            Assert.False(aliases.TryGetProperty(Oidc.Discovery.IntrospectionEndpoint, out _));
+            Assert.False(aliases.TryGetProperty(Oidc.Discovery.DeviceAuthorizationEndpoint, out _));
         }
         finally
         {

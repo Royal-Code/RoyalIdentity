@@ -86,16 +86,6 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 entries.Add(Oidc.Discovery.RevocationEndpoint, baseUrl + Oidc.Routes.BuildRevocationUrl(realmPath));
             }
 
-            if (options.Endpoints.EnableIntrospectionEndpoint)
-            {
-                entries.Add(Oidc.Discovery.IntrospectionEndpoint, baseUrl + Oidc.Routes.BuildIntrospectionUrl(realmPath));
-            }
-
-            if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
-            {
-                entries.Add(Oidc.Discovery.DeviceAuthorizationEndpoint, baseUrl + Oidc.Routes.BuildDeviceAuthorizationUrl(realmPath));
-            }
-
             if (options.MutualTls.Enabled)
             {
                 var mtlsEndpoints = new Dictionary<string, string>();
@@ -106,15 +96,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 }
                 if (options.Endpoints.EnableTokenRevocationEndpoint)
                 {
-                    mtlsEndpoints.Add(Oidc.Discovery.RevocationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
-                }
-                if (options.Endpoints.EnableIntrospectionEndpoint)
-                {
-                    mtlsEndpoints.Add(Oidc.Discovery.IntrospectionEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
-                }
-                if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
-                {
-                    mtlsEndpoints.Add(Oidc.Discovery.DeviceAuthorizationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
+                    mtlsEndpoints.Add(Oidc.Discovery.RevocationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsRevocationUrl(realmPath)));
                 }
 
                 if (mtlsEndpoints.Count is not 0)
@@ -214,11 +196,6 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 OpenIdConnectGrantTypes.ClientCredentials,
                 OpenIdConnectGrantTypes.RefreshToken
             ];
-
-            if (options.Endpoints.EnableDeviceAuthorizationEndpoint)
-            {
-                standardGrantTypes.Add(OpenIdConnectGrantTypes.DeviceCode);
-            }
 
             var showGrantTypes = new List<string>(standardGrantTypes);
 

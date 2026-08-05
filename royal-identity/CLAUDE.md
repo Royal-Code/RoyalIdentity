@@ -49,7 +49,7 @@ Completed refactoring plans (useful as historical record and for understanding d
 Active plans (check status before modifying affected areas):
 
 - [.ai/plans/plan-refactoring-debt-closure.md](.ai/plans/plan-refactoring-debt-closure.md) — EM EXECUÇÃO;
-  Fases 1-2 concluídas, Fase 3 é a próxima.
+  Fases 1-3 concluídas, Fase 4 é a próxima.
 
 The resources/scopes domain redesign is complete; only persistence of its realm-scoped
 `ConfigurationResourceBridgeOptions` catalog remains deferred to a future dedicated plan. `Tests.Host` is

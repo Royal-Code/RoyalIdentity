@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using RoyalIdentity.Options;
 
@@ -17,6 +18,7 @@ public sealed class ServerOptionsPayloadSerializer
 
     private static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.General)
     {
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { GetOnlyCollectionModifier.Apply } },
         Converters = { new ConfigurationObjectJsonConverter() },
     };

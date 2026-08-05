@@ -203,6 +203,100 @@ a rotação final de refresh token sem editar os mesmos handlers em paralelo.
 
 ---
 
+## OAuth 2.0 Device Authorization Grant (Device Flow / RFC 8628)
+
+**Identificador:** `BL-OAUTH-DEVICE-AUTHORIZATION`
+
+**Área:** OAuth2 / Devices / Token endpoint / UI de verificação / Operational
+
+**Status:** RASTREADO; análise e plano ainda não criados.
+
+**Especificação:** [RFC 8628 — OAuth 2.0 Device Authorization Grant](https://www.rfc-editor.org/rfc/rfc8628.html),
+Standards Track. O protocolo cria um Device Authorization Endpoint separado, o grant
+`urn:ietf:params:oauth:grant-type:device_code` no token endpoint, códigos `device_code`/`user_code`, interação do
+usuário em outro dispositivo, polling e os erros `authorization_pending`, `slow_down`, `access_denied` e
+`expired_token`.
+
+**Estado verificado:** constantes protocolares existem, mas não há rota, context/pipeline, store de códigos,
+verificação pelo usuário, controle de polling ou rate limiting. A remoção do `case DeviceCode` vazio no
+`TokenEndpoint` não removeu uma implementação: o branch produzia `context=null` e impedia um `IExtensionGrant`
+registrado para a URN padronizada. O fallback de extension grants agora preserva esse seam, mas sozinho não
+constitui suporte ao RFC 8628.
+
+**Escopo futuro mínimo:** endpoint autenticado de device authorization; geração e persistência Operational de
+`device_code` e `user_code` com digest, TTL e consumo/decisão atômicos; página/fluxo de verificação realm-scoped;
+polling com intervalo e rate limit; taxonomia completa de erros; policy por client; discovery fiel e testes
+SQLite/PostgreSQL. Reintroduzir uma option de endpoint e limites específicos somente no mesmo corte do runtime;
+um único `InputLengthRestrictions.DeviceCode` genérico não modela os dois códigos nem suas diferentes ameaças.
+
+**Quando revisitar:** quando houver demanda de smart TVs, consoles, CLIs ou dispositivos sem browser/input
+adequado. Não usar como substituto do Authorization Code + PKCE em aplicações nativas capazes de abrir browser.
+
+---
+
+## OAuth 2.0 Token Exchange (RFC 8693)
+
+**Identificador:** `BL-OAUTH-TOKEN-EXCHANGE`
+
+**Área:** OAuth2 / STS / Delegação / Impersonação / Token endpoint
+
+**Status:** RASTREADO; análise e plano ainda não criados.
+
+**Especificação:** [RFC 8693 — OAuth 2.0 Token Exchange](https://www.rfc-editor.org/rfc/rfc8693.html), Standards
+Track. É um extension grant do token endpoint, não um endpoint separado, identificado por
+`urn:ietf:params:oauth:grant-type:token-exchange`.
+
+**Estado verificado:** a URN existe nas dependências/constantes usadas pelo projeto, mas não há handler, validação
+de `subject_token`/`actor_token`, policy de delegação/impersonação ou emissão com `issued_token_type`. O antigo
+`case TokenExchange` vazio impedia o `IExtensionsGrantsProvider` de atender a URN; removê-lo preserva a arquitetura
+correta para uma implementação futura registrada e mantém `unsupported_grant_type` quando ela não existe.
+
+**Escopo futuro mínimo:** autenticação e autorização explícitas do client para troca; validação por tipo do
+`subject_token` e `actor_token`; distinção entre delegação e impersonação; binding de realm, audience/resource e
+scopes; política de tipos de token de entrada/saída; emissão, revogação e auditoria sem criar cadeia privilegiada
+ou vazar tokens; metadata somente quando a implementação estiver ativa.
+
+**Quando revisitar:** quando existir caso concreto de serviço agindo em nome de usuário, troca entre domínios de
+confiança ou STS/federação. Não habilitar apenas porque a URN é padronizada: a policy de confiança é parte central
+da feature.
+
+---
+
+## Persistência de logs operacionais e auditoria de segurança
+
+**Identificador:** `BL-OBS-DURABLE-LOGGING-AUDIT`
+
+**Área:** Observabilidade / Auditoria / Operações / Multi-realm
+
+**Status:** RASTREADO; depende de requisitos de retenção, consulta e implantação antes de virar plano.
+
+**Estado verificado:** os erros do protocolo já são enviados de forma estruturada e com redaction para
+`ILogger`; o antigo `LoggingOptions.UseLogService` alcançava somente três blocos TODO vazios, depois da chamada ao
+logger, e nunca interceptou ou persistiu nada. Mantê-lo não garantiria histórico. Os hosts ainda não declaram um
+backend durável como contrato de produção. O módulo `UserAccounts` possui o seam semântico
+`ISecurityAuditSink`, atualmente no-op por default; o core possui `IEventDispatcher`/`IEventObserver`. O macroplano
+de dados já reserva o futuro `plan-data-audit-outbox.md`, ainda não criado.
+
+**Decisão de direção:** tratar dois problemas separadamente:
+
+1. **Logs operacionais:** manter `ILogger` como boundary e permitir que cada deployment/cliente registre um ou
+   mais `ILoggerProvider`/exporters no composition root (arquivo, banco, OpenTelemetry/OTLP, serviço externo etc.).
+   Isso captura todo o pipeline, não apenas callers de `LoggerExtensions`, e reutiliza a extensão padrão do .NET.
+2. **Auditoria durável e consultável:** usar registros semânticos tipados, realm-scoped e sem segredos. Evoluir os
+   eventos/sinks existentes — ou criar um `IProtocolSecurityAuditSink` somente se a análise provar que o core
+   precisa de um contrato próprio — em vez de transformar texto de log em modelo de auditoria.
+
+**Requisitos para o plano:** decidir retenção, índices/consulta, categorias, correlação por realm/activity,
+redaction/allowlist, política de falha e backpressure, acesso administrativo, exportação, provider neutrality e se
+há necessidade real de outbox. Distinguir seleção por deployment/cliente da seleção dinâmica por realm; a segunda
+não deve ser inferida sem requisito explícito.
+
+**Quando revisitar:** antes do primeiro deployment que exija histórico persistente, investigação forense,
+compliance ou consulta administrativa. Se retenção/consulta não forem necessárias, um provider/exporter externo
+de logs pode ser suficiente sem criar store do produto.
+
+---
+
 ## Persistência EFCore do primeiro corte (PostgreSQL/SQLite) — ✅ CONCLUÍDO
 
 **Área:** Storage / Persistência

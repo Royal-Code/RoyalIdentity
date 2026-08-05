@@ -1,16 +1,16 @@
 # Plan: Fechamento de dívidas de refatoração e superfícies inativas (`plan-refactoring-debt-closure`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 2 de 5 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 3 de 5 fases executadas
 
 ## Progresso
 
-`██░░░` **40%** - 2 de 5 fases
+`███░░` **60%** - 3 de 5 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Decisões encerradas e documentação de resources | Concluida |
 | Fase 2 - Marcadores antigos e código obsoleto | Concluida |
-| Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release | Pendente |
+| Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release | Concluida |
 | Fase 4 - Contrato explícito de `acr_values` | Pendente |
 | Fase 5 - Aceites transversais e fechamento | Pendente |
 
@@ -51,6 +51,10 @@
 - [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md) — é o dono da separação entre a
   referência PAR e Request Object/JAR e removerá a metadata `request_parameter_supported=true` enquanto
   `ProcessRequestObject` continuar sem implementação.
+- [RFC 8628](https://www.rfc-editor.org/rfc/rfc8628.html) e
+  [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693.html) — confirmam que Device Authorization e Token Exchange
+  são extensões OAuth legítimas; o primeiro exige também endpoint/fluxo próprio, enquanto o segundo é um
+  extension grant do token endpoint.
 - `git show f3478412 -- RoyalIdentity/Contracts/IClientSecretChecker.cs` — a alteração marcada no
   `[Redesign]` já ocorreu: `ParsedSecret?`/`ParseAsync` viraram `EvaluatedClient?`/`EvaluateClientAsync`.
 - `RoyalIdentity/Extensions/AuthenticationPropertiesExtensions.cs`,
@@ -117,7 +121,10 @@
 - **Histórico não é backlog:** decisões canceladas devem permanecer explicadas, mas não contar como fase pendente.
 - **Persistência de resources é plano próprio:** este plano desbloqueia documentação; não desenha entidades,
   migrations ou CRUD do catálogo.
-- **Auditoria não nasce de um boolean morto:** remover `UseLogService` não autoriza criar sink, outbox ou store.
+- **Auditoria não nasce de um boolean morto:** remover `UseLogService` não autoriza criar sink, outbox ou store,
+  mas também não cancela a necessidade futura. Logs operacionais persistentes usam providers/exporters de
+  `ILogger` no host; auditoria consultável exige eventos tipados, retenção e semântica próprias, agora rastreadas
+  por `BL-OBS-DURABLE-LOGGING-AUDIT` no backlog.
 - **Localization permanece ativa:** os `[Redesign("Usar Resource")]` de `AccountOptions` não entram nesta limpeza.
 - **Handoff de introspection:** a remoção de `EnableIntrospectionEndpoint` no payload pré-release v1 é temporária
   até o endpoint real. O plano de Reference Tokens/Introspection precisa restaurar gate, runtime e discovery no
@@ -191,13 +198,18 @@
   da separação entre referência PAR e Request Object/JAR. Fonte: decisão humana + RFC 9700 plan + código
   verificado de `DiscoveryHandler`/`Constants`.
 - **DF8 — Extension grants pelo provider:** remover branches vazios de `DeviceCode` e `TokenExchange`; o branch
-  default consulta `IExtensionsGrantsProvider`, e ausência continua `unsupported_grant_type`. Fonte: arquitetura
-  atual do token endpoint.
+  default consulta `IExtensionsGrantsProvider`, e ausência continua `unsupported_grant_type`. Isso preserva o
+  seam para as extensões padronizadas dos RFCs 8628/8693, mas não afirma que estejam implementadas; Device Flow
+  ainda exige endpoint, interação, store e polling próprios. Fonte: arquitetura atual do token endpoint + RFCs
+  8628/8693.
 - **DF9 — Options mortas removidas:** remover `EnableIntrospectionEndpoint`,
   `EnableDeviceAuthorizationEndpoint` e `InputLengthRestrictions.DeviceCode`; constantes protocolares sem efeito
   podem permanecer. Fonte: decisão humana + superfícies verificadas.
-- **DF10 — Logging único:** remover `UseLogService` e blocos TODO; `ILogger` permanece o único destino deste
-  corte. Fonte: decisão humana nesta discussão.
+- **DF10 — Logging extensível pelo host:** remover `UseLogService` e blocos TODO; `ILogger` permanece o boundary
+  operacional deste corte e cada composition root pode adicionar `ILoggerProvider`/exporter. Persistência de logs
+  e auditoria semântica durável são requisitos diferentes e permanecem rastreados no backlog, sem acoplar
+  `LoggerExtensions` a banco ou serviço específico. Fonte: decisão humana clarificada após a Fase 3 + abstração
+  de logging do .NET.
 - **DF11 — `acr_values` como preferência ordenada:** substituir `HashSet<string>` por uma representação exposta
   como `IReadOnlyList<string>` em `IWithAcr`, `AuthorizeContext` e `AuthorizationContext`. O parse preserva a ordem
   de entrada, remove duplicatas mantendo a primeira ocorrência com comparação ordinal e aceita valores dentro do
@@ -274,6 +286,17 @@
 - **Revisão do plano de Localization:** confirmou-se que `Tests.Endpoints` está fora da solution e seu único teste
   duplica byte a byte, salvo namespace, o cenário de `Tests.Pipelines/ServerEndpointTests.cs`.
   - **Conclusão:** remover o projeto órfão nesta limpeza conforme DF19; Localization usa discovery integration.
+
+**Clarificação do mantenedor após a Fase 3 (2026-08-02):**
+
+- **Device Authorization e Token Exchange são extensões legítimas:** os branches vazios não eram implementação
+  parcial e bloqueavam o provider; a remoção é mantida, enquanto os RFCs 8628/8693 passam a ter itens próprios
+  `BL-OAUTH-DEVICE-AUTHORIZATION` e `BL-OAUTH-TOKEN-EXCHANGE` no backlog.
+- **Introspection permanece planejado:** a remoção da option/metadata é apenas o intervalo sem runtime; o plano
+  `plan-reference-tokens-introspection.md` continua dono da reintrodução completa e fiel.
+- **Persistência de logs não foi cancelada:** o boolean/TODO não fornecia a extensibilidade desejada. O backlog
+  `BL-OBS-DURABLE-LOGGING-AUDIT` separa providers/exporters de `ILogger`, configurados pelo host, de auditoria
+  semântica durável baseada em eventos/sinks tipados.
 
 ---
 
@@ -540,30 +563,30 @@ extension provider, retirar logging sem efeito e atualizar o formato corrente se
 
 **Tarefas:**
 
-- [ ] Confirmar que não existe endpoint mapeado de introspection ou Device Authorization.
-- [ ] Remover `EnableIntrospectionEndpoint` e `EnableDeviceAuthorizationEndpoint` de `EndpointsOptions` e cópias.
-- [ ] Remover `InputLengthRestrictions.DeviceCode`, já que a extensão proprietária valida seus parâmetros.
-- [ ] Remover metadata, aliases mTLS e grant anunciado condicionados às options removidas.
-- [ ] Corrigir o alias mTLS vivo de revocation para `BuildMtlsRevocationUrl`; não alterar o alias correto de token.
-- [ ] Registrar no handoff de `plan-reference-tokens-introspection.md` que eventual alias de introspection usa
+- [x] Confirmar que não existe endpoint mapeado de introspection ou Device Authorization.
+- [x] Remover `EnableIntrospectionEndpoint` e `EnableDeviceAuthorizationEndpoint` de `EndpointsOptions` e cópias.
+- [x] Remover `InputLengthRestrictions.DeviceCode`, já que a extensão proprietária valida seus parâmetros.
+- [x] Remover metadata, aliases mTLS e grant anunciado condicionados às options removidas.
+- [x] Corrigir o alias mTLS vivo de revocation para `BuildMtlsRevocationUrl`; não alterar o alias correto de token.
+- [x] Registrar no handoff de `plan-reference-tokens-introspection.md` que eventual alias de introspection usa
   `BuildMtlsIntrospectionUrl`, nunca a rota de token ou revocation.
-- [ ] Preservar o handoff para `plan-pushed-authorization-requests.md`: não tratar
+- [x] Preservar o handoff para `plan-pushed-authorization-requests.md`: não tratar
   `request_parameter_supported=true` como capacidade válida nem removê-lo isoladamente antes de separar
   referência PAR de Request Object/JAR.
-- [ ] Remover os `case DeviceCode` e `case TokenExchange` vazios do token endpoint.
-- [ ] Garantir que o branch default consulte `IExtensionsGrantsProvider` para ambos quando registrados.
-- [ ] Garantir `unsupported_grant_type` exato quando nenhuma extensão possuir o grant.
-- [ ] Remover `LoggingOptions.UseLogService` e sua cópia.
-- [ ] Remover os três blocos TODO de `LoggerExtensions` sem alterar filtros/redaction.
-- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion` ou
+- [x] Remover os `case DeviceCode` e `case TokenExchange` vazios do token endpoint.
+- [x] Garantir que o branch default consulte `IExtensionsGrantsProvider` para ambos quando registrados.
+- [x] Garantir `unsupported_grant_type` exato quando nenhuma extensão possuir o grant.
+- [x] Remover `LoggingOptions.UseLogService` e sua cópia.
+- [x] Remover os três blocos TODO de `LoggerExtensions` sem alterar filtros/redaction.
+- [x] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion` ou
   `RealmOptionsPayloadSerializer.CurrentVersion` for diferente de 1; preservar v1 após o corte.
-- [ ] Atualizar seeds, fixtures, payload coverage e testes de versões não suportadas.
-- [ ] Não criar migration relacional ou JSON; documentar o reprovisionamento obrigatório dos payloads v1 antigos.
-- [ ] Testar dois realms com discovery sem endpoints mortos.
-- [ ] Testar extension grant registrado e não registrado sem duplicar a taxonomia do plano OAuth 2.1.
-- [ ] Estender `Tests.Integration/Endpoints/DiscoveryTests.cs` com omissões exatas e alias mTLS de revocation.
-- [ ] Criar `Tests.Integration/Endpoints/ExtensionGrantRoutingTests.cs` para grants registrados/não registrados.
-- [ ] Criar `Tests.Architecture/InactiveProtocolSurfaceBoundaryTests.cs` para ausência de
+- [x] Atualizar seeds, fixtures, payload coverage e testes de versões não suportadas.
+- [x] Não criar migration relacional ou JSON; documentar o reprovisionamento obrigatório dos payloads v1 antigos.
+- [x] Testar dois realms com discovery sem endpoints mortos.
+- [x] Testar extension grant registrado e não registrado sem duplicar a taxonomia do plano OAuth 2.1.
+- [x] Estender `Tests.Integration/Endpoints/DiscoveryTests.cs` com omissões exatas e alias mTLS de revocation.
+- [x] Criar `Tests.Integration/Endpoints/ExtensionGrantRoutingTests.cs` para grants registrados/não registrados.
+- [x] Criar `Tests.Architecture/InactiveProtocolSurfaceBoundaryTests.cs` para ausência de
   options/branches/markers removidos na Fase 3 e preservação dos filtros sensíveis de logging; não reutilizar como
   aceite as guardas de `RefactoringDebtBoundaryTests` já entregues pela Fase 2.
 
@@ -584,7 +607,23 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~InactiveProtocolSurf
 
 ### Resultado da Fase 3
 
-*a preencher*
+A superfície inativa foi removida sem anunciar ou mapear introspection/Device Authorization: as duas options,
+o limite genérico de `DeviceCode`, os branches de discovery e os `case` vazios deixaram o core. `device_code` e
+token exchange registrados agora alcançam exclusivamente `IExtensionsGrantsProvider`; um grant ausente continua
+respondendo `unsupported_grant_type`. O alias mTLS vivo de revocation usa sua própria rota, e o handoff do plano
+de Reference Tokens fixa `BuildMtlsIntrospectionUrl` para a futura implementação. A revisão de aceite confirmou
+que os RFCs 8628/8693 continuam capacidades futuras legítimas e criou backlog nominal para ambos; os branches
+vazios removidos não representavam implementação parcial.
+
+`UseLogService` e os três TODOs sem efeito foram removidos, preservando integralmente
+`LoggingOptions.AlwaysRedacted`. Persistência futura permanece rastreada, usando providers/exporters de `ILogger`
+para logs operacionais e um contrato semântico distinto para auditoria durável. Os serializers Configuration
+permanecem em v1 e agora rejeitam membros JSON
+desconhecidos, inclusive os quatro campos removidos do shape pré-release; dados anteriores exigem
+reprovisionamento conforme ADR-020, sem migration ou leitor legado. Os filtros obrigatórios fecharam em 29
+testes de payload, 9 de discovery, 3 de roteamento de extension grants e 5 guardas arquiteturais. A suíte integral
+fechou com 1.498 aprovados, 51 ignorados opt-in e zero falhas; `git diff --check` e o guard nominal não encontraram
+resíduos.
 
 ---
 
@@ -740,18 +779,18 @@ dotnet test RoyalIdentity.sln
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Payload v1 antigo sobrevive ao corte | ambiente não é reprovisionado | JSON pré-release incompatível | ADR-020 + DF14 + reprovisionamento explícito | Aberto |
-| Extension grant muda erro | remoção do `case` alcança provider inesperado | comportamento diferente | concluir OAuth 2.1 antes + testes registrado/ausente | Aberto |
+| Payload v1 antigo sobrevive ao corte | ambiente não é reprovisionado | JSON pré-release incompatível | ADR-020 + DF14 + reprovisionamento explícito | Fechado na Fase 3 |
+| Extension grant muda erro | remoção do `case` alcança provider inesperado | comportamento diferente | concluir OAuth 2.1 antes + testes registrado/ausente | Fechado na Fase 3 |
 | Metadata futura some sem registro | consumidor esperava feature inexistente | descoberta deixa de anunciar falso suporte | breaking aceito; plano futuro reintroduz conjunto completo | Aceito |
 | Remoção obsoleta quebra caller oculto | reflection/source externo | build/consumer falha | `rg`, build integral; sem consumidores de produção | Fechado na Fase 2 |
 | ACR perde ordem | parse/lista não preserva preferência | interação futura escolhe valor errado | DF11 + teste de ordem/duplicata | Aberto |
-| Logging perde redaction | limpeza remove filtro junto do switch | segredo em log | testes capturando valores sensíveis + RFC 9700 | Aberto |
+| Logging perde redaction | limpeza remove filtro junto do switch | segredo em log | testes capturando valores sensíveis + RFC 9700 | Mitigado na Fase 3 |
 | Histórico é reescrito | docs apagam motivo das decisões | perda de rastreabilidade | adendos e cancelamento explícito, sem apagar resultados | Fechado na Fase 1 |
 | Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + nota normativa pós-conclusão em DF22 + orientação persistente + destino nominal sem criar plano | Mitigado na Fase 1 |
-| Alias mTLS sobrevivente aponta para token | remoção apaga branches mortos, mas não corrige revocation | metadata conduz ao endpoint errado | DF7 + teste exato de URL | Aberto |
+| Alias mTLS sobrevivente aponta para token | remoção apaga branches mortos, mas não corrige revocation | metadata conduz ao endpoint errado | DF7 + teste exato de URL | Fechado na Fase 3 |
 | Filtro executa zero testes | classe planejada não existe ou filtro é amplo/incorreto | fase fecha em falso verde | DF17 + regra em AGENTS/CLAUDE; fixtures nomeadas nas fases seguintes | Mitigado na Fase 1 |
-| Introspection futura recria cadeia pré-release | plano ignora ADR-020 | bumps sem contrato publicado | DF18 + handoff bilateral | Aberto |
-| Exceção JAR vira precedente | DF7 é lida como se metadata falsa fosse aceitável em geral | novas capabilities sem runtime | delimitação de DF7 + handoff nominal ao plano PAR | Aberto |
+| Introspection futura recria cadeia pré-release | plano ignora ADR-020 | bumps sem contrato publicado | DF18 + handoff bilateral | Mitigado na Fase 3 |
+| Exceção JAR vira precedente | DF7 é lida como se metadata falsa fosse aceitável em geral | novas capabilities sem runtime | delimitação de DF7 + handoff nominal ao plano PAR | Mitigado na Fase 3 |
 
 ---
 
@@ -762,9 +801,15 @@ dotnet test RoyalIdentity.sln
 - Localization de UI e mensagens de `AccountOptions` — destino: plano específico de localização.
 - Introspection + reference tokens — destino:
   [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), que reintroduz
-  `EnableIntrospectionEndpoint` somente com endpoint real e parte das versões Configuration vigentes naquele
-  momento; não copiar o alias mTLS incorreto removido/corrigido aqui.
-- Device Authorization e Token Exchange — destino: planos/extensões próprios quando priorizados.
+  `EnableIntrospectionEndpoint` somente com endpoint real, preserva os payloads pré-release em v1 e não copia o
+  alias mTLS incorreto removido/corrigido aqui.
+- Device Authorization RFC 8628 — destino: `BL-OAUTH-DEVICE-AUTHORIZATION` em
+  [backlog-001.md](../backlogs/backlog-001.md); a implementação precisa do endpoint, store, interação e polling,
+  não apenas do grant no token endpoint.
+- Token Exchange RFC 8693 — destino: `BL-OAUTH-TOKEN-EXCHANGE` em
+  [backlog-001.md](../backlogs/backlog-001.md); permanece um `IExtensionGrant` do token endpoint quando priorizado.
+- Persistência de logs operacionais e auditoria consultável — destino: `BL-OBS-DURABLE-LOGGING-AUDIT` em
+  [backlog-001.md](../backlogs/backlog-001.md) e futuro `plan-data-audit-outbox.md`, se os requisitos justificarem.
 - Metadata de Request Object/JAR anunciada sem implementação — destino:
   [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md), que separa a URN PAR antes de
   omitir `request_parameter_supported` e `request_uri_parameter_supported` falsos.

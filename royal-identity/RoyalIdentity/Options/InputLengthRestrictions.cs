@@ -29,7 +29,6 @@ public class InputLengthRestrictions
         IdentityProvider = other.IdentityProvider;
         ExternalError = other.ExternalError;
         AuthorizationCode = other.AuthorizationCode;
-        DeviceCode = other.DeviceCode;
         RefreshToken = other.RefreshToken;
         TokenHandle = other.TokenHandle;
         Jwt = other.Jwt;
@@ -109,11 +108,6 @@ public class InputLengthRestrictions
     /// Max length for authorization codes
     /// </summary>
     public int AuthorizationCode { get; set; } = Default;
-
-    /// <summary>
-    /// Max length for device codes
-    /// </summary>
-    public int DeviceCode { get; set; } = Default;
 
     /// <summary>
     /// Max length for refresh tokens

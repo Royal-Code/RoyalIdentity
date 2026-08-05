@@ -662,8 +662,10 @@ Reference e as migrations funcionam nos dois providers.
 - [ ] Publicar `introspection_endpoint` HTTPS realm-scoped.
 - [ ] Omitir endpoint, métodos e aliases de discovery quando `EnableIntrospectionEndpoint=false`.
 - [ ] Publicar `introspection_endpoint_auth_methods_supported` exatamente conforme Q1.
-- [ ] Publicar signing algorithms/mTLS aliases somente quando exigidos pela resposta Q1.
-- [ ] Confirmar que discovery nunca aponta introspection para token/revocation por engano.
+- [ ] Publicar signing algorithms/mTLS aliases somente quando exigidos pela resposta Q1; eventual alias de
+  introspection usa `BuildMtlsIntrospectionUrl`.
+- [ ] Confirmar que discovery nunca aponta introspection para token/revocation por engano, nem reutiliza
+  `BuildMtlsTokenUrl` ou `BuildMtlsRevocationUrl` para esse alias.
 - [ ] Criar ResourceServers de teste com secrets hashados e audiences/resources distintos.
 - [ ] Emitir reference token por authorization code e client credentials e introspectá-lo pelo ResourceServer
   autorizado.

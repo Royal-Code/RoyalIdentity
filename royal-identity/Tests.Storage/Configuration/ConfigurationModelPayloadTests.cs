@@ -44,6 +44,7 @@ public class ConfigurationModelPayloadTests
         Assert.DoesNotContain("CheckSessionCookieDomain", json, StringComparison.Ordinal);
         Assert.DoesNotContain("CheckSessionCookieSameSiteMode", json, StringComparison.Ordinal);
         Assert.DoesNotContain(nameof(LoggingOptions.RedactedParameterNames), json, StringComparison.Ordinal);
+        AssertCurrentPayloadOmitsInactiveProtocolSurface(json);
         Assert.Equal(json, reserialized);
         Assert.Equal("https://issuer.example", restored.IssuerUri);
         Assert.True(restored.DispatchEvents);
@@ -112,6 +113,17 @@ public class ConfigurationModelPayloadTests
             () => serverSerializer.Deserialize(ServerOptionsPayloadSerializer.CurrentVersion, json));
     }
 
+    [Theory]
+    [InlineData("{\"Endpoints\":{\"Enable" + "IntrospectionEndpoint\":true}}")]
+    [InlineData("{\"Endpoints\":{\"Enable" + "DeviceAuthorizationEndpoint\":true}}")]
+    [InlineData("{\"InputLengthRestrictions\":{\"DeviceCode\":100}}")]
+    [InlineData("{\"Logging\":{\"UseLog" + "Service\":true}}")]
+    public void ServerOptions_PreviousPreReleaseShapeAtVersionOne_FailsClosed(string json)
+    {
+        Assert.Throws<ConfigurationPayloadException>(
+            () => serverSerializer.Deserialize(ServerOptionsPayloadSerializer.CurrentVersion, json));
+    }
+
     [Fact]
     public void RealmOptions_Payload_DoesNotSerializeServerOptions()
     {
@@ -124,6 +136,7 @@ public class ConfigurationModelPayloadTests
         Assert.DoesNotContain(nameof(LoggingOptions.RedactedParameterNames), json, StringComparison.Ordinal);
         Assert.DoesNotContain("https://server.example", json);
         Assert.Contains("https://realm.example", json);
+        AssertCurrentPayloadOmitsInactiveProtocolSurface(json);
     }
 
     [Fact]
@@ -281,6 +294,20 @@ public class ConfigurationModelPayloadTests
             () => realmSerializer.Deserialize(RealmOptionsPayloadSerializer.CurrentVersion, json, new ServerOptions()));
     }
 
+    [Theory]
+    [InlineData("{\"Endpoints\":{\"Enable" + "IntrospectionEndpoint\":true}}")]
+    [InlineData("{\"Endpoints\":{\"Enable" + "DeviceAuthorizationEndpoint\":true}}")]
+    [InlineData("{\"InputLengthRestrictions\":{\"DeviceCode\":100}}")]
+    [InlineData("{\"Logging\":{\"UseLog" + "Service\":true}}")]
+    public void RealmOptions_PreviousPreReleaseShapeAtVersionOne_FailsClosed(string json)
+    {
+        Assert.Throws<ConfigurationPayloadException>(
+            () => realmSerializer.Deserialize(
+                RealmOptionsPayloadSerializer.CurrentVersion,
+                json,
+                new ServerOptions()));
+    }
+
     /// <summary>
     /// A realm persisted before a name joined the redaction set must not keep logging it.
     /// </summary>
@@ -324,5 +351,13 @@ public class ConfigurationModelPayloadTests
 
         foreach (var mandatory in LoggingOptions.AlwaysRedacted)
             Assert.Contains(mandatory, restored.Logging.RedactedParameterNames);
+    }
+
+    private static void AssertCurrentPayloadOmitsInactiveProtocolSurface(string json)
+    {
+        Assert.DoesNotContain("Enable" + "IntrospectionEndpoint", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enable" + "DeviceAuthorizationEndpoint", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"DeviceCode\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("UseLog" + "Service", json, StringComparison.Ordinal);
     }
 }

@@ -27,7 +27,6 @@ public class LoggingOptions
     public LoggingOptions(LoggingOptions other)
     {
         SensitiveValuesFilter = [.. other.SensitiveValuesFilter];
-        UseLogService = other.UseLogService;
     }
 
     /// <summary>
@@ -70,8 +69,4 @@ public class LoggingOptions
     [JsonIgnore]
     public IEnumerable<string> RedactedParameterNames => AlwaysRedacted.Concat(SensitiveValuesFilter);
 
-    /// <summary>
-    /// Determines whether endpoint error logs should be sent to a log service for alternative and additional handling.
-    /// </summary>
-    public bool UseLogService { get; internal set; }
 }
