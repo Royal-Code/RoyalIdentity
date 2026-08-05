@@ -50,8 +50,9 @@
 - [plan-oidc-session-management.md](plan-oidc-session-management.md) — predecessor que implementa o OP iframe e
   fixa a exceção protocolar de framing; a Fase 5 deve preservar seus testes de ausência de headers bloqueadores.
 - [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — predecessor que remove
-  `LoggingOptions.UseLogService`, mantém os payloads Configuration pré-release em v1 e corrige o alias mTLS de revocation; este
-  plano consome essa superfície simplificada sem reintroduzir option/branch ou a rota incorreta.
+  `LoggingOptions.UseLogService`, mantém os payloads Configuration pré-release em v1 e omite
+  `mtls_endpoint_aliases`, pois nenhuma rota alternativa mTLS está mapeada; este plano consome essa superfície
+  simplificada sem reintroduzir option/branch ou metadata sem runtime.
 - [plan-localization.md](plan-localization.md) — predecessor que adiciona localization ao grafo de realm mantendo
   Server e Realm Options em v1; é a baseline funcional imediata para adicionar `RedirectUriValidation`.
 - [plans-roadmap-02.md](plans-roadmap-02.md) e [backlog-001.md](../backlogs/backlog-001.md) — API/UI
@@ -670,8 +671,9 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
   o que também não puder depender de configuração.
 - [ ] Consumir `LoggingOptions` sem `UseLogService` e ampliar somente `SensitiveValuesFilter`/redaction; não
   reintroduzir option ou branch removido pelo plano predecessor.
-- [ ] Preservar o alias mTLS de revocation já corrigido para `BuildMtlsRevocationUrl`; corrigir/mapear somente
-  endpoints restantes antes de anunciá-los e omitir aliases/métodos indisponíveis.
+- [ ] Preservar a omissão de `mtls_endpoint_aliases` entregue pelo predecessor até mapear endpoints alternativos
+  mTLS reais. Se os aliases forem implementados nesta fase, mapear e testar token/revocation antes de anunciá-los,
+  usando `BuildMtlsTokenUrl` e `BuildMtlsRevocationUrl` respectivamente; caso contrário, continuar omitindo-os.
 - [ ] Preservar `private_key_jwt` com backing de replay declarado e incluir seu uso no assessment.
 - [ ] Provar por teste que `tls_client_auth` e `self_signed_tls_client_auth` autenticam de fato, antes de
   mantê-los anunciados. Entregue pela Fase 4 do plano de erros: o discovery os anuncia quando
@@ -688,14 +690,15 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
   `Tests.Integration/Endpoints/AuthorizationEndpointCorsTests.cs`; estender
   `Tests.Integration/Endpoints/DiscoveryTests.cs` para aliases/capacidades exatos.
 - [ ] Estender `Tests.Architecture/Rfc9700BoundaryTests.cs` para impedir reintrodução de `UseLogService`, aliases
-  mTLS construídos pela rota errada e dependências proibidas do assessment.
+  mTLS sem rota ou construídos pela rota errada e dependências proibidas do assessment.
 
 **Critérios de aceite:** nenhuma página sensível pode ser enquadrada por origem não autorizada; a única exceção é
 o OP iframe, cuja resposta não contém `X-Frame-Options: DENY` nem `frame-ancestors 'none'`; referrer não carrega
 parâmetros; logs capturados não contêm segredos/handles; discovery não anuncia rota/método inexistente;
 authorization endpoint continua fora do CORS; startup falha ou alerta de forma explícita para configuração de
-proxy/issuer insegura conforme o contrato fechado na fase; `UseLogService` não reaparece, revocation mTLS não
-volta à rota de token e cada filtro obrigatório seleciona ao menos um teste.
+proxy/issuer insegura conforme o contrato fechado na fase; `UseLogService` não reaparece, nenhum alias mTLS é
+publicado sem rota alternativa real, revocation nunca usa a rota de token e cada filtro obrigatório seleciona ao
+menos um teste.
 
 **Testes:**
 
@@ -793,7 +796,8 @@ dotnet test RoyalIdentity.sln
 11. Não reintroduzir password grant ou implicit/hybrid por extension grant acidental.
 12. Não criar `OAuthSecurityProfile`, assessor DI ou snapshot persistido.
 13. O hardening de clickjacking não bloqueia `check_session_iframe` e não amplia essa exceção a outra rota.
-14. Debt Closure não é revertido: `UseLogService` permanece ausente e revocation mTLS usa sua rota própria.
+14. Debt Closure não é revertido: `UseLogService` permanece ausente e aliases mTLS continuam omitidos até suas
+    rotas alternativas existirem; cada alias implementado usa o builder do próprio endpoint.
 15. Server e Realm Options permanecem em v1 durante o pre-release; serializers rejeitam outras versões.
 16. Enquanto o runtime aceitar PKCE `plain` por opt-in, a metadata o anuncia e o assessment o diagnostica.
 17. Nenhum comando filtrado obrigatório pode fechar fase selecionando zero testes.

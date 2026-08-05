@@ -243,8 +243,12 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
         }
     }
 
+    /// <summary>
+    /// RFC 8705 aliases are optional, but a client must prefer them when present. Until the alternate mTLS
+    /// routes are mapped, discovery must keep the conventional live endpoints and omit the alias object.
+    /// </summary>
     [Fact]
-    public async Task Get_WithMutualTlsEnabled_MustPublishOnlyTheExactLiveEndpointAliases()
+    public async Task Get_WithMutualTlsEnabled_MustOmitEndpointAliasesUntilAlternateRoutesExist()
     {
         await factory.UpdateRealmAsync(
             factory.Handles.Demo,
@@ -255,21 +259,10 @@ public class DiscoveryTests : IClassFixture<PersistentStorageAppFactory>
             var url = Oidc.Routes.BuildDiscoveryConfigurationUrl(factory.Handles.Demo.Path);
             using var document = JsonDocument.Parse(await client.GetStringAsync(url));
             var root = document.RootElement;
-            var aliases = root.GetProperty(Oidc.Discovery.MtlsEndpointAliases);
 
-            Assert.Equal(2, aliases.EnumerateObject().Count());
-
-            var tokenEndpoint = root.GetProperty(Oidc.Discovery.TokenEndpoint).GetString()!;
-            var revocationEndpoint = root.GetProperty(Oidc.Discovery.RevocationEndpoint).GetString()!;
-
-            Assert.Equal(
-                tokenEndpoint.Replace("/connect/token", "/connect/mtls/token", StringComparison.Ordinal),
-                aliases.GetProperty(Oidc.Discovery.TokenEndpoint).GetString());
-            Assert.Equal(
-                revocationEndpoint.Replace("/connect/revocation", "/connect/mtls/revocation", StringComparison.Ordinal),
-                aliases.GetProperty(Oidc.Discovery.RevocationEndpoint).GetString());
-            Assert.False(aliases.TryGetProperty(Oidc.Discovery.IntrospectionEndpoint, out _));
-            Assert.False(aliases.TryGetProperty(Oidc.Discovery.DeviceAuthorizationEndpoint, out _));
+            Assert.True(root.TryGetProperty(Oidc.Discovery.TokenEndpoint, out _));
+            Assert.True(root.TryGetProperty(Oidc.Discovery.RevocationEndpoint, out _));
+            Assert.False(root.TryGetProperty(Oidc.Discovery.MtlsEndpointAliases, out _));
         }
         finally
         {

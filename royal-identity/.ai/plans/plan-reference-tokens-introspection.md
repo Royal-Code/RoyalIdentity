@@ -663,7 +663,8 @@ Reference e as migrations funcionam nos dois providers.
 - [ ] Omitir endpoint, métodos e aliases de discovery quando `EnableIntrospectionEndpoint=false`.
 - [ ] Publicar `introspection_endpoint_auth_methods_supported` exatamente conforme Q1.
 - [ ] Publicar signing algorithms/mTLS aliases somente quando exigidos pela resposta Q1; eventual alias de
-  introspection usa `BuildMtlsIntrospectionUrl`.
+  introspection exige uma rota alternativa real e usa `BuildMtlsIntrospectionUrl`. Sem essa rota, omitir o alias e
+  manter o endpoint convencional.
 - [ ] Confirmar que discovery nunca aponta introspection para token/revocation por engano, nem reutiliza
   `BuildMtlsTokenUrl` ou `BuildMtlsRevocationUrl` para esse alias.
 - [ ] Criar ResourceServers de teste com secrets hashados e audiences/resources distintos.

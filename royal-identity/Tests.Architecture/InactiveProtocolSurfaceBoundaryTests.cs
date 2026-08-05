@@ -33,7 +33,7 @@ public class InactiveProtocolSurfaceBoundaryTests
     }
 
     [Fact]
-    public void Discovery_ContainsOnlyLiveProtocolBranchesAndUsesTheRevocationMtlsRoute()
+    public void Discovery_DoesNotPublishAliasesForUnmappedMtlsEndpoints()
     {
         var source = ReadCoreSource("Handlers", "DiscoveryHandler.cs");
 
@@ -41,8 +41,9 @@ public class InactiveProtocolSurfaceBoundaryTests
         Assert.DoesNotContain("Enable" + "DeviceAuthorizationEndpoint", source, StringComparison.Ordinal);
         Assert.DoesNotContain("BuildMtls" + "IntrospectionUrl", source, StringComparison.Ordinal);
         Assert.DoesNotContain("BuildMtls" + "DeviceAuthorizationUrl", source, StringComparison.Ordinal);
-        Assert.Contains("BuildMtlsTokenUrl", source, StringComparison.Ordinal);
-        Assert.Contains("BuildMtlsRevocationUrl", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildMtlsTokenUrl", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildMtlsRevocationUrl", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("MtlsEndpointAliases", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,6 +76,10 @@ public class InactiveProtocolSurfaceBoundaryTests
 
         Assert.DoesNotContain("Introspection" + "Endpoint", source, StringComparison.Ordinal);
         Assert.DoesNotContain("DeviceAuthorization" + "Endpoint", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Oidc.Routes.MtlsToken", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Oidc.Routes.MtlsRevocation", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Oidc.Routes.MtlsIntrospection", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Oidc.Routes.MtlsDeviceAuthorization", source, StringComparison.Ordinal);
     }
 
     private static string ReadCoreSource(params string[] relativePath)

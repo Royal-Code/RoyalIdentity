@@ -86,45 +86,6 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
                 entries.Add(Oidc.Discovery.RevocationEndpoint, baseUrl + Oidc.Routes.BuildRevocationUrl(realmPath));
             }
 
-            if (options.MutualTls.Enabled)
-            {
-                var mtlsEndpoints = new Dictionary<string, string>();
-
-                if (options.Endpoints.EnableTokenEndpoint)
-                {
-                    mtlsEndpoints.Add(Oidc.Discovery.TokenEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsTokenUrl(realmPath)));
-                }
-                if (options.Endpoints.EnableTokenRevocationEndpoint)
-                {
-                    mtlsEndpoints.Add(Oidc.Discovery.RevocationEndpoint, ConstructMtlsEndpoint(Oidc.Routes.BuildMtlsRevocationUrl(realmPath)));
-                }
-
-                if (mtlsEndpoints.Count is not 0)
-                {
-                    entries.Add(Oidc.Discovery.MtlsEndpointAliases, mtlsEndpoints);
-                }
-
-                string ConstructMtlsEndpoint(string endpoint)
-                {
-                    // path based
-                    if (options.MutualTls.DomainName.IsMissing())
-                    {
-                        return baseUrl + endpoint;
-                    }
-
-                    // domain based
-                    if (options.MutualTls.DomainName.Contains('.'))
-                    {
-                        return $"https://{options.MutualTls.DomainName}/{endpoint}";
-                    }
-                    // sub-domain based
-                    else
-                    {
-                        var parts = baseUrl.Split("://");
-                        return $"https://{options.MutualTls.DomainName}.{parts[1]}{endpoint}";
-                    }
-                }
-            }
         }
 
         // logout

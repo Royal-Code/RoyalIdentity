@@ -86,10 +86,10 @@
 - **Exceção JAR conhecida:** discovery também publica `request_parameter_supported=true`, embora
   `ProcessRequestObject` seja um stub. Este plano não antecipa a separação semântica de `request_uri`; a correção
   e seu guard pertencem ao plano posterior de PAR/JAR.
-- **Alias mTLS de revocation incorreto:** `DiscoveryHandler` constrói os aliases mTLS de token, revocation,
-  introspection e Device Authorization com `BuildMtlsTokenUrl`; remover as duas superfícies mortas elimina seus
-  aliases incorretos, mas deixa revocation apontando para a rota de token. `BuildMtlsRevocationUrl` já existe e não
-  possui caller.
+- **Aliases mTLS sem runtime:** `DiscoveryHandler` constrói os aliases mTLS de token, revocation, introspection e
+  Device Authorization com `BuildMtlsTokenUrl`; além dos builders incorretos, nenhuma rota
+  `/{realm}/connect/mtls/*` é mapeada. Pelo RFC 8705 §5, um client mTLS deve preferir um alias publicado, portanto
+  token e revocation também precisam ser omitidos até existirem endpoints alternativos reais.
 - **Branches vazios:** `TokenEndpoint` intercepta `DeviceCode` e `TokenExchange`, produz `context=null` e impede
   que o fallback de `IExtensionsGrantsProvider` os trate.
 - **Configuração sem efeito:** `LoggingOptions.UseLogService` tem setter interno e não possui configuração
@@ -192,8 +192,9 @@
   `AuthorizationContext.IdP` e `GenerateCodeChallengeS256` depois de confirmar zero callers; não criar shims.
   Fonte: inventário local + breaking changes permitidos.
 - **DF7 — Discovery prova runtime e rota exata, com corte delimitado:** nesta fase, introspection e Device
-  Authorization desaparecem até seus planos próprios, e o alias mTLS de revocation permanece usando
-  `BuildMtlsRevocationUrl`, nunca a rota de token. A metadata falsa `request_parameter_supported=true` é uma
+  Authorization desaparecem até seus planos próprios, e `mtls_endpoint_aliases` é omitido por inteiro enquanto
+  não houver rotas alternativas mTLS alcançáveis. O suporte mTLS nos endpoints convencionais não depende dessa
+  metadata opcional. A metadata falsa `request_parameter_supported=true` é uma
   exceção temporária explicitamente inventariada, não um precedente: sua remoção pertence ao plano de PAR, junto
   da separação entre referência PAR e Request Object/JAR. Fonte: decisão humana + RFC 9700 plan + código
   verificado de `DiscoveryHandler`/`Constants`.
@@ -567,7 +568,8 @@ extension provider, retirar logging sem efeito e atualizar o formato corrente se
 - [x] Remover `EnableIntrospectionEndpoint` e `EnableDeviceAuthorizationEndpoint` de `EndpointsOptions` e cópias.
 - [x] Remover `InputLengthRestrictions.DeviceCode`, já que a extensão proprietária valida seus parâmetros.
 - [x] Remover metadata, aliases mTLS e grant anunciado condicionados às options removidas.
-- [x] Corrigir o alias mTLS vivo de revocation para `BuildMtlsRevocationUrl`; não alterar o alias correto de token.
+- [x] Omitir `mtls_endpoint_aliases` por inteiro: as URLs de token e revocation também não possuem rotas
+  alternativas mapeadas e, quando publicadas, são preferenciais para clients mTLS conforme RFC 8705 §5.
 - [x] Registrar no handoff de `plan-reference-tokens-introspection.md` que eventual alias de introspection usa
   `BuildMtlsIntrospectionUrl`, nunca a rota de token ou revocation.
 - [x] Preservar o handoff para `plan-pushed-authorization-requests.md`: não tratar
@@ -584,14 +586,15 @@ extension provider, retirar logging sem efeito e atualizar o formato corrente se
 - [x] Não criar migration relacional ou JSON; documentar o reprovisionamento obrigatório dos payloads v1 antigos.
 - [x] Testar dois realms com discovery sem endpoints mortos.
 - [x] Testar extension grant registrado e não registrado sem duplicar a taxonomia do plano OAuth 2.1.
-- [x] Estender `Tests.Integration/Endpoints/DiscoveryTests.cs` com omissões exatas e alias mTLS de revocation.
+- [x] Estender `Tests.Integration/Endpoints/DiscoveryTests.cs` com omissões exatas, inclusive dos aliases mTLS sem
+  runtime, preservando os endpoints convencionais.
 - [x] Criar `Tests.Integration/Endpoints/ExtensionGrantRoutingTests.cs` para grants registrados/não registrados.
 - [x] Criar `Tests.Architecture/InactiveProtocolSurfaceBoundaryTests.cs` para ausência de
   options/branches/markers removidos na Fase 3 e preservação dos filtros sensíveis de logging; não reutilizar como
   aceite as guardas de `RefactoringDebtBoundaryTests` já entregues pela Fase 2.
 
 **Critérios de aceite:** discovery não contém introspection/Device Authorization nem os anuncia em mTLS/grants;
-o alias mTLS de revocation aponta exatamente para a rota mTLS de revocation e o de token permanece correto;
+`mtls_endpoint_aliases` é omitido enquanto não houver rotas alternativas mTLS reais;
 options e JSON v1 corrente não contêm as propriedades removidas; extension grants alcançam o provider; ausência responde
 conforme OAuth 2.1; não há branch de logging sem efeito; filtros sensíveis permanecem; payloads antigos falham
 fechados; cada filtro obrigatório seleciona ao menos um teste.
@@ -610,8 +613,10 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~InactiveProtocolSurf
 A superfície inativa foi removida sem anunciar ou mapear introspection/Device Authorization: as duas options,
 o limite genérico de `DeviceCode`, os branches de discovery e os `case` vazios deixaram o core. `device_code` e
 token exchange registrados agora alcançam exclusivamente `IExtensionsGrantsProvider`; um grant ausente continua
-respondendo `unsupported_grant_type`. O alias mTLS vivo de revocation usa sua própria rota, e o handoff do plano
-de Reference Tokens fixa `BuildMtlsIntrospectionUrl` para a futura implementação. A revisão de aceite confirmou
+respondendo `unsupported_grant_type`. A primeira revisão havia corrigido o builder de revocation sem verificar o
+roteamento: como nenhuma rota `/{realm}/connect/mtls/*` existe, a revisão externa final removeu toda a metadata
+`mtls_endpoint_aliases`. O handoff do plano de Reference Tokens fixa `BuildMtlsIntrospectionUrl` somente depois de
+existir endpoint alternativo real. A revisão de aceite confirmou
 que os RFCs 8628/8693 continuam capacidades futuras legítimas e criou backlog nominal para ambos; os branches
 vazios removidos não representavam implementação parcial.
 
@@ -724,7 +729,7 @@ dotnet test RoyalIdentity.sln
 |---|---|---|---|---|
 | Encerrar falsos redesigns | 1-2 | DF2-DF6 | contexts/token/client markers coerentes | `rg` + build + Architecture |
 | Corrigir resources docs | 1, 5 | DF12-DF13 | modelo concluído; só persistência diferida | buscas documentais |
-| Remover metadata morta | 3, 5 | DF7, DF9, DF16-DF18 | discovery sem endpoints/grants inexistentes; revocation mTLS exata | Discovery multi-realm |
+| Remover metadata morta | 3, 5 | DF7, DF9, DF16-DF18 | discovery sem endpoints/grants/aliases inexistentes | Discovery multi-realm |
 | Preservar extension grants | 3 | DF8 | provider alcançado; ausência padronizada | TokenEndpoint/Integration |
 | Remover logging sem efeito | 3 | DF10, DF14 | option/branches ausentes; redaction preservada | Logging + payload v1 |
 | Fechar `acr_values` | 4-5 | DF6, DF11, DF17 | lista ordenada/distinta sem claim/metadata fictícia | AcrValues integration |
@@ -749,7 +754,8 @@ dotnet test RoyalIdentity.sln
 10. Resources permanecem realm-scoped e voláteis até o plano de persistência próprio.
 11. Localization e Check Session não são apagados como dívida por esta limpeza.
 12. Payloads internos permanecem em v1 durante o pre-release; cortes incompatíveis exigem reprovisionamento.
-13. Alias mTLS de endpoint vivo usa sempre seu próprio route builder; revocation nunca aponta para token.
+13. `mtls_endpoint_aliases` só é publicado para endpoints alternativos realmente mapeados; cada alias usa seu
+    próprio route builder.
 14. `acr_values` preserva ordem de preferência e unicidade pela primeira ocorrência; não usa `HashSet` na borda.
 15. Nenhum comando filtrado obrigatório pode fechar fase selecionando zero testes.
 16. Discovery permanece em `Tests.Integration`; `Tests.Endpoints` não volta à solution nem ao filesystem.
@@ -766,8 +772,8 @@ dotnet test RoyalIdentity.sln
 - Options Configuration permanecem em v1 e não contêm propriedades removidas.
 - `acr_values` tem comportamento e testes explícitos, sem catálogo/metadata/claim fictícia.
 - Foundations/matriz descrevem corretamente o redesign concluído de resources.
-- Alias mTLS de revocation aponta para a rota correta e o handoff de introspection parte da baseline Configuration
-  vigente nos planos posteriores.
+- Discovery omite aliases mTLS enquanto as rotas alternativas não existem; planos posteriores só os reintroduzem
+  junto do runtime correspondente e usando o builder próprio de cada endpoint.
 - Classes de teste nomeadas existem e nenhum filtro obrigatório seleciona zero testes.
 - `Tests.Endpoints` foi removido e seu cenário equivalente permanece coberto por `Tests.Pipelines`.
 - `dotnet build RoyalIdentity.sln` passa.
@@ -787,7 +793,7 @@ dotnet test RoyalIdentity.sln
 | Logging perde redaction | limpeza remove filtro junto do switch | segredo em log | testes capturando valores sensíveis + RFC 9700 | Mitigado na Fase 3 |
 | Histórico é reescrito | docs apagam motivo das decisões | perda de rastreabilidade | adendos e cancelamento explícito, sem apagar resultados | Fechado na Fase 1 |
 | Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + nota normativa pós-conclusão em DF22 + orientação persistente + destino nominal sem criar plano | Mitigado na Fase 1 |
-| Alias mTLS sobrevivente aponta para token | remoção apaga branches mortos, mas não corrige revocation | metadata conduz ao endpoint errado | DF7 + teste exato de URL | Fechado na Fase 3 |
+| Alias mTLS aponta para rota ausente/incorreta | metadata faz client mTLS preferir URL que responde 404 | token/revocation deixam de funcionar para client conformante | DF7 + omissão integral + teste de discovery/rotas | Fechado na revisão da Fase 3 |
 | Filtro executa zero testes | classe planejada não existe ou filtro é amplo/incorreto | fase fecha em falso verde | DF17 + regra em AGENTS/CLAUDE; fixtures nomeadas nas fases seguintes | Mitigado na Fase 1 |
 | Introspection futura recria cadeia pré-release | plano ignora ADR-020 | bumps sem contrato publicado | DF18 + handoff bilateral | Mitigado na Fase 3 |
 | Exceção JAR vira precedente | DF7 é lida como se metadata falsa fosse aceitável em geral | novas capabilities sem runtime | delimitação de DF7 + handoff nominal ao plano PAR | Mitigado na Fase 3 |
@@ -801,8 +807,8 @@ dotnet test RoyalIdentity.sln
 - Localization de UI e mensagens de `AccountOptions` — destino: plano específico de localização.
 - Introspection + reference tokens — destino:
   [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), que reintroduz
-  `EnableIntrospectionEndpoint` somente com endpoint real, preserva os payloads pré-release em v1 e não copia o
-  alias mTLS incorreto removido/corrigido aqui.
+  `EnableIntrospectionEndpoint` somente com endpoint real, preserva os payloads pré-release em v1 e só publica
+  alias mTLS quando o endpoint alternativo também estiver realmente mapeado.
 - Device Authorization RFC 8628 — destino: `BL-OAUTH-DEVICE-AUTHORIZATION` em
   [backlog-001.md](../backlogs/backlog-001.md); a implementação precisa do endpoint, store, interação e polling,
   não apenas do grant no token endpoint.
