@@ -1,17 +1,17 @@
 # Plan: Fechamento de dívidas de refatoração e superfícies inativas (`plan-refactoring-debt-closure`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 3 de 5 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 4 de 5 fases executadas
 
 ## Progresso
 
-`███░░` **60%** - 3 de 5 fases
+`████░` **80%** - 4 de 5 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Decisões encerradas e documentação de resources | Concluida |
 | Fase 2 - Marcadores antigos e código obsoleto | Concluida |
 | Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release | Concluida |
-| Fase 4 - Contrato explícito de `acr_values` | Pendente |
+| Fase 4 - Contrato explícito de `acr_values` | Concluida |
 | Fase 5 - Aceites transversais e fechamento | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -644,22 +644,22 @@ catálogo, rejeição de valor desconhecido, HRD proprietário ou claim não com
 
 **Tarefas:**
 
-- [ ] Trocar `AcrValues` de `HashSet<string>` para `IReadOnlyList<string>` em `IWithAcr`, `AuthorizeContext` e
+- [x] Trocar `AcrValues` de `HashSet<string>` para `IReadOnlyList<string>` em `IWithAcr`, `AuthorizeContext` e
   `AuthorizationContext`, atualizando os consumidores no mesmo corte.
-- [ ] Fazer o parse preservar ordem de entrada e remover duplicatas pela primeira ocorrência com comparação
+- [x] Fazer o parse preservar ordem de entrada e remover duplicatas pela primeira ocorrência com comparação
   ordinal/case-sensitive.
-- [ ] Documentar `AuthorizeContext.AcrValues` como preferências recebidas em ordem.
-- [ ] Manter rejeição de `acr_values` acima de `InputLengthRestrictions.AcrValues`.
-- [ ] Remover o TODO de validação contra future realm options.
-- [ ] Não interpretar prefixo proprietário `idp:` nem recriar `AuthorizationContext.IdP`.
-- [ ] Não adicionar `SupportedAcrValues`, policy, validator DI ou options de realm.
-- [ ] Garantir que discovery não publique `acr_values_supported`.
-- [ ] Garantir que `DefaultTokenClaimsService` só emita `acr` já estabelecido no principal.
-- [ ] Criar `Tests.Integration/Endpoints/AcrValuesTests.cs`.
-- [ ] Testar valor único, múltiplas preferências em ordem, duplicata preservando a primeira ocorrência,
+- [x] Documentar `AuthorizeContext.AcrValues` como preferências recebidas em ordem.
+- [x] Manter rejeição de `acr_values` acima de `InputLengthRestrictions.AcrValues`.
+- [x] Remover o TODO de validação contra future realm options.
+- [x] Não interpretar prefixo proprietário `idp:` nem recriar `AuthorizationContext.IdP`.
+- [x] Não adicionar `SupportedAcrValues`, policy, validator DI ou options de realm.
+- [x] Garantir que discovery não publique `acr_values_supported`.
+- [x] Garantir que `DefaultTokenClaimsService` só emita `acr` já estabelecido no principal.
+- [x] Criar `Tests.Integration/Endpoints/AcrValuesTests.cs`.
+- [x] Testar valor único, múltiplas preferências em ordem, duplicata preservando a primeira ocorrência,
   desconhecido dentro do limite e excesso de tamanho.
-- [ ] Testar que `acr_values` recebido não produz automaticamente claim `acr`.
-- [ ] Documentar o handoff para futuros planos de MFA/federação.
+- [x] Testar que `acr_values` recebido não produz automaticamente claim `acr`.
+- [x] Documentar o handoff para futuros planos de MFA/federação.
 
 **Critérios de aceite:** valores desconhecidos dentro do limite não falham por catálogo inexistente; excesso
 falha como hoje; a representação pública não é `HashSet` e a ordem distinta por primeira ocorrência chega ao
@@ -674,7 +674,20 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AcrValuesTests"
 
 ### Resultado da Fase 4
 
-*a preencher*
+Concluída. `AcrValues` agora atravessa `IWithAcr`, `AuthorizeContext` e o boundary de interação como
+`IReadOnlyList<string>` ordenada; o parse remove duplicatas pela primeira ocorrência com comparação ordinal e
+preserva valores desconhecidos, inclusive prefixos `idp:`, sem lhes atribuir semântica proprietária. O limite
+continua realm-scoped e responde `invalid_request` quando excedido. A regressão expôs que
+`DefaultAuthorizeRequestValidator` reconhecia apenas `ProblemDetails` e confundia o `ErrorResponseResult`
+unificado pelo baseline OAuth 2.1 com sucesso; a fronteira agora materializa também esse payload protocolar em
+`AuthorizationValidationResult.Error`.
+
+`AcrValuesTests` fecha 8 casos: contratos públicos, valor único, ordem, unicidade case-sensitive, valor
+desconhecido, excesso de tamanho, ausência de metadata e fluxo code/token sem claim `acr` fabricada. A foundation
+registra o handoff: somente métodos de autenticação futuros podem estabelecer `acr`, e catálogo/policy/discovery
+pertencem aos planos de MFA/passwordless ou federação. O filtro obrigatório selecionou 8 testes, todos aprovados.
+A suíte integral fechou com 1.506 aprovados, 51 ignorados opt-in e zero falhas; `git diff --check` permaneceu
+limpo.
 
 ---
 
@@ -789,7 +802,7 @@ dotnet test RoyalIdentity.sln
 | Extension grant muda erro | remoção do `case` alcança provider inesperado | comportamento diferente | concluir OAuth 2.1 antes + testes registrado/ausente | Fechado na Fase 3 |
 | Metadata futura some sem registro | consumidor esperava feature inexistente | descoberta deixa de anunciar falso suporte | breaking aceito; plano futuro reintroduz conjunto completo | Aceito |
 | Remoção obsoleta quebra caller oculto | reflection/source externo | build/consumer falha | `rg`, build integral; sem consumidores de produção | Fechado na Fase 2 |
-| ACR perde ordem | parse/lista não preserva preferência | interação futura escolhe valor errado | DF11 + teste de ordem/duplicata | Aberto |
+| ACR perde ordem | parse/lista não preserva preferência | interação futura escolhe valor errado | DF11 + teste de ordem/duplicata | Fechado na Fase 4 |
 | Logging perde redaction | limpeza remove filtro junto do switch | segredo em log | testes capturando valores sensíveis + RFC 9700 | Mitigado na Fase 3 |
 | Histórico é reescrito | docs apagam motivo das decisões | perda de rastreabilidade | adendos e cancelamento explícito, sem apagar resultados | Fechado na Fase 1 |
 | Persistência entra por acidente | executor troca bridge nesta limpeza | escopo/storage sem plano | DF13 + nota normativa pós-conclusão em DF22 + orientação persistente + destino nominal sem criar plano | Mitigado na Fase 1 |

@@ -186,17 +186,12 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         //////////////////////////////////////////////////////////
         // check acr_values
         //////////////////////////////////////////////////////////
-        if (context.AcrValues.Count > 0)
+        var acrValues = context.Raw.Get(Oidc.Authorize.Request.AcrValues);
+        if (acrValues is not null && acrValues.Length > restrictions.AcrValues)
         {
-            var acrValues = context.Raw.Get(Oidc.Authorize.Request.AcrValues)!;
-            if (acrValues.Length > restrictions.AcrValues)
-            {
-                logger.LogError(context, "Acr values too long");
-                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid acr_values: too long");
-                return ValueTask.CompletedTask;
-            }
-
-            // TODO: check acr_values, valide against future realm options
+            logger.LogError(context, "Acr values too long");
+            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid acr_values: too long");
+            return ValueTask.CompletedTask;
         }
 
         return ValueTask.CompletedTask;

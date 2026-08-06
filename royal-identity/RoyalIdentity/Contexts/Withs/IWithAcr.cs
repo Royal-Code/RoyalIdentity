@@ -3,10 +3,10 @@
 public interface IWithAcr : IEndpointContextBase
 {
     /// <summary>
-    /// Gets or sets the authentication context reference classes.
+    /// Gets the authentication context reference class preferences in the order supplied by the client.
     /// </summary>
     /// <value>
-    /// The authentication context reference classes.
+    /// The ordered, distinct authentication context reference class preferences.
     /// </value>
-    public HashSet<string> AcrValues { get; }
+    public IReadOnlyList<string> AcrValues { get; }
 }

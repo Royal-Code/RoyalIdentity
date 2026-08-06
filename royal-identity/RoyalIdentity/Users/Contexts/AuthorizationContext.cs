@@ -88,12 +88,12 @@ public class AuthorizationContext
     public RequestedResources Resources { get; }
 
     /// <summary>
-    /// The acr values passed from the authorization request.
+    /// The ordered ACR preferences passed from the authorization request.
     /// </summary>
     /// <value>
-    /// The acr values.
+    /// The distinct preferences in client order.
     /// </value>
-    public HashSet<string> AcrValues { get; }
+    public IReadOnlyList<string> AcrValues { get; }
 
     /// <summary>
     /// Gets the validated contents of the request object (if present)

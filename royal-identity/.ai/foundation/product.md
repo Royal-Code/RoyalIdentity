@@ -69,6 +69,17 @@ A middleware (`RealmDiscoveryMiddleware`) identifies the realm from the route be
 - `AllowPlainTextPkce = false` by default (plain method is insecure, must be explicitly enabled)
 - S256 is the expected default method
 
+### Authentication Context (`acr_values` / `acr`)
+
+- `acr_values` is accepted as an ordered, case-sensitive list of client preferences. Duplicate values are
+  removed by first occurrence, and unknown values within the configured input-length limit are retained rather
+  than interpreted as an IdP selector or rejected against a catalog that does not exist.
+- Receiving `acr_values` does not establish an authentication context and never creates an `acr` claim. Tokens
+  may propagate `acr` only when it is already established on the authenticated principal.
+- Discovery does not publish `acr_values_supported` until the product has real authentication methods and a
+  realm-scoped policy/catalog that can satisfy that promise. That work belongs to future MFA/passwordless and
+  federation plans.
+
 ### OpenID Connect Session Management
 
 - `/{realm}/connect/checksession` is implemented and advertised as `check_session_iframe` only when enabled and

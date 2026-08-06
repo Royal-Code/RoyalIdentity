@@ -109,12 +109,12 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public bool UserDeniedConsent { get; set; }
 
     /// <summary>
-    /// Gets or sets the authentication context reference classes.
+    /// Gets the authentication context reference class preferences in the order supplied by the client.
     /// </summary>
     /// <value>
-    /// The authentication context reference classes.
+    /// The ordered preferences, with duplicate values removed by their first ordinal occurrence.
     /// </value>
-    public HashSet<string> AcrValues { get; } = [];
+    public IReadOnlyList<string> AcrValues { get; private set; } = [];
 
     /// <summary>
     /// Gets or sets the display mode.
@@ -281,10 +281,24 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
         LoginHint = raw.Get(Oidc.Authorize.Request.LoginHint);
 
         var acrValues = raw.Get(Oidc.Authorize.Request.AcrValues);
-        AcrValues.AddRange(acrValues.FromSpaceSeparatedString());
+        AcrValues = ParseOrderedDistinctAcrValues(acrValues);
 
         CodeChallenge = raw.Get(Oidc.Authorize.Request.CodeChallenge);
         CodeChallengeMethod = raw.Get(Oidc.Authorize.Request.CodeChallengeMethod);
+    }
+
+    private static IReadOnlyList<string> ParseOrderedDistinctAcrValues(string? rawAcrValues)
+    {
+        var values = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var value in rawAcrValues.FromSpaceSeparatedString())
+        {
+            if (seen.Add(value))
+                values.Add(value);
+        }
+
+        return values.AsReadOnly();
     }
 
     [MemberNotNull(nameof(RedirectUri))]
