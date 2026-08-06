@@ -677,17 +677,19 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~AcrValuesTests"
 Concluída. `AcrValues` agora atravessa `IWithAcr`, `AuthorizeContext` e o boundary de interação como
 `IReadOnlyList<string>` ordenada; o parse remove duplicatas pela primeira ocorrência com comparação ordinal e
 preserva valores desconhecidos, inclusive prefixos `idp:`, sem lhes atribuir semântica proprietária. O limite
-continua realm-scoped e responde `invalid_request` quando excedido. A regressão expôs que
-`DefaultAuthorizeRequestValidator` reconhecia apenas `ProblemDetails` e confundia o `ErrorResponseResult`
-unificado pelo baseline OAuth 2.1 com sucesso; a fronteira agora materializa também esse payload protocolar em
-`AuthorizationValidationResult.Error`.
+continua realm-scoped e responde `invalid_request` quando excedido. A regressão expôs que `ResponseHandler`
+produzia `ErrorResponseResult` em sua factory de erro, mas seu próprio `HasProblem` reconhecia apenas
+`ProblemDetails`, fazendo `DefaultAuthorizeRequestValidator` confundir toda falha protocolar da continuação com
+sucesso. A correção ficou na causa: `HasProblem` agora mapeia o payload protocolar para `ProblemDetails`, sem usar
+`CreateResponseAsync` como inspetor nem depender dos handlers concretos do pipeline.
 
 `AcrValuesTests` fecha 8 casos: contratos públicos, valor único, ordem, unicidade case-sensitive, valor
 desconhecido, excesso de tamanho, ausência de metadata e fluxo code/token sem claim `acr` fabricada. A foundation
 registra o handoff: somente métodos de autenticação futuros podem estabelecer `acr`, e catálogo/policy/discovery
 pertencem aos planos de MFA/passwordless ou federação. O filtro obrigatório selecionou 8 testes, todos aprovados.
-A suíte integral fechou com 1.506 aprovados, 51 ignorados opt-in e zero falhas; `git diff --check` permaneceu
-limpo.
+A revisão acrescentou três regressões diretas de `ResponseHandler` para erro protocolar, `ProblemDetails` e
+sucesso. A suíte integral fechou com 1.509 aprovados, 51 ignorados opt-in e zero falhas; `git diff --check`
+permaneceu limpo.
 
 ---
 

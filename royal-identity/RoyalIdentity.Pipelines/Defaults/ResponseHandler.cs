@@ -47,9 +47,20 @@ public sealed class ResponseHandler(IResult result) : IResponseHandler
 
     public bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem)
     {
-        problem = result is IValueHttpResult<ProblemDetails> valueResult
-            ? valueResult.Value
-            : null;
+        if (result is ErrorResponseResult errorResult)
+        {
+            problem = new ProblemDetails
+            {
+                Status = errorResult.StatusCode,
+                Title = errorResult.Error.Error,
+                Detail = errorResult.Error.ErrorDescription,
+                Instance = errorResult.Error.ErrorUri
+            };
+
+            return true;
+        }
+
+        problem = result is IValueHttpResult<ProblemDetails> valueResult ? valueResult.Value : null;
 
         return problem is not null;
     }

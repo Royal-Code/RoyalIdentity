@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Pipelines.Abstractions;
-using RoyalIdentity.Pipelines.Defaults;
 using RoyalIdentity.Models;
 using RoyalIdentity.Users.Contexts;
 
@@ -43,20 +42,6 @@ public class DefaultAuthorizeRequestValidator : IAuthorizeRequestValidator
                     ErrorUri = problems.Instance
                 }
             };
-
-        var response = await context.Response.CreateResponseAsync(ct);
-        if (response is ErrorResponseResult errorResponse)
-        {
-            return new AuthorizationValidationResult()
-            {
-                Error = new ErrorDetails()
-                {
-                    Error = errorResponse.Error.Error,
-                    ErrorDescription = errorResponse.Error.ErrorDescription,
-                    ErrorUri = errorResponse.Error.ErrorUri
-                }
-            };
-        }
 
         return new AuthorizationValidationResult()
         {

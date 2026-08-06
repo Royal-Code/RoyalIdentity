@@ -12,10 +12,10 @@ namespace RoyalIdentity.Pipelines.Abstractions;
 public interface IResponseHandler
 {
     /// <summary>
-    /// Check if the response has problems.
+    /// Checks whether the response represents failed processing and exposes its normalized problem details.
     /// </summary>
-    /// <param name="problem"></param>
-    /// <returns></returns>
+    /// <param name="problem">The normalized problem when the response represents a failure.</param>
+    /// <returns><see langword="true"/> when the response represents a failure; otherwise, <see langword="false"/>.</returns>
     bool HasProblem([NotNullWhen(true)] out ProblemDetails? problem);
 
     /// <summary>
