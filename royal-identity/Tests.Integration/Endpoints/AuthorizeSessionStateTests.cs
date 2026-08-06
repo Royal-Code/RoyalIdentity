@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contexts.Decorators;
+using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Models;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Responses;
@@ -109,6 +111,41 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
         Assert.Equal("caller-state", parameters["state"]);
         Assert.Null(parameters["code"]);
         Assert.DoesNotContain("account/login", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AuthorizeContinuation_PromptNoneCombinedWithAnotherValue_ReturnsAValidationError()
+    {
+        using var scope = factory.Services.CreateScope();
+        var realm = await factory.LoadRealmAsync(factory.Handles.Demo);
+        var httpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        httpContext.Request.Scheme = "https";
+        httpContext.Request.Host = new HostString("continuation.contract.test");
+        httpContext.Items[Server.RealmCurrentKey] = realm;
+        var parameters = new NameValueCollection
+        {
+            [Oidc.Authorize.Request.ClientId] = factory.Handles.DemoClient.ClientId,
+            [Oidc.Authorize.Request.ResponseType] = Oidc.ResponseTypes.Code,
+            [Oidc.Authorize.Request.ResponseMode] = Oidc.ResponseModes.Query,
+            [Oidc.Authorize.Request.Scope] = "openid profile",
+            [Oidc.Authorize.Request.RedirectUri] = "http://localhost:5000/callback",
+            [Oidc.Authorize.Request.Prompt] = "none login",
+        };
+
+        var result = await scope.ServiceProvider
+            .GetRequiredService<IAuthorizeRequestValidator>()
+            .ValidateAsync(
+                new AuthorizationValidationRequest
+                {
+                    HttpContext = httpContext,
+                    Parameters = parameters,
+                },
+                default);
+
+        Assert.Null(result.Context);
+        Assert.NotNull(result.Error);
+        Assert.Equal(Oidc.Authorize.Errors.InvalidRequest, result.Error.Error);
+        Assert.Equal("Invalid prompt", result.Error.ErrorDescription);
     }
 
     [Theory]
