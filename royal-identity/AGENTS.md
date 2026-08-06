@@ -66,8 +66,11 @@ Check Session route/discovery under an HTTPS gate, Web Crypto iframe, opt-in Nod
 AGPLv3 + Apache-2.0 provenance/notice gate. Future framing hardening must preserve the iframe exception recorded
 in that plan and in `plan-rfc9700-security-hardening.md` DF19.
 
-`.ai/plans/plan-refactoring-debt-closure.md` is the active implementation plan; Fases 1-3 are complete and Fase 4
-is next. The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
+`.ai/plans/plan-refactoring-debt-closure.md` is **completed (5/5 phases)** — obsolete markers and inactive
+protocol surfaces were removed, extension grants route only through their provider, Configuration payloads remain
+at pre-release v1, `acr_values` is an ordered preference without fabricated policy/claim/metadata, and all
+deferred capabilities have nominal backlog/plan owners. `.ai/plans/plan-localization.md` is the next implementation
+plan. The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
 `ConfigurationResourceBridgeOptions` per baseline DF22 until a dedicated persistence plan is authorized. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
 migrates or seeds. `RoyalIdentity.Demo` is a self-provisioned, ephemeral SQLite in-memory executable.

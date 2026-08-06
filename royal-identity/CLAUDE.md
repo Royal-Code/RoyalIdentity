@@ -48,8 +48,11 @@ Completed refactoring plans (useful as historical record and for understanding d
 
 Active plans (check status before modifying affected areas):
 
-- [.ai/plans/plan-refactoring-debt-closure.md](.ai/plans/plan-refactoring-debt-closure.md) — EM EXECUÇÃO;
-  Fases 1-3 concluídas, Fase 4 é a próxima.
+- [.ai/plans/plan-refactoring-debt-closure.md](.ai/plans/plan-refactoring-debt-closure.md) — COMPLETED (5/5;
+  inactive protocol/refactoring surfaces closed, Configuration payloads kept at pre-release v1, ordered
+  `acr_values`, and deferred capabilities assigned to nominal owners).
+- [.ai/plans/plan-localization.md](.ai/plans/plan-localization.md) — next implementation plan; decisions closed,
+  0/7 phases.
 
 The resources/scopes domain redesign is complete; only persistence of its realm-scoped
 `ConfigurationResourceBridgeOptions` catalog remains deferred to a future dedicated plan. `Tests.Host` is

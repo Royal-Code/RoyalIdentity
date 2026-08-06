@@ -1,10 +1,10 @@
 # Plan: Fechamento de dívidas de refatoração e superfícies inativas (`plan-refactoring-debt-closure`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 4 de 5 fases executadas
+## Status: CONCLUÍDO - decisões fechadas; 5 de 5 fases executadas (2026-08-06)
 
 ## Progresso
 
-`████░` **80%** - 4 de 5 fases
+`█████` **100%** - 5 de 5 fases
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Marcadores antigos e código obsoleto | Concluida |
 | Fase 3 - Superfícies protocolares inativas, logging e payloads pré-release | Concluida |
 | Fase 4 - Contrato explícito de `acr_values` | Concluida |
-| Fase 5 - Aceites transversais e fechamento | Pendente |
+| Fase 5 - Aceites transversais e fechamento | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -704,19 +704,19 @@ rastreabilidade e diferidos.
 
 **Tarefas:**
 
-- [ ] Executar busca final por markers, TODOs, options e metadata removidos.
-- [ ] Confirmar que os únicos `[Redesign]` restantes têm destino ativo documentado.
-- [ ] Confirmar que o plano OIDC continua dono de check-session sem tratar seu bump histórico como baseline atual.
-- [ ] Confirmar que o plano RFC 9700 verifica metadata/logging já simplificados sem reintroduzir options.
-- [ ] Confirmar que o plano OAuth 2.1 continua dono dos códigos/status/headers de token errors.
-- [ ] Confirmar que `plan-reference-tokens-introspection.md` consome a remoção da option no payload v1, restaura o
+- [x] Executar busca final por markers, TODOs, options e metadata removidos.
+- [x] Confirmar que os únicos `[Redesign]` restantes têm destino ativo documentado.
+- [x] Confirmar que o plano OIDC continua dono de check-session sem tratar seu bump histórico como baseline atual.
+- [x] Confirmar que o plano RFC 9700 verifica metadata/logging já simplificados sem reintroduzir options.
+- [x] Confirmar que o plano OAuth 2.1 continua dono dos códigos/status/headers de token errors.
+- [x] Confirmar que `plan-reference-tokens-introspection.md` consome a remoção da option no payload v1, restaura o
   gate somente com runtime real e não reutiliza `BuildMtlsTokenUrl` para introspection.
-- [ ] Confirmar que `plan-pushed-authorization-requests.md` possui nominalmente a remoção da metadata JAR falsa e
+- [x] Confirmar que `plan-pushed-authorization-requests.md` possui nominalmente a remoção da metadata JAR falsa e
   seu guard depois de separar a referência PAR.
-- [ ] Atualizar roadmap com o estado real deste plano quando sua execução terminar.
-- [ ] Registrar a futura persistência de resources sem criar o plano antes da decisão do mantenedor.
-- [ ] Executar build e suíte integral.
-- [ ] Atualizar Status, Progresso, resultados das fases e matriz.
+- [x] Atualizar roadmap com o estado real deste plano quando sua execução terminar.
+- [x] Registrar a futura persistência de resources sem criar o plano antes da decisão do mantenedor.
+- [x] Executar build e suíte integral.
+- [x] Atualizar Status, Progresso, resultados das fases e matriz.
 
 **Critérios de aceite:** nenhuma referência ativa contradiz as decisões; nenhuma metadata aponta para endpoint
 inexistente; todos os payloads Configuration permanecem em v1; resources são descritos como modelo concluído/bridge transitória;
@@ -734,7 +734,26 @@ dotnet test RoyalIdentity.sln
 
 ### Resultado da Fase 5
 
-*a preencher*
+Concluída. A busca final encontrou somente os três `[Redesign("Usar Resource")]` de `AccountOptions`, todos
+entregues nominalmente a `plan-localization.md`; não encontrou `[Obsolete]`, TODO ativo nem as options/símbolos
+removidos por este plano. `Tests.Endpoints` permanece ausente, os serializers Configuration e Operational
+continuam em `CurrentVersion = 1`, e discovery omite introspection, Device Authorization e
+`mtls_endpoint_aliases` sem runtime alternativo. A capability JAR ainda incorreta permanece como a única exceção
+inventariada de metadata e tem correção e guard nominais na Fase 5 do plano PAR.
+
+Os handoffs foram conferidos nos dois lados: Session Management conserva seu histórico concluído sem definir a
+baseline atual de payload; OAuth 2.1 segue dono da taxonomia/status/headers; RFC 9700 consome
+`LoggingOptions`/metadata simplificados e preserva a exceção de framing de Check Session; Reference
+Tokens/Introspection restaura `EnableIntrospectionEndpoint` em v1 somente junto da rota real e proíbe reutilizar
+builders mTLS de outros endpoints. A persistência do catálogo realm-scoped continua registrada para o futuro
+`plan-data-resource-catalog-storage.md`, que permanece deliberadamente inexistente até autorização.
+
+A revisão final acrescentou uma regressão de continuação: `prompt="none login"` atravessa
+`IAuthorizeRequestValidator` e retorna `invalid_request` com `Context = null`, protegendo a distinção entre
+`AuthorizeValidateContext` e a Authentication Response redirecionável do browser. Build, filtros obrigatórios e
+suíte integral passaram. Os filtros selecionaram 5 testes arquiteturais, 9 de discovery, 3 de extension grants,
+8 de ACR, 3 do contrato `ResponseHandler` e 1 da continuação `prompt=none`; a suíte final fechou com 1.510
+aprovados, 51 ignorados opt-in e zero falhas. `git diff --check` permaneceu limpo.
 
 ---
 

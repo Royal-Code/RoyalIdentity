@@ -85,10 +85,8 @@ definida em `../analisys/`.
 
 ## Execução atual
 
-[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) está em execução: Fases 1-4 concluídas, Fase 5
-é a próxima. O plano consome a factory de Authentication Response do Session Management concluído e mantém os
-payloads Configuration pré-release em v1 conforme ADR-020. Em seguida, executar
-[plan-localization.md](plan-localization.md), que mantém v1 ao adicionar as options de realm e
+[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) foi concluído em 2026-08-06, com 5/5 fases.
+A próxima execução é [plan-localization.md](plan-localization.md), que mantém v1 ao adicionar as options de realm e
 fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
@@ -185,7 +183,7 @@ erro, e antes de `plan-refactoring-debt-closure.md`, que depende de sua baseline
 ### 2.2. Fechamento de dívidas de refatoração e superfícies inativas
 
 **Plano criado:** [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md)
-(EM EXECUÇÃO — 1/5 fases; Fase 1 concluída em 2026-08-01)
+(CONCLUÍDO — 5/5 fases; encerrado em 2026-08-06)
 
 Fecha marcadores antigos, decisões que deixaram de ser refatorações ativas e superfícies protocolares anunciadas
 sem implementação. Também corrige a documentação do redesign concluído de resources, sem antecipar sua
@@ -424,7 +422,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 3. ~~Concluir `plan-replay-protection.md` (Fase 3).~~ CONCLUÍDO.
 4. ~~Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).~~ CONCLUÍDO.
 5. ~~Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).~~ CONCLUÍDO.
-6. Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — EM EXECUÇÃO (Fases 2/5 concluídas).
+6. ~~Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).~~ CONCLUÍDO.
 7. Executar [plan-localization.md](plan-localization.md).
 8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.
