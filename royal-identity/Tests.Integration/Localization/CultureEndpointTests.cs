@@ -1,9 +1,14 @@
 using System.Net;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Net.Http.Headers;
 using RoyalIdentity.Contracts.Models.Messages;
+using RoyalIdentity.Razor.Localization;
 using RoyalIdentity.Contracts.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Tests.Integration.Prepare;
+using SetCookieHeaderValue = Microsoft.Net.Http.Headers.SetCookieHeaderValue;
 
 namespace Tests.Integration.Localization;
 
@@ -81,9 +86,26 @@ public class CultureEndpointTests : IClassFixture<PersistentStorageAppFactory>
         Assert.Equal("es-419", response.Content.Headers.ContentLanguage.FirstOrDefault());
     }
 
+    /// <summary>Mints a genuine antiforgery cookie/token pair from the host's own services.</summary>
+    private (SetCookieHeaderValue Cookie, AntiforgeryTokenSet Tokens) MintAntiforgery()
+    {
+        using var scope = factory.Services.CreateScope();
+        var antiforgery = scope.ServiceProvider.GetRequiredService<IAntiforgery>();
+        var httpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        var tokens = antiforgery.GetAndStoreTokens(httpContext);
+        var cookie = SetCookieHeaderValue.Parse(
+            httpContext.Response.Headers[HeaderNames.SetCookie].ToString());
+
+        return (cookie, tokens);
+    }
+
     private HttpClient CreateClient()
         => factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
+    /// <summary>
+    /// Posts with a genuine antiforgery pair. Minting it through <see cref="IAntiforgery"/> and sending the
+    /// matching cookie is what makes the other assertions about behaviour rather than about the guard.
+    /// </summary>
     private async Task<HttpResponseMessage> PostAsync(
         string locale,
         string returnUrl,
@@ -91,12 +113,86 @@ public class CultureEndpointTests : IClassFixture<PersistentStorageAppFactory>
     {
         client ??= CreateClient();
 
-        return await client.PostAsync(
-            $"/{factory.Handles.Demo.Path}/account/culture",
-            new FormUrlEncodedContent(new Dictionary<string, string>
+        var (cookie, tokens) = MintAntiforgery();
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/{factory.Handles.Demo.Path}/account/culture")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["locale"] = locale,
                 ["returnUrl"] = returnUrl,
+                [tokens.FormFieldName] = tokens.RequestToken!,
+            }),
+        };
+        request.Headers.Add("Cookie", $"{cookie.Name}={cookie.Value}");
+
+        return await client.SendAsync(request);
+    }
+
+    [Fact]
+    public async Task TheEndpoint_RejectsAPostWithoutAnAntiforgeryToken()
+    {
+        // Reading Request.Form by hand gives an endpoint no antiforgery metadata, so the host middleware never
+        // covers it: without the explicit validation this POST would change state cross-site.
+        var response = await CreateClient().PostAsync(
+            $"/{factory.Handles.Demo.Path}/account/culture",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["locale"] = "pt-BR",
+                ["returnUrl"] = "/demo/account/login",
             }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(response.Headers.Contains("Set-Cookie"));
+    }
+
+    [Fact]
+    public async Task TheEndpoint_RejectsAPostWhoseTokenBelongsToAnotherCookie()
+    {
+        // Two genuine mints, then the cookie of one paired with the token of the other. Posting a forged
+        // string with no cookie at all would prove far less: it is the pairing that antiforgery checks.
+        var (firstCookie, _) = MintAntiforgery();
+        var (_, secondToken) = MintAntiforgery();
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/{factory.Handles.Demo.Path}/account/culture")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["locale"] = "pt-BR",
+                ["returnUrl"] = "/demo/account/login",
+                ["__RequestVerificationToken"] = secondToken.RequestToken!,
+            }),
+        };
+        request.Headers.Add("Cookie", $"{firstCookie.Name}={firstCookie.Value}");
+
+        var response = await CreateClient().SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TheLogoutScreen_IgnoresAMessageMintedForAnotherRealm()
+    {
+        // The logout identifier is opaque but not realm-bound, so a message from realm A must not steer the
+        // culture of realm B.
+        var otherRealm = await factory.LoadRealmAsync(factory.Handles.Server);
+        using var scope = factory.Services.CreateScope();
+        var messageStore = scope.ServiceProvider.GetRequiredService<IMessageStore>();
+
+        var logoutId = await messageStore.WriteAsync(new Message<LogoutMessage>(new LogoutMessage
+        {
+            RealmId = otherRealm.Id,
+            SessionId = "session-from-another-realm",
+            UiLocales = "es-419",
+        }), default);
+
+        var response = await CreateClient().GetAsync(
+            $"/{factory.Handles.Demo.Path}/account/logout?logoutId={logoutId}");
+
+        Assert.NotEqual("es-419", response.Content.Headers.ContentLanguage.FirstOrDefault());
     }
 }

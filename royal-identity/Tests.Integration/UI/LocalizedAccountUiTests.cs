@@ -167,15 +167,18 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
         if (!candidate.Contains(' ', StringComparison.Ordinal) && candidate.Contains('.', StringComparison.Ordinal))
             return false;
 
-        // Prose may start lowercase: a fragment appended after @L["..."] — the exact shape of the residue
-        // this scanner previously missed — reads "this application will access", not "This ...".
+        // Prose may start lowercase: a fragment appended after @L["..."] — the shape of the residue this
+        // scanner first missed — reads "this application will access", not "This ...".
         var isSentence = Regex.IsMatch(
             candidate,
-            @"^[A-Za-z][A-Za-z]*(?: [A-Za-z][A-Za-z,']*)+[.!?]?$",
+            @"^[A-Za-z][A-Za-z]*(?: [A-Za-z][A-Za-z,']*)+[.!?…]*$",
             RegexOptions.CultureInvariant);
-        var isClosedWord = Regex.IsMatch(candidate, @"^[A-Z][A-Za-z]+[.!?]$", RegexOptions.CultureInvariant);
 
-        return isSentence || isClosedWord;
+        // A single word is product text too: a button reading "Continue" or a state reading "Loading..." was
+        // invisible to the previous version, which demanded either several words or exactly one final mark.
+        var isWord = Regex.IsMatch(candidate, @"^[A-Za-z][A-Za-z']{2,}[.!?…]*$", RegexOptions.CultureInvariant);
+
+        return isSentence || isWord;
     }
 
     private Task<string> GetAsync(string relativePath, string culture)

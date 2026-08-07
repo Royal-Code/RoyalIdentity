@@ -70,7 +70,7 @@ in that plan and in `plan-rfc9700-security-hardening.md` DF19.
 protocol surfaces were removed, extension grants route only through their provider, Configuration payloads remain
 at pre-release v1, `acr_values` is an ordered preference without fabricated policy/claim/metadata, and all
 deferred capabilities have nominal backlog/plan owners. `.ai/plans/plan-localization.md` is the active
-implementation plan; Fases 1-2 are complete and Fases 3-5 are open after an external review. `RealmOptions.Internationalization` is now the
+implementation plan; Fases 1, 2 and 4 are complete and Fases 3 and 5 are open after external review. `RealmOptions.Internationalization` is now the
 realm-scoped localization policy — active by default, with `SupportedLocales` an ordered, case-insensitively
 distinct `List<string>` normalized and validated before the configuration snapshot is published.
 The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
@@ -280,7 +280,10 @@ Current status:
   of the realm-scoped catalog remains deferred; do not add it outside a future
   `plan-data-resource-catalog-storage.md`.
 - Realm-specific options and CORS were completed by `.ai/plans/plan-realm-options-redesign.md`.
-- Localization messages still marked in `AccountOptions` remain active and belong to `plan-localization.md`.
+- Localization is being implemented by `.ai/plans/plan-localization.md`. Its Phase 4 removed the former
+  configurable UI messages and their `[Redesign("Usar Resource")]` markers from `AccountOptions`; do not
+  reintroduce presentable text as core configuration. The remaining work through Phase 5 is request-culture
+  preference completion and full account-UI localization/validation coverage.
 
 ## External RoyalCode Libraries (`UserAccounts` module family only)
 

@@ -80,8 +80,15 @@ public sealed class RealmRequestCultureProvider(IUiLocaleCatalog catalog) : Requ
                 {
                     // Read only: consuming the message here would break the logout flow that owns it.
                     var logout = await messageStore.ReadAsync<LogoutMessage>(logoutId!, httpContext.RequestAborted);
-                    if (logout?.Data?.UiLocales is { } logoutLocales)
+
+                    // The identifier is opaque but not realm-bound, so a message minted for another realm must
+                    // not steer this realm's culture.
+                    if (logout?.Data is { } message
+                        && string.Equals(message.RealmId, realm.Id, StringComparison.Ordinal)
+                        && message.UiLocales is { } logoutLocales)
+                    {
                         return logoutLocales;
+                    }
                 }
             }
 
@@ -100,7 +107,9 @@ public sealed class RealmRequestCultureProvider(IUiLocaleCatalog catalog) : Requ
         }
         catch (OperationCanceledException)
         {
-            // A cancelled request has no culture to negotiate; the caller falls back to the realm default.
+            // A cancelled request has no hint to read. Returning null lets the remaining precedence levels
+            // still answer — Accept-Language, then the realm default — because a cancelled read is a missing
+            // hint, not a reason to ignore what the browser already said.
             return null;
         }
     }

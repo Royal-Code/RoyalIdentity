@@ -1,4 +1,6 @@
 using System.Xml.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoyalIdentity.Contracts.Localization;
 
 namespace Tests.Architecture;
@@ -110,15 +112,70 @@ public class LocalizationBoundaryTests
         }
     }
 
+    [Fact]
+    public void TheUiCatalogue_WinsRegardlessOfRegistrationOrder()
+    {
+        // The composition that exposed the defect: the core registered first. The hosts happen to call Razor
+        // first, so only an explicit inverse-order test reproduces it.
+        foreach (var coreFirst in new[] { true, false })
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+
+            if (coreFirst)
+            {
+                services.TryAddSingleton<IUiLocaleCatalog, EmptyUiLocaleCatalog>();
+                services.AddRoyalIdentityRazor();
+            }
+            else
+            {
+                services.AddRoyalIdentityRazor();
+                services.TryAddSingleton<IUiLocaleCatalog, EmptyUiLocaleCatalog>();
+            }
+
+            using var provider = services.BuildServiceProvider();
+            var catalog = provider.GetRequiredService<IUiLocaleCatalog>();
+
+            Assert.IsNotType<EmptyUiLocaleCatalog>(catalog);
+        }
+    }
+
+    [Fact]
+    public void AHostOwnCatalogue_SurvivesTheRazorRegistration()
+    {
+        // Removing the empty default must not become "remove whatever is registered": a host that supplies its
+        // own catalogue keeps it.
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IUiLocaleCatalog, HostSuppliedCatalog>();
+        services.AddRoyalIdentityRazor();
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<HostSuppliedCatalog>(provider.GetRequiredService<IUiLocaleCatalog>());
+    }
+
+    private sealed class HostSuppliedCatalog : IUiLocaleCatalog
+    {
+        public string? NeutralLocale => "en";
+
+        public IReadOnlyList<string> AvailableLocales => ["en"];
+
+        public bool Supports(string locale) => locale == "en";
+    }
+
     private static IEnumerable<(string Path, string Text)> ProductSourceFiles()
     {
         var root = ProjectReferenceReader.FindRepositoryRoot();
 
+        // Components are consumers too: restricting the sweep to *.cs left every .razor free to reach for
+        // ResourceManager directly.
         return new[] { "RoyalIdentity", "RoyalIdentity.Razor" }
-            .SelectMany(project => Directory.EnumerateFiles(
-                Path.Combine(root, project),
-                "*.cs",
-                SearchOption.AllDirectories))
+            .SelectMany(project => new[] { "*.cs", "*.razor" }
+                .SelectMany(pattern => Directory.EnumerateFiles(
+                    Path.Combine(root, project),
+                    pattern,
+                    SearchOption.AllDirectories)))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
                 && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
             .Select(path => (Path.GetRelativePath(root, path), File.ReadAllText(path)));

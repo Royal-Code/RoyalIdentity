@@ -1,17 +1,17 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 2 de 7 fases concluídas; Fases 3-5 abertas
+## Status: EM EXECUÇÃO - decisões fechadas; 3 de 7 fases concluídas (1, 2 e 4); Fases 3 e 5 abertas
 
 ## Progresso
 
-`██░░░░░` **29%** - 2 de 7 fases concluídas
+`███░░░░` **43%** - 3 de 7 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Concluida |
 | Fase 2 - Catálogos RESX e infraestrutura de localização | Concluida |
 | Fase 3 - Seleção de cultura por request e preferência do usuário | Reaberta |
-| Fase 4 - Códigos de apresentação e remoção de textos do core | Reaberta |
+| Fase 4 - Códigos de apresentação e remoção de textos do core | Concluida |
 | Fase 5 - Localização integral da UI de conta | Pendente |
 | Fase 6 - Discovery e aceites multi-realm ponta a ponta | Pendente |
 | Fase 7 - Documentação, guards e fechamento da dívida | Pendente |
@@ -635,7 +635,7 @@ fontes validadas; oferecer preferência persistida realm-scoped sem abrir redire
 - [x] Reutilizar parsing do framework para `Accept-Language` e filtrar pela allowlist efetiva do realm.
 - [x] Aplicar match exato, parent e fallback para a única variante do mesmo idioma conforme DF20.
 - [x] Inserir `UseRequestLocalization` depois de `UseRealmDiscovery` e antes de CORS/autenticação.
-- [x] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound. (endpoint e componente entregues; **colocação do componente numa tela SSR com form nomeado em aberto** — ver Resultado)
+- [ ] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound. (endpoint protegido e testado; **componente sem colocação em nenhuma tela** — ver Resultado)
 - [x] Gravar cookie persistente HttpOnly/SameSite/realm-scoped contendo somente locale canônico.
 - [x] Ignorar cookie/hints que deixaram de ser suportados após refresh.
 - [x] Definir comportamento de `Enabled=false` como ausência de negociação, usando default/neutro sem metadata.
@@ -654,6 +654,7 @@ rejeitado; cada filtro obrigatório seleciona ao menos um teste.
 ```powershell
 dotnet test Tests.Integration --filter "FullyQualifiedName~RequestCultureTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~CulturePreferenceTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~CultureEndpointTests"
 dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundaryTests"
 ```
 
@@ -726,6 +727,7 @@ ao menos um teste.
 dotnet test Tests.UserAccounts --filter "FullyQualifiedName~LoginFlow_KeepsGenericExternalMessage_AndPreservesInternalReason"
 dotnet test Tests.Integration --filter "FullyQualifiedName~LoginPageTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~LoginEventCharacterizationTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~ErrorPageLocalizationTests"
 ```
 
 ### Resultado da Fase 4
@@ -1147,3 +1149,69 @@ marcada com essa ressalva explícita; fechá-la exige entender a interação ent
 SSR do .NET 10, o que merece investigação própria e não um chute.
 
 Estado: **1.616 aprovados, 51 ignorados opt-in, 0 falhas**; `git diff --check` limpo.
+
+---
+
+## Terceira revisão externa — antiforgery era um bloqueante real
+
+**O achado de segurança procede e era meu.** `MapPost` lendo `Request.Form` à mão **não** recebe metadata de
+antiforgery, então o middleware do host nunca cobria a rota: o endpoint que grava cookie estava aberto a
+submissão cross-site, e o meu teste — que postava sem token e esperava redirect — *provava* isso em vez de
+provar proteção. O comentário do `CultureSelector` afirmando que "o endpoint valida o token" também estava
+errado, e a tarefa correspondente estava marcada como concluída.
+
+Corrigido: o endpoint valida `IAntiforgery.ValidateRequestAsync` explicitamente e responde `400`. Dois testes
+negativos novos — POST sem token e POST com token forjado — mais a emissão de um par token/cookie genuíno nos
+testes positivos, para que eles falem de comportamento e não do guard. A tarefa voltou a ficar **desmarcada**,
+porque o seletor ainda não está colocado em tela nenhuma.
+
+Demais correções desta passagem:
+
+- **`LogoutMessage` de outro realm influenciava a cultura deste.** O identificador é opaco, mas não é
+  realm-bound; agora o `RealmId` da mensagem é conferido contra o realm corrente antes de o `ui_locales` ser
+  aceito.
+- **Documentação do cancelamento estava errada:** o `catch` devolve `null` e a resolução continua por
+  `Accept-Language`, não "cai para o default". O comentário passou a descrever o que o código faz — e a razão:
+  uma leitura cancelada é um hint ausente, não motivo para ignorar o que o navegador já disse.
+- **Faltava a regressão do defeito crítico da Fase 4.** Agora a página de erro é renderizada nas três culturas:
+  um `MessageCode` aparece traduzido e nunca como chave, e um `ErrorDescription` literal chega intacto junto do
+  código OAuth normativo. Verificado por mutação — revertendo `Error.razor` para imprimir o campo cru, os três
+  casos falham.
+- **Scanner cego para palavra isolada.** `Continue` e `Loading...` passavam, porque eu exigia várias palavras ou
+  exatamente uma pontuação final. Ambos os formatos agora são detectados.
+- **Guard de `ResourceManager` só via `*.cs`**, deixando todo `.razor` livre; passou a cobrir os dois.
+- **Ordem de composição não tinha teste.** Agora há um que registra o core primeiro — a condição que originou a
+  correção e que a composição normal dos hosts não reproduz — e outro que prova que um catálogo próprio do host
+  sobrevive ao registro do Razor.
+
+Ainda **não** entregue, e por isso as fases seguem abertas: a colocação do seletor numa tela SSR que já tem form
+nomeado; o teste de `ui_locales` recuperado por `returnUrl`/parâmetros armazenados; a regressão SSR de campo
+obrigatório provando que `LocalizedValidationMessage` rende a frase e não a chave; e a promoção das mutações do
+scanner a regressões permanentes.
+
+Estado: **1.624 aprovados, 51 ignorados opt-in, 0 falhas**; `git diff --check` limpo.
+
+---
+
+## Quarta revisão externa — topologia de testes e gates
+
+Todos os pontos procedem; nenhum era funcional.
+
+- **A regressão da página de erro estava na fixture errada.** Ficara em `CultureEndpointTests` — comportamento
+  de UI dentro de uma fixture de endpoint — e, pior, **nenhum filtro obrigatório da Fase 4 a selecionava**. Uma
+  regressão que o gate não roda não é regressão. Movida para `Tests.Integration/UI/ErrorPageLocalizationTests.cs`
+  e acrescentada ao gate da fase. Com isso a **Fase 4 fecha**: não resta pendência funcional nem de gate.
+- **`CultureEndpointTests` não estava nos comandos obrigatórios da Fase 3**, ou seja, o principal teste de
+  segurança da fase ficava fora do fechamento nominal. Acrescentado.
+- **O teste dito "token não corresponde ao cookie" não enviava cookie.** Provava token forjado sem cookie, que é
+  outra coisa. Agora cunha **dois pares genuínos** e cruza o cookie de um com o token do outro — é o pareamento
+  que o antiforgery verifica.
+- **A checagem de `RealmId` não tinha regressão.** Adicionada, e verificada por mutação: removendo a
+  comparação, o teste falha.
+- **O cancelamento sumiu da minha lista final de pendências** embora continuasse aberto no plano. Registro
+  aqui: continua aberto e sem teste, porque forçá-lo exigiria instrumentar o resolver, o que faria o teste
+  falar do mock e não do comportamento.
+
+Pendências reais das Fases 3 e 5, sem mudança: colocação do seletor numa tela SSR com form nomeado;
+`ui_locales` recuperado por `returnUrl`/parâmetros armazenados; cancelamento; regressão SSR de validação por
+campo; e promoção das mutações do scanner a regressões permanentes.

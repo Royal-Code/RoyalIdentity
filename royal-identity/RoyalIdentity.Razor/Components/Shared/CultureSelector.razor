@@ -42,8 +42,9 @@
 
     /// <remarks>
     /// A plain form rather than a Blazor SSR named form: a second named form on a page that already has one
-    /// diverts the <c>_handler</c> dispatch and makes the page's own POST fail antiforgery. The endpoint
-    /// validates the token itself.
+    /// diverts the <c>_handler</c> dispatch and makes the page's own POST fail antiforgery. The endpoint validates the
+    /// antiforgery token itself, explicitly, because reading <c>Request.Form</c> by hand gives an endpoint no
+    /// antiforgery metadata for the host middleware to act on.
     /// </remarks>
     protected override void OnParametersSet()
     {

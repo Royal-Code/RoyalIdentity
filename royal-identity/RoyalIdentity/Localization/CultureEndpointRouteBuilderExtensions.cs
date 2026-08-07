@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -13,21 +14,35 @@ public static class CultureEndpointRouteBuilderExtensions
     /// </summary>
     /// <remarks>
     /// A dedicated endpoint rather than a Blazor SSR named form: a second named form on a page that already
-    /// has one diverts the <c>_handler</c> dispatch and makes the page's own POST fail antiforgery. Antiforgery
-    /// still applies here — the host installs the middleware, and this route does not opt out of it.
+    /// has one diverts the <c>_handler</c> dispatch and makes the page's own POST fail antiforgery.
+    /// <para>
+    /// The token is validated here, explicitly. Reading <c>Request.Form</c> by hand does <b>not</b> give an
+    /// endpoint antiforgery metadata — only model-bound form parameters do — so relying on the host's
+    /// middleware would have left this state-changing POST open to cross-site submission.
+    /// </para>
     /// </remarks>
     public static IEndpointRouteBuilder MapRealmCultureSelection(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        endpoints.MapPost("{realm}/account/culture", (
+        endpoints.MapPost("{realm}/account/culture", async (
             HttpContext httpContext,
+            IAntiforgery antiforgery,
             ICulturePreferenceService culturePreference) =>
         {
             if (!httpContext.TryGetCurrentRealm(out var realm))
                 return Results.NotFound();
 
-            var form = httpContext.Request.Form;
+            try
+            {
+                await antiforgery.ValidateRequestAsync(httpContext);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                return Results.BadRequest();
+            }
+
+            var form = await httpContext.Request.ReadFormAsync();
             culturePreference.Apply(form["locale"]);
 
             // The return address is only ever a path inside this realm. Accepting the posted value as-is
