@@ -1,0 +1,56 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Localization
+
+@inject IStringLocalizer<AccountResources> L
+@inject ICulturePreferenceService CulturePreference
+@inject NavigationManager Navigation
+
+@if (locales.Count > 1)
+{
+    <form method="post" action="@PostUrl" class="culture-selector">
+        @*
+            The framework component, not IAntiforgery directly: GetAndStoreTokens rotates the request token on
+            every call, which invalidated the token already rendered for the page's own form.
+        *@
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@Navigation.ToBaseRelativePath(Navigation.Uri)" />
+
+        <label for="culture-selector-locale" class="form-label">@L["Common_Language"]</label>
+        <select id="culture-selector-locale" name="locale" class="form-select">
+            @foreach (var locale in locales)
+            {
+                <option value="@locale" selected="@(locale == CultureInfo.CurrentUICulture.Name)">
+                    @NativeName(locale)
+                </option>
+            }
+        </select>
+
+        <button type="submit" class="btn btn-outline-secondary">@L["Common_ApplyLanguage"]</button>
+    </form>
+}
+
+@code {
+    private IReadOnlyList<string> locales = [];
+
+    /// <summary>The realm this selector belongs to; the POST is realm-scoped like the cookie it writes.</summary>
+    [Parameter, EditorRequired]
+    public string Realm { get; set; } = default!;
+
+    private string PostUrl => $"/{Realm}/account/culture";
+
+    /// <remarks>
+    /// A plain form rather than a Blazor SSR named form: a second named form on a page that already has one
+    /// diverts the <c>_handler</c> dispatch and makes the page's own POST fail antiforgery. The endpoint
+    /// validates the token itself.
+    /// </remarks>
+    protected override void OnParametersSet()
+    {
+        // Fewer than two locales is not a choice, so the selector does not render at all.
+        locales = CulturePreference.GetSelectableLocales();
+    }
+
+    private static string NativeName(string locale)
+        => CultureInfo.GetCultureInfo(locale).NativeName;
+}

@@ -103,7 +103,7 @@ public class LoginPageService(
     private async Task<LoginResult> BuildErrorPageAsync(AccountUiMessageCode code, CancellationToken ct)
     {
         // The protected message carries the code; the error page resolves it in the reader's culture.
-        var error = new ErrorMessage { ErrorDescription = AccountUiMessages.ResourceKeys[code] };
+        var error = new ErrorMessage { MessageCode = AccountUiMessages.ResourceKeys[code] };
         var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
         return new LoginResult(LoginResultType.Error, Routes.BuildErrorUrl(errorId), ForceLoad: true);
     }

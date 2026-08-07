@@ -86,7 +86,7 @@ definida em `../analisys/`.
 ## Execução atual
 
 [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) foi concluído em 2026-08-06, com 5/5 fases.
-[plan-localization.md](plan-localization.md) está em execução: Fase 1 concluída, Fase 2 é a próxima. Ele mantém
+[plan-localization.md](plan-localization.md) está em execução: Fases 1-2 concluídas; Fases 3-5 abertas após revisão externa. Ele mantém
 v1 ao adicionar as options de realm e fecha a última dívida antiga de `redesign-todo.md`. Depois vem
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
@@ -207,7 +207,7 @@ resources/scopes continuará reservada para um futuro `plan-data-resource-catalo
 ### 2.3. Localization realm-scoped da UI
 
 **Plano criado:** [plan-localization.md](plan-localization.md)
-(EM EXECUÇÃO — 1/7 fases; Fase 1 concluída em 2026-08-06)
+(EM EXECUÇÃO — 2/7 fases concluídas; Fases 3-5 abertas)
 
 Fecha a última pendência antiga de `redesign-todo.md`: transforma o scaffold órfão
 `InternationalizationOptions` em configuração persistida por realm, seleciona cultura por request e localiza
@@ -423,7 +423,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 4. ~~Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).~~ CONCLUÍDO.
 5. ~~Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).~~ CONCLUÍDO.
 6. ~~Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).~~ CONCLUÍDO.
-7. Executar [plan-localization.md](plan-localization.md) — EM EXECUÇÃO (Fase 1/7 concluída).
+7. Executar [plan-localization.md](plan-localization.md) — EM EXECUÇÃO (2/7 concluídas; 3-5 abertas).
 8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
 9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.
 10. Executar [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md), após fechar Q1/Q2/Q3.

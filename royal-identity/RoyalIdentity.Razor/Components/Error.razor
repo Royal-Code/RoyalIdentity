@@ -82,7 +82,14 @@
         await MessageStore.DeleteAsync(ErrorId, CancellationToken.None);
     }
 
-    private string GetError() => errorMessage?.Error ?? ErrorType ?? "Error";
+    private string GetError() => errorMessage?.Error ?? ErrorType ?? L["Error_Title"];
 
-    private string GetDescription() => errorMessage?.ErrorDescription ?? ErrorDescription ?? string.Empty;
+    /// <summary>
+    /// A presentation code is resolved in the reader's culture; a literal description — a protocol one, for
+    /// instance — is printed as it arrived. Rendering the raw field would print resource keys such as
+    /// "Consent_RequestNotFound" to the user.
+    /// </summary>
+    private string GetDescription() => errorMessage?.MessageCode is { } code
+        ? L[code]
+        : errorMessage?.ErrorDescription ?? ErrorDescription ?? string.Empty;
 }

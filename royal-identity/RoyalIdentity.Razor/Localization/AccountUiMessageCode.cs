@@ -51,11 +51,15 @@ public static class AccountUiMessages
     /// </summary>
     public static AccountUiMessageCode From(LoginFlowErrorCode code) => code switch
     {
+        LoginFlowErrorCode.InvalidCredentials => AccountUiMessageCode.LoginInvalidCredentials,
         LoginFlowErrorCode.InvalidReturnUrl => AccountUiMessageCode.LoginInvalidReturnUrl,
         // A missing realm context is an infrastructure fault; the user is told nothing about it beyond the
         // generic failure, exactly like a bad credential.
         LoginFlowErrorCode.NoRealmContext => AccountUiMessageCode.LoginInvalidCredentials,
-        _ => AccountUiMessageCode.LoginInvalidCredentials,
+        // No catch-all: a reason added to the core must be given a message here deliberately, instead of
+        // silently inheriting "invalid credentials".
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(code), code, "This login failure has no presentation message."),
     };
 
     public static string Resolve(this IStringLocalizer<AccountResources> localizer, AccountUiMessageCode code)

@@ -31,7 +31,7 @@ public class ConsentPageService(
         {
             var error = new ErrorMessage
             {
-                ErrorDescription = AccountUiMessages.ResourceKeys[AccountUiMessageCode.ConsentRequestNotFound]
+                MessageCode = AccountUiMessages.ResourceKeys[AccountUiMessageCode.ConsentRequestNotFound]
             };
             var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
             return new ConsentResult(ConsentResultType.Denied, Routes.BuildErrorUrl(errorId), ForceLoad: true);

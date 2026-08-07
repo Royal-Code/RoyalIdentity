@@ -1,5 +1,6 @@
-using Microsoft.AspNetCore.Routing;
+﻿using Microsoft.AspNetCore.Routing;
 using RoyalIdentity.Endpoints;
+using RoyalIdentity.Localization;
 using RoyalIdentity.Pipelines.Abstractions;
 using RoyalIdentity.Pipelines.Mapping;
 using RoyalIdentity.Pipelines.Defaults;
@@ -21,5 +22,8 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapPipeline<RevocationEndpoint>(Oidc.Routes.Revocation);
         endpoints.MapPipeline<EndSessionEndpoint>(Oidc.Routes.EndSession);
         endpoints.MapPipeline<CheckSessionEndpoint>(Oidc.Routes.CheckSession);
+
+        // Realm-scoped explicit language choice (plan-localization DF10).
+        endpoints.MapRealmCultureSelection();
     }
 }

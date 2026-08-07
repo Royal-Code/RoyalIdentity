@@ -25,7 +25,7 @@
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.Domain" class="form-control" id="Domain" aria-required="true" placeholder="@L["Domain_Placeholder"]" auto-focus />
                 <label for="Domain" class="form-label">@L["Domain_Label"]</label>
-                <ValidationMessage For="() => Input.Domain" class="text-danger" />
+                <LocalizedValidationMessage For="() => Input.Domain" />
             </div>
 
             <div>
@@ -58,7 +58,7 @@
 
         if (realm is null)
         {
-            errorMessage = "Domain not found.";
+            errorMessage = L["Domain_NotFound"];
             return;
         }
 

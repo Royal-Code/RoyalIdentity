@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Localization;
+using RoyalIdentity.Contracts.Models.Messages;
+using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
 using RoyalIdentity.Users.Contracts;
@@ -24,10 +26,12 @@ public sealed class RealmRequestCultureProvider(IUiLocaleCatalog catalog) : Requ
     {
         ArgumentNullException.ThrowIfNull(httpContext);
 
-        // No realm yet means this request never reached realm discovery — a static file, for instance. The
-        // framework's remaining providers and the default culture handle it.
+        // Screens that choose the realm run before realm discovery can know one — domain selection is the
+        // whole point. They still belong to the product, so they negotiate against the shipped catalogue: a
+        // user who cannot read English must not be asked to pick a domain in English (decisão do mantenedor,
+        // que resolve a contradição entre DF5 "sem realm ⇒ neutro" e o aceite da Fase 5).
         if (!httpContext.TryGetCurrentRealm(out var realm))
-            return null;
+            return DetermineCatalogueCulture(httpContext);
 
         var internationalization = realm.Options.Internationalization;
         var supported = internationalization.SupportedLocales;
@@ -50,10 +54,14 @@ public sealed class RealmRequestCultureProvider(IUiLocaleCatalog catalog) : Requ
     }
 
     /// <summary>
-    /// Reads the OIDC <c>ui_locales</c> hint. The authorize and end-session requests carry it inline; the
-    /// account screens carry it in the <c>returnUrl</c>, which may in turn point at server-stored parameters,
-    /// so the authorization context resolver is what reads it back (MP-5).
+    /// Reads the OIDC <c>ui_locales</c> hint from whichever carrier this request uses: inline on authorize and
+    /// end-session, inside the <c>returnUrl</c> on the account screens — which may itself point at
+    /// server-stored parameters (MP-5) — or inside the protected <c>LogoutMessage</c> on the logout screens.
     /// </summary>
+    /// <remarks>
+    /// The logout carrier matters because the sign-out screens are reached by an opaque identifier: without
+    /// reading it, a session that started in Portuguese would say goodbye in English.
+    /// </remarks>
     private static async Task<string?> ResolveUiLocalesAsync(HttpContext httpContext, Realm realm)
     {
         if (httpContext.Request.Query.TryGetValue(Oidc.Authorize.Request.UiLocales, out var inline)
@@ -62,14 +70,27 @@ public sealed class RealmRequestCultureProvider(IUiLocaleCatalog catalog) : Requ
             return inline!;
         }
 
-        if (!httpContext.Request.Query.TryGetValue("returnUrl", out var returnUrl)
-            || string.IsNullOrWhiteSpace(returnUrl))
-        {
-            return null;
-        }
-
         try
         {
+            if (httpContext.Request.Query.TryGetValue(UI.Routes.Params.LogoutId, out var logoutId)
+                && !string.IsNullOrWhiteSpace(logoutId))
+            {
+                var messageStore = httpContext.RequestServices.GetService<IMessageStore>();
+                if (messageStore is not null)
+                {
+                    // Read only: consuming the message here would break the logout flow that owns it.
+                    var logout = await messageStore.ReadAsync<LogoutMessage>(logoutId!, httpContext.RequestAborted);
+                    if (logout?.Data?.UiLocales is { } logoutLocales)
+                        return logoutLocales;
+                }
+            }
+
+            if (!httpContext.Request.Query.TryGetValue(UI.Routes.Params.ReturnUrl, out var returnUrl)
+                || string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return null;
+            }
+
             var resolver = httpContext.RequestServices.GetService<IAuthorizationContextResolver>();
             if (resolver is null)
                 return null;
@@ -96,13 +117,29 @@ public sealed class RealmRequestCultureProvider(IUiLocaleCatalog catalog) : Requ
         if (languages is null || languages.Count is 0)
             return false;
 
-        foreach (var language in languages.OrderByDescending(value => value.Quality ?? 1d))
+        // RFC 9110: q=0 means the client refuses that language, so it is dropped rather than ranked last.
+        foreach (var language in languages
+            .Where(value => (value.Quality ?? 1d) > 0d)
+            .OrderByDescending(value => value.Quality ?? 1d))
         {
             if (LocaleMatcher.TryMatch(language.Value.Value, supported, out matched))
                 return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Culture for a request with no realm: the browser's preference, limited to what the composed UI ships.
+    /// </summary>
+    private ProviderCultureResult? DetermineCatalogueCulture(HttpContext httpContext)
+    {
+        if (catalog.NeutralLocale is null)
+            return null;
+
+        return TryMatchAcceptLanguage(httpContext, catalog.AvailableLocales, out var accepted)
+            ? new ProviderCultureResult(accepted!, accepted!)
+            : new ProviderCultureResult(catalog.NeutralLocale, catalog.NeutralLocale);
     }
 
     private ProviderCultureResult Result(string locale)

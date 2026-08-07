@@ -175,6 +175,19 @@ public class LocalizationCatalogTests : IClassFixture<PersistentStorageAppFactor
     }
 
     [Fact]
+    public void EveryPresentationCodeValue_HasAResourceKey()
+    {
+        // Walking the dictionary proves only what is already in it. Walking the enum is what catches a member
+        // added without a key — the case the earlier assertion was blind to.
+        foreach (var code in Enum.GetValues<AccountUiMessageCode>())
+        {
+            Assert.True(
+                AccountUiMessages.ResourceKeys.ContainsKey(code),
+                $"{code} has no resource key.");
+        }
+    }
+
+    [Fact]
     public void NormativeProtocolCodes_AreNotTranslated()
     {
         // "invalid_request" and friends are wire values defined by OAuth/OIDC; turning them into resource

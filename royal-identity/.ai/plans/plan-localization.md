@@ -1,17 +1,17 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 4 de 7 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 2 de 7 fases concluídas; Fases 3-5 abertas
 
 ## Progresso
 
-`████░░░` **57%** - 4 de 7 fases
+`██░░░░░` **29%** - 2 de 7 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Concluida |
 | Fase 2 - Catálogos RESX e infraestrutura de localização | Concluida |
-| Fase 3 - Seleção de cultura por request e preferência do usuário | Concluida |
-| Fase 4 - Códigos de apresentação e remoção de textos do core | Concluida |
+| Fase 3 - Seleção de cultura por request e preferência do usuário | Reaberta |
+| Fase 4 - Códigos de apresentação e remoção de textos do core | Reaberta |
 | Fase 5 - Localização integral da UI de conta | Pendente |
 | Fase 6 - Discovery e aceites multi-realm ponta a ponta | Pendente |
 | Fase 7 - Documentação, guards e fechamento da dívida | Pendente |
@@ -635,11 +635,11 @@ fontes validadas; oferecer preferência persistida realm-scoped sem abrir redire
 - [x] Reutilizar parsing do framework para `Accept-Language` e filtrar pela allowlist efetiva do realm.
 - [x] Aplicar match exato, parent e fallback para a única variante do mesmo idioma conforme DF20.
 - [x] Inserir `UseRequestLocalization` depois de `UseRealmDiscovery` e antes de CORS/autenticação.
-- [x] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound.
+- [x] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound. (endpoint e componente entregues; **colocação do componente numa tela SSR com form nomeado em aberto** — ver Resultado)
 - [x] Gravar cookie persistente HttpOnly/SameSite/realm-scoped contendo somente locale canônico.
 - [x] Ignorar cookie/hints que deixaram de ser suportados após refresh.
 - [x] Definir comportamento de `Enabled=false` como ausência de negociação, usando default/neutro sem metadata.
-- [x] Cobrir cancelamento, realm ausente, recurso neutro e cultures pai sem lançar erro protocolar.
+- [ ] Cobrir cancelamento, realm ausente, recurso neutro e cultures pai sem lançar erro protocolar.
 - [x] Criar `Tests.Integration/Localization/RequestCultureTests.cs` e
   `Tests.Integration/Localization/CulturePreferenceTests.cs`; estender
   `Tests.Architecture/LocalizationBoundaryTests.cs` com a ordem do middleware nos três hosts.
@@ -706,7 +706,7 @@ view models/mensagens protegidas, testes de login/consent/logout.
 - [x] Remover as três propriedades de mensagem e `[Redesign("Usar Resource")]` de `AccountOptions`.
 - [x] Remover cópia, payload, seeds e testes associados às propriedades eliminadas.
 - [x] Criar códigos de apresentação Razor para consentimento, logout, request ausente e retorno inválido.
-- [x] Transportar código + argumentos seguros em redirects/mensagens protegidas, sem persistir frase inglesa.
+- [x] Transportar código + argumentos seguros em redirects/mensagens protegidas, sem persistir frase inglesa. (corrigido na revisão: `ErrorMessage.MessageCode` separado de `ErrorDescription`)
 - [x] Mapear todos os códigos para chaves de `AccountResources` e falhar teste quando um código não tiver recurso
   em inglês, `pt-BR` ou `es-419`.
 - [x] Garantir que descrição OAuth/OIDC e `error` normativo não sejam convertidos em códigos de recurso.
@@ -1034,3 +1034,116 @@ dotnet test RoyalIdentity.sln
 - [ASP.NET Core 10 localization](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/localization/make-content-localizable?view=aspnetcore-10.0).
 - [Blazor globalization and localization](https://learn.microsoft.com/en-us/aspnet/core/blazor/globalization-localization?view=aspnetcore-10.0).
 - [Blazor forms validation](https://learn.microsoft.com/en-us/aspnet/core/blazor/forms/validation?view=aspnetcore-10.0).
+
+
+---
+
+## Revisão externa de 2026-08-06 — Fases 3 e 4 reabertas
+
+A revisão foi verificada ponto a ponto contra o código e **procede em tudo que é técnico**. Correções já
+aplicadas nesta passagem:
+
+- **Regressão introduzida pela Fase 4 (a mais grave):** os page services gravavam a chave RESX em
+  `ErrorMessage.ErrorDescription`, que `Error.razor` imprime cru — a tela mostraria `Consent_RequestNotFound` ao
+  usuário. Antes da Fase 4 mostrava uma frase inglesa; ou seja, a fase **piorou** a superfície que pretendia
+  melhorar. `ErrorMessage` ganhou `MessageCode` separado de `ErrorDescription`, porque um único campo que ora
+  carrega frase ora carrega chave não pode ser renderizado com segurança; descrição protocolar continua literal.
+- **`Accept-Language: pt-BR;q=0`** era ordenado por último em vez de descartado, então podia ser selecionado.
+  `q=0` significa recusa (RFC 9110) e agora é filtrado.
+- **`From(LoginFlowErrorCode)`** tinha `_ =>` silencioso: um motivo novo do core viraria "credencial inválida"
+  sem ninguém decidir. Agora lança, e um teste novo percorre **os valores do enum**, não o dicionário — a
+  asserção anterior só provava o que já estava lá.
+- **Substituição do catálogo dependia da ordem de registro:** com `TryAddSingleton` dos dois lados, chamar
+  `AddOpenIdConnectProviderServices()` antes de `AddRoyalIdentityRazor()` deixaria o catálogo vazio vigente. O
+  Razor agora remove explicitamente o default vazio e preserva um catálogo próprio do host.
+
+**Reabertas por tarefas marcadas sem implementação (erro meu de registro, não do revisor):**
+
+- Fase 3: `ui_locales` de End Session pelo `LogoutMessage` protegido **não existe** — o provider lê query e
+  `returnUrl`, nunca `logoutId`; o seletor POST com antiforgery **não existe** — `ICulturePreferenceService` só
+  tem chamadores em teste; e as coberturas de cancelamento real, parâmetros armazenados e End Session não foram
+  escritas.
+- Fase 4: além da regressão acima, os guards não eram exaustivos.
+
+**Correção do meu diagnóstico da Fase 5:** a tela de domínio **não** falha nas três culturas — o inglês passa,
+só `pt-BR` e `es-419` falham. E a causa é distinta da tela de login: `/account/domain` não tem realm, o provider
+retorna `null` por desenho e o middleware cai no catálogo neutro. Isso expõe uma contradição real entre a Fase 3
+(sem realm ⇒ neutro) e a Fase 5 (tela pré-realm deve respeitar `Accept-Language`). **Decisão do mantenedor:** a
+tela de seleção de domínio usa o idioma do navegador, respeitando `Accept-Language`; falta implementar.
+
+**Também pendente, apontado pela revisão e confirmado:** resíduos visíveis que o scanner não vê — fragmento
+inglês após `@L[...]` em `ResourceServerConsent`, `"Domain not found."` em `SelectDomainPage`, e
+`alt="Royal Identity"` em `AccountLayout` com `Branding_DefaultLogoAlt` já disponível. O scanner descarta tudo
+após `@code`, ignora atributos e não vê texto misturado com expressões Razor; **seu verde não prova ausência de
+hardcode** e precisa ser fortalecido. Os formulários ainda usam `ValidationMessage` padrão, que recebe a chave
+crua ao lado do campo mesmo com o summary traduzido.
+
+### Continuação — correções aplicadas em seguida
+
+**As 4 falhas eram duas coisas distintas, e a maior era do meu teste, não do produto.** Dei dump do HTML
+renderizado sob `pt-BR`: a página vem inteiramente traduzida — `Entrar`, `Usuário`, `Senha`,
+`Lembrar meu acesso`. As asserções falhavam porque o Razor codifica não-ASCII como `Usu&#xE1;rio` e eu comparava
+com o caractere cru. **A "divergência de cultura no render SSR" nunca existiu**; o diagnóstico que registrei — e
+que a revisão aceitou — estava errado. O teste passou a decodificar entidades, de modo que a asserção fale sobre
+o idioma e não sobre o encoder.
+
+Restavam então só as duas da tela pré-realm, que eram reais. Implementada a decisão do mantenedor: sem realm, o
+provider negocia `Accept-Language` contra o catálogo entregue pelo produto, caindo no neutro só quando não há
+match. Isso resolve a contradição entre DF5 e o aceite da Fase 5 — quem não lê inglês não deve ser obrigado a
+escolher um domínio em inglês.
+
+Resíduos visíveis corrigidos: o fragmento `this application will access` após `@L[...]` em
+`ResourceServerConsent`, `"Domain not found."` em `SelectDomainPage`, `alt="Royal Identity"` em `AccountLayout`
+(o logo do realm mantém o display name do tenant, que é dado dele) e o fallback `"Error"` em `Error.razor`.
+
+**O scanner foi reescrito e, desta vez, provado por mutação.** Ele agora varre o arquivo inteiro, lê
+`placeholder`/`title`/`alt`/`aria-label`, e quebra nós mistos para ver um fragmento inglês ao lado de um
+`@L[...]`. Injetei deliberadamente os dois formatos de resíduo e confirmei que **os dois** falham o teste — o
+que a primeira versão dele não fazia. O exercício achou uma cegueira que sobrevivia ao "fortalecimento": prosa
+iniciada em minúscula, que é exatamente a forma do resíduo que a revisão encontrou.
+
+Estado: **1.608 aprovados, 51 ignorados opt-in, 0 falhas**; `git diff --check` limpo.
+
+**Continua pendente para fechar as fases 3-5:** `ui_locales` de End Session pelo `LogoutMessage` protegido;
+seletor POST de idioma com antiforgery e return URL realm-bound; `ValidationMessage` por campo (o summary
+traduz, mas o componente padrão ao lado do input ainda recebe a chave crua); e as coberturas de cancelamento
+real, parâmetros de authorization armazenados e End Session.
+
+
+---
+
+## Continuação — as quatro pendências
+
+**`ui_locales` de End Session (entregue).** O provider passou a ler `logoutId` e a carregar o `LogoutMessage`
+protegido, sem consumi-lo — deletá-lo ali quebraria o fluxo de logout que o possui. Sem isso, uma sessão
+iniciada em espanhol se despedia em inglês. Coberto por `CultureEndpointTests`.
+
+**`ValidationMessage` por campo (entregue).** Criado `LocalizedValidationMessage`, que resolve a chave e o nome
+do campo juntos, e substituídos os três usos do componente padrão. Antes, o summary mostrava a tradução
+enquanto o campo mostrava `Validation_Required` cru ao lado do input. `DomainInput` ganhou as mesmas chaves de
+`LoginInputModel`.
+
+**Endpoint de preferência (entregue).** `POST {realm}/account/culture` grava só locale canônico que o realm
+oferece e só redireciona para dentro do realm. O `returnUrl` postado é validado contra absolutos, `//host`,
+`/\` e caminhos de outro realm; qualquer coisa fora cai no login do próprio realm — um seletor de idioma não
+pode virar open redirect. Cinco casos de return URL, mais rejeição de locale não oferecido, em
+`CultureEndpointTests`.
+
+**Coberturas (entregues em parte).** End Session e parâmetros de return URL cobertos. Cancelamento real
+continua sem teste próprio: o caminho existe (`OperationCanceledException` cai para o default do realm) mas não
+achei uma forma de forçá-lo sem instrumentar o resolver.
+
+### Ponto em aberto — colocação do seletor
+
+O componente `CultureSelector` existe e o endpoint é testado, mas **colocá-lo numa tela que já tem um form SSR
+nomeado quebra dez testes de login/consent com `400 BadRequest`**. Tentei duas abordagens: um Blazor SSR named
+form (desvia o dispatch de `_handler`) e um form simples com token emitido por `IAntiforgery` (o
+`GetAndStoreTokens` rotaciona o request token e invalida o do form da página). Trocar para o componente
+`<AntiforgeryToken />` também não resolveu.
+
+Recuei em vez de continuar por tentativa e erro, e deixei o componente sem colocação. **A funcionalidade está
+implementada e testada na borda que importa — o endpoint —, mas a UI ainda não a oferece.** A tarefa fica
+marcada com essa ressalva explícita; fechá-la exige entender a interação entre múltiplos forms e antiforgery no
+SSR do .NET 10, o que merece investigação própria e não um chute.
+
+Estado: **1.616 aprovados, 51 ignorados opt-in, 0 falhas**; `git diff --check` limpo.

@@ -20,7 +20,7 @@ public class EndSessionPageService(
             {
                 // "invalid_request" is the normative OAuth code and is never translated (DF11).
                 Error = "invalid_request",
-                ErrorDescription = AccountUiMessages.ResourceKeys[AccountUiMessageCode.LogoutIdRequired]
+                MessageCode = AccountUiMessages.ResourceKeys[AccountUiMessageCode.LogoutIdRequired]
             };
             var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
             return new LogoutResult(LogoutResultType.Error, Routes.BuildErrorUrl(errorId));
@@ -45,7 +45,7 @@ public class EndSessionPageService(
             var error = new ErrorMessage
             {
                 Error = "invalid_request",
-                ErrorDescription = AccountUiMessages.ResourceKeys[AccountUiMessageCode.LogoutIdNotFound]
+                MessageCode = AccountUiMessages.ResourceKeys[AccountUiMessageCode.LogoutIdNotFound]
             };
             var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
             return new LogoutResult(LogoutResultType.Error, Routes.BuildErrorUrl(errorId));

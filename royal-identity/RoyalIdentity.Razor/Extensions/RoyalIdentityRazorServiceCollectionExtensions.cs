@@ -35,8 +35,17 @@ public static class RoyalIdentityRazorServiceCollectionExtensions
         // validation pipeline; no experimental DataAnnotations-for-Blazor package (DF18).
         services.AddValidation();
 
-        // The UI replaces the core's empty catalogue. TryAddSingleton is deliberate: a host that already
-        // registered its own catalogue keeps it.
+        // Replacing the core's empty catalogue must not depend on which Add* the host calls first. Removing
+        // only the known empty default keeps a host's own catalogue intact, while TryAdd alone would leave the
+        // empty one in place whenever AddOpenIdConnectProviderServices() ran first — a composition whose
+        // behaviour silently changed with call order.
+        var emptyDefault = services.FirstOrDefault(descriptor =>
+            descriptor.ServiceType == typeof(IUiLocaleCatalog)
+            && descriptor.ImplementationType == typeof(EmptyUiLocaleCatalog));
+
+        if (emptyDefault is not null)
+            services.Remove(emptyDefault);
+
         services.TryAddSingleton<IUiLocaleCatalog, ResxUiLocaleCatalog>();
         services.AddScoped<IConfigurationSnapshotValidator, UiLocaleConfigurationValidator>();
 

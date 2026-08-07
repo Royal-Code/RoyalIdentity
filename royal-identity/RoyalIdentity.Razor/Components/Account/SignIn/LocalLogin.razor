@@ -16,13 +16,13 @@
     <div class="form-floating mb-3">
         <InputText @bind-Value="Input.Username" class="form-control" id="Username" autocomplete="username" aria-required="true" placeholder="@L["Login_Username"]" auto-focus />
         <label for="Username" class="form-label">@L["Login_Username"]</label>
-        <ValidationMessage For="() => Input.Username" class="text-danger"/>
+        <LocalizedValidationMessage For="() => Input.Username" />
     </div>
 
     <div class="form-floating mb-3">
         <InputText type="password" @bind-Value="Input.Password" class="form-control" id="Password" autocomplete="off" aria-required="true" placeholder="@L["Login_Password"]" />
         <label for="Password" class="form-label">@L["Login_Password"]</label>
-        <ValidationMessage For="() => Input.Password" class="text-danger"/>
+        <LocalizedValidationMessage For="() => Input.Password" />
     </div>
 
     @if (Model.AllowRememberLogin)

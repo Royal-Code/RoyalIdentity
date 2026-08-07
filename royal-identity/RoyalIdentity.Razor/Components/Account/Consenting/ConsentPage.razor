@@ -79,7 +79,7 @@
         <div class="form-floating mb-3">
             <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="@L["Consent_DescriptionPlaceholder"]" auto-focus />
             <label for="Description" class="form-label">@L["Consent_DescriptionLabel"]</label>
-            <ValidationMessage For="() => inputModel.Description" class="text-danger" />
+            <LocalizedValidationMessage For="() => inputModel.Description" />
         </div>
 
         @if (viewModel?.AllowRememberConsent is true)

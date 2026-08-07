@@ -96,33 +96,86 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
     /// </summary>
     private static readonly string[] AllowedLiterals =
     [
-        "ltr", "rtl",
+        // Document direction values and the framework's own attribute vocabulary.
+        "ltr", "rtl", "post", "get", "text", "password", "checkbox", "hidden", "submit", "button",
+        "username", "off", "on", "true", "false", "alert", "stylesheet", "module",
     ];
 
+    /// <summary>
+    /// Attributes whose value a user reads. Everything else is markup or wiring.
+    /// </summary>
+    private static readonly string[] PresentableAttributes = ["placeholder", "title", "alt", "aria-label"];
+
+    /// <summary>
+    /// Finds product text a component would render in English regardless of culture.
+    /// </summary>
+    /// <remarks>
+    /// The first version of this scanner was green while four real residues shipped: it stopped at
+    /// <c>@code</c>, ignored attributes, and skipped any text node that also contained a Razor expression —
+    /// which is exactly the shape of <c>@L["..."] this application will access</c>. It now covers the whole
+    /// file, reads the presentable attributes, and splits mixed nodes so an English fragment beside a
+    /// localized one is still seen.
+    /// </remarks>
     private static IEnumerable<string> FindPresentableLiterals(string path)
     {
-        var text = File.ReadAllText(path);
         var name = Path.GetFileName(path);
 
-        // Only the markup half of the file renders to a user; the @code block is C#, where comments and
-        // identifiers would otherwise register as product text.
-        var codeBlock = text.IndexOf("@code", StringComparison.Ordinal);
-        if (codeBlock >= 0)
-            text = text[..codeBlock];
+        // Razor directives and C# comments are declarations and prose about the code, not rendered text;
+        // both would otherwise register as product strings.
+        var text = string.Join(
+            "\n",
+            File.ReadAllLines(path).Where(line =>
+                !Regex.IsMatch(
+                    line.TrimStart(),
+                    @"^(@(using|inject|page|layout|attribute|inherits|implements|typeparam|namespace|rendermode|preservewhitespace)|//|\*)")));
 
-        // Text nodes between tags: the ones a user reads. Attribute values, code and Razor expressions are
-        // excluded because they carry markup and technical values.
-        foreach (Match match in Regex.Matches(text, @">([^<>@{}]+)<", RegexOptions.CultureInvariant))
+        // A rendered text node lives on one line. Allowing it to span newlines let a ">" from a generic
+        // type argument pair with a "<" further down, turning C# declarations into fake "prose".
+        foreach (Match node in Regex.Matches(text, ">([^<>\n]+)<", RegexOptions.CultureInvariant))
         {
-            var candidate = match.Groups[1].Value.Trim();
-
-            if (candidate.Length < 3 || AllowedLiterals.Contains(candidate, StringComparer.Ordinal))
-                continue;
-
-            // Product text is words; punctuation, numbers and css-ish fragments are not.
-            if (Regex.IsMatch(candidate, @"^[A-Za-z][A-Za-z ,.'!?]{2,}$", RegexOptions.CultureInvariant))
-                yield return $"{name}: '{candidate}'";
+            // Splitting on Razor expressions is what exposes an English fragment sitting next to @L[...].
+            foreach (var fragment in Regex.Split(node.Groups[1].Value, @"@[A-Za-z_][\w\.]*(?:\[[^\]]*\])?|@\([^)]*\)|@\{|\}"))
+            {
+                if (IsProductText(fragment, out var candidate))
+                    yield return $"{name}: '{candidate}'";
+            }
         }
+
+        foreach (var attribute in PresentableAttributes)
+        {
+            var pattern = attribute + @"\s*=\s*""([^""]*)""";
+            foreach (Match match in Regex.Matches(text, pattern, RegexOptions.CultureInvariant))
+            {
+                if (IsProductText(match.Groups[1].Value, out var candidate))
+                    yield return $"{name}: {attribute}='{candidate}'";
+            }
+        }
+    }
+
+    private static bool IsProductText(string fragment, out string candidate)
+    {
+        candidate = fragment.Trim();
+
+        if (candidate.Length < 3
+            || candidate.Contains('@', StringComparison.Ordinal)
+            || AllowedLiterals.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // A dotted token with no spaces is an identifier or a namespace, never a sentence.
+        if (!candidate.Contains(' ', StringComparison.Ordinal) && candidate.Contains('.', StringComparison.Ordinal))
+            return false;
+
+        // Prose may start lowercase: a fragment appended after @L["..."] — the exact shape of the residue
+        // this scanner previously missed — reads "this application will access", not "This ...".
+        var isSentence = Regex.IsMatch(
+            candidate,
+            @"^[A-Za-z][A-Za-z]*(?: [A-Za-z][A-Za-z,']*)+[.!?]?$",
+            RegexOptions.CultureInvariant);
+        var isClosedWord = Regex.IsMatch(candidate, @"^[A-Z][A-Za-z]+[.!?]$", RegexOptions.CultureInvariant);
+
+        return isSentence || isClosedWord;
     }
 
     private Task<string> GetAsync(string relativePath, string culture)
@@ -136,7 +189,10 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
         var response = await client.GetAsync(path);
         response.EnsureSuccessStatusCode();
 
-        return await response.Content.ReadAsStringAsync();
+        // Razor encodes non-ASCII as HTML entities ("Usu&#xE1;rio"), so comparing against the literal
+        // "Usuário" would fail on a page that is in fact correctly translated. Decoding is what makes the
+        // assertion about the language rather than about the encoder.
+        return System.Net.WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
     }
 
     private static string FindSolutionRoot()
