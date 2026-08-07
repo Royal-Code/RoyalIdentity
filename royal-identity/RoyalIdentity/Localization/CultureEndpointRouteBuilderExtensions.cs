@@ -13,8 +13,8 @@ public static class CultureEndpointRouteBuilderExtensions
     /// Maps <c>POST {realm}/account/culture</c>.
     /// </summary>
     /// <remarks>
-    /// A dedicated endpoint rather than a Blazor SSR named form: a second named form on a page that already
-    /// has one diverts the <c>_handler</c> dispatch and makes the page's own POST fail antiforgery.
+    /// A dedicated endpoint keeps this preference action independent from each account page's named form and
+    /// model binding.
     /// <para>
     /// The token is validated here, explicitly. Reading <c>Request.Form</c> by hand does <b>not</b> give an
     /// endpoint antiforgery metadata — only model-bound form parameters do — so relying on the host's

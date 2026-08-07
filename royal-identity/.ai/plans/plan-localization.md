@@ -1145,13 +1145,12 @@ pode virar open redirect. Cinco casos de return URL, mais rejeição de locale n
 continua sem teste próprio: o caminho existe (`OperationCanceledException` cai para o default do realm) mas não
 achei uma forma de forçá-lo sem instrumentar o resolver.
 
-### Ponto em aberto — colocação do seletor
+### Registro histórico — tentativa inicial de colocação do seletor
 
-O componente `CultureSelector` existe e o endpoint é testado, mas **colocá-lo numa tela que já tem um form SSR
-nomeado quebra dez testes de login/consent com `400 BadRequest`**. Tentei duas abordagens: um Blazor SSR named
-form (desvia o dispatch de `_handler`) e um form simples com token emitido por `IAntiforgery` (o
-`GetAndStoreTokens` rotaciona o request token e invalida o do form da página). Trocar para o componente
-`<AntiforgeryToken />` também não resolveu.
+O componente `CultureSelector` existia e o endpoint era testado, mas a primeira tentativa de colocá-lo numa tela
+com outro form SSR fez dez testes de login/consent responderem `400 BadRequest`. Naquele momento atribuí a falha
+ao dispatch de `_handler` e à rotação de tokens. A investigação de fechamento abaixo demonstrou que esse
+diagnóstico estava errado: o helper de teste combinava controles dos dois forms por usar XPath absoluto.
 
 Recuei em vez de continuar por tentativa e erro, e deixei o componente sem colocação. **A funcionalidade está
 implementada e testada na borda que importa — o endpoint —, mas a UI ainda não a oferece.** A tarefa fica
@@ -1233,3 +1232,9 @@ As três pendências da Fase 3 listadas nas revisões acima foram encerradas com
 de parâmetros armazenados e fallback após cancelamento do resolver. Permanecem abertas somente as duas
 pendências próprias da Fase 5: regressão SSR de validação por campo e transformação das sondas de mutação do
 scanner em regressões permanentes.
+
+O diagnóstico histórico de que um segundo form desviava `_handler` estava incorreto. Os dez `400 BadRequest`
+eram fabricados por `FormAction`: o XPath absoluto `//input | //textarea | //select` partia da raiz e misturava
+os controles de forms irmãos, enviando inclusive dois tokens antiforgery no POST de login/consentimento — algo
+que o navegador não faz. O XPath relativo `.//...` alinha o helper à semântica real de submissão sem reduzir as
+regressões do endpoint, que continuam cobrindo ausência de token e pareamento token/cookie inválido.

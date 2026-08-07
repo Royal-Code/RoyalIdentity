@@ -27,10 +27,9 @@ public class FormAction
 
         content = [];
 
-        // query all input, textarea, select elements
-        // Keep the query relative to this form. Account pages may render a second, independent culture
-        // preference form; an absolute XPath would silently mix both payloads and hide dispatch/antiforgery
-        // defects in the tests.
+        // Keep the query relative to this form: a browser submits only the selected form's controls. In
+        // HtmlAgilityPack, an XPath starting with // searches from the document root and would fabricate a
+        // payload containing controls from sibling forms, including duplicate antiforgery tokens.
         var inputs = form.SelectNodes(".//input | .//textarea | .//select");
         if (inputs is null)
             return;
