@@ -109,6 +109,65 @@ public class ConfigurationSnapshotTests
     }
 
     [Fact]
+    public async Task Refresh_WhenAValidatorRejectsTheData_NothingIsPublished()
+    {
+        using var harness = new SnapshotTestHarness(
+            validators: [new RejectingSnapshotValidator("alpha offers a locale the UI cannot render")]);
+        harness.Source.Data = SnapshotTestHarness.BuildData(new ServerOptions(), "alpha");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("was not published", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("cannot render", exception.Message, StringComparison.Ordinal);
+        Assert.False(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
+    public async Task Refresh_WhenAValidatorRejectsALaterLoad_KeepsTheLastKnownGoodSnapshot()
+    {
+        var validator = new RejectingSnapshotValidator();
+        using var harness = new SnapshotTestHarness(validators: [validator]);
+        harness.Source.Data = SnapshotTestHarness.BuildData(
+            new ServerOptions { IssuerUri = "https://good.test" }, "alpha");
+
+        await harness.Refresher.RefreshAsync();
+        validator.Error = "the refreshed configuration is invalid";
+
+        Assert.False(await harness.Refresher.TryRefreshAsync());
+        Assert.True(harness.Snapshot.IsLoaded);
+        Assert.Equal("https://good.test", harness.Snapshot.ServerOptions.IssuerUri);
+    }
+
+    [Fact]
+    public async Task Refresh_ReportsEveryValidatorErrorAtOnce()
+    {
+        using var harness = new SnapshotTestHarness(validators:
+        [
+            new RejectingSnapshotValidator("first problem"),
+            new RejectingSnapshotValidator("second problem"),
+        ]);
+        harness.Source.Data = SnapshotTestHarness.BuildData(new ServerOptions(), "alpha");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("first problem", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("second problem", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Refresh_WithoutValidators_PublishesAsBefore()
+    {
+        using var harness = new SnapshotTestHarness();
+        harness.Source.Data = SnapshotTestHarness.BuildData(new ServerOptions(), "alpha");
+
+        await harness.Refresher.RefreshAsync();
+
+        Assert.True(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
     public async Task Refresh_WhenTheEffectiveCheckSessionNameCollidesWithTheBaseAuthenticationCookie_Fails()
     {
         using var harness = new SnapshotTestHarness();

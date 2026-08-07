@@ -12,6 +12,7 @@ using RoyalIdentity.Contracts;
 using RoyalIdentity.Contracts.Defaults;
 using RoyalIdentity.Contracts.Defaults.ReplayProtection;
 using RoyalIdentity.Contracts.Defaults.SecretsEvaluators;
+using RoyalIdentity.Contracts.Localization;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Handlers;
@@ -87,6 +88,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IClientSecretEvaluator, PrivateKeyJwtSecretEvaluator>();
         services.AddTransient<IClientSecretEvaluator, TlsClientAuthSecretEvaluator>();
         services.AddTransient<IClientSecretEvaluator, NoSecretEvaluator>();
+
+        // Localization: the core ships the contract and an empty catalogue, so a host without an OP user
+        // interface promises no locales. RoyalIdentity.Razor replaces it (plan-localization DF7).
+        services.TryAddSingleton<IUiLocaleCatalog, EmptyUiLocaleCatalog>();
 
         // Realm management
         services.AddScoped<IRealmManager, RealmManager>();

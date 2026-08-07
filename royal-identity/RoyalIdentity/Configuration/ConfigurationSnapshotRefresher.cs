@@ -31,6 +31,7 @@ internal sealed class ConfigurationSnapshotRefresher(
             var source = scope.ServiceProvider.GetRequiredService<IConfigurationSnapshotSource>();
 
             var data = await source.LoadAsync(ct);
+            await ValidateAsync(scope.ServiceProvider, data, ct);
 
             var previousPaths = holder.Publish(data);
             InvalidateCookieOptions(previousPaths, holder.RealmPaths);
@@ -68,6 +69,26 @@ internal sealed class ConfigurationSnapshotRefresher(
                     "Configuration snapshot refresh failed before any snapshot had been published.");
             }
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Runs the registered validators against the freshly loaded data. Every validator is consulted before
+    /// throwing, so one refresh reports every problem instead of only the first (plan-localization DF8).
+    /// </summary>
+    private static async Task ValidateAsync(
+        IServiceProvider scopedProvider, ConfigurationSnapshotData data, CancellationToken ct)
+    {
+        var validators = scopedProvider.GetServices<IConfigurationSnapshotValidator>();
+        List<string> errors = [];
+
+        foreach (var validator in validators)
+            errors.AddRange(await validator.ValidateAsync(data, ct));
+
+        if (errors.Count is not 0)
+        {
+            throw new InvalidOperationException(
+                $"The configuration snapshot is invalid and was not published: {string.Join(" ", errors)}");
         }
     }
 

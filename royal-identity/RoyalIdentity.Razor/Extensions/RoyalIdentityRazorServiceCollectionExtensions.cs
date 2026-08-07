@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using RoyalIdentity.Configuration;
+using RoyalIdentity.Contracts.Localization;
+using RoyalIdentity.Razor.Localization;
 using RoyalIdentity.Razor.Services;
 
 // ReSharper disable once CheckNamespace
@@ -22,6 +26,19 @@ public static class RoyalIdentityRazorServiceCollectionExtensions
         // validated per request by the cookie OnValidatePrincipal → IUserSessionService.IsSessionValidAsync;
         // circuit-level revalidation (SecurityStamp) is reserved out of scope (ADR-014 / plan).
         services.AddScoped<AuthenticationStateProvider, ServerAuthenticationStateProvider>();
+
+        // ResourcesPath must stay "Resources" and the marker types must stay in the assembly root namespace:
+        // together they resolve to RoyalIdentity.Razor.Resources.<Marker>, which is where the .resx live.
+        services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+        // Validation messages and field display names come from the shared catalogue through the .NET 10
+        // validation pipeline; no experimental DataAnnotations-for-Blazor package (DF18).
+        services.AddValidation();
+
+        // The UI replaces the core's empty catalogue. TryAddSingleton is deliberate: a host that already
+        // registered its own catalogue keeps it.
+        services.TryAddSingleton<IUiLocaleCatalog, ResxUiLocaleCatalog>();
+        services.AddScoped<IConfigurationSnapshotValidator, UiLocaleConfigurationValidator>();
 
         services.AddHttpContextAccessor();
         services.AddScoped<ISessionContextService, SessionContextService>();

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Common_Continue" xml:space="preserve">
+    <value>Continuar</value>
+  </data>
+  <data name="Common_Loading" xml:space="preserve">
+    <value>Cargando...</value>
+  </data>
+  <data name="Common_Language" xml:space="preserve">
+    <value>Idioma</value>
+  </data>
+  <data name="Common_ApplyLanguage" xml:space="preserve">
+    <value>Aplicar</value>
+  </data>
+  <data name="Branding_DefaultLogoAlt" xml:space="preserve">
+    <value>Logotipo de la organización</value>
+  </data>
+  <data name="Error_Title" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Error_Generic" xml:space="preserve">
+    <value>Lo sentimos, ocurrió un error</value>
+  </data>
+  <data name="Error_RequestIdLabel" xml:space="preserve">
+    <value>Id de la solicitud:</value>
+  </data>
+  <data name="Domain_Title" xml:space="preserve">
+    <value>Seleccionar dominio</value>
+  </data>
+  <data name="Domain_Label" xml:space="preserve">
+    <value>Dominio</value>
+  </data>
+  <data name="Domain_Placeholder" xml:space="preserve">
+    <value>empresa.com</value>
+  </data>
+  <data name="Domain_NotFound" xml:space="preserve">
+    <value>Dominio no encontrado.</value>
+  </data>
+  <data name="Login_Title" xml:space="preserve">
+    <value>Iniciar sesión</value>
+  </data>
+  <data name="Login_Username" xml:space="preserve">
+    <value>Usuario</value>
+  </data>
+  <data name="Login_Password" xml:space="preserve">
+    <value>Contraseña</value>
+  </data>
+  <data name="Login_RememberMe" xml:space="preserve">
+    <value>Recordar mi sesión</value>
+  </data>
+  <data name="Login_ForgotPassword" xml:space="preserve">
+    <value>¿Olvidó su contraseña?</value>
+  </data>
+  <data name="Login_ExternalHeading" xml:space="preserve">
+    <value>Use otro servicio para iniciar sesión.</value>
+  </data>
+  <data name="Login_ExternalProviderTitle" xml:space="preserve">
+    <value>Iniciar sesión con su cuenta {0}</value>
+  </data>
+  <data name="Login_InvalidCredentials" xml:space="preserve">
+    <value>Usuario o contraseña inválidos</value>
+  </data>
+  <data name="Login_InvalidReturnUrl" xml:space="preserve">
+    <value>La dirección de retorno no es válida.</value>
+  </data>
+  <data name="SignedIn_Title" xml:space="preserve">
+    <value>Sesión iniciada</value>
+  </data>
+  <data name="SignedIn_WelcomeBack" xml:space="preserve">
+    <value>¡Bienvenido de nuevo!</value>
+  </data>
+  <data name="SignedIn_Success" xml:space="preserve">
+    <value>Ha iniciado sesión correctamente.</value>
+  </data>
+  <data name="SignedIn_ReturnToApplication" xml:space="preserve">
+    <value>Ya puede volver a su aplicación.</value>
+  </data>
+  <data name="Consent_Title" xml:space="preserve">
+    <value>Consentimiento</value>
+  </data>
+  <data name="Consent_ClientLogoAlt" xml:space="preserve">
+    <value>Logotipo de la aplicación</value>
+  </data>
+  <data name="Consent_RequestingPermission" xml:space="preserve">
+    <value>está solicitando su permiso</value>
+  </data>
+  <data name="Consent_UncheckPermissions" xml:space="preserve">
+    <value>Desmarque los permisos que no desea conceder.</value>
+  </data>
+  <data name="Consent_PersonalInformation" xml:space="preserve">
+    <value>Información personal</value>
+  </data>
+  <data name="Consent_Required" xml:space="preserve">
+    <value>(obligatorio)</value>
+  </data>
+  <data name="Consent_ProtectedResourcesTitle" xml:space="preserve">
+    <value>Recursos protegidos</value>
+  </data>
+  <data name="Consent_OfflineAccessTitle" xml:space="preserve">
+    <value>Acceso sin conexión</value>
+  </data>
+  <data name="Consent_OfflineAccessDescription" xml:space="preserve">
+    <value>La aplicación podrá acceder a sus recursos mientras usted esté ausente.</value>
+  </data>
+  <data name="Consent_DescriptionLabel" xml:space="preserve">
+    <value>Descripción</value>
+  </data>
+  <data name="Consent_DescriptionPlaceholder" xml:space="preserve">
+    <value>Descripción o nombre del dispositivo</value>
+  </data>
+  <data name="Consent_RememberDecision" xml:space="preserve">
+    <value>Recordar mi decisión</value>
+  </data>
+  <data name="Consent_Allow" xml:space="preserve">
+    <value>Sí, permitir</value>
+  </data>
+  <data name="Consent_Deny" xml:space="preserve">
+    <value>No, no permitir</value>
+  </data>
+  <data name="Consent_GrantedTitle" xml:space="preserve">
+    <value>Consentido</value>
+  </data>
+  <data name="Consent_PermissionsGranted" xml:space="preserve">
+    <value>Los permisos han sido concedidos</value>
+  </data>
+  <data name="Consent_Redirecting" xml:space="preserve">
+    <value>Redirigiendo a la aplicación</value>
+  </data>
+  <data name="Consent_RequestNotFound" xml:space="preserve">
+    <value>No se encontró la solicitud de consentimiento.</value>
+  </data>
+  <data name="Consent_RememberNotAllowed" xml:space="preserve">
+    <value>Esta aplicación no permite recordar la decisión.</value>
+  </data>
+  <data name="Consent_RequiredScopeNotGranted" xml:space="preserve">
+    <value>No se concedió un permiso obligatorio.</value>
+  </data>
+  <data name="Logout_Title" xml:space="preserve">
+    <value>Cerrar sesión</value>
+  </data>
+  <data name="Logout_LoggingOutTitle" xml:space="preserve">
+    <value>Cerrando sesión</value>
+  </data>
+  <data name="Logout_Processing" xml:space="preserve">
+    <value>Procesando, espere un momento</value>
+  </data>
+  <data name="Logout_ReturnToClient" xml:space="preserve">
+    <value>Haga clic aquí para volver a la aplicación {0}.</value>
+  </data>
+  <data name="Logout_ReturnToApplication" xml:space="preserve">
+    <value>Haga clic aquí para volver a la aplicación.</value>
+  </data>
+  <data name="Logout_LoggedOutTitle" xml:space="preserve">
+    <value>Sesión cerrada</value>
+  </data>
+  <data name="Logout_LoggedOutMessage" xml:space="preserve">
+    <value>Su sesión ha sido cerrada.</value>
+  </data>
+  <data name="Logout_IdRequired" xml:space="preserve">
+    <value>El identificador de cierre de sesión es obligatorio.</value>
+  </data>
+  <data name="Logout_IdNotFound" xml:space="preserve">
+    <value>No se encontró la solicitud de cierre de sesión.</value>
+  </data>
+  <data name="Profile_Title" xml:space="preserve">
+    <value>Panel del usuario</value>
+  </data>
+  <data name="Profile_Greeting" xml:space="preserve">
+    <value>Hola {0}.</value>
+  </data>
+  <data name="Profile_UserInformation" xml:space="preserve">
+    <value>Información del usuario</value>
+  </data>
+</root>

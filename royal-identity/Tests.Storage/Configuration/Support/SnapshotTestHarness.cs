@@ -78,7 +78,9 @@ internal sealed class SnapshotTestHarness : IDisposable
 
     private readonly ServiceProvider provider;
 
-    public SnapshotTestHarness(TimeSpan? refreshInterval = null)
+    public SnapshotTestHarness(
+        TimeSpan? refreshInterval = null,
+        IReadOnlyList<IConfigurationSnapshotValidator>? validators = null)
     {
         Source = new FakeConfigurationSnapshotSource();
         CookieCache = new SpyCookieOptionsCache();
@@ -88,6 +90,9 @@ internal sealed class SnapshotTestHarness : IDisposable
         services.AddLogging();
         services.AddSingleton<TimeProvider>(Clock);
         services.AddSingleton<IConfigurationSnapshotSource>(Source);
+
+        foreach (var validator in validators ?? [])
+            services.AddSingleton(validator);
         services.AddSingleton(new ConfigurationSnapshotRefreshOptions
         {
             RefreshInterval = refreshInterval ?? TimeSpan.FromMinutes(5),
@@ -121,4 +126,16 @@ internal sealed class SnapshotTestHarness : IDisposable
     }
 
     public void Dispose() => provider.Dispose();
+}
+
+/// <summary>
+/// Snapshot validator whose verdict the test controls, standing in for a composition-supplied assertion such
+/// as the UI locale catalogue check.
+/// </summary>
+internal sealed class RejectingSnapshotValidator(string? error = null) : IConfigurationSnapshotValidator
+{
+    public string? Error { get; set; } = error;
+
+    public ValueTask<IReadOnlyList<string>> ValidateAsync(ConfigurationSnapshotData data, CancellationToken ct)
+        => ValueTask.FromResult<IReadOnlyList<string>>(Error is null ? [] : [Error]);
 }

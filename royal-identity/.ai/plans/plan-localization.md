@@ -1,15 +1,15 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 1 de 7 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 2 de 7 fases executadas
 
 ## Progresso
 
-`█░░░░░░` **14%** - 1 de 7 fases
+`██░░░░░` **29%** - 2 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Concluida |
-| Fase 2 - Catálogos RESX e infraestrutura de localização | Pendente |
+| Fase 2 - Catálogos RESX e infraestrutura de localização | Concluida |
 | Fase 3 - Seleção de cultura por request e preferência do usuário | Pendente |
 | Fase 4 - Códigos de apresentação e remoção de textos do core | Pendente |
 | Fase 5 - Localização integral da UI de conta | Pendente |
@@ -556,19 +556,19 @@ disponibilidade sem dependência core→Razor e validar options/catálogos antes
 
 **Tarefas:**
 
-- [ ] Criar markers e `.resx` de `AccountResources`/`ValidationResources` com namespace/base name comprovados.
-- [ ] Preencher as 57 chaves de `AccountResources` e cinco de `ValidationResources` conforme
+- [x] Criar markers e `.resx` de `AccountResources`/`ValidationResources` com namespace/base name comprovados.
+- [x] Preencher as 57 chaves de `AccountResources` e cinco de `ValidationResources` conforme
   `an-localization-resource-inventory.md`.
-- [ ] Preencher catálogo neutro inglês e traduções `pt-BR`/`es-419` para todas as 62 chaves.
-- [ ] Registrar `AddLocalization` em `AddRoyalIdentityRazor` com `ResourcesPath` coerente.
-- [ ] Registrar validation localization do .NET 10 com `AddValidation` e catálogo compartilhado.
-- [ ] Criar `IUiLocaleCatalog` no core, implementação vazia/default e implementação RESX no Razor.
-- [ ] Criar cadeia `IConfigurationSnapshotValidator` e executá-la após `LoadAsync`, antes de `Publish`.
-- [ ] Implementar validator Razor que exige locale neutro, catálogos configurados e paridade de chaves/placeholders.
-- [ ] Preservar startup fail-closed e last-known-good em refresh inválido.
-- [ ] Adicionar guards contra HTML em recursos e contra uso direto de `ResourceManager`/designer nos consumers.
-- [ ] Adicionar teste arquitetural garantindo que `RoyalIdentity` não referencia `RoyalIdentity.Razor`.
-- [ ] Criar `Tests.Integration/Localization/LocalizationCatalogTests.cs` e
+- [x] Preencher catálogo neutro inglês e traduções `pt-BR`/`es-419` para todas as 62 chaves.
+- [x] Registrar `AddLocalization` em `AddRoyalIdentityRazor` com `ResourcesPath` coerente.
+- [x] Registrar validation localization do .NET 10 com `AddValidation` e catálogo compartilhado.
+- [x] Criar `IUiLocaleCatalog` no core, implementação vazia/default e implementação RESX no Razor.
+- [x] Criar cadeia `IConfigurationSnapshotValidator` e executá-la após `LoadAsync`, antes de `Publish`.
+- [x] Implementar validator Razor que exige locale neutro, catálogos configurados e paridade de chaves/placeholders.
+- [x] Preservar startup fail-closed e last-known-good em refresh inválido.
+- [x] Adicionar guards contra HTML em recursos e contra uso direto de `ResourceManager`/designer nos consumers.
+- [x] Adicionar teste arquitetural garantindo que `RoyalIdentity` não referencia `RoyalIdentity.Razor`.
+- [x] Criar `Tests.Integration/Localization/LocalizationCatalogTests.cs` e
   `Tests.Architecture/LocalizationBoundaryTests.cs`; estender
   `Tests.Storage/Configuration/ConfigurationSnapshotTests.cs` para startup/refresh inválidos.
 
@@ -587,7 +587,33 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundary
 
 ### Resultado da Fase 2
 
-*a preencher*
+**Concluída em 2026-08-06.** Os seis catálogos foram gerados a partir de uma tabela única de 62 chaves, de modo
+que as três culturas não podem divergir em conjunto de chaves nem em placeholders por construção — 57 em
+`AccountResources`, 5 em `ValidationResources`, 186 entradas no total. O texto veio dos components reais, não
+de invenção: `LoginPage`, `LocalLogin`, `SelectDomainPage`, `ExternalLoginPicker`, `SignedIn`, `ConsentPage`,
+`ConsentedPage`, `Error`, `ProfilePage` e as três telas de End Session foram lidos antes de traduzir.
+
+O base name dos markers foi **comprovado, não presumido**: os `.resx` compilam para
+`RoyalIdentity.Razor.Resources.AccountResources.resources`, que é exatamente o que o framework calcula a partir
+de um marker no namespace raiz mais `ResourcesPath = "Resources"`. Como `IStringLocalizer` devolve a própria
+chave quando não encontra o catálogo, um erro de namespace apareceria como chave crua na tela; por isso os
+testes resolvem as 62 chaves nas três culturas e afirmam `ResourceNotFound == false`, em vez de só instanciar o
+localizer. Os markers documentam essa dependência para que ninguém os mova para um namespace aninhado.
+
+`IUiLocaleCatalog` e `EmptyUiLocaleCatalog` ficaram no core; `ResxUiLocaleCatalog` no Razor **prova**
+disponibilidade sondando uma chave real por cultura em vez de confiar numa lista fixa, o que faz um satellite
+assembly ausente ser detectado. O core registra o catálogo vazio por `TryAddSingleton`, e o Razor o substitui —
+a dependência só aponta da UI para o core, com guard arquitetural.
+
+A cadeia `IConfigurationSnapshotValidator` roda depois de `LoadAsync` e antes de `Publish`, consultando **todos**
+os validators antes de lançar, para que um refresh reporte todos os problemas de uma vez. `UiLocaleConfigurationValidator`
+recusa realm que ofereça locale sem catálogo. Um host sem UI composta não falha realm nenhum: sem catálogo não há
+promessa a contradizer, e a metadata simplesmente fica ausente por DF14.
+
+Filtros obrigatórios: `LocalizationCatalogTests` 13/13, `LocalizationBoundaryTests` 5/5 e
+`ConfigurationSnapshotTests` 19/19 — este último cobrindo startup fail-closed, last-known-good preservado em
+refresh inválido e agregação de erros de múltiplos validators. Suíte integral 1.562 aprovados, 51 ignorados
+opt-in, 0 falhas (+22). `git diff --check` limpo.
 
 ---
 
