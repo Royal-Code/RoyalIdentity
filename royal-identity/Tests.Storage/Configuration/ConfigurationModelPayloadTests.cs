@@ -140,6 +140,96 @@ public class ConfigurationModelPayloadTests
     }
 
     [Fact]
+    public void RealmOptions_Internationalization_RoundTripsOrderAndCanonicalCasing()
+    {
+        var realmOptions = new RealmOptions(new ServerOptions());
+        realmOptions.Internationalization.DefaultLocale = "pt-BR";
+        realmOptions.Internationalization.SupportedLocales.Clear();
+        realmOptions.Internationalization.SupportedLocales.AddRange(["pt-BR", "es-419", "en"]);
+
+        var (_, json) = realmSerializer.Serialize(realmOptions);
+        var restored = realmSerializer.Deserialize(
+            RealmOptionsPayloadSerializer.CurrentVersion,
+            json,
+            new ServerOptions());
+        var (_, reserialized) = realmSerializer.Serialize(restored);
+
+        Assert.Contains("Internationalization", json, StringComparison.Ordinal);
+        Assert.Equal(json, reserialized);
+        Assert.True(restored.Internationalization.Enabled);
+        Assert.Equal("pt-BR", restored.Internationalization.DefaultLocale);
+        // The configured order is the contract; only discovery reorders it (DF22).
+        Assert.Equal(["pt-BR", "es-419", "en"], restored.Internationalization.SupportedLocales);
+        Assert.Empty(restored.Internationalization.Validate());
+    }
+
+    [Fact]
+    public void RealmOptions_Internationalization_PersistedLocalesReplaceTheConstructorDefaults()
+    {
+        // The get-only list starts populated with the product defaults, so a payload that offers fewer locales
+        // must clear them instead of merging — otherwise a realm could never narrow its offer.
+        var realmOptions = new RealmOptions(new ServerOptions());
+        realmOptions.Internationalization.SupportedLocales.Clear();
+        realmOptions.Internationalization.SupportedLocales.Add("pt-BR");
+        realmOptions.Internationalization.DefaultLocale = "pt-BR";
+
+        var (_, json) = realmSerializer.Serialize(realmOptions);
+        var restored = realmSerializer.Deserialize(
+            RealmOptionsPayloadSerializer.CurrentVersion,
+            json,
+            new ServerOptions());
+
+        Assert.Equal(["pt-BR"], restored.Internationalization.SupportedLocales);
+    }
+
+    [Fact]
+    public void RealmOptions_Internationalization_DisabledSurvivesTheRoundTrip()
+    {
+        // Enabled is the one flag that defaults to true, so a realm opting out depends on false being written
+        // and read back rather than falling through to the constructor default.
+        var realmOptions = new RealmOptions(new ServerOptions());
+        realmOptions.Internationalization.Enabled = false;
+
+        var (_, json) = realmSerializer.Serialize(realmOptions);
+        var restored = realmSerializer.Deserialize(
+            RealmOptionsPayloadSerializer.CurrentVersion,
+            json,
+            new ServerOptions());
+
+        Assert.False(restored.Internationalization.Enabled);
+    }
+
+    [Fact]
+    public void RealmOptions_Internationalization_NullLocaleEntry_IsRejectedByValidationNotByACrash()
+    {
+        // A get-only collection is repopulated item by item, so a persisted null reaches the list. It must
+        // surface as a named configuration error, which is what fails the snapshot closed.
+        var restored = realmSerializer.Deserialize(
+            RealmOptionsPayloadSerializer.CurrentVersion,
+            "{\"Internationalization\":{\"DefaultLocale\":null,\"SupportedLocales\":[null]}}",
+            new ServerOptions());
+
+        restored.Internationalization.Normalize();
+
+        Assert.Equal(2, restored.Internationalization.Validate().Count);
+    }
+
+    [Fact]
+    public void RealmOptions_PayloadWrittenBeforeLocalization_AdoptsTheProductDefaults()
+    {
+        // Adding a member keeps older pre-release payloads readable; per DF21 they become localization-enabled
+        // with the product defaults, which is what reprovisioning then writes back explicitly.
+        var restored = realmSerializer.Deserialize(
+            RealmOptionsPayloadSerializer.CurrentVersion,
+            "{\"IssuerUri\":\"https://realm.example\"}",
+            new ServerOptions());
+
+        Assert.True(restored.Internationalization.Enabled);
+        Assert.Equal("en", restored.Internationalization.DefaultLocale);
+        Assert.Equal(["en", "pt-BR", "es-419"], restored.Internationalization.SupportedLocales);
+    }
+
+    [Fact]
     public void RealmOptions_RoundTrip_RebindsAuthoritativeServerOptionsAndIsStable()
     {
         var originalServer = new ServerOptions { IssuerUri = "https://server-original.example" };

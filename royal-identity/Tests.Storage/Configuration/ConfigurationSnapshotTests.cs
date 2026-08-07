@@ -61,6 +61,54 @@ public class ConfigurationSnapshotTests
     }
 
     [Fact]
+    public async Task Refresh_NormalizesRealmLocalesBeforePublication()
+    {
+        using var harness = new SnapshotTestHarness();
+        var data = SnapshotTestHarness.BuildData(new ServerOptions(), "alpha");
+        var internationalization = data.Realms.Single().Options.Internationalization;
+        internationalization.DefaultLocale = "PT-br";
+        internationalization.SupportedLocales.Clear();
+        internationalization.SupportedLocales.AddRange(["pt-br", "ES-419", "PT-BR", "en"]);
+        harness.Source.Data = data;
+
+        await harness.Refresher.RefreshAsync();
+
+        var published = harness.Snapshot.FindRealmByPath("alpha")!.Options.Internationalization;
+        Assert.Equal("pt-BR", published.DefaultLocale);
+        Assert.Equal(["pt-BR", "es-419", "en"], published.SupportedLocales);
+    }
+
+    [Fact]
+    public async Task Refresh_WithARealmLocaleTheRuntimeDoesNotKnow_FailsBeforePublication()
+    {
+        using var harness = new SnapshotTestHarness();
+        var data = SnapshotTestHarness.BuildData(new ServerOptions(), "alpha");
+        data.Realms.Single().Options.Internationalization.SupportedLocales.Add("zz-ZZ");
+        harness.Source.Data = data;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("zz-ZZ", exception.Message, StringComparison.Ordinal);
+        Assert.False(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
+    public async Task Refresh_WithARealmDefaultLocaleOutsideItsSupportedSet_FailsBeforePublication()
+    {
+        using var harness = new SnapshotTestHarness();
+        var data = SnapshotTestHarness.BuildData(new ServerOptions(), "alpha");
+        data.Realms.Single().Options.Internationalization.DefaultLocale = "fr";
+        harness.Source.Data = data;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("must be one of", exception.Message, StringComparison.Ordinal);
+        Assert.False(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
     public async Task Refresh_WhenTheEffectiveCheckSessionNameCollidesWithTheBaseAuthenticationCookie_Fails()
     {
         using var harness = new SnapshotTestHarness();

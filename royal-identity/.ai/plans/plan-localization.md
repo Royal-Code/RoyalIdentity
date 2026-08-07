@@ -1,14 +1,14 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: RASCUNHO - decisões fechadas; 0 de 7 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 1 de 7 fases executadas
 
 ## Progresso
 
-`░░░░░░░` **0%** - 0 de 7 fases
+`█░░░░░░` **14%** - 1 de 7 fases
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Pendente |
+| Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Concluida |
 | Fase 2 - Catálogos RESX e infraestrutura de localização | Pendente |
 | Fase 3 - Seleção de cultura por request e preferência do usuário | Pendente |
 | Fase 4 - Códigos de apresentação e remoção de textos do core | Pendente |
@@ -467,18 +467,18 @@ não estiver em v1.
 
 **Tarefas:**
 
-- [ ] Falhar antes de editar se os planos predecessores não terminaram ou se os serializers de server e realm
+- [x] Falhar antes de editar se os planos predecessores não terminaram ou se os serializers de server e realm
   não escreverem v1.
-- [ ] Incorporar `InternationalizationOptions` a todos os construtores/cópias de `RealmOptions`.
-- [ ] Trocar `SupportedLocales` para `List<string>` get-only e implementar a normalização, deduplicação, ordem e
+- [x] Incorporar `InternationalizationOptions` a todos os construtores/cópias de `RealmOptions`.
+- [x] Trocar `SupportedLocales` para `List<string>` get-only e implementar a normalização, deduplicação, ordem e
   comparação fechadas em DF22.
-- [ ] Implementar validação de tags, default, conjunto não vazio e pertencimento do default.
-- [ ] Aplicar os defaults decididos a novos realms e aos seeds de Server/Demo/testes.
-- [ ] Preservar `RealmOptionsPayloadSerializer.CurrentVersion = 1` e a exclusão de `ServerOptions`.
-- [ ] Atualizar fixtures/scripts que gravam payload e reprovisionar artefatos v1 antigos de desenvolvimento.
-- [ ] Provar roundtrip estável, ordem determinística, cópia profunda, defaults e falha fechada.
-- [ ] Confirmar que nenhuma migration relacional SQLite/PostgreSQL foi criada.
-- [ ] Criar `Tests.Integration/Options/InternationalizationOptionsTests.cs` e estender
+- [x] Implementar validação de tags, default, conjunto não vazio e pertencimento do default.
+- [x] Aplicar os defaults decididos a novos realms e aos seeds de Server/Demo/testes.
+- [x] Preservar `RealmOptionsPayloadSerializer.CurrentVersion = 1` e a exclusão de `ServerOptions`.
+- [x] Atualizar fixtures/scripts que gravam payload e reprovisionar artefatos v1 antigos de desenvolvimento.
+- [x] Provar roundtrip estável, ordem determinística, cópia profunda, defaults e falha fechada.
+- [x] Confirmar que nenhuma migration relacional SQLite/PostgreSQL foi criada.
+- [x] Criar `Tests.Integration/Options/InternationalizationOptionsTests.cs` e estender
   `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs`.
 
 **Critérios de aceite:** todo realm materializado contém options válidas e independentes; novos realms e seeds
@@ -496,7 +496,51 @@ dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayload
 
 ### Resultado da Fase 1
 
-*a preencher*
+**Concluída em 2026-08-06.** O gate de pré-condição passou antes de qualquer edição: os dois planos
+predecessores estão `CONCLUÍDO` e `ServerOptionsPayloadSerializer.CurrentVersion` e
+`RealmOptionsPayloadSerializer.CurrentVersion` estavam — e continuam — em `1`.
+
+`InternationalizationOptions` deixou de ser scaffold: nasce com `Enabled=true`, `DefaultLocale="en"` e
+`SupportedLocales=["en","pt-BR","es-419"]` (DF21), expõe `SupportedLocales` como `List<string>` get-only na ordem
+configurada (DF22) e ganhou `Normalize()`/`Validate()` sem qualquer dependência de apresentação. `RealmOptions`
+recebeu a propriedade e a cópia profunda; como todo realm — seeds de Server/Demo/Migrations, `RealmManager` e
+fixtures — é criado por `new RealmOptions(serverOptions)`, os defaults chegam a todos sem tocar em cada seed.
+
+A normalização foi calibrada empiricamente contra o .NET 10, não presumida. `CultureInfo.GetCultureInfo(tag,
+predefinedOnly: true)` canonicaliza (`pt-br`→`pt-BR`, `ES-419`→`es-419`) e rejeita `zz-ZZ`/`xx-XX-XX`, mas aceita
+dois valores que não são language tags: `""` resolve para a cultura invariante e `en_US` resolve para o nome
+customizado `en_us`. Por isso a resolução é precedida por uma checagem de forma BCP-47 (subtags alfanuméricos
+ASCII separados por `-`, o primeiro alfabético), e a cultura invariante é recusada explicitamente. Tag
+desconhecida sobrevive à normalização com a forma configurada — deduplicada — para que `Validate()` consiga
+nomeá-la no erro.
+
+A materialização passou a normalizar e validar cada realm em `PublishedConfigurationSnapshot.Clone`, junto das
+validações de cookie de check-session já existentes, falhando fechado antes da publicação atômica. A validação
+**não** depende de `Enabled`: desabilitar suspende a negociação, não a necessidade de um fallback coerente, já
+que a UI continua renderizando em `DefaultLocale`.
+
+O payload seguiu em v1 sem migration relacional ou JSON — os scripts SQL revisáveis declaram `payload_json TEXT`
+e não embutem payload, então nada precisou ser reescrito. Como acrescentar um membro é compatível na leitura,
+payload pré-release anterior à localization continua legível e adota os defaults do produto, que é exatamente o
+que o reprovisionamento depois grava de forma explícita. O `GetOnlyCollectionModifier` garante semântica de
+substituição: um payload com menos locales limpa os defaults do construtor em vez de mesclá-los.
+
+A revisão externa não encontrou bloqueantes, e a verificação das suas afirmações fechou três lacunas de
+cobertura que ela não examinou, todas já com o comportamento correto: `Enabled=false` sobrevive ao round-trip
+(é a única flag cujo default é `true`, então a desativação de um realm depende de o `false` ser escrito e lido
+em vez de cair no default do construtor); um locale `null` vindo do JSON — alcançável porque o
+`GetOnlyCollectionModifier` repopula item a item — vira erro nomeado de configuração em vez de exceção; e um
+realm criado em runtime por `IRealmManager.CreateAsync` nasce com os defaults, o que antes se apoiava apenas na
+leitura do código.
+
+Filtros obrigatórios: `InternationalizationOptionsTests` 22/22 e `ConfigurationModelPayloadTests` 34/34 —
+nenhum selecionou zero testes; `ConfigurationSnapshotTests` cobre a materialização. Suíte integral 1.540
+aprovados, 51 ignorados opt-in, 0 falhas (eram 1.510 ao fim do plano anterior; +30). Build sem erros e
+`git diff --check` limpo.
+
+Fica registrado o que **não** está provado por teste próprio desta fase: a política de last-known-good em falha
+de refresh periódico é o mecanismo genérico de `ConfigurationSnapshotRefresher.TryRefreshAsync`, que captura
+`Exception` e já possui cobertura própria; a validação de localization não a especializa.
 
 ---
 
@@ -851,7 +895,7 @@ dotnet test RoyalIdentity.sln
 | Tradução revela estado da conta | chaves diferentes por motivo | enumeração de usuário | um código/recurso para três motivos + testes | Aberto |
 | Culture afeta protocolo | formatter/comparer usa cultura corrente | interoperabilidade ou vulnerabilidade | comparações ordinais/invariant + regressão protocolar | Aberto |
 | Payload executado fora de ordem | predecessor funcional não foi concluído ou serializer não está em v1 | shape inconsistente | dependência explícita + gate de ambos em `CurrentVersion == 1` | Aberto |
-| Coleção perde ordem/canonicalização | `HashSet` ou sort implícito reaparece | metadata e preferência ficam instáveis | DF22 + roundtrip/ordem/duplicata por casing | Aberto |
+| Coleção perde ordem/canonicalização | `HashSet` ou sort implícito reaparece | metadata e preferência ficam instáveis | DF22 + roundtrip/ordem/duplicata por casing | Fechado na Fase 1 |
 | Filtro executa zero testes | classe planejada não existe ou projeto está fora da solution | fase fecha em falso verde | DF23 + classes/arquivos nomeados | Aberto |
 | Validação SSR fica em inglês | apenas component text usa localizer | experiência parcialmente localizada | API .NET 10 + testes client/server | Aberto |
 | Scan de hardcodes tem falsos positivos | nomes técnicos/test data em inglês | guard frágil | allowlist pequena, revisada e restrita ao produto UI | Aberto |

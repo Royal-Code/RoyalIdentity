@@ -53,8 +53,26 @@ internal sealed class PublishedConfigurationSnapshot
         ValidateCheckSessionCookie($"Realm '{clone.Path}'", clone.Options.Authentication);
         _ = CheckSessionStateManager.GetCookieName(clone.Options.Authentication, clone);
         _ = CheckSessionStateManager.GetCookiePath(clone);
+        NormalizeInternationalization($"Realm '{clone.Path}'", clone.Options.Internationalization);
 
         return clone;
+    }
+
+    /// <summary>
+    /// Canonicalizes the realm's locales and fails the snapshot closed when the policy is incoherent, so every
+    /// materialized realm carries valid options (plan-localization Fase 1). Validation does not depend on
+    /// <see cref="InternationalizationOptions.Enabled"/>: the fallback locale is still what the UI renders in.
+    /// </summary>
+    private static void NormalizeInternationalization(string owner, InternationalizationOptions options)
+    {
+        options.Normalize();
+
+        var errors = options.Validate();
+        if (errors.Count is not 0)
+        {
+            throw new InvalidOperationException(
+                $"{owner} has invalid internationalization options: {string.Join(" ", errors)}");
+        }
     }
 
     private static void ValidateCheckSessionCookie(string owner, AuthenticationOptions authentication)

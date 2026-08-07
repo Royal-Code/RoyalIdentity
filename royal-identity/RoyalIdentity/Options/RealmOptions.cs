@@ -61,6 +61,7 @@ public class RealmOptions
         Keys = new KeyOptions(other.Keys);
         Caching = new CacheOptions(other.Caching);
         Account = new AccountOptions(other.Account);
+        Internationalization = new InternationalizationOptions(other.Internationalization);
         Session = new SessionOptions(other.Session);
         Branding = new RealmBrandingOptions(other.Branding);
         OperationalStorage = new OperationalStorageOptions(other.OperationalStorage);
@@ -141,6 +142,12 @@ public class RealmOptions
     /// Gets or sets the account options.
     /// </summary>
     public AccountOptions Account { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the internationalization policy of this realm: whether the UI negotiates a culture, the
+    /// offered locales in preference order and the fallback (plan-localization DF1/DF21/DF22).
+    /// </summary>
+    public InternationalizationOptions Internationalization { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the SSO session lifetime and passive-invalidation policy (Realm-only — ADR-017 §2.12).
