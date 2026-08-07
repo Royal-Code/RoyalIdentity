@@ -1,4 +1,5 @@
 using System.Net;
+using HtmlAgilityPack;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -54,6 +55,72 @@ public class CultureEndpointTests : IClassFixture<PersistentStorageAppFactory>
         Assert.Contains($"path=/{factory.Handles.Demo.Path}", setCookie, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("secure", setCookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task TheAccountLayout_RendersAnIndependentWorkingSelectorAlongsideThePageForm()
+    {
+        var client = CreateClient();
+        var pagePath = $"/{factory.Handles.Demo.Path}/account/login?source=selector-test";
+        var page = await client.GetAsync(pagePath);
+        var document = new HtmlDocument();
+        document.LoadHtml(await page.Content.ReadAsStringAsync());
+
+        var selector = document.DocumentNode.SelectSingleNode(
+            "//form[contains(concat(' ', normalize-space(@class), ' '), ' culture-selector ')]");
+        Assert.NotNull(selector);
+        Assert.Equal($"/{factory.Handles.Demo.Path}/account/culture", selector.GetAttributeValue("action", ""));
+        Assert.Equal(
+            ["en", "pt-BR", "es-419"],
+            selector.SelectNodes(".//option").Select(option => option.GetAttributeValue("value", "")));
+        Assert.Equal(
+            pagePath.TrimStart('/'),
+            selector.SelectSingleNode(".//input[@name='returnUrl']").GetAttributeValue("value", ""));
+
+        var selectorResponse = await new FormAction(client, selector)
+            .SetValue("locale", "pt-BR")
+            .SubmitAsync();
+
+        Assert.Equal(HttpStatusCode.Redirect, selectorResponse.StatusCode);
+        Assert.Equal(pagePath, selectorResponse.Headers.Location!.ToString());
+
+        // Both tokens came from the same SSR document. Posting the selector must not invalidate or divert the
+        // named login form that shares the page.
+        var pageForm = document.DocumentNode.SelectSingleNode("//main//form");
+        var loginResponse = await new FormAction(client, pageForm)
+            .SetValue("Input.Username", "alice")
+            .SetValue("Input.Password", "wrong")
+            .SubmitAsync();
+
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task TheAccountLayout_DoesNotRenderASelectorWhenTheRealmOffersNoChoice()
+    {
+        await factory.UpdateRealmAsync(factory.Handles.Demo, options =>
+        {
+            options.Internationalization.SupportedLocales.Clear();
+            options.Internationalization.SupportedLocales.Add("en");
+        });
+        try
+        {
+            var response = await CreateClient().GetAsync(
+                $"/{factory.Handles.Demo.Path}/account/login");
+            var document = new HtmlDocument();
+            document.LoadHtml(await response.Content.ReadAsStringAsync());
+
+            Assert.Null(document.DocumentNode.SelectSingleNode(
+                "//form[contains(concat(' ', normalize-space(@class), ' '), ' culture-selector ')]"));
+        }
+        finally
+        {
+            await factory.UpdateRealmAsync(factory.Handles.Demo, options =>
+            {
+                options.Internationalization.SupportedLocales.Clear();
+                options.Internationalization.SupportedLocales.AddRange(["en", "pt-BR", "es-419"]);
+            });
+        }
     }
 
     [Fact]

@@ -28,7 +28,12 @@ public class FormAction
         content = [];
 
         // query all input, textarea, select elements
-        var inputs = form.SelectNodes("//input | //textarea | //select");
+        // Keep the query relative to this form. Account pages may render a second, independent culture
+        // preference form; an absolute XPath would silently mix both payloads and hide dispatch/antiforgery
+        // defects in the tests.
+        var inputs = form.SelectNodes(".//input | .//textarea | .//select");
+        if (inputs is null)
+            return;
         // for each element, get the name and value and add to content
         foreach (var input in inputs)
         {

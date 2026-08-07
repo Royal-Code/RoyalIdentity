@@ -43,7 +43,10 @@
         }
     </main>
     <footer>
-
+        @if (CurrentRealm is { } realm)
+        {
+            <CultureSelector Realm="@realm.Path" />
+        }
     </footer>
 </div>
 

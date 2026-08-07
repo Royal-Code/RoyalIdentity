@@ -1,18 +1,18 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 3 de 7 fases concluídas (1, 2 e 4); Fases 3 e 5 abertas
+## Status: EM EXECUÇÃO - decisões fechadas; 4 de 7 fases concluídas (1-4); Fase 5 em andamento
 
 ## Progresso
 
-`███░░░░` **43%** - 3 de 7 fases concluídas
+`████░░░` **57%** - 4 de 7 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Concluida |
 | Fase 2 - Catálogos RESX e infraestrutura de localização | Concluida |
-| Fase 3 - Seleção de cultura por request e preferência do usuário | Reaberta |
+| Fase 3 - Seleção de cultura por request e preferência do usuário | Concluida |
 | Fase 4 - Códigos de apresentação e remoção de textos do core | Concluida |
-| Fase 5 - Localização integral da UI de conta | Pendente |
+| Fase 5 - Localização integral da UI de conta | Em andamento |
 | Fase 6 - Discovery e aceites multi-realm ponta a ponta | Pendente |
 | Fase 7 - Documentação, guards e fechamento da dívida | Pendente |
 
@@ -635,11 +635,11 @@ fontes validadas; oferecer preferência persistida realm-scoped sem abrir redire
 - [x] Reutilizar parsing do framework para `Accept-Language` e filtrar pela allowlist efetiva do realm.
 - [x] Aplicar match exato, parent e fallback para a única variante do mesmo idioma conforme DF20.
 - [x] Inserir `UseRequestLocalization` depois de `UseRealmDiscovery` e antes de CORS/autenticação.
-- [ ] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound. (endpoint protegido e testado; **componente sem colocação em nenhuma tela** — ver Resultado)
+- [x] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound.
 - [x] Gravar cookie persistente HttpOnly/SameSite/realm-scoped contendo somente locale canônico.
 - [x] Ignorar cookie/hints que deixaram de ser suportados após refresh.
 - [x] Definir comportamento de `Enabled=false` como ausência de negociação, usando default/neutro sem metadata.
-- [ ] Cobrir cancelamento, realm ausente, recurso neutro e cultures pai sem lançar erro protocolar.
+- [x] Cobrir cancelamento, realm ausente, recurso neutro e cultures pai sem lançar erro protocolar.
 - [x] Criar `Tests.Integration/Localization/RequestCultureTests.cs` e
   `Tests.Integration/Localization/CulturePreferenceTests.cs`; estender
   `Tests.Architecture/LocalizationBoundaryTests.cs` com a ordem do middleware nos três hosts.
@@ -660,11 +660,12 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundary
 
 ### Resultado da Fase 3
 
-**Concluída em 2026-08-06.** `RealmRequestCultureProvider` implementa a precedência da DF5 e substitui — não
+**Concluída definitivamente em 2026-08-07 após revisão.** `RealmRequestCultureProvider` implementa a precedência da DF5 e substitui — não
 complementa — os providers default do framework: query string, cookie estranho e `Accept-Language` cru
 conseguiriam cada um selecionar uma cultura que o realm nunca ofereceu, que é exatamente o que a precedência
-realm-scoped existe para impedir. Nenhum caminho do provider pode falhar um request: realm ausente devolve
-`null` e deixa o framework decidir, e cancelamento durante a resolução de `returnUrl` cai para o default.
+realm-scoped existe para impedir. Nenhum caminho do provider pode falhar um request: sem realm, a UI pré-realm
+negocia contra o catálogo do produto; cancelamento durante a resolução de `returnUrl` ignora somente esse hint e
+continua em `Accept-Language`, default do realm e recurso neutro.
 
 `LocaleMatcher` implementa a DF20 em três passos — exato, cadeia de pais, e variante irmã **apenas quando é
 única**. `es-MX` contra `{en, es-419}` resolve; contra `{en, es-419, es-ES}` não resolve, porque escolher uma
@@ -684,8 +685,17 @@ revalida contra os locales vigentes, então um realm que deixa de oferecer um lo
 antigos no mesmo instante, sem erro. O middleware entra entre `UseRealmDiscovery` e `UseRealmCors`/`UseAuthentication`,
 com guard arquitetural que verifica a ordem por índice e impede que qualquer host monte a sua própria.
 
-Filtros obrigatórios: `RequestCultureTests` 19/19, `CulturePreferenceTests` 10/10 e `LocalizationBoundaryTests`
-7/7. Suíte integral 1.593 aprovados, 51 ignorados opt-in, 0 falhas (+31). `git diff --check` limpo.
+O fechamento após revisão acrescentou três provas antes ausentes: `ui_locales` é recuperado de parâmetros de
+authorization armazenados sem consumir o handle; cancelamento real do resolver cai para o próximo nível; e uma
+requisição sem realm e sem idioma compatível usa o catálogo neutro. O `CultureSelector` foi colocado uma única
+vez no `AccountLayout`, só renderiza quando o realm oferece mais de um locale e preserva realm/return URL. Uma
+regressão submete, a partir do mesmo HTML SSR, o seletor e o form nomeado de login, provando que antiforgery e
+dispatch permanecem independentes. O utilitário `FormAction` passou a coletar somente controles descendentes do
+form selecionado, em vez de misturar todos os forms do documento.
+
+Filtros obrigatórios: `RequestCultureTests` 22/22, `CulturePreferenceTests` 10/10, `CultureEndpointTests` 13/13
+e `LocalizationBoundaryTests` 9/9. Suíte integral 1.630 aprovados, 51 ignorados opt-in, 0 falhas.
+`git diff --check` limpo.
 
 ---
 
@@ -780,7 +790,7 @@ atributos não visuais; derivar semântica cultural do documento.
 - [ ] Migrar validações DataAnnotations dos input models para `ValidationResources` pelo pipeline do .NET 10.
 - [x] Manter markup nos components e somente texto/placeholders nos `.resx`.
 - [x] Manter nomes/descrições de client, scopes e resources como conteúdo do tenant, com encoding normal.
-- [ ] Exibir o seletor somente com mais de um locale efetivo e preservar return URL/realm.
+- [x] Exibir o seletor somente com mais de um locale efetivo e preservar return URL/realm.
 - [x] Substituir `lang="en"` por cultura efetiva em Server, Demo e Tests.Host.
 - [x] Derivar `dir="ltr|rtl"` de `TextInfo.IsRightToLeft`.
 - [x] Criar teste/allowlist que falha para nova string apresentável fixa em inglês na UI do produto.
@@ -1212,6 +1222,14 @@ Todos os pontos procedem; nenhum era funcional.
   aqui: continua aberto e sem teste, porque forçá-lo exigiria instrumentar o resolver, o que faria o teste
   falar do mock e não do comportamento.
 
-Pendências reais das Fases 3 e 5, sem mudança: colocação do seletor numa tela SSR com form nomeado;
+Pendências registradas naquele momento para as Fases 3 e 5: colocação do seletor numa tela SSR com form nomeado;
 `ui_locales` recuperado por `returnUrl`/parâmetros armazenados; cancelamento; regressão SSR de validação por
 campo; e promoção das mutações do scanner a regressões permanentes.
+
+### Fechamento das pendências da Fase 3 — 2026-08-07
+
+As três pendências da Fase 3 listadas nas revisões acima foram encerradas com regressões executáveis: seletor no
+`AccountLayout` convivendo com o form nomeado de login, recuperação não destrutiva de `ui_locales` pelo handle
+de parâmetros armazenados e fallback após cancelamento do resolver. Permanecem abertas somente as duas
+pendências próprias da Fase 5: regressão SSR de validação por campo e transformação das sondas de mutação do
+scanner em regressões permanentes.
