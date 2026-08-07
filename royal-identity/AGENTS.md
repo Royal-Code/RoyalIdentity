@@ -69,8 +69,11 @@ in that plan and in `plan-rfc9700-security-hardening.md` DF19.
 `.ai/plans/plan-refactoring-debt-closure.md` is **completed (5/5 phases)** — obsolete markers and inactive
 protocol surfaces were removed, extension grants route only through their provider, Configuration payloads remain
 at pre-release v1, `acr_values` is an ordered preference without fabricated policy/claim/metadata, and all
-deferred capabilities have nominal backlog/plan owners. `.ai/plans/plan-localization.md` is the next implementation
-plan. The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
+deferred capabilities have nominal backlog/plan owners. `.ai/plans/plan-localization.md` is the active
+implementation plan; Fase 1 is complete and Fase 2 is next. `RealmOptions.Internationalization` is now the
+realm-scoped localization policy — active by default, with `SupportedLocales` an ordered, case-insensitively
+distinct `List<string>` normalized and validated before the configuration snapshot is published.
+The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
 `ConfigurationResourceBridgeOptions` per baseline DF22 until a dedicated persistence plan is authorized. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
 migrates or seeds. `RoyalIdentity.Demo` is a self-provisioned, ephemeral SQLite in-memory executable.

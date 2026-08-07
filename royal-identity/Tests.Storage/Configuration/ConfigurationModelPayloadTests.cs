@@ -210,8 +210,20 @@ public class ConfigurationModelPayloadTests
             new ServerOptions());
 
         restored.Internationalization.Normalize();
+        var errors = restored.Internationalization.Validate();
 
-        Assert.Equal(2, restored.Internationalization.Validate().Count);
+        // Naming the offending property is the point: the snapshot failure message is what an operator reads.
+        Assert.Equal(2, errors.Count);
+        Assert.Single(
+            errors,
+            error => error.Contains(
+                $"{nameof(RealmOptions.Internationalization)}.{nameof(InternationalizationOptions.SupportedLocales)}",
+                StringComparison.Ordinal));
+        Assert.Single(
+            errors,
+            error => error.Contains(
+                $"{nameof(RealmOptions.Internationalization)}.{nameof(InternationalizationOptions.DefaultLocale)}",
+                StringComparison.Ordinal));
     }
 
     [Fact]
