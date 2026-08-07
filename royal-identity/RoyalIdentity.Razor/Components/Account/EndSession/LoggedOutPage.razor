@@ -1,12 +1,17 @@
-﻿@attribute [Route(Routes.LoggedOut)]
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
+@attribute [Route(Routes.LoggedOut)]
 
 <AccountContent>
     <Title>
-        <h1>Logged out</h1>
+        <h1>@L["Logout_LoggedOutTitle"]</h1>
     </Title>
     <ChildContent>
         <div>
-            You have been logged out.
+            @L["Logout_LoggedOutMessage"]
         </div>
     </ChildContent>
 </AccountContent>

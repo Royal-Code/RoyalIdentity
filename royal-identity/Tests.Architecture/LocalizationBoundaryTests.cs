@@ -65,6 +65,51 @@ public class LocalizationBoundaryTests
         Assert.Empty(offenders);
     }
 
+    [Fact]
+    public void RequestLocalization_RunsAfterRealmDiscoveryAndBeforeAuthentication()
+    {
+        // The culture comes from realm options, so discovery must have run; and everything that renders text —
+        // CORS-preflighted UI, authentication challenges, components — must already see it (DF9).
+        var source = File.ReadAllText(Path.Combine(
+            ProjectReferenceReader.FindRepositoryRoot(),
+            "RoyalIdentity",
+            "Extensions",
+            "ApplicationBuilderExtensions.cs"));
+
+        var discovery = source.IndexOf("UseRealmDiscovery()", StringComparison.Ordinal);
+        var localization = source.IndexOf("UseRealmRequestLocalization()", StringComparison.Ordinal);
+        var cors = source.IndexOf("UseRealmCors()", StringComparison.Ordinal);
+        var authentication = source.IndexOf("UseAuthentication()", StringComparison.Ordinal);
+
+        Assert.True(discovery >= 0 && localization >= 0 && cors >= 0 && authentication >= 0);
+        Assert.True(discovery < localization, "Request localization must run after realm discovery.");
+        Assert.True(localization < cors, "Request localization must run before realm CORS.");
+        Assert.True(localization < authentication, "Request localization must run before authentication.");
+    }
+
+    [Fact]
+    public void EveryHost_ComposesTheProtocolPipelineRatherThanItsOwnMiddlewareOrder()
+    {
+        // Server, Demo and Tests.Host must not hand-roll the order: one shared extension is what keeps the
+        // three of them identical.
+        var root = ProjectReferenceReader.FindRepositoryRoot();
+
+        foreach (var host in new[] { "RoyalIdentity.Server", "RoyalIdentity.Demo", "Tests.Host" })
+        {
+            var sources = Directory
+                .EnumerateFiles(Path.Combine(root, host), "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                    && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+                .Select(File.ReadAllText)
+                .ToArray();
+
+            Assert.Contains(sources, text =>
+                text.Contains("UseRoyalIdentityProtocol()", StringComparison.Ordinal));
+            Assert.DoesNotContain(sources, text =>
+                text.Contains("UseRequestLocalization(", StringComparison.Ordinal));
+        }
+    }
+
     private static IEnumerable<(string Path, string Text)> ProductSourceFiles()
     {
         var root = ProjectReferenceReader.FindRepositoryRoot();

@@ -1,3 +1,8 @@
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
 @attribute [Route(Routes.LoggingOut)]
 
 @using RoyalIdentity.Extensions
@@ -5,18 +10,18 @@
 @inject IEndSessionPageService EndSessionPageService
 @inject NavigationManager NavigationManager
 
-<PageTitle>Logging out</PageTitle>
+<PageTitle>@L["Logout_LoggingOutTitle"]</PageTitle>
 
 <AccountContent>
     <Title>
-        <h1>Logging out</h1>
+        <h1>@L["Logout_LoggingOutTitle"]</h1>
     </Title>
     <ChildContent>
         <div>
-            Processing, wait a moment
+            @L["Logout_Processing"]
         </div>
         <div>
-            Click <a class="@ClickCssClasses" href="@RedirectUrl">here</a> @ToReturnMessage
+            <a class="@ClickCssClasses" href="@RedirectUrl">@ReturnMessage</a>
         </div>
         @if (model?.HasFrontChannel is true)
         {
@@ -33,9 +38,9 @@
 
     private string RedirectUrl => model?.PostLogoutRedirectUri ?? Routes.BuildLoggedOutUrl(Realm);
 
-    private string ToReturnMessage => model?.ClientName.IsPresent() is true
-        ? $"to return to the {model.ClientName} application."
-        : "to return to the application.";
+    private string ReturnMessage => model?.ClientName.IsPresent() is true
+        ? L["Logout_ReturnToClient", model.ClientName!]
+        : L["Logout_ReturnToApplication"];
 
     [Parameter]
     public string Realm { get; set; } = default!;

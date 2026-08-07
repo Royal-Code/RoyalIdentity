@@ -132,7 +132,7 @@ public class RealmOptionsPhase6Tests : IClassFixture<PersistentStorageAppFactory
         source.UI.AccessDeniedPath = "/{realm}/account/source-denied";
         source.Caching.KeyCacheDuration = TimeSpan.FromMinutes(22);
         source.Account.AllowRememberLogin = false;
-        source.Account.InvalidCredentialsErrorMessage = "source invalid";
+        source.Internationalization.DefaultLocale = "pt-BR";
         source.Account.RememberMeLoginDuration = TimeSpan.FromDays(9);
         source.Branding.LogoUri = "https://cdn.example/logo.svg";
         source.Branding.FaviconUri = "https://cdn.example/favicon.ico";
@@ -176,7 +176,7 @@ public class RealmOptionsPhase6Tests : IClassFixture<PersistentStorageAppFactory
         Assert.Equal("/{realm}/account/source-denied", copy.UI.AccessDeniedPath);
         Assert.Equal(TimeSpan.FromMinutes(22), copy.Caching.KeyCacheDuration);
         Assert.False(copy.Account.AllowRememberLogin);
-        Assert.Equal("source invalid", copy.Account.InvalidCredentialsErrorMessage);
+        Assert.Equal("pt-BR", copy.Internationalization.DefaultLocale);
         Assert.Equal(TimeSpan.FromDays(9), copy.Account.RememberMeLoginDuration);
         Assert.Equal("https://cdn.example/logo.svg", copy.Branding.LogoUri);
         Assert.Equal("https://cdn.example/favicon.ico", copy.Branding.FaviconUri);

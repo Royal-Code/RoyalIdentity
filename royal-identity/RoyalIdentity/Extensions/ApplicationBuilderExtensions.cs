@@ -31,6 +31,10 @@ public static class ApplicationBuilderExtensions
 
         app.UseForwardedHeaders();
         app.UseRealmDiscovery();
+        // Culture is negotiated from realm options, so it must run after realm discovery; everything that can
+        // render text — CORS-preflighted UI, authentication challenges, components — must see it already set
+        // (plan-localization DF9).
+        app.UseRealmRequestLocalization();
         app.UseRealmCors();
         app.UseAuthentication();
         app.UseAuthorization();

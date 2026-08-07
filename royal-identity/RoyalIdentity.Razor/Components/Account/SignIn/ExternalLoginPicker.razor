@@ -1,8 +1,13 @@
-﻿@if (ExternalProviders.Any())
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
+@if (ExternalProviders.Any())
 {
     <div class="card">
         <div class="card-header">
-            <h2>Use another service to log in.</h2>
+            <h2>@L["Login_ExternalHeading"]</h2>
         </div>
 
         <div class="card-body">
@@ -15,7 +20,7 @@
                         {
                             <button type="submit" class="btn btn-primary" name="provider"
                                     value="@provider.AuthenticationScheme"
-                                    title="Log in using your @provider.DisplayName account">
+                                    title="@L["Login_ExternalProviderTitle", provider.DisplayName]">
                                 @provider.DisplayName
                             </button>
                         }

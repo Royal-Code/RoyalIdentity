@@ -81,23 +81,13 @@ public static class LocaleMatcher
     {
         culture = null;
 
-        if (string.IsNullOrWhiteSpace(tag))
+        // LanguageTag is the single gate: it refuses the inputs CultureInfo would otherwise materialize, such
+        // as "en_US", whose parent chain would negotiate as English without ever being a language tag.
+        if (!LanguageTag.TryNormalize(tag, out var canonical))
             return false;
 
-        try
-        {
-            // predefinedOnly keeps an arbitrary client string from materializing as a custom culture.
-            var resolved = CultureInfo.GetCultureInfo(tag.Trim(), predefinedOnly: true);
-            if (resolved.Name.Length is 0)
-                return false;
-
-            culture = resolved;
-            return true;
-        }
-        catch (CultureNotFoundException)
-        {
-            return false;
-        }
+        culture = CultureInfo.GetCultureInfo(canonical);
+        return true;
     }
 
     private static string PrimaryLanguage(string locale)

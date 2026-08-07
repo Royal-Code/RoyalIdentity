@@ -1,4 +1,9 @@
-﻿@inherits LayoutComponentBase
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
+@inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 @using RoyalIdentity.Models
 @using RoyalIdentity.Options
@@ -29,7 +34,7 @@
     <main>
         @if (HttpContext is null)
         {
-            <p>Loading...</p>
+            <p>@L["Common_Loading"]</p>
         }
         else
         {

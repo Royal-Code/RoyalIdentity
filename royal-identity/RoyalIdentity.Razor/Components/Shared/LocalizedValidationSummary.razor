@@ -1,0 +1,59 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Reflection
+@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<ValidationResources> V
+
+@if (messages.Count is not 0)
+{
+    <ul class="validation-errors text-danger" role="alert">
+        @foreach (var message in messages)
+        {
+            <li class="validation-message">@message</li>
+        }
+    </ul>
+}
+
+@code {
+    private List<string> messages = [];
+
+    [CascadingParameter]
+    private EditContext? EditContext { get; set; }
+
+    /// <summary>
+    /// Renders the SSR validation messages in the request's culture.
+    /// </summary>
+    /// <remarks>
+    /// The DataAnnotations attributes carry catalogue keys because they need compile-time constants, and
+    /// <c>RequiredAttribute</c> formats its message with the display name — which would be the raw key. So the
+    /// message and the field name are resolved here, together, and the sentence is composed inside a single
+    /// culture rather than assembled from translated fragments (DF15).
+    /// </remarks>
+    protected override void OnParametersSet()
+    {
+        messages = [];
+
+        if (EditContext?.Model is not { } model)
+            return;
+
+        foreach (var property in model.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            var field = new FieldIdentifier(model, property.Name);
+            foreach (var raw in EditContext.GetValidationMessages(field))
+                messages.Add(Localize(raw, property));
+        }
+    }
+
+    private string Localize(string raw, PropertyInfo property)
+    {
+        // Anything that is not one of our keys is already presentable text from a framework or custom rule.
+        if (!raw.StartsWith("Validation_", StringComparison.Ordinal))
+            return raw;
+
+        var displayKey = property.GetCustomAttribute<DisplayAttribute>()?.Name;
+        var displayName = displayKey is null ? property.Name : V[displayKey].Value;
+
+        return string.Format(V[raw].Value, displayName);
+    }
+}

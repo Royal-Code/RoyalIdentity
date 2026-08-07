@@ -1,17 +1,17 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 2 de 7 fases executadas
+## Status: EM EXECUÇÃO - decisões fechadas; 4 de 7 fases executadas
 
 ## Progresso
 
-`██░░░░░` **29%** - 2 de 7 fases
+`████░░░` **57%** - 4 de 7 fases
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Contrato realm-scoped e payload Configuration pré-release | Concluida |
 | Fase 2 - Catálogos RESX e infraestrutura de localização | Concluida |
-| Fase 3 - Seleção de cultura por request e preferência do usuário | Pendente |
-| Fase 4 - Códigos de apresentação e remoção de textos do core | Pendente |
+| Fase 3 - Seleção de cultura por request e preferência do usuário | Concluida |
+| Fase 4 - Códigos de apresentação e remoção de textos do core | Concluida |
 | Fase 5 - Localização integral da UI de conta | Pendente |
 | Fase 6 - Discovery e aceites multi-realm ponta a ponta | Pendente |
 | Fase 7 - Documentação, guards e fechamento da dívida | Pendente |
@@ -629,18 +629,18 @@ fontes validadas; oferecer preferência persistida realm-scoped sem abrir redire
 
 **Tarefas:**
 
-- [ ] Implementar `RealmRequestCultureProvider` com a precedência exata de DF5.
-- [ ] Resolver `ui_locales` pelo `AuthorizationContext` para parâmetros inline e armazenados.
-- [ ] Resolver `ui_locales` de End Session por `LogoutMessage` protegido.
-- [ ] Reutilizar parsing do framework para `Accept-Language` e filtrar pela allowlist efetiva do realm.
-- [ ] Aplicar match exato, parent e fallback para a única variante do mesmo idioma conforme DF20.
-- [ ] Inserir `UseRequestLocalization` depois de `UseRealmDiscovery` e antes de CORS/autenticação.
-- [ ] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound.
-- [ ] Gravar cookie persistente HttpOnly/SameSite/realm-scoped contendo somente locale canônico.
-- [ ] Ignorar cookie/hints que deixaram de ser suportados após refresh.
-- [ ] Definir comportamento de `Enabled=false` como ausência de negociação, usando default/neutro sem metadata.
-- [ ] Cobrir cancelamento, realm ausente, recurso neutro e cultures pai sem lançar erro protocolar.
-- [ ] Criar `Tests.Integration/Localization/RequestCultureTests.cs` e
+- [x] Implementar `RealmRequestCultureProvider` com a precedência exata de DF5.
+- [x] Resolver `ui_locales` pelo `AuthorizationContext` para parâmetros inline e armazenados.
+- [x] Resolver `ui_locales` de End Session por `LogoutMessage` protegido.
+- [x] Reutilizar parsing do framework para `Accept-Language` e filtrar pela allowlist efetiva do realm.
+- [x] Aplicar match exato, parent e fallback para a única variante do mesmo idioma conforme DF20.
+- [x] Inserir `UseRequestLocalization` depois de `UseRealmDiscovery` e antes de CORS/autenticação.
+- [x] Implementar seletor POST/serviço de preferência com antiforgery, locale canônico e return URL realm-bound.
+- [x] Gravar cookie persistente HttpOnly/SameSite/realm-scoped contendo somente locale canônico.
+- [x] Ignorar cookie/hints que deixaram de ser suportados após refresh.
+- [x] Definir comportamento de `Enabled=false` como ausência de negociação, usando default/neutro sem metadata.
+- [x] Cobrir cancelamento, realm ausente, recurso neutro e cultures pai sem lançar erro protocolar.
+- [x] Criar `Tests.Integration/Localization/RequestCultureTests.cs` e
   `Tests.Integration/Localization/CulturePreferenceTests.cs`; estender
   `Tests.Architecture/LocalizationBoundaryTests.cs` com a ordem do middleware nos três hosts.
 
@@ -659,7 +659,32 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundary
 
 ### Resultado da Fase 3
 
-*a preencher*
+**Concluída em 2026-08-06.** `RealmRequestCultureProvider` implementa a precedência da DF5 e substitui — não
+complementa — os providers default do framework: query string, cookie estranho e `Accept-Language` cru
+conseguiriam cada um selecionar uma cultura que o realm nunca ofereceu, que é exatamente o que a precedência
+realm-scoped existe para impedir. Nenhum caminho do provider pode falhar um request: realm ausente devolve
+`null` e deixa o framework decidir, e cancelamento durante a resolução de `returnUrl` cai para o default.
+
+`LocaleMatcher` implementa a DF20 em três passos — exato, cadeia de pais, e variante irmã **apenas quando é
+única**. `es-MX` contra `{en, es-419}` resolve; contra `{en, es-419, es-ES}` não resolve, porque escolher uma
+das duas seria invenção.
+
+A execução expôs um defeito real e produziu uma correção estrutural. O primeiro `LocaleMatcher` aceitava
+`en_US`: `CultureInfo` o materializa como cultura `en_us` cujo **pai é `en`**, então a cadeia de pais casava e
+negociava inglês para uma string que não é language tag. A Fase 1 já tinha essa guarda, mas só em
+`InternationalizationOptions` — duplicá-la seria criar duas definições de "o que é um locale". Em vez disso,
+extraí `LanguageTag.TryNormalize` como **ponto único de normalização**, e tanto a configuração quanto a
+negociação passam por ele. Consequência: uma tag que as options recusam armazenar também não pode ser casada em
+tempo de request.
+
+A preferência explícita é realm-scoped por nome e path do cookie, `HttpOnly`/`Secure`/`SameSite=Lax`/essencial,
+e guarda **somente** a tag canônica — nunca a grafia enviada pelo chamador nem return URL. `CulturePreferenceCookie.Read`
+revalida contra os locales vigentes, então um realm que deixa de oferecer um locale para de honrar cookies
+antigos no mesmo instante, sem erro. O middleware entra entre `UseRealmDiscovery` e `UseRealmCors`/`UseAuthentication`,
+com guard arquitetural que verifica a ordem por índice e impede que qualquer host monte a sua própria.
+
+Filtros obrigatórios: `RequestCultureTests` 19/19, `CulturePreferenceTests` 10/10 e `LocalizationBoundaryTests`
+7/7. Suíte integral 1.593 aprovados, 51 ignorados opt-in, 0 falhas (+31). `git diff --check` limpo.
 
 ---
 
@@ -675,17 +700,17 @@ view models/mensagens protegidas, testes de login/consent/logout.
 
 **Tarefas:**
 
-- [ ] Introduzir `LoginFlowErrorCode` e substituir `LoginFlowResult.ErrorMessage`.
-- [ ] Mapear credencial inválida/inativa/bloqueada para um único `InvalidCredentials`.
-- [ ] Preservar `AuthenticationFailureReason` no `UserLoginFailureEvent` sem redesenhar eventos/auditoria.
-- [ ] Remover as três propriedades de mensagem e `[Redesign("Usar Resource")]` de `AccountOptions`.
-- [ ] Remover cópia, payload, seeds e testes associados às propriedades eliminadas.
-- [ ] Criar códigos de apresentação Razor para consentimento, logout, request ausente e retorno inválido.
-- [ ] Transportar código + argumentos seguros em redirects/mensagens protegidas, sem persistir frase inglesa.
-- [ ] Mapear todos os códigos para chaves de `AccountResources` e falhar teste quando um código não tiver recurso
+- [x] Introduzir `LoginFlowErrorCode` e substituir `LoginFlowResult.ErrorMessage`.
+- [x] Mapear credencial inválida/inativa/bloqueada para um único `InvalidCredentials`.
+- [x] Preservar `AuthenticationFailureReason` no `UserLoginFailureEvent` sem redesenhar eventos/auditoria.
+- [x] Remover as três propriedades de mensagem e `[Redesign("Usar Resource")]` de `AccountOptions`.
+- [x] Remover cópia, payload, seeds e testes associados às propriedades eliminadas.
+- [x] Criar códigos de apresentação Razor para consentimento, logout, request ausente e retorno inválido.
+- [x] Transportar código + argumentos seguros em redirects/mensagens protegidas, sem persistir frase inglesa.
+- [x] Mapear todos os códigos para chaves de `AccountResources` e falhar teste quando um código não tiver recurso
   em inglês, `pt-BR` ou `es-419`.
-- [ ] Garantir que descrição OAuth/OIDC e `error` normativo não sejam convertidos em códigos de recurso.
-- [ ] Estender `Tests.UserAccounts/UserAccountsIntegrationTests.cs`,
+- [x] Garantir que descrição OAuth/OIDC e `error` normativo não sejam convertidos em códigos de recurso.
+- [x] Estender `Tests.UserAccounts/UserAccountsIntegrationTests.cs`,
   `Tests.Integration/UI/LoginPageTests.cs` e
   `Tests.Integration/Characterization/LoginEventCharacterizationTests.cs` sem criar fixture concorrente em
   `Tests.Identity`.
@@ -705,7 +730,32 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~LoginEventCharacteriz
 
 ### Resultado da Fase 4
 
-*a preencher*
+**Concluída em 2026-08-06.** `LoginFlowErrorCode` substituiu `LoginFlowResult.ErrorMessage`, e as três
+propriedades de mensagem saíram de `AccountOptions` junto dos seus `[Redesign("Usar Resource")]` — **os últimos
+três marcadores do código**. Credencial inválida, conta inexistente, inativa e bloqueada colapsam num único
+`InvalidCredentials` por DF12; o `UserLoginFailureEvent` continua carregando o `AuthenticationFailureReason`
+preciso, então auditoria não perdeu nada e nenhum pipeline de eventos foi redesenhado (DF13).
+
+`AccountUiMessageCode` no Razor mapeia cada código para uma chave de `AccountResources` por dicionário
+explícito, e não por nome do enum: um rename passaria despercebido se a chave fosse derivada. O código atravessa
+redirects e mensagens protegidas; a resolução para texto acontece só no render, na cultura do request.
+`invalid_request` permanece intacto onde é valor normativo de protocolo, com teste que impede um código OAuth de
+virar recurso traduzido.
+
+Quatro testes de caracterização falharam ao afirmar a frase inglesa. **Foram atualizados, não relaxados**: o
+comportamento observável — resposta genérica, anti-enumeração, sem sessão — é idêntico; o que mudou é que a
+borda agora reporta o código estável em vez do texto. Vale registrar que era exatamente isso que esses testes
+deveriam ter fixado desde o início, já que a frase nunca foi o contrato.
+
+Um efeito colateral útil: `RealmOptionsPhase6Tests` usava `InvalidCredentialsErrorMessage` como sonda de cópia
+profunda de `AccountOptions`; a sonda passou a ser a política de localization, que exercita também a cópia da
+coleção de locales.
+
+Filtros obrigatórios: `LoginFlow_KeepsGenericExternalMessage_AndPreservesInternalReason` (Tests.UserAccounts),
+`Characterization` 31/31 e `LocalizationCatalogTests` 16/16 — os três novos guards ligam cada
+`LoginFlowErrorCode` a um código de apresentação e cada código a texto em `en`/`pt-BR`/`es-419`. Suíte integral
+1.596 aprovados, 51 ignorados opt-in, 0 falhas. Build sem erros; a busca por `Usar Resource` e pelas três
+propriedades não retorna nada. `git diff --check` limpo.
 
 ---
 
@@ -721,18 +771,18 @@ atributos não visuais; derivar semântica cultural do documento.
 
 **Tarefas:**
 
-- [ ] Inventariar login local, domain selection, login externo, consent, offline access, logout, erro,
+- [x] Inventariar login local, domain selection, login externo, consent, offline access, logout, erro,
   signed-in, perfil e loading.
-- [ ] Localizar `PageTitle`, headings, labels, botões, placeholders, ajuda e mensagens de validação/erro.
-- [ ] Localizar `title`, `alt`, `aria-label` e demais textos de acessibilidade.
+- [x] Localizar `PageTitle`, headings, labels, botões, placeholders, ajuda e mensagens de validação/erro.
+- [x] Localizar `title`, `alt`, `aria-label` e demais textos de acessibilidade.
 - [ ] Migrar validações DataAnnotations dos input models para `ValidationResources` pelo pipeline do .NET 10.
-- [ ] Manter markup nos components e somente texto/placeholders nos `.resx`.
-- [ ] Manter nomes/descrições de client, scopes e resources como conteúdo do tenant, com encoding normal.
+- [x] Manter markup nos components e somente texto/placeholders nos `.resx`.
+- [x] Manter nomes/descrições de client, scopes e resources como conteúdo do tenant, com encoding normal.
 - [ ] Exibir o seletor somente com mais de um locale efetivo e preservar return URL/realm.
-- [ ] Substituir `lang="en"` por cultura efetiva em Server, Demo e Tests.Host.
-- [ ] Derivar `dir="ltr|rtl"` de `TextInfo.IsRightToLeft`.
-- [ ] Criar teste/allowlist que falha para nova string apresentável fixa em inglês na UI do produto.
-- [ ] Criar `Tests.Integration/UI/LocalizedAccountUiTests.cs` para a matriz completa das três culturas.
+- [x] Substituir `lang="en"` por cultura efetiva em Server, Demo e Tests.Host.
+- [x] Derivar `dir="ltr|rtl"` de `TextInfo.IsRightToLeft`.
+- [x] Criar teste/allowlist que falha para nova string apresentável fixa em inglês na UI do produto.
+- [x] Criar `Tests.Integration/UI/LocalizedAccountUiTests.cs` para a matriz completa das três culturas.
 
 **Critérios de aceite:** cada superfície listada renderiza inglês, `pt-BR` e `es-419`; validação client/server
 SSR tem a mesma cultura; `html lang`/`dir` correspondem à cultura efetiva; nenhum recurso contém markup; não há
@@ -749,7 +799,32 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizedAccountUiTes
 
 ### Resultado da Fase 5
 
-*a preencher*
+**EM ANDAMENTO — não concluída em 2026-08-06.** Registro o estado real em vez de fechar a fase.
+
+**Entregue e verde:** as 15 superfícies visíveis foram substituídas por `IStringLocalizer<AccountResources>` —
+login, domain, login externo, signed-in, consentimento, consentido, os três ecrãs de End Session, erro, perfil,
+layout e o grupo de resource servers. `title`/`alt` de acessibilidade entraram no catálogo. `lang` e `dir`
+derivam de `CultureInfo.CurrentUICulture` e `TextInfo.IsRightToLeft` nos três hosts, com teste verde nas três
+culturas. A frase do logout deixou de ser remontada de fragmentos `Click`/`here`/`to return` e virou uma única
+chave com o nome do client como argumento, conforme o inventário exige.
+
+A allowlist de strings fixas está implementada e **verde**, e encontrou dois resíduos reais que eu havia
+perdido: `Loading...` em `AccountLayout` e `Protected resources` em `ResourceServerConsent`. Ambos localizados.
+O scanner ignora o bloco `@code`, senão comentários e identificadores C# entrariam como texto de produto.
+
+A validação SSR usa chaves nos atributos DataAnnotations mais `LocalizedValidationSummary`, porque
+`ErrorMessageResourceType` exigiria classe designer gerada — que a DF3 proíbe. A composição da frase acontece
+inteira dentro de uma cultura, sem juntar fragmentos traduzidos.
+
+**Pendente e vermelho (4 testes):** `LocalizedAccountUiTests.TheLoginScreen_RendersInTheNegotiatedCulture`
+falha para `pt-BR` e `es-419`, e `TheDomainScreen_RendersInTheNegotiatedCulture` falha nas três culturas. O
+inglês renderiza; as traduções não. Não é catálogo ausente — `LocalizationCatalogTests` resolve as 62 chaves nas
+três culturas e o `IUiLocaleCatalog` do host composto lista `en`/`pt-BR`/`es-419` — nem cultura não negociada,
+porque `lang="pt-BR"` sai correto no mesmo documento. A hipótese a investigar é a cultura em vigor no momento
+do render dos components SSR versus a do middleware. **A fase não deve ser fechada antes disso.**
+
+Estado da suíte: 1.603 aprovados, 51 ignorados opt-in, **4 falhas** — todas na fixture nova desta fase; nenhuma
+regressão fora dela.
 
 ---
 

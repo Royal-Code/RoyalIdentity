@@ -1,19 +1,23 @@
-@attribute [Route(Routes.Consent)]
+﻿@attribute [Route(Routes.Consent)]
 
 @using RoyalIdentity.Extensions
 @using RoyalIdentity.Razor.Components.Shared
 
+@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
 @inject IConsentPageService ConsentPageService
 @inject NavigationManager NavigationManager
 
-<PageTitle>Consent</PageTitle>
+<PageTitle>@L["Consent_Title"]</PageTitle>
 
 <AccountContent>
     <div class="lead">
         @if (viewModel?.ClientLogoUrl.IsPresent() is true)
         {
             <div class="client-logo">
-                <img src="@viewModel.ClientLogoUrl" alt="Client Logo" />
+                <img src="@viewModel.ClientLogoUrl" alt="@L["Consent_ClientLogoAlt"]" />
             </div>
         }
         <div class="text-center mb-2">
@@ -22,19 +26,19 @@
             </strong>
             <br />
             <small class="text-muted">
-                is requesting your permission
+                @L["Consent_RequestingPermission"]
             </small>
         </div>
         <p>
             <small class="fw-light fs-6">
-                Uncheck the permissions you do not wish to grant.
+                @L["Consent_UncheckPermissions"]
             </small>
         </p>
     </div>
 
     <EditForm Enhance Model="inputModel" method="post" OnValidSubmit="ConsentHandler" FormName="consent">
         <DataAnnotationsValidator />
-        <ValidationSummary class="text-danger" role="alert" />
+        <LocalizedValidationSummary />
         <StatusMessage Message="@errorMessage" MessageClass="danger" />
 
         <InputText @bind-Value="inputModel.ReturnUrl" type="hidden" />
@@ -42,7 +46,7 @@
         <Scopes @bind-Value="inputModel.IdentityScopesConsent"
         BindPrefix="inputModel.IdentityScopesConsent"
         IconClass="icon-user"
-        Description="Personal Information" />
+        Description="@L["Consent_PersonalInformation"]" />
 
         @{
             var scopeOffset = 0;
@@ -62,10 +66,10 @@
             <div class="mb-3">
                 <div class="offline-access-box">
                     <span class="icon-time"></span>
-                    <strong>Offline access</strong>
+                    <strong>@L["Consent_OfflineAccessTitle"]</strong>
                     <div>
                         <small class="text-muted">
-                            The application will be able to access your resources while you are away.
+                            @L["Consent_OfflineAccessDescription"]
                         </small>
                     </div>
                 </div>
@@ -73,8 +77,8 @@
         }
 
         <div class="form-floating mb-3">
-            <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="Description or name of device" auto-focus />
-            <label for="Description" class="form-label">Description</label>
+            <InputText @bind-Value="inputModel.Description" class="form-control" id="Description" placeholder="@L["Consent_DescriptionPlaceholder"]" auto-focus />
+            <label for="Description" class="form-label">@L["Consent_DescriptionLabel"]</label>
             <ValidationMessage For="() => inputModel.Description" class="text-danger" />
         </div>
 
@@ -84,7 +88,7 @@
                 <div class="form-check">
                     <InputCheckbox @bind-Value="inputModel.RememberConsent" id="RememberConsent" class="darker-border-checkbox form-check-input" />
                     <label class="form-check-label" for="RememberConsent">
-                        <strong>Remember My Decision</strong>
+                        <strong>@L["Consent_RememberDecision"]</strong>
                     </label>
                 </div>
             </div>
@@ -93,8 +97,8 @@
         <StatusMessage Message="@errorMessage" MessageClass="danger" />
 
         <div class="d-flex justify-content-evenly">
-            <button type="submit" name="inputModel.Button" value="@ConsentButtons.Yes" class="btn btn btn-primary">Yes, Allow</button>
-            <button type="submit" name="inputModel.Button" value="@ConsentButtons.No" class="btn btn btn-secondary">No, Do Not Allow</button>
+            <button type="submit" name="inputModel.Button" value="@ConsentButtons.Yes" class="btn btn btn-primary">@L["Consent_Allow"]</button>
+            <button type="submit" name="inputModel.Button" value="@ConsentButtons.No" class="btn btn btn-secondary">@L["Consent_Deny"]</button>
         </div>
 
         @if (viewModel?.ClientUrl.IsPresent() is true)
@@ -151,7 +155,7 @@
 
         if (result.Type == ConsentResultType.ValidationError)
         {
-            errorMessage = result.ErrorMessage;
+            errorMessage = result.MessageCode is { } code ? L.Resolve(code) : null;
             viewModel = await ConsentPageService.BuildViewModelAsync(InputModel.ReturnUrl, CancellationToken.None);
             inputModel = InputModel;
             return;

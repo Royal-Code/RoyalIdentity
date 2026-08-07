@@ -1,4 +1,9 @@
-﻿@page "/error"
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
+@page "/error"
 
 @using System.Diagnostics
 @using RoyalIdentity.Contracts.Models.Messages
@@ -8,15 +13,15 @@
 
 @inject IMessageStore MessageStore
 
-<PageTitle>Error</PageTitle>
+<PageTitle>@L["Error_Title"]</PageTitle>
 
 <AccountContent>
     <Title>
-        <h1>Error</h1>
+        <h1>@L["Error_Title"]</h1>
     </Title>
     <ChildContent>
         <div class="alert alert-danger">
-            Sorry, there was an error
+            @L["Error_Generic"]
 
             <strong>
                 <em>
@@ -31,7 +36,7 @@
         @if (ShowRequestId)
         {
             <div class="request-id">
-                <label>Request Id:</label>
+                <label>@L["Error_RequestIdLabel"]</label>
                 <br />
                 <strong>@RequestId</strong>
             </div>

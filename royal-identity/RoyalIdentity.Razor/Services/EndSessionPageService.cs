@@ -1,5 +1,6 @@
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
+using RoyalIdentity.Razor.Localization;
 using RoyalIdentity.Razor.ViewModels;
 using RoyalIdentity.Users;
 using static RoyalIdentity.Options.Constants.UI;
@@ -15,7 +16,12 @@ public class EndSessionPageService(
         var effectiveLogoutId = logoutId ?? await signOutManager.CreateLogoutIdAsync(ct);
         if (effectiveLogoutId is null)
         {
-            var error = new ErrorMessage { Error = "invalid_request", ErrorDescription = "Logout Id is required" };
+            var error = new ErrorMessage
+            {
+                // "invalid_request" is the normative OAuth code and is never translated (DF11).
+                Error = "invalid_request",
+                ErrorDescription = AccountUiMessages.ResourceKeys[AccountUiMessageCode.LogoutIdRequired]
+            };
             var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
             return new LogoutResult(LogoutResultType.Error, Routes.BuildErrorUrl(errorId));
         }
@@ -36,7 +42,11 @@ public class EndSessionPageService(
         var message = await messageStore.ReadAsync<LogoutMessage>(confirmedId, ct);
         if (message?.Data is null)
         {
-            var error = new ErrorMessage { Error = "invalid_request", ErrorDescription = "Logout Id is not found" };
+            var error = new ErrorMessage
+            {
+                Error = "invalid_request",
+                ErrorDescription = AccountUiMessages.ResourceKeys[AccountUiMessageCode.LogoutIdNotFound]
+            };
             var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
             return new LogoutResult(LogoutResultType.Error, Routes.BuildErrorUrl(errorId));
         }

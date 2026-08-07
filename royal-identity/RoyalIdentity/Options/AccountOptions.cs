@@ -17,9 +17,6 @@ public class AccountOptions
         AllowTwoFactorAuthentication = other.AllowTwoFactorAuthentication;
         AllowSocialLogin = other.AllowSocialLogin;
         AutomaticRedirectAfterSignOut = other.AutomaticRedirectAfterSignOut;
-        InvalidCredentialsErrorMessage = other.InvalidCredentialsErrorMessage;
-        InactiveUserErrorMessage = other.InactiveUserErrorMessage;
-        BlockedUserErrorMessage = other.BlockedUserErrorMessage;
     }
 
     /// <summary>
@@ -52,21 +49,4 @@ public class AccountOptions
     /// </summary>
     public bool AutomaticRedirectAfterSignOut { get; set; } = true;
 
-    /// <summary>
-    /// Generic login failure message for invalid credentials.
-    /// </summary>
-    [Redesign("Usar Resource")]
-    public string InvalidCredentialsErrorMessage { get; set; } = "Invalid username or password";
-
-    /// <summary>
-    /// Generic login failure message for inactive users.
-    /// </summary>
-    [Redesign("Usar Resource")]
-    public string InactiveUserErrorMessage { get; set; } = "Invalid username or password";
-
-    /// <summary>
-    /// Generic login failure message for blocked users.
-    /// </summary>
-    [Redesign("Usar Resource")]
-    public string BlockedUserErrorMessage { get; set; } = "Invalid username or password";
 }

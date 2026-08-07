@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using RoyalIdentity.Contracts.Localization;
 using RoyalIdentity.Razor;
+using RoyalIdentity.Razor.Localization;
+using RoyalIdentity.Users;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Localization;
@@ -127,6 +129,58 @@ public class LocalizationCatalogTests : IClassFixture<PersistentStorageAppFactor
         Assert.True(catalog.Supports("pt-BR"));
         Assert.True(catalog.Supports("PT-br"));
         Assert.False(catalog.Supports("fr"));
+    }
+
+    [Fact]
+    public void EveryPresentationCode_HasAResourceInEveryShippedCulture()
+    {
+        // Fase 4 (DF11): a code that crosses the core/UI boundary is worthless if it cannot be rendered.
+        var accountKeys = ReadKeys("AccountResources.resx");
+        var localizerFactory = factory.Services.GetRequiredService<IStringLocalizerFactory>();
+        var previous = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            foreach (var (code, key) in AccountUiMessages.ResourceKeys)
+            {
+                Assert.True(accountKeys.ContainsKey(key), $"{code} maps to the missing key '{key}'.");
+
+                foreach (var culture in Cultures)
+                {
+                    CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
+                    var localizer = localizerFactory.Create(typeof(AccountResources));
+
+                    Assert.False(
+                        localizer[key].ResourceNotFound,
+                        $"{code} has no '{culture}' text.");
+                }
+            }
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = previous;
+        }
+    }
+
+    [Fact]
+    public void EveryLoginFlowErrorCode_MapsToAPresentationCode()
+    {
+        // The core may add a failure reason; it must not be able to add one the UI cannot render.
+        foreach (var code in Enum.GetValues<LoginFlowErrorCode>())
+        {
+            var uiCode = AccountUiMessages.From(code);
+
+            Assert.True(AccountUiMessages.ResourceKeys.ContainsKey(uiCode));
+        }
+    }
+
+    [Fact]
+    public void NormativeProtocolCodes_AreNotTranslated()
+    {
+        // "invalid_request" and friends are wire values defined by OAuth/OIDC; turning them into resource
+        // lookups would corrupt the protocol response.
+        foreach (var value in ReadKeys("AccountResources.resx").Values)
+            Assert.DoesNotContain("invalid_request", value, StringComparison.Ordinal);
     }
 
     [Fact]

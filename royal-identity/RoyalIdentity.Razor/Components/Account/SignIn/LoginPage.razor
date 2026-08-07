@@ -1,13 +1,18 @@
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
 @attribute [Route(Routes.Login)]
 
 @inject ILoginPageService LoginPageService
 @inject NavigationManager NavigationManager
 
-<PageTitle>Log in</PageTitle>
+<PageTitle>@L["Login_Title"]</PageTitle>
 
 <AccountContent>
     <Title>
-        <h1>Log in</h1>
+        <h1>@L["Login_Title"]</h1>
     </Title>
     <ChildContent>
         @if (model is not null)

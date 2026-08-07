@@ -43,7 +43,8 @@ public static class HostEndpoints
                     statusCode: 400,
                     type: "invalid-credentials",
                     title: "Invalid credentials",
-                    detail: result.ErrorMessage);
+                    // The test host has no UI catalogue; it reports the stable code, not a rendered phrase.
+                    detail: result.ErrorCode?.ToString());
             }
 
             return Results.Ok();

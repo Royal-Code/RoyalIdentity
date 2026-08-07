@@ -1,3 +1,7 @@
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
 @inject ILoginPageService LoginPageService
 @inject NavigationManager NavigationManager
 
@@ -5,19 +9,19 @@
 
 <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
     <DataAnnotationsValidator/>
-    <ValidationSummary class="text-danger" role="alert"/>
+    <LocalizedValidationSummary />
 
     <InputText @bind-Value="Input.ReturnUrl" type="hidden" />
 
     <div class="form-floating mb-3">
-        <InputText @bind-Value="Input.Username" class="form-control" id="Username" autocomplete="username" aria-required="true" placeholder="Username" auto-focus />
-        <label for="Username" class="form-label">Username</label>
+        <InputText @bind-Value="Input.Username" class="form-control" id="Username" autocomplete="username" aria-required="true" placeholder="@L["Login_Username"]" auto-focus />
+        <label for="Username" class="form-label">@L["Login_Username"]</label>
         <ValidationMessage For="() => Input.Username" class="text-danger"/>
     </div>
 
     <div class="form-floating mb-3">
-        <InputText type="password" @bind-Value="Input.Password" class="form-control" id="Password" autocomplete="off" aria-required="true" placeholder="Password" />
-        <label for="Password" class="form-label">Password</label>
+        <InputText type="password" @bind-Value="Input.Password" class="form-control" id="Password" autocomplete="off" aria-required="true" placeholder="@L["Login_Password"]" />
+        <label for="Password" class="form-label">@L["Login_Password"]</label>
         <ValidationMessage For="() => Input.Password" class="text-danger"/>
     </div>
 
@@ -26,18 +30,18 @@
         <div class="checkbox mb-3">
             <label class="form-label">
                 <InputCheckbox @bind-Value="Input.RememberLogin" class="darker-border-checkbox form-check-input"/>
-                Remember My Login
+                @L["Login_RememberMe"]
             </label>
         </div>
     }
 
     <div>
-        <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
+        <button type="submit" class="w-100 btn btn-lg btn-primary">@L["Login_Title"]</button>
     </div>
 
     <div class="mt-2">
         <p class="text-center">
-            <a href="account/forgot-password">Forgot your password?</a>
+            <a href="account/forgot-password">@L["Login_ForgotPassword"]</a>
         </p>
     </div>
 </EditForm>
@@ -63,7 +67,7 @@
         var result = await LoginPageService.LoginAsync(Input, CancellationToken.None);
         if (result.NavigateTo is null)
         {
-            errorMessage = result.ErrorMessage;
+            errorMessage = result.MessageCode is { } code ? L.Resolve(code) : null;
             return;
         }
         NavigationManager.NavigateTo(result.NavigateTo, result.ForceLoad);

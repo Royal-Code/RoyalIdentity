@@ -1,13 +1,18 @@
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
 @attribute [Route(Routes.SignedIn)]
 
-<PageTitle>Signed In</PageTitle>
+<PageTitle>@L["SignedIn_Title"]</PageTitle>
 
 <AccountContent>
     <div class="signed-in-container">
         <div class="signed-in-message">
-            <h2>Welcome back!</h2>
-            <p>You have successfully signed in.</p>
-            <p>You can now return to your application.</p>
+            <h2>@L["SignedIn_WelcomeBack"]</h2>
+            <p>@L["SignedIn_Success"]</p>
+            <p>@L["SignedIn_ReturnToApplication"]</p>
         </div>
     </div>
 </AccountContent>

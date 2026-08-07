@@ -248,11 +248,13 @@ public class UserAccountsIntegrationTests
         var result = await flow.LoginAsync(new LoginRequest("alice", "secret", ReturnUrl: null, RememberLogin: false), default);
 
         Assert.Equal(LoginFlowOutcome.Error, result.Outcome);
-        Assert.Equal(realm.Options.Account.InvalidCredentialsErrorMessage, result.ErrorMessage);
+        // DF12: every observable failure collapses to one code, so the user cannot enumerate accounts...
+        Assert.Equal(LoginFlowErrorCode.InvalidCredentials, result.ErrorCode);
 
         var evt = Assert.IsType<UserLoginFailureEvent>(Assert.Single(events.Events));
+        // ...while the event still carries the precise internal reason (DF13: events are not redesigned).
         Assert.Equal(expectedReason, evt.Reason);
-        Assert.Equal(realm.Options.Account.InvalidCredentialsErrorMessage, evt.Message);
+        Assert.Equal(nameof(LoginFlowErrorCode.InvalidCredentials), evt.Message);
         Assert.Equal("r1", evt.RealmId);
     }
 

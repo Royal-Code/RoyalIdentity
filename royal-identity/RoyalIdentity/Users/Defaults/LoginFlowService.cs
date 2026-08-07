@@ -40,7 +40,7 @@ public sealed class LoginFlowService(
         if (realm is null)
         {
             logger.LogWarning("Login attempted without a realm context");
-            return new LoginFlowResult(LoginFlowOutcome.Error, ErrorMessage: "No realm context.");
+            return new LoginFlowResult(LoginFlowOutcome.Error, ErrorCode: LoginFlowErrorCode.NoRealmContext);
         }
 
         var authenticator = userDirectory.GetLocalAuthenticator(realm);
@@ -65,11 +65,18 @@ public sealed class LoginFlowService(
 
         if (!authResult.Success)
         {
-            var message = ErrorMessageFor(realm, authResult.Reason);
+            // DF12: the user always reads the same thing, whatever the reason; the event keeps the precise
+            // reason so operators and auditing do not lose it (DF13 — events are not redesigned here).
             await eventDispatcher.DispatchAsync(
-                new UserLoginFailureEvent(request.Login, message, authResult.Reason, context),
+                new UserLoginFailureEvent(
+                    request.Login,
+                    nameof(LoginFlowErrorCode.InvalidCredentials),
+                    authResult.Reason,
+                    context),
                 realm);
-            return new LoginFlowResult(LoginFlowOutcome.Error, ErrorMessage: message);
+            return new LoginFlowResult(
+                LoginFlowOutcome.Error,
+                ErrorCode: LoginFlowErrorCode.InvalidCredentials);
         }
 
         var subject = authResult.Subject!;
@@ -148,19 +155,9 @@ public sealed class LoginFlowService(
 
         var uri = new Uri(returnUrl!, UriKind.RelativeOrAbsolute);
         if (uri is { IsAbsoluteUri: true, IsLoopback: false })
-            return new LoginFlowResult(LoginFlowOutcome.InvalidReturnUrl, returnUrl, $"No consent request matching request: {uri}");
+            return new LoginFlowResult(LoginFlowOutcome.InvalidReturnUrl, returnUrl, LoginFlowErrorCode.InvalidReturnUrl);
 
         return new LoginFlowResult(LoginFlowOutcome.LocalRedirect, returnUrl);
     }
 
-    private static string ErrorMessageFor(Realm realm, AuthenticationFailureReason? reason)
-    {
-        var account = realm.Options.Account;
-        return reason switch
-        {
-            AuthenticationFailureReason.Inactive => account.InactiveUserErrorMessage,
-            AuthenticationFailureReason.Blocked => account.BlockedUserErrorMessage,
-            _ => account.InvalidCredentialsErrorMessage
-        };
-    }
 }

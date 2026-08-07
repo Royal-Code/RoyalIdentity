@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using RoyalIdentity.Localization;
 
 namespace RoyalIdentity.Options;
 
@@ -132,66 +133,10 @@ public class InternationalizationOptions
     }
 
     /// <summary>
-    /// Resolves a configured tag to its canonical <see cref="CultureInfo.Name"/>.
+    /// Resolves a configured tag to its canonical <see cref="CultureInfo.Name"/> through the shared
+    /// <see cref="LanguageTag"/> gate, so configuration and request negotiation can never disagree about
+    /// what counts as a locale.
     /// </summary>
     internal static bool TryNormalizeLocale(string? tag, [NotNullWhen(true)] out string? normalized)
-    {
-        normalized = null;
-
-        if (!IsWellFormedLanguageTag(tag))
-            return false;
-
-        try
-        {
-            // predefinedOnly rejects tags this runtime's culture data does not know, such as "zz-ZZ", which the
-            // other overload would happily materialize as a custom culture.
-            var culture = CultureInfo.GetCultureInfo(tag, predefinedOnly: true);
-
-            // The invariant culture answers to the empty name and is not a locale a realm can offer.
-            if (culture.Name.Length is 0)
-                return false;
-
-            normalized = culture.Name;
-            return true;
-        }
-        catch (CultureNotFoundException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Checks the shape before asking the runtime, because <see cref="CultureInfo"/> also accepts inputs that
-    /// are not language tags: <c>en_US</c> resolves and canonicalizes to <c>en_us</c>.
-    /// </summary>
-    private static bool IsWellFormedLanguageTag([NotNullWhen(true)] string? tag)
-    {
-        if (string.IsNullOrEmpty(tag))
-            return false;
-
-        var subtagLength = 0;
-        var isFirstSubtag = true;
-
-        foreach (var character in tag)
-        {
-            if (character is '-')
-            {
-                if (subtagLength is 0)
-                    return false;
-
-                subtagLength = 0;
-                isFirstSubtag = false;
-                continue;
-            }
-
-            var isValidCharacter = isFirstSubtag
-                ? char.IsAsciiLetter(character)
-                : char.IsAsciiLetterOrDigit(character);
-
-            if (!isValidCharacter || ++subtagLength > 8)
-                return false;
-        }
-
-        return subtagLength is not 0;
-    }
+        => LanguageTag.TryNormalize(tag, out normalized);
 }

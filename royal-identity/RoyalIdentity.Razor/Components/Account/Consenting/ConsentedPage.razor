@@ -1,10 +1,15 @@
-﻿@attribute [Route(Routes.Consented)]
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
+@attribute [Route(Routes.Consented)]
 
 @using RoyalIdentity.Razor.Components.Shared
 
 @inject NavigationManager NavigationManager
 
-<PageTitle>Consented</PageTitle>
+<PageTitle>@L["Consent_GrantedTitle"]</PageTitle>
 
 <PageScript Src="./_content/RoyalIdentity.Razor/Components/Account/Consenting/ConsentedPage.razor.js" />
 
@@ -13,11 +18,11 @@
     <div class="lead" id="consent-redirect" data-returnUrl="@ReturnUrl">
         <div class="text-center mb-2">
             <small class="text-muted">
-                The permissions have been granted
+                @L["Consent_PermissionsGranted"]
             </small>
             <br />
             <small class="text-muted">
-                Redirecting to the application
+                @L["Consent_Redirecting"]
             </small>
         </div>
     </div>

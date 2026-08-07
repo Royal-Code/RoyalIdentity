@@ -43,7 +43,11 @@ public enum LoginFlowOutcome
 
 /// <summary>
 /// The result of <see cref="Defaults.LoginFlowService.LoginAsync"/>: the <see cref="Outcome"/> plus the
-/// returnUrl/message the UI needs to render the next step. Carries no <c>Subject</c>/<c>UserSession</c>/
-/// <c>ClaimsPrincipal</c> — the cookie is already written by the time this returns.
+/// returnUrl and, on failure, a stable <see cref="LoginFlowErrorCode"/>. Carries no <c>Subject</c>/
+/// <c>UserSession</c>/<c>ClaimsPrincipal</c> — the cookie is already written by the time this returns — and no
+/// presentable text: the code crosses the boundary and the UI resolves it in the request's culture (DF11).
 /// </summary>
-public sealed record LoginFlowResult(LoginFlowOutcome Outcome, string? ReturnUrl = null, string? ErrorMessage = null);
+public sealed record LoginFlowResult(
+    LoginFlowOutcome Outcome,
+    string? ReturnUrl = null,
+    LoginFlowErrorCode? ErrorCode = null);

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +16,7 @@ using RoyalIdentity.Contracts.Localization;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Endpoints;
 using RoyalIdentity.Handlers;
+using RoyalIdentity.Localization;
 using RoyalIdentity.Options;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Contracts;
@@ -92,6 +93,7 @@ public static class ServiceCollectionExtensions
         // Localization: the core ships the contract and an empty catalogue, so a host without an OP user
         // interface promises no locales. RoyalIdentity.Razor replaces it (plan-localization DF7).
         services.TryAddSingleton<IUiLocaleCatalog, EmptyUiLocaleCatalog>();
+        services.AddScoped<ICulturePreferenceService, CulturePreferenceService>();
 
         // Realm management
         services.AddScoped<IRealmManager, RealmManager>();

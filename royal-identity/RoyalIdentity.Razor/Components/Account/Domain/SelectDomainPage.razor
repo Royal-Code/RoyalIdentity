@@ -1,30 +1,35 @@
-﻿@attribute [Route(Routes.SelectDomain)]
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
+@attribute [Route(Routes.SelectDomain)]
 
 @using RoyalIdentity.Contracts.Storage
 
 @inject IStorage storage;
 @inject NavigationManager NavigationManager
 
-<PageTitle>Select domain</PageTitle>
+<PageTitle>@L["Domain_Title"]</PageTitle>
 
 <AccountContent>
     <Title>
-        <h1>Select domain</h1>
+        <h1>@L["Domain_Title"]</h1>
     </Title>
     <ChildContent>
         <StatusMessage Message="@errorMessage" MessageClass="danger" />
         <EditForm Model="Input" method="post" OnValidSubmit="SelectDomain" FormName="select-domain">
             <DataAnnotationsValidator/>
-            <ValidationSummary class="text-danger" role="alert"/>
+            <LocalizedValidationSummary />
 
             <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Domain" class="form-control" id="Domain" aria-required="true" placeholder="company.com" auto-focus />
-                <label for="Domain" class="form-label">Domain</label>
+                <InputText @bind-Value="Input.Domain" class="form-control" id="Domain" aria-required="true" placeholder="@L["Domain_Placeholder"]" auto-focus />
+                <label for="Domain" class="form-label">@L["Domain_Label"]</label>
                 <ValidationMessage For="() => Input.Domain" class="text-danger" />
             </div>
 
             <div>
-                <button type="submit" class="w-100 btn btn-lg btn-primary">Continue</button>
+                <button type="submit" class="w-100 btn btn-lg btn-primary">@L["Common_Continue"]</button>
             </div>
 
         </EditForm>
@@ -45,7 +50,7 @@
     {
         if (Input.Domain is null)
         {
-            errorMessage = "Please enter a domain.";
+            errorMessage = L["Domain_NotFound"];
             return;
         }
 

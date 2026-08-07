@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
+using RoyalIdentity.Razor.Localization;
 using RoyalIdentity.Razor.ViewModels;
 using RoyalIdentity.Users;
 using RoyalIdentity.Users.Defaults;
@@ -70,7 +71,7 @@ public class LoginPageService(
         return result.Outcome switch
         {
             LoginFlowOutcome.Error =>
-                new LoginResult(LoginResultType.Error, ErrorMessage: result.ErrorMessage),
+                new LoginResult(LoginResultType.Error, MessageCode: MessageCodeFor(result)),
 
             LoginFlowOutcome.RequiresConsent =>
                 new LoginResult(LoginResultType.RequiresConsent, Routes.BuildConsentUrl(realm.Path, input.ReturnUrl)),
@@ -88,15 +89,21 @@ public class LoginPageService(
                 new LoginResult(LoginResultType.Success, Routes.BuildProfileUrl(realm.Path), ForceLoad: true),
 
             LoginFlowOutcome.InvalidReturnUrl =>
-                await BuildErrorPageAsync(result.ErrorMessage, ct),
+                await BuildErrorPageAsync(MessageCodeFor(result), ct),
 
-            _ => new LoginResult(LoginResultType.Error, ErrorMessage: result.ErrorMessage)
+            _ => new LoginResult(LoginResultType.Error, MessageCode: MessageCodeFor(result))
         };
     }
 
-    private async Task<LoginResult> BuildErrorPageAsync(string? errorDescription, CancellationToken ct)
+    private static AccountUiMessageCode MessageCodeFor(LoginFlowResult result)
+        => result.ErrorCode is { } code
+            ? AccountUiMessages.From(code)
+            : AccountUiMessageCode.LoginInvalidCredentials;
+
+    private async Task<LoginResult> BuildErrorPageAsync(AccountUiMessageCode code, CancellationToken ct)
     {
-        var error = new ErrorMessage { ErrorDescription = errorDescription };
+        // The protected message carries the code; the error page resolves it in the reader's culture.
+        var error = new ErrorMessage { ErrorDescription = AccountUiMessages.ResourceKeys[code] };
         var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
         return new LoginResult(LoginResultType.Error, Routes.BuildErrorUrl(errorId), ForceLoad: true);
     }

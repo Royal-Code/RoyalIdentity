@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using RoyalIdentity.Users;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Characterization;
@@ -146,7 +147,7 @@ public class UserAccountsPersistentRegressionTests : IClassFixture<PersistentSto
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Invalid username or password", content); // generic (anti-enumeration)
+        Assert.Contains(nameof(LoginFlowErrorCode.InvalidCredentials), content); // generic (anti-enumeration)
         Assert.Equal(HttpStatusCode.Redirect, protectedResource.StatusCode); // no session created
     }
 

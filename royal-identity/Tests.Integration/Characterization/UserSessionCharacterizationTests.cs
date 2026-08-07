@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using System.Net;
+using RoyalIdentity.Users;
 using Tests.Integration.Prepare;
 
 namespace Tests.Integration.Characterization;
@@ -119,7 +120,7 @@ public class UserSessionCharacterizationTests : IClassFixture<PersistentStorageA
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Invalid username or password", content); // generic (anti-enumeration)
+        Assert.Contains(nameof(LoginFlowErrorCode.InvalidCredentials), content); // generic (anti-enumeration)
         Assert.Empty(await factory.FindSessionsAsync(factory.Handles.Demo, subject));
     }
 
@@ -146,7 +147,7 @@ public class UserSessionCharacterizationTests : IClassFixture<PersistentStorageA
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Invalid username or password", content); // same generic message as invalid creds
+        Assert.Contains(nameof(LoginFlowErrorCode.InvalidCredentials), content); // same generic code as invalid creds
         Assert.Empty(await factory.FindSessionsAsync(factory.Handles.Demo, subject));
         var state = await factory.FindAccountStateAsync(factory.Handles.Demo, subject);
         Assert.NotNull(state);

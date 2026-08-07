@@ -36,7 +36,7 @@ public class LoginEventCharacterizationTests : IClassFixture<EventCapturingAppFa
         Assert.Equal("alice", evt.Username);
         Assert.Equal(factory.Handles.Demo.Id, evt.RealmId);
         Assert.Equal(AuthenticationFailureReason.InvalidCredentials, evt.Reason);
-        Assert.Equal("Invalid username or password", evt.Message);
+        Assert.Equal(nameof(LoginFlowErrorCode.InvalidCredentials), evt.Message);
     }
 
     [Fact]

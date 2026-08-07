@@ -1,21 +1,26 @@
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
 @attribute [Route(Routes.Profile)]
 @attribute [Authorize]
 
 @using Microsoft.AspNetCore.Authorization
 @using RoyalIdentity.Extensions
 
-<PageTitle>User Panel</PageTitle>
+<PageTitle>@L["Profile_Title"]</PageTitle>
 
-<h1>User Panel</h1>
+<h1>@L["Profile_Title"]</h1>
 
 <AuthorizeView>
 
     <h2>
-        Olá @context.User.GetDisplayName().
+        @L["Profile_Greeting", context.User.GetDisplayName()]
     </h2>
 
     <div>
-        <div>User information</div>
+        <div>@L["Profile_UserInformation"]</div>
         <div>
             @foreach(var claim in context.User.Claims)
             {

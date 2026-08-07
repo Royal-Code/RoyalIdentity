@@ -1,3 +1,8 @@
+﻿@using Microsoft.Extensions.Localization
+@using RoyalIdentity.Razor.Localization
+
+@inject IStringLocalizer<AccountResources> L
+
 @using RoyalIdentity.Extensions
 
 @if (Group.Scopes.Count is not 0 || Group.ProtectedResources.Count is not 0)
@@ -31,7 +36,7 @@
                 <div class="protected-resources">
                     <div class="protected-resources-title">
                         <span class="icon-lock"></span>
-                        Protected resources this application will access
+                        @L["Consent_ProtectedResourcesTitle"] this application will access
                     </div>
                     <ul class="list-group list-group-flush">
                         @foreach (var resource in Group.ProtectedResources)

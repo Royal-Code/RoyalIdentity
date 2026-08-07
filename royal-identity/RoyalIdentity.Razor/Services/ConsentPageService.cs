@@ -3,6 +3,7 @@ using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
+using RoyalIdentity.Razor.Localization;
 using RoyalIdentity.Razor.ViewModels;
 using static RoyalIdentity.Options.Constants;
 using static RoyalIdentity.Options.Constants.UI;
@@ -28,7 +29,10 @@ public class ConsentPageService(
         var context = await sessionContext.GetAuthorizationContextAsync(input.ReturnUrl);
         if (context is null)
         {
-            var error = new ErrorMessage { ErrorDescription = $"No consent request matching request: {input.ReturnUrl}" };
+            var error = new ErrorMessage
+            {
+                ErrorDescription = AccountUiMessages.ResourceKeys[AccountUiMessageCode.ConsentRequestNotFound]
+            };
             var errorId = await messageStore.WriteAsync(new Message<ErrorMessage>(error), ct);
             return new ConsentResult(ConsentResultType.Denied, Routes.BuildErrorUrl(errorId), ForceLoad: true);
         }
@@ -45,20 +49,24 @@ public class ConsentPageService(
 
         if (viewModel.AllowRememberConsent is false && input.RememberConsent)
             return new ConsentResult(ConsentResultType.ValidationError,
-                ErrorMessage: "Client does not allow consent to be remembered.");
+                MessageCode: AccountUiMessageCode.ConsentRememberNotAllowed);
 
         foreach (var scope in viewModel.IdentityScopes)
         {
             var inputScope = input.IdentityScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
             if (scope.Required && inputScope?.Checked is not true)
-                return new ConsentResult(ConsentResultType.ValidationError, ErrorMessage: "Required scope not granted.");
+                return new ConsentResult(
+                    ConsentResultType.ValidationError,
+                    MessageCode: AccountUiMessageCode.ConsentRequiredScopeNotGranted);
         }
 
         foreach (var scope in viewModel.Scopes)
         {
             var inputScope = input.ScopesConsent.FirstOrDefault(s => s.Scope == scope.Name);
             if (scope.Required && inputScope?.Checked is not true)
-                return new ConsentResult(ConsentResultType.ValidationError, ErrorMessage: "Required scope not granted.");
+                return new ConsentResult(
+                    ConsentResultType.ValidationError,
+                    MessageCode: AccountUiMessageCode.ConsentRequiredScopeNotGranted);
         }
 
         var consentedScopes = input.IdentityScopesConsent
