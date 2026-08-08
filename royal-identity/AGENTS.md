@@ -74,6 +74,10 @@ phases)** — `RealmOptions.Internationalization` is the realm-scoped localizati
 `SupportedLocales` an ordered, case-insensitively distinct `List<string>` normalized and validated before the
 configuration snapshot is published. The account UI ships RESX catalogs for `en`, `pt-BR` and `es-419`, request
 culture follows the documented realm-scoped precedence, and discovery publishes only the effective UI catalog.
+`.ai/plans/plan-rfc9700-security-hardening.md` is the active plan (1/6 phases complete). Its Fase 1 introduced the
+pure, ephemeral `ClientSecurityAssessment.Create(Client, RealmOptions)` and stable `RuleId` findings under
+`RoyalIdentity.Models.Security`; the assessment is never persisted, registered in DI or used as a runtime
+authorization gate. Q1 is closed with a 30-second default refresh-token retry tolerance to be applied in Fase 4.
 The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
 `ConfigurationResourceBridgeOptions` per baseline DF22 until a dedicated persistence plan is authorized. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never

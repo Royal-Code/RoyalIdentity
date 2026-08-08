@@ -30,7 +30,7 @@ derivado de IS4/IdentityModel.
 
 **Área:** OAuth2/OIDC / Segurança / Clients / Admin
 
-**Status:** Promovido a plano em 2026-07-30.
+**Status:** Em execução; Fase 1/6 concluída em 2026-08-07.
 
 **Plano:** [plan-rfc9700-security-hardening.md](../plans/plan-rfc9700-security-hardening.md).
 

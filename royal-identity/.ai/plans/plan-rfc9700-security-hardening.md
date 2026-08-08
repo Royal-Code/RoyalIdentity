@@ -1,17 +1,17 @@
 # Plan: Aderência e hardening de segurança OAuth 2.0 conforme RFC 9700 (`plan-rfc9700-security-hardening`)
 
-## Status: RASCUNHO - decisões de arquitetura fechadas; Q1 pendente antes da Fase 4
+## Status: EM EXECUÇÃO - decisões fechadas; Fase 1 concluída; Fase 2 é a próxima
 
 ## Progresso
 
-`░░░░░░` **0%** - 0 de 6 fases
+`█░░░░░` **17%** - 1 de 6 fases concluída
 
 | Fase | Estado |
 |---|---|
-| Fase 1 - Assessment determinístico e catálogo de regras | Pendente |
+| Fase 1 - Assessment determinístico e catálogo de regras | Concluida |
 | Fase 2 - Validação configurável e segura de redirect URIs | Pendente |
 | Fase 3 - Authorization Code, PKCE e remoção do front-channel legado | Pendente |
-| Fase 4 - Rotação e detecção de replay de refresh tokens | Bloqueada por Q1 |
+| Fase 4 - Rotação e detecção de replay de refresh tokens | Pendente |
 | Fase 5 - Segurança HTTP, metadata, client authentication e logs | Pendente |
 | Fase 6 - Handoff administrativo, aceites e fechamento | Pendente |
 
@@ -171,7 +171,8 @@
     - **C)** outro valor limitado definido pelo mantenedor.
   - **Impacto se não decidir:** bloqueia o default, os testes de borda e o fechamento da Fase 4; não bloqueia
     as Fases 1-3 e 5.
-  - **Status:** Aberta.
+  - **Resposta:** opção **A**, 30 segundos.
+  - **Status:** Fechada em 2026-08-07; convertida em DF23.
 
 ---
 
@@ -249,6 +250,9 @@
   `code_challenge_methods_supported` anuncia `S256` e `plain`; a lista expressa capacidade, não preferência.
   `S256` continua obrigatório e clientes com `AllowPlainTextPkce=true` recebem finding não aderente. Remover
   `plain` da metadata exige remover no mesmo corte a option e o caminho runtime. Fonte: RFC 9700 §2.1.1 + RFC 8414.
+- **DF23 — Retry limitado de refresh token:** o default de `Client.RefreshTokenPostConsumedTimeTolerance` será
+  30 segundos. A janela preserva o retry imediato após falha de persistência no client, sem manter reutilização
+  ilimitada; a capacidade continua configurável por client. Fonte: resposta humana Q1, opção A.
 
 ---
 
@@ -269,6 +273,10 @@
   - **Resposta humana:** o projeto está em desenvolvimento, sem clients de produção; breaking changes são
     aceitáveis.
   - **Conclusão:** DF15 e registro persistente em `AGENTS.md`.
+- **Tolerância de retry do refresh token:** foram consideradas janela de 30 segundos, tolerância zero e outro
+  valor limitado.
+  - **Resposta humana em 2026-08-07:** opção A, 30 segundos.
+  - **Conclusão:** DF23; a Fase 4 aplica o novo default e preserva configuração explícita por client.
 
 **Revisão externa de posicionamento e execução (2026-07-31):**
 
@@ -414,7 +422,7 @@ payloads Server/Realm v1.
 2. **Fase 2 (redirect)** — introduz a única compatibilidade configurável decidida.
 3. **Fase 3 (authorization flow)** — depende da baseline de erros OAuth 2.1 e remove superfícies legadas antes
    de consolidar metadata/headers.
-4. **Fase 4 (refresh)** — estende Operational com decisão atômica e depende de Q1.
+4. **Fase 4 (refresh)** — estende Operational com decisão atômica e aplica a janela de 30 segundos da DF23.
 5. **Fase 5 (HTTP/metadata/logs)** — fecha recomendações transversais sobre as superfícies restantes.
 6. **Fase 6 (handoff/aceites)** — valida ambos os providers, hosts, documentação e rastreabilidade administrativa.
 
@@ -442,16 +450,17 @@ inexequíveis, para manter diagnóstico de dados manualmente construídos.
 
 **Tarefas:**
 
-- [ ] Mapear cada regra aplicável do RFC 9700 a `RuleId`, nível normativo, severidade e condição verificável.
-- [ ] Criar enums de status, requirement level e severidade com valores definidos.
-- [ ] Criar `ClientSecurityFinding` imutável e sem texto localizado de UI.
-- [ ] Criar `ClientSecurityAssessment` com factory method estático e `Status` derivado.
-- [ ] Avaliar PKCE, plain, response/grant types, redirect policy/valores, refresh para public client,
+- [x] Mapear cada regra aplicável do RFC 9700 a `RuleId`, nível normativo, severidade e condição verificável.
+- [x] Criar enums de status, requirement level e severidade com valores definidos.
+- [x] Criar `ClientSecurityFinding` imutável e sem texto localizado de UI.
+- [x] Criar `ClientSecurityAssessment` com factory method estático e `Status` derivado.
+- [x] Avaliar PKCE, plain, response/grant types, valores de redirect e reservar o `RuleId` da policy de comparação
+  que a Fase 2 tornará observável, refresh para public client,
   client authentication e sender constraint observável.
-- [ ] Documentar que `Compliant` significa “sem findings de configuração aplicáveis”, não certificação de deploy.
-- [ ] Adicionar testes table-driven para cada regra, precedência de status, nulidade e determinismo.
-- [ ] Adicionar guard arquitetural para impedir dependência de UI/Data/provider.
-- [ ] Criar `Tests.Identity/Security/ClientSecurityAssessmentTests.cs` e
+- [x] Documentar que `Compliant` significa “sem findings de configuração aplicáveis”, não certificação de deploy.
+- [x] Adicionar testes table-driven para cada regra, precedência de status, nulidade e determinismo.
+- [x] Adicionar guard arquitetural para impedir dependência de UI/Data/provider.
+- [x] Criar `Tests.Identity/Security/ClientSecurityAssessmentTests.cs` e
   `Tests.Architecture/Rfc9700BoundaryTests.cs`.
 
 **Critérios de aceite:** duas chamadas com os mesmos objetos produzem valores equivalentes; não há interface,
@@ -468,7 +477,41 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~Rfc9700BoundaryTests
 
 ### Resultado da Fase 1
 
-*a preencher*
+Fase concluída em 2026-08-07 e corrigida após revisão em 2026-08-08. `RoyalIdentity.Models.Security` passou a
+conter o assessment público e efêmero, findings imutáveis, três enums com valores explícitos e doze `RuleId`
+estáveis. `Create(Client, RealmOptions)` é
+estático, síncrono e determinístico; valida argumentos, não usa DI/I/O/relógio/storage e deriva `Status` com
+precedência `NonCompliant > Warning > Compliant`. A documentação XML delimita `Compliant` como ausência de
+finding aplicável à configuração observável, nunca como certificação do deployment. O resultado não entra em
+`Client`, options, Data, EF, cache ou runtime de autorização.
+
+| RuleId | Nível/status ao violar | Severidade | Condição observável na Fase 1 |
+|---|---|---|---|
+| `RFC9700-2.1-REDIRECT-EXACT-MATCH` | MUST / `NonCompliant` | Critical | redirect registrado contém wildcard; a Fase 2 estende a mesma regra à comparação realm-scoped |
+| `RFC6749-3.1.2-ABSOLUTE-AUTHORIZATION-REDIRECT` | MUST / `NonCompliant` | Critical | redirect não é URI absoluta |
+| `RFC6749-3.1.2-NO-AUTHORIZATION-REDIRECT-FRAGMENT` | MUST NOT / `NonCompliant` | Critical | redirect contém fragment |
+| `RFC9700-2.6-HTTPS-AUTHORIZATION-REDIRECT` | MUST NOT / `NonCompliant` | Critical | redirect absoluto não usa HTTPS; a exceção loopback continua diferida pela DF9 |
+| `RFC9700-2.1.1-PKCE` | public: MUST / `NonCompliant`; confidential: RECOMMENDED / `Warning` | High/Medium | authorization-code client não exige PKCE |
+| `RFC9700-2.1.1-PKCE-S256` | SHOULD / `Warning` | Medium | client permite `plain` |
+| `RFC9700-2.1.2-NO-FRONTCHANNEL-ACCESS-TOKEN` | SHOULD NOT / `Warning` | High | response type contém `token` |
+| `RFC9700-2.4-NO-PASSWORD-GRANT` | MUST NOT / `NonCompliant` | Critical | grant `password` configurado |
+| `RFC9700-2.2.2-PUBLIC-REFRESH-REPLAY` | MUST / `NonCompliant` | High | public client pode receber refresh token antes da rotação da Fase 4 |
+| `RFC9700-2.5-CLIENT-AUTHENTICATION` | SHOULD / `Warning` | High | confidential client não exige autenticação |
+| `RFC9700-2.5-ASYMMETRIC-CLIENT-AUTHENTICATION` | RECOMMENDED / `Warning` | Medium | nenhuma credencial assimétrica utilizável é observável |
+| `RFC9700-2.2.1-SENDER-CONSTRAINED-ACCESS-TOKENS` | SHOULD / `Warning` | Medium | configuração não restringe autenticação exclusivamente a mTLS |
+
+O sender constraint é deliberadamente conservador: `private_key_jwt` satisfaz autenticação assimétrica, mas não
+torna o access token sender-constrained; mTLS só elimina o finding quando está habilitado, é obrigatório para o
+client e não há mecanismo alternativo registrado. `X509CertificateBase64` pertence ao caminho
+`private_key_jwt`; somente `X509Thumbprint`/`X509Name`, efetivamente consumidos pelo avaliador mTLS, contam como
+credenciais mTLS. Para public clients, a remediação declara que DPoP ainda não é suportado em vez de recomendar
+um caminho mTLS que o assessment não consegue reconhecer. Valores técnicos de `Description`/`Remediation` não são texto
+de UI; o futuro Admin localiza a apresentação pelo `RuleId`.
+
+Gates após a rodada de revisão: `ClientSecurityAssessmentTests` 24/24 e `Rfc9700BoundaryTests` 5/5. A suíte
+integral terminou com 1.674 aprovados, 51 ignorados opt-in e 0 falhas. O build executado por `dotnet test` terminou
+sem erros; warnings preexistentes de pacote/framework/nullability permanecem. `git diff --check` e a varredura
+explícita dos arquivos novos por whitespace também passaram.
 
 ---
 
@@ -583,7 +626,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~CodeSingleUseTests"
 
 ## Fase 4 - Rotação e detecção de replay de refresh tokens
 
-**Depende de:** Fase 1, Q1, DF13, DF15, DF18, DF21, conclusão de
+**Depende de:** Fase 1, DF13, DF15, DF18, DF21, DF23, conclusão de
 [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md) e semânticas vigentes de
 `plan-data-operational-storage.md`/`plan-data-storage-matrix.md`.
 
@@ -598,7 +641,7 @@ atômica.
 
 **Tarefas:**
 
-- [ ] Fechar Q1 no histórico e transformar a resposta em DF antes do primeiro edit.
+- [x] Fechar Q1 no histórico e transformar a resposta em DF antes do primeiro edit.
 - [ ] Modelar `FamilyId`, geração, sucessor e revogação sem expor handles em claro.
 - [ ] Definir na matriz a nova operação atômica de rotação e seus outcomes: sucesso, retry idempotente,
   replay/família revogada, conflito e ausência.
@@ -613,6 +656,9 @@ atômica.
 - [ ] Responder replay e família revogada com `invalid_grant` pela baseline OAuth 2.1, sem recriar writer/helper.
 - [ ] Refatorar criação/persistência para não gravar access/identity/refresh tokens antes de vencer a rotação.
 - [ ] Preservar downscoping, audiences, claims mode, expiração absoluta/sliding e revogação por subject.
+- [ ] Atualizar `ClientSecurityAssessment` para que public clients com refresh token deixem de receber o finding
+  `RFC9700-2.2.2-PUBLIC-REFRESH-REPLAY` quando a rotação com detecção de família estiver garantida pelo runtime;
+  adicionar regressão que impeça o finding `NonCompliant` de sobreviver como falso positivo.
 - [ ] Criar migrations incrementais SQLite/PostgreSQL e atualizar cleanup/purge.
 - [ ] Adicionar contratos sequenciais, concorrentes e de crash/retry nos dois providers.
 - [ ] Criar `Tests.Storage/Storage/Contracts/RefreshTokenFamilyStoreContractTests.cs` e
@@ -623,7 +669,8 @@ atômica.
 sucessores distintos; retry tolerado retorna o mesmo refresh handle sucessor; replay real revoga a família;
 tokens de família revogada falham; nenhum caminho aceita reutilização ilimitada; regras atuais de claims/resources
 continuam verdes; o default do client sobrevive à materialização Configuration; erros de replay usam a baseline
-OAuth 2.1; cada filtro obrigatório seleciona ao menos um teste.
+OAuth 2.1; o assessment não mantém falso `NonCompliant` para public clients depois da rotação; cada filtro
+obrigatório seleciona ao menos um teste.
 
 **Testes:**
 
@@ -684,7 +731,9 @@ suporte real e limitar o assessment ao que os modelos conseguem provar.
   `ForwardedHeadersOptions.AllowedHosts` e trusted proxies/networks necessários ao host; diagnosticar o uso de
   `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` sem uma fronteira de rede equivalente e não alegar que
   `ClientSecurityAssessment` prova o deployment.
-- [ ] Atualizar findings de client authentication assimétrica e sender constraint como recomendações.
+- [ ] Revalidar os findings de client authentication assimétrica e sender constraint contra os evaluators reais:
+  preservar `X509CertificateBase64`/JWK como `private_key_jwt`, `X509Thumbprint`/`X509Name` como mTLS, manter ambos
+  como recomendações e decidir nominalmente o tratamento administrativo de DPoP diferido para public clients.
 - [ ] Criar `Tests.Integration/Security/BrowserSecurityHeadersTests.cs`,
   `Tests.Integration/Security/SensitiveLoggingTests.cs` e
   `Tests.Integration/Endpoints/AuthorizationEndpointCorsTests.cs`; estender
@@ -721,7 +770,7 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~Rfc9700BoundaryTests
 
 ## Fase 6 - Handoff administrativo, aceites e fechamento
 
-**Depende de:** Fases 1-5, DF1-DF22 e baseline concluída de `plan-replay-protection.md`.
+**Depende de:** Fases 1-5, DF1-DF23 e baseline concluída de `plan-replay-protection.md`.
 
 **Escopo:** testes amplos, documentação pública, roadmap/backlog, READMEs de hosts,
 `plan-data-storage-matrix.md`, referências do futuro Admin.
@@ -769,11 +818,11 @@ dotnet test RoyalIdentity.sln
 
 | Objetivo | Fase(s) | Decisão(es) | Critério(s) de aceite | Teste(s) |
 |---|---|---|---|---|
-| Defaults/runtime RFC 9700 | 2-5 | DF7-DF15, DF18-DF22 | redirects, PKCE, front-channel, refresh e HTTP seguros | classes nomeadas Identity/Integration/Storage |
+| Defaults/runtime RFC 9700 | 2-5 | DF7-DF15, DF18-DF23 | redirects, PKCE, front-channel, refresh e HTTP seguros | classes nomeadas Identity/Integration/Storage |
 | Assessment puro | 1 | DF1-DF6, DF21 | determinístico, sem DI/I/O/persistência | `ClientSecurityAssessmentTests` |
 | Findings estáveis | 1, 6 | DF5, DF16 | RuleIds únicos e documentados | unitários + auditoria Fase 6 |
 | Redirect configurável | 2 | DF7-DF9, DF20-DF21 | Ordinal/sem wildcard; Server/Realm v1 fail-closed | `RedirectUriValidationTests`; `RedirectUriPolicyTests`; payload |
-| Replay de refresh | 4 | DF13, DF18, DF21 + resposta Q1 | sucessor único; família revogada; default Configuration | `RefreshTokenFamilyStoreContractTests`; `RefreshTokenRotationTests` |
+| Replay de refresh | 4 | DF13, DF18, DF21, DF23 | sucessor único; família revogada; default Configuration | `RefreshTokenFamilyStoreContractTests`; `RefreshTokenRotationTests` |
 | Handoff ao Admin | 6 | DF16 | contrato/documentação e links, sem snapshot | revisão documental + solução |
 | Framing com exceção protocolar | 5 | DF10, DF19 | páginas sensíveis bloqueadas; OP iframe frameable | CheckSessionEndpoint + browser/header tests |
 | Metadata PKCE fiel | 1, 3, 5 | DF6, DF14, DF22 | `S256`/`plain` refletem runtime; plain opt-in gera finding | Assessment + AuthorizationCodeOnly + Discovery |
@@ -826,18 +875,18 @@ dotnet test RoyalIdentity.sln
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Assessment promete mais que consegue provar | UI chama `Compliant` de “deployment certificado” | falsa segurança | DF6; texto explícito e diagnóstico de host separado | Aberto |
+| Assessment promete mais que consegue provar | UI chama `Compliant` de “deployment certificado” | falsa segurança | DF6; texto explícito e diagnóstico de host separado | Mitigado na Fase 1 |
 | Relaxamento de redirect vira open redirect | wildcard amplo ou ignore-case habilitado | exfiltração de code | validação de pattern, finding alto e default seguro | Aberto |
 | Remoção de implicit/hybrid deixa código morto | response handlers/constants sem consumers | superfície confusa e manutenção incorreta | busca de callers + architecture/integration tests | Aberto |
 | Retry de refresh cria dois sucessores | duas requests vencem operações separadas | família bifurcada e replay aceito | decisão transacional única + contract concorrente | Aberto |
 | Revogação perde corrida com sucessor | replay e rotação chegam juntos | token da família permanece ativo | estado de família verificado/movido na mesma transação | Aberto |
 | Mudança de factory persiste token antes de vencer | token factory grava durante construção | credencial órfã/emitida ao perdedor | separar construção e persistência; teste de falha | Aberto |
-| RuleId muda após integração Admin | rename sem coordenação | localização/UX quebradas | constantes estáveis + documentação + testes de unicidade | Aberto |
+| RuleId muda após integração Admin | rename sem coordenação | localização/UX quebradas | constantes estáveis + documentação + testes de unicidade | Mitigado na Fase 1 |
 | Hardening duplica replay protection concluída | novo cache/check-add contorna `IReplayProtectionStore` | duas semânticas de replay e backing inconsistente | DF17 + guards existentes do plano concluído | Aberto |
 | Fase 3 duplica a taxonomia OAuth 2.1 | helpers/códigos são recriados no hardening | contratos divergentes para o mesmo erro | DF18; consumir o plano de erros concluído | Aberto |
 | Hardening bloqueia o OP iframe | regra global trata todo resultado browser-facing igualmente | Session Management anunciado deixa de funcionar | DF19 + regressão `CheckSessionEndpointTests` | Aberto |
 | Payload pré-release parte da baseline errada | executor ignora Debt Closure/Localization ou ADR-020 | perda de options ou bump indevido | DF20 + gate Server/Realm v1 | Aberto |
-| Filtro amplo mascara teste ausente | OR ou nome incidental seleciona outra fixture | fase fecha sem provar o hardening | DF21 + classes/comandos separados | Aberto |
+| Filtro amplo mascara teste ausente | OR ou nome incidental seleciona outra fixture | fase fecha sem provar o hardening | DF21 + classes/comandos separados | Mitigado na Fase 1; revalidar por fase |
 | Metadata omite capacidade PKCE ativa | `plain` continua runtime, mas some de discovery | metadata deixa de representar o servidor | DF22 + teste exato de metadata/runtime | Aberto |
 
 ---

@@ -92,9 +92,9 @@ definida em `../analisys/`.
 
 ## Execução atual
 
-Não há plano de implementação em execução. A próxima execução é
-[plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
-“Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
+O plano em execução é [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md): 1/6 fases
+concluída, com a Fase 2 como próxima. Ele está ligado ao item “Aderência RFC 9700 e assessment de clients” do
+[backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
 executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), que depende da remoção
 do front-channel legado e da rotação final de refresh token. Depois, executar
 [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md): o PAR consome a baseline final de
@@ -244,7 +244,8 @@ realm, claims localizados e conteúdo multilíngue cadastrado pelo tenant perman
 ### 3. Aderência e hardening OAuth 2.0 conforme RFC 9700
 
 **Plano criado:** [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md)
-(RASCUNHO — 0/6 fases)
+(EM EXECUÇÃO — 1/6 fases; Fase 1 entregou o assessment puro e a Fase 2 é a próxima; Q1 fechada pela opção A,
+tolerância default de refresh token de 30 segundos)
 
 **Backlog relacionado:** item “Aderência RFC 9700 e assessment de clients” em
 [backlog-001.md](../backlogs/backlog-001.md).
@@ -429,7 +430,7 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 5. ~~Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).~~ CONCLUÍDO.
 6. ~~Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).~~ CONCLUÍDO.
 7. ~~Executar [plan-localization.md](plan-localization.md).~~ CONCLUÍDO.
-8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — PRÓXIMA EXECUÇÃO.
+8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — EM EXECUÇÃO (1/6).
 9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.
 10. Executar [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md), após fechar Q1/Q2/Q3.
 11. Evoluir administração de sessões por dispositivo.

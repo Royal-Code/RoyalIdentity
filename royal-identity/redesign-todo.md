@@ -102,6 +102,10 @@ UI composta realmente entrega. Overrides por tenant, claims localizados, conteú
 tenant e a futura UI administrativa permanecem capacidades distintas, rastreadas no plano/roadmap e não como
 dívida deste redesign.
 
-## RFC 9700 (PLANEJADO)
+## RFC 9700 (EM EXECUÇÃO — 1/6)
 
 Avaliar se a implementação atual está de acordo com **rfc9700**.
+
+**Estado atual:** `.ai/plans/plan-rfc9700-security-hardening.md` está em execução. A Fase 1 entregou o
+`ClientSecurityAssessment` puro e os `RuleId` estáveis; a Fase 2, de redirect URIs seguros, é a próxima. A Q1 foi
+fechada pela opção A: a Fase 4 aplicará tolerância default de 30 segundos ao retry de refresh token.
