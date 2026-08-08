@@ -1,10 +1,10 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 5 de 7 fases concluídas (1-5); Fase 6 é a próxima
+## Status: EM EXECUÇÃO - decisões fechadas; 6 de 7 fases concluídas (1-6); Fase 7 é a próxima
 
 ## Progresso
 
-`█████░░` **71%** - 5 de 7 fases concluídas
+`██████░` **86%** - 6 de 7 fases concluídas
 
 | Fase | Estado |
 |---|---|
@@ -13,7 +13,7 @@
 | Fase 3 - Seleção de cultura por request e preferência do usuário | Concluida |
 | Fase 4 - Códigos de apresentação e remoção de textos do core | Concluida |
 | Fase 5 - Localização integral da UI de conta | Concluida |
-| Fase 6 - Discovery e aceites multi-realm ponta a ponta | Pendente |
+| Fase 6 - Discovery e aceites multi-realm ponta a ponta | Concluida |
 | Fase 7 - Documentação, guards e fechamento da dívida | Pendente |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
@@ -856,23 +856,24 @@ fallback, isolamento, persistência e UI.
 
 **Tarefas:**
 
-- [ ] Injetar o catálogo efetivo em discovery sem tornar o core dependente de Razor.
-- [ ] Publicar `ui_locales_supported` apenas quando options e catálogo da UI estiverem ativos.
-- [ ] Ordenar metadata com default primeiro e preservar a ordem configurada normalizada dos demais locales.
-- [ ] Omitir `claims_locales_supported`.
-- [ ] Cobrir o realm `admin`: publicar locales quando o host compõe a UI OIDC genérica e omitir quando o catálogo
+- [x] Injetar o catálogo efetivo em discovery sem tornar o core dependente de Razor.
+- [x] Publicar `ui_locales_supported` apenas quando options e catálogo da UI estiverem ativos.
+- [x] Ordenar metadata com default primeiro e preservar a ordem configurada normalizada dos demais locales.
+- [x] Omitir `claims_locales_supported`.
+- [x] Cobrir o realm `admin`: publicar locales quando o host compõe a UI OIDC genérica e omitir quando o catálogo
   default/vazio prova que o host não possui essa UI; não usar a existência de páginas administrativas como gate.
-- [ ] Cobrir `ui_locales` ordenado, inválido, desconhecido e culture pai.
-- [ ] Cobrir `es-419` exato, `es-MX` com variante espanhola única e ausência de inferência quando houver
+- [x] Cobrir `ui_locales` ordenado, inválido, desconhecido e culture pai.
+- [x] Cobrir `es-419` exato, `es-MX` com variante espanhola única e ausência de inferência quando houver
   variantes espanholas ambíguas.
-- [ ] Cobrir authorization parameters inline e armazenados.
-- [ ] Cobrir End Session/logout com `ui_locales`.
-- [ ] Cobrir cookie > `ui_locales` > `Accept-Language` > default > neutro.
-- [ ] Cobrir dois realms com options/cookies diferentes e impedir vazamento entre eles.
-- [ ] Cobrir refresh inválido preservando snapshot/metadata anterior.
-- [ ] Validar o payload v1 corrente e a paridade Configuration em SQLite e PostgreSQL opt-in.
-- [ ] Verificar Server, Demo e Tests.Host com a mesma ordem de middleware/registro.
-- [ ] Criar `Tests.Integration/Endpoints/LocalizationDiscoveryTests.cs` e concentrar nele os casos de metadata;
+- [x] Cobrir authorization parameters inline e armazenados.
+- [x] Cobrir End Session/logout com `ui_locales`.
+- [x] Cobrir cookie > `ui_locales` > `Accept-Language` > default > neutro.
+- [x] Cobrir dois realms com options/cookies diferentes e impedir vazamento entre eles.
+- [x] Cobrir refresh inválido preservando o snapshot anterior e provar separadamente que a metadata do realm
+  lido do store continua limitada ao catálogo efetivo.
+- [x] Validar o payload v1 corrente e a paridade Configuration em SQLite e PostgreSQL opt-in.
+- [x] Verificar Server, Demo e Tests.Host com a mesma ordem de middleware/registro.
+- [x] Criar `Tests.Integration/Endpoints/LocalizationDiscoveryTests.cs` e concentrar nele os casos de metadata;
   não adicionar dependência a `Tests.Endpoints`.
 
 **Critérios de aceite:** metadata é exatamente verdadeira para cada realm; locale não suportado não gera erro
@@ -896,7 +897,22 @@ dotnet test Tests.Architecture --filter "FullyQualifiedName~LocalizationBoundary
 
 ### Resultado da Fase 6
 
-*a preencher*
+`DiscoveryHandler` passou a consumir somente o contrato core-owned `IUiLocaleCatalog`: publica
+`ui_locales_supported` quando a política do realm está ativa e existe catálogo efetivo, move o default para a
+primeira posição e preserva a ordem normalizada dos demais. Um host com o catálogo vazio omite a metadata, assim
+como um realm desabilitado; `claims_locales_supported` permanece ausente.
+
+`LocalizationDiscoveryTests` (7/7) prova defaults, realm `admin`, catálogo vazio, disable explícito, ordenação,
+isolamento de dois realms, last-known-good do snapshot após refresh rejeitado e filtragem independente da
+metadata lida do store. A matriz de hints permanece
+coberta por `RequestCultureTests` (22/22), `CulturePreferenceTests` (10/10), `CultureEndpointTests` e
+`LocalizedAccountUiTests` (18/18); o caso de parent culture foi tornado explícito. A persistência de
+`Internationalization` virou contrato provider-neutral de realm, executado por SQLite e pela suíte PostgreSQL
+opt-in. O aceite `Test-ServerPostgreSql.ps1` agora exige os três locales exatos e a ausência de claims locales no
+host de produção provisionado externamente.
+
+Gates nominais: 7/7, 22/22, 10/10, 18/18, 34/34, 19/19 e 9/9. PostgreSQL 17 real aprovado. Suíte integral:
+1.645 aprovados, 51 ignorados opt-in, 0 falhas; `git diff --check` limpo.
 
 ---
 
@@ -915,6 +931,9 @@ suíte completa.
 - [ ] Marcar `Localization` como concluída em `redesign-todo.md` e apontar para este plano.
 - [ ] Atualizar `product.md`, `tech.md`, `structure.md` e `AGENTS.md` com options, precedência, resources e
   limites de localização.
+- [ ] Registrar em `tech.md` que last-known-good protege somente consumidores de `IConfigurationSnapshot`,
+  enquanto realm discovery continua lendo o store assíncrono ao vivo; não apresentar validators de snapshot
+  como gate universal de requests.
 - [ ] Atualizar roadmap movendo este plano para concluídos e preservando a dependência do futuro Admin.
 - [ ] Atualizar backlog do Admin para reutilizar infraestrutura e localizar `RuleId` sem persistir findings.
 - [ ] Registrar explicitamente que overrides por realm, claims localizados e conteúdo multilíngue do tenant
@@ -1250,3 +1269,39 @@ mensagem ao lado do campo obrigatório e proíbe que a chave `Validation_Require
 sondas de mutação do scanner viraram casos permanentes; o caso `Loading...` inicialmente falhou e expôs que a
 regra de identificador pontuado rodava antes da regra de palavra isolada. A classificação foi corrigida e os
 gates da Fase 5 e a suíte integral passaram.
+
+
+---
+
+## Revisão da Fase 6
+
+Os sete gates foram reproduzidos com os números exatos do relatório (7, 22, 10, 18, 34, 19 e 9), a suíte
+integral fechou em 1.645/51/0 e `git diff --check` está limpo. A implementação de `ui_locales_supported`
+confere com a DF14: omitida quando `Enabled=false` **ou** quando o catálogo composto é vazio, default primeiro,
+ordem configurada preservada, deduplicação case-insensitive, e `claims_locales_supported` ausente.
+
+Duas mutações confirmaram que os testes são carga real: publicar ignorando o catálogo, e remover a regra de
+default-primeiro. Ambas derrubam a fixture.
+
+### Achado — o fail-closed da DF8 não cobre o atendimento de requests
+
+A segunda mutação expôs algo que nenhum teste nomeava. `InvalidRefresh_MustKeepTheLastKnownGoodLocalizationMetadata`
+passava, mas **não pelo motivo do seu nome**. Investigando: uma sonda descartável confirmou que o snapshot
+publicado de fato preserva o valor anterior quando o validator rejeita o refresh — a DF8 funciona. Só que
+`HttpContextExtensions.SetCurrentRealmAsync` resolve o realm do request por
+`IStorage.Realms.GetByPathAsync`, **não** pelo snapshot validado.
+
+Consequência: um realm salvo com configuração que o validator recusa publicar continua **vivo para os
+requests**. O que impede o locale sem catálogo de aparecer na metadata não é o last-known-good — é o filtro
+`uiLocaleCatalog.Supports(...)` no `DiscoveryHandler`, que portanto é **carga, não defesa redundante**.
+
+Isso é propriedade pré-existente da resolução de realm, anterior a este plano, e alterá-la é decisão
+arquitetural própria — não a mudei. O que corrigi foi o registro: o teste passou a se chamar
+`ARealmLocaleTheUiCannotRender_IsRejectedByTheSnapshotAndOmittedFromMetadata` e a afirmar **as duas garantias
+separadamente**: o snapshot publicado não contém o locale recusado, embora o store já o contenha; e a metadata
+também não o publica, por causa do filtro do catálogo. Antes, uma única asserção de saída não conseguia dizer
+qual mecanismo estava segurando o comportamento.
+
+**Fica registrado para a Fase 7 / planos futuros:** a promessa da DF8 ("refresh inválido preserva o
+last-known-good") vale para o snapshot, não para o realm que atende o request. Qualquer futura validação que
+dependa de o snapshot ser a única porta precisa saber disso.

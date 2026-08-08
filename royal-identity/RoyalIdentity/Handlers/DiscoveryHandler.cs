@@ -2,6 +2,7 @@
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
+using RoyalIdentity.Contracts.Localization;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Options;
@@ -16,6 +17,7 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
     private readonly IStorage storage;
     private readonly IClientSecretChecker clientSecretChecker;
     private readonly IExtensionsGrantsProvider extensionGrantsProvider;
+    private readonly IUiLocaleCatalog uiLocaleCatalog;
     private readonly ILogger logger;
 
     public DiscoveryHandler(
@@ -23,12 +25,14 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         IStorage storage,
         IClientSecretChecker clientSecretChecker,
         IExtensionsGrantsProvider extensionGrantsProvider,
+        IUiLocaleCatalog uiLocaleCatalog,
         ILogger<DiscoveryHandler> logger)
     {
         this.keys = keys;
         this.storage = storage;
         this.clientSecretChecker = clientSecretChecker;
         this.extensionGrantsProvider = extensionGrantsProvider;
+        this.uiLocaleCatalog = uiLocaleCatalog;
         this.logger = logger;
     }
 
@@ -203,6 +207,8 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         entries.Add(Oidc.Discovery.SubjectTypesSupported, options.Discovery.SupportedSubjectTypes.ToArray());
         entries.Add(Oidc.Discovery.CodeChallengeMethodsSupported, options.Discovery.CodeChallengeMethodsSupported.ToArray());
 
+        AddUiLocalesSupported(entries, options.Internationalization);
+
         if (options.Endpoints.EnableAuthorizeEndpoint)
         {
             entries.Add(Oidc.Discovery.RequestParameterSupported, true);
@@ -243,6 +249,32 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         }
 
         context.Response = new DiscoveryResponse(entries);
+    }
+
+    private void AddUiLocalesSupported(
+        IDictionary<string, object> entries,
+        InternationalizationOptions options)
+    {
+        if (!options.Enabled || uiLocaleCatalog.NeutralLocale is null)
+            return;
+
+        List<string> locales = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+        AddIfAvailable(options.DefaultLocale);
+        foreach (var locale in options.SupportedLocales)
+            AddIfAvailable(locale);
+
+        if (locales.Count is not 0)
+            entries.Add(Oidc.Discovery.UILocalesSupported, locales.ToArray());
+
+        return;
+
+        void AddIfAvailable(string locale)
+        {
+            if (uiLocaleCatalog.Supports(locale) && seen.Add(locale))
+                locales.Add(locale);
+        }
     }
 
     private async Task<string[]> GetProtectedResourcesPublishedInDiscoveryAsync(

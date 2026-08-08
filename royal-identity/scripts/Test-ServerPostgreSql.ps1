@@ -246,6 +246,16 @@ try {
         if ([string]::IsNullOrWhiteSpace($discovery.authorization_endpoint)) {
             throw "OIDC discovery did not return an authorization endpoint."
         }
+        $expectedUiLocales = @("en", "pt-BR", "es-419")
+        $actualUiLocales = @($discovery.ui_locales_supported)
+        if (($actualUiLocales -join "|") -ne ($expectedUiLocales -join "|")) {
+            throw (
+                "OIDC discovery did not preserve the PostgreSQL-backed realm locale policy. " +
+                "Expected '$($expectedUiLocales -join ',')', got '$($actualUiLocales -join ',')'.")
+        }
+        if ($discovery.PSObject.Properties.Name -contains "claims_locales_supported") {
+            throw "OIDC discovery announced localized claims that the product does not implement."
+        }
 
         $verifierBytes = [byte[]]::new(32)
         $random = [Security.Cryptography.RandomNumberGenerator]::Create()

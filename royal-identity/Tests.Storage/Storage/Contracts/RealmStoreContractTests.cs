@@ -107,7 +107,31 @@ public abstract class RealmStoreContractTests : StorageContractTests
         Assert.NotNull(survivingCode);
     }
 
-    // RL-05 + DF24: enumeration is a set — saved realms must appear; no order is contractual.
+    // plan-localization Fase 6: RealmOptions is a provider-owned JSON payload. This contract runs unchanged
+    // against SQLite and the opt-in PostgreSQL suite, so locale order, default and the enabled flag cannot
+    // diverge between providers even though the columns themselves remain provider-neutral.
+    [Fact]
+    public async Task Save_Realm_RoundTripsInternationalizationConfiguration()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var realm = await harness.CreateRealmAsync("localization-options");
+        realm.Options.Internationalization.Enabled = false;
+        realm.Options.Internationalization.DefaultLocale = "pt-BR";
+        realm.Options.Internationalization.SupportedLocales.Clear();
+        realm.Options.Internationalization.SupportedLocales.AddRange(["pt-BR", "es-419", "en"]);
+
+        await harness.Storage.Realms.SaveAsync(realm);
+
+        var restored = await harness.Storage.Realms.GetByIdAsync(realm.Id, default);
+        Assert.NotNull(restored);
+        Assert.False(restored.Options.Internationalization.Enabled);
+        Assert.Equal("pt-BR", restored.Options.Internationalization.DefaultLocale);
+        Assert.Equal(
+            ["pt-BR", "es-419", "en"],
+            restored.Options.Internationalization.SupportedLocales);
+    }
+
+    // RL-05 + DF24: enumeration is a set; saved realms must appear, but no order is contractual.
     [Fact]
     public async Task GetAll_ContainsSavedRealms()
     {

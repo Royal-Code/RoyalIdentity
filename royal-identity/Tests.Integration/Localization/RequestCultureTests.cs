@@ -35,8 +35,8 @@ public class RequestCultureTests : IClassFixture<PersistentStorageAppFactory>
     [InlineData("es-419", new[] { "en", "pt-BR", "es-419" }, "es-419")]
     // Casing is normalized, not rejected.
     [InlineData("PT-br", new[] { "en", "pt-BR", "es-419" }, "pt-BR")]
-    // Parent culture: pt-BR is offered, the request asked for the parent's other child.
-    [InlineData("pt", new[] { "en", "pt" }, "pt")]
+    // Parent culture: the request's neutral parent is offered.
+    [InlineData("es-MX", new[] { "en", "es" }, "es")]
     // DF20: a single offered variant of the same language is an acceptable answer for es-MX.
     [InlineData("es-MX", new[] { "en", "es-419" }, "es-419")]
     // ...but two candidates are ambiguous, and inventing one is worse than falling through.
