@@ -196,11 +196,18 @@ production Server. The former `RoyalIdentity.Storage.InMemory` fake was removed 
 
 ## UI (Current State)
 
-- Built in Razor Components (Blazor Server mode)
-- Covers full authentication flows: login, logout, consent
-- Admin screens planned: users, clients, realm configuration
-- Current known design debt: too much logic inside Razor components — should be extracted into `UILoginService`, `UIConsentService`, etc.
-- Localization: all text currently hardcoded in English; localization support is planned but not implemented
+- Built with Razor Components using static server rendering for the account flows.
+- Covers login, logout, consent, domain selection, profile and protocol error presentation through dedicated
+  presentation services; components do not own protocol/business orchestration.
+- Product UI text, validation and accessibility labels use RESX catalogues through `IStringLocalizer<T>` in
+  `en`, `pt-BR` and Latin-American Spanish (`es-419`).
+- Localization policy is realm-scoped in `RealmOptions.Internationalization`. New realms enable it by default;
+  the effective order is explicit realm cookie, OIDC `ui_locales`, `Accept-Language`, realm default, then the
+  neutral product catalogue.
+- Discovery publishes `ui_locales_supported` only for locales present in both the realm policy and the composed
+  UI catalogue. Protocol strings, OAuth/OIDC errors and tenant-provided names/descriptions are not translated.
+- Admin screens remain planned for users, clients and realm configuration. They must reuse the localization
+  infrastructure with Admin-owned resources rather than persist translated text in domain/configuration models.
 
 ---
 
@@ -215,9 +222,9 @@ production Server. The former `RoyalIdentity.Storage.InMemory` fake was removed 
 
 ## Known Pending Redesigns (Active Design Debt)
 
-From redesign-todo.md and `[Redesign]` attributes in code:
-
-1. **Localization**: Add localization support for all UI text.
+The legacy redesign items for Realm, Resources, Users, UI Services and Localization are complete. Deferred
+capabilities such as the Admin UI, tenant-authored multilingual content and persistence of the resource catalogue
+belong to their own backlog/plans; they are not unfinished parts of those redesigns.
 
 The scope/resource domain redesign is complete. Persistence of its realm-scoped catalog remains deferred, but is
 storage work rather than another redesign of `AllowedScopes` or `AllowOfflineAccess`.

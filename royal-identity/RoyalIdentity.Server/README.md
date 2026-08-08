@@ -72,6 +72,18 @@ that saw it first receives, which in a replicated deployment lets most of them t
 `replay_handles` is cleaned by the same Operational maintenance as every other expired record, so the cleanup mode
 above already covers it.
 
+## Localization
+
+The Server composes the shared OIDC account UI and its RESX catalogues for `en`, `pt-BR` and `es-419`.
+Localization is realm configuration persisted in Configuration storage, not an `appsettings.json` switch:
+`RealmOptions.Internationalization` controls whether negotiation is enabled, the ordered offered locales and the
+default. Discovery publishes `ui_locales_supported` only for locales that are both configured and shipped by the
+composed UI; it does not advertise localized claims.
+
+The Product seed gives new realms the product defaults (`en`, `pt-BR`, `es-419`, default `en`). Future Admin
+screens may edit that policy, but must not store translated product text in realm/client records. Runtime
+translation overrides and tenant-authored multilingual content remain deferred capabilities.
+
 ### How long a client assertion may live
 
 `Authentication.ClientAssertionMaxLifetime` caps how far ahead of the server's own clock an assertion may claim to

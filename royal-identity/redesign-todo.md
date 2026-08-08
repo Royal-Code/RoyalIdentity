@@ -87,7 +87,7 @@ Precisa unificar o usuário e revisar a sessão e o login.
 ViewModels movidos para `RoyalIdentity.Razor/ViewModels/`.
 Componentes Razor agora apenas exibem dados.
 
-## Localization
+## Localization (CONCLUÍDO)
 
 Adicionar a funcionalidade de localização.
 
@@ -95,7 +95,12 @@ Todos os textos e labels estão fixos no código em inglês.
 
 Deverá ser possível adicionar arquivos de localização para cada idioma.
 
-**Aberto:** implementação planejada em `.ai/plans/plan-localization.md`.
+**Estado final:** concluído por `.ai/plans/plan-localization.md`. A UI de conta usa catálogos RESX em `en`,
+`pt-BR` e `es-419`; a política é realm-scoped em `RealmOptions.Internationalization`; a seleção respeita cookie,
+`ui_locales`, `Accept-Language`, default do realm e catálogo neutro; discovery publica somente os locales que a
+UI composta realmente entrega. Overrides por tenant, claims localizados, conteúdo multilíngue configurado pelo
+tenant e a futura UI administrativa permanecem capacidades distintas, rastreadas no plano/roadmap e não como
+dívida deste redesign.
 
 ## RFC 9700 (PLANEJADO)
 

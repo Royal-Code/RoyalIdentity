@@ -19,6 +19,11 @@ it — and it is **not** a production configuration: a replicated deployment mus
 `AddOperationalReplayProtection()`, which the Server does. The in-memory backing logs a warning saying so when it
 starts.
 
+The seeded demo realm enables localization with `en`, `pt-BR` and `es-419` (default `en`). The account UI can
+select the language from its realm-scoped preference, OIDC `ui_locales` or the browser's `Accept-Language`, and
+discovery advertises the effective UI catalogue. Because the Demo database is ephemeral, any runtime realm
+configuration disappears when the process stops.
+
 ASP.NET Core may log `No XML encryptor configured` while creating this process-local Data Protection key ring.
 That warning is expected in the Demo: the ring lives in its private temporary directory, is shared only by the
 provisioner and runtime of that process, and is deleted when the Demo stops. It is not a production configuration.

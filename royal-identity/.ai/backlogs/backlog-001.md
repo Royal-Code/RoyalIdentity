@@ -78,10 +78,14 @@ constante. O CRUD de clients/realm deve consumir `ClientSecurityAssessment` conf
 **Deferral:** O realm `admin` existe como constante mas não tem páginas. Depende da API administrativa e de decisões de UX sobre o painel.
 **Quando revisitar:** Junto com a API administrativa.
 **Relações:** item “API e UI Administrativa” de [plans-roadmap-02.md](../plans/plans-roadmap-02.md) e
-[plan-rfc9700-security-hardening.md](../plans/plan-rfc9700-security-hardening.md).
+[plan-rfc9700-security-hardening.md](../plans/plan-rfc9700-security-hardening.md). A infraestrutura de recursos,
+negociação e validação localizada já foi entregue por
+[plan-localization.md](../plans/plan-localization.md); o Admin deve estendê-la com catálogos próprios.
 **Nota de design:** Nas telas de client, calcular o assessment em tempo real; mostrar
 `Compliant`/`Warning`/`NonCompliant`, localizar mensagens por `RuleId` e destacar opções de redirect relaxadas
-como inseguras/não aderentes. Não criar tabela, snapshot ou campo persistido para assessment/findings.
+como inseguras/não aderentes. Resolver cada `RuleId` por `IStringLocalizer<T>`/recurso do Admin; não armazenar
+frases traduzidas em `Client`, `Realm`, assessment ou finding. Não criar tabela, snapshot ou campo persistido para
+assessment/findings.
 
 ---
 

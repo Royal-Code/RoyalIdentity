@@ -254,6 +254,8 @@ scoped services have request lifetime, not circuit lifetime.
 - Page services consume core ports/pipelines; components do not reach into persistence adapters.
 - Presentation messages are resolved at the UI boundary. OAuth/OIDC error codes and protocol descriptions remain
   protocol values and are not translated.
+- The core owns only the `IUiLocaleCatalog` capability contract and locale policy/matching. RESX catalogues,
+  marker types and presentable message codes belong to `RoyalIdentity.Razor/Localization/` and `Resources/`.
 - Tenant-provided names/descriptions are data, not localization resources, and remain normally encoded.
 - HTML/markup stays in components; resource files contain text and placeholders only.
 
@@ -276,6 +278,8 @@ Configuration belongs to the narrowest owner that can enforce it:
 
 - server-wide hosting/protocol defaults belong to `ServerOptions`;
 - realm-specific protocol/UI policy belongs to `RealmOptions` or a feature options object composed by it;
+- ordered locale policy belongs to `RealmOptions.Internationalization`; shipped translations belong to the
+  composed UI catalogue and are not configuration data;
 - rich account policy belongs to the `UserAccounts` module options, not core `AccountOptions`;
 - provider configuration belongs to composition roots/provider projects.
 

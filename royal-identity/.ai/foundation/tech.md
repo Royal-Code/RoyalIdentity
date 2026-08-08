@@ -29,7 +29,8 @@
 ### Testing
 
 - xUnit (all test projects)
-- In-memory storage (no external DB or services required for any test)
+- Default suites use isolated SQLite/EF and require no external service; PostgreSQL 17, Aspire and browser
+  acceptances are explicit opt-in gates.
 
 ---
 
@@ -107,6 +108,32 @@ Pipelines are registered per context type as `IContextPipeline<TContext>` in the
 - Extracts the realm path segment from the route
 - Loads `Realm` + `RealmOptions` from `IStorage.GetRealmStore()`
 - Stores current realm in `HttpContext` items under `Server.RealmCurrentKey`
+
+### Realm-scoped localization
+
+`RealmOptions.Internationalization` owns whether localization negotiation is enabled, the ordered supported
+locales and the realm default. New realms default to `en`, `pt-BR` and `es-419`. `LanguageTag` supplies the shared
+validation/canonicalization gate, and `LocaleMatcher` never invents a match when sibling variants are ambiguous.
+
+`RoyalIdentity` owns the presentation-independent `IUiLocaleCatalog` contract and an empty default.
+`RoyalIdentity.Razor` composes the effective RESX catalogue and resolves all product UI text through
+`IStringLocalizer<T>`. Request culture runs after realm discovery and before authentication/rendering, with this
+precedence: realm-scoped preference cookie, OIDC `ui_locales` (inline, stored authorization parameters or logout
+message), `Accept-Language`, realm default, then neutral catalogue. Unknown hints are ignored, never protocol
+errors. Product resources contain text/placeholders only; protocol strings and tenant-provided data are not
+localized.
+
+Discovery consumes only `IUiLocaleCatalog`, so the core never references Razor. It publishes
+`ui_locales_supported` as the intersection of the realm policy and the composed catalogue, with the default
+first, and does not publish `claims_locales_supported`.
+
+Snapshot validation and request reads have deliberately different scopes. `IConfigurationSnapshotValidator`
+runs before `IConfigurationSnapshot.Publish`; failed refresh keeps last-known-good for consumers of
+`IConfigurationSnapshot`. Realm discovery is an asynchronous live-store consumer and continues to materialize
+the current realm through `IStorage.Realms`, as established by the Configuration storage design. Therefore a
+snapshot validator is not a universal request gate. Localization remains safe on that live path through catalogue
+filtering in discovery and neutral-catalogue fallback in request culture. Any future change that wants snapshot
+semantics for all requests is a Configuration architecture decision, not a localization shortcut.
 
 ### Authentication Scheme
 
@@ -288,7 +315,8 @@ ServerOptions
     ├── MutualTlsOptions
     ├── UIOptions (paths: LoginPath, LogoutPath, ConsentPath, etc.)
     ├── LoggingOptions
-    └── AccountOptions (IdP account-flow/UI settings only)
+    ├── AccountOptions (IdP account-flow/UI settings only)
+    └── InternationalizationOptions (realm locale policy and ordered supported locales)
 ```
 
 `RealmOptions` contains a `ServerOptions` reference for server-wide defaults. Realm-level settings override server defaults. `EndpointContextBase.Options` exposes `RealmOptions`; `EndpointContextBase.ServerOptions` exposes the root `ServerOptions`.

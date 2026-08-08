@@ -82,12 +82,17 @@ definida em `../analisys/`.
   endpoint/discovery HTTPS, iframe Web Crypto frameable e aceites Node/Chromium cross-site. O fechamento adicionou
   documentação operacional e a distribuição AGPLv3 + Apache-2.0 com notice, 80 candidatos de proveniência
   classificados e gate reproduzível.
+- [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) — CONCLUÍDO (2026-08-06), 5/5 fases.
+  Removeu marcadores e superfícies protocolares inativas, preservou payloads pre-release v1, fechou `acr_values`
+  como preferência ordenada e atribuiu cada capacidade diferida a um backlog/plano nominal.
+- [plan-localization.md](plan-localization.md) — CONCLUÍDO (2026-08-07), 7/7 fases. Entregou política
+  `Internationalization` realm-scoped, catálogos RESX `en`/`pt-BR`/`es-419`, seleção determinística de cultura,
+  UI de conta e validação integralmente localizadas, metadata fiel, isolamento multi-realm e contratos de
+  persistência/aceites SQLite e PostgreSQL.
 
 ## Execução atual
 
-[plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md) foi concluído em 2026-08-06, com 5/5 fases.
-[plan-localization.md](plan-localization.md) está em execução: Fases 1-6 concluídas; Fase 7 é a próxima. Ele mantém
-v1 ao adicionar as options de realm e fecha a última dívida antiga de `redesign-todo.md`. Depois vem
+Não há plano de implementação em execução. A próxima execução é
 [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md), ligado ao item
 “Aderência RFC 9700 e assessment de clients” do [backlog-001.md](../backlogs/backlog-001.md). Após o hardening,
 executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), que depende da remoção
@@ -207,7 +212,7 @@ resources/scopes continuará reservada para um futuro `plan-data-resource-catalo
 ### 2.3. Localization realm-scoped da UI
 
 **Plano criado:** [plan-localization.md](plan-localization.md)
-(EM EXECUÇÃO — 6/7 fases concluídas; Fase 7 é a próxima)
+(CONCLUÍDO — 7/7 fases, 2026-08-07)
 
 Fecha a última pendência antiga de `redesign-todo.md`: transforma o scaffold órfão
 `InternationalizationOptions` em configuração persistida por realm, seleciona cultura por request e localiza
@@ -423,8 +428,8 @@ planos de dados/sessão/admin quando a operação de chaves virar requisito.
 4. ~~Executar [plan-oauth21-token-error-responses.md](plan-oauth21-token-error-responses.md).~~ CONCLUÍDO.
 5. ~~Executar [plan-oidc-session-management.md](plan-oidc-session-management.md).~~ CONCLUÍDO.
 6. ~~Executar [plan-refactoring-debt-closure.md](plan-refactoring-debt-closure.md).~~ CONCLUÍDO.
-7. Executar [plan-localization.md](plan-localization.md) — EM EXECUÇÃO (6/7 concluídas; Fase 7 é a próxima).
-8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md).
+7. ~~Executar [plan-localization.md](plan-localization.md).~~ CONCLUÍDO.
+8. Executar [plan-rfc9700-security-hardening.md](plan-rfc9700-security-hardening.md) — PRÓXIMA EXECUÇÃO.
 9. Executar [plan-reference-tokens-introspection.md](plan-reference-tokens-introspection.md), após fechar Q1/Q2.
 10. Executar [plan-pushed-authorization-requests.md](plan-pushed-authorization-requests.md), após fechar Q1/Q2/Q3.
 11. Evoluir administração de sessões por dispositivo.

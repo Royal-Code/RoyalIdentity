@@ -1,10 +1,10 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 6 de 7 fases concluídas (1-6); Fase 7 é a próxima
+## Status: CONCLUÍDO - 7 de 7 fases concluídas
 
 ## Progresso
 
-`██████░` **86%** - 6 de 7 fases concluídas
+`███████` **100%** - 7 de 7 fases concluídas
 
 | Fase | Estado |
 |---|---|
@@ -14,7 +14,7 @@
 | Fase 4 - Códigos de apresentação e remoção de textos do core | Concluida |
 | Fase 5 - Localização integral da UI de conta | Concluida |
 | Fase 6 - Discovery e aceites multi-realm ponta a ponta | Concluida |
-| Fase 7 - Documentação, guards e fechamento da dívida | Pendente |
+| Fase 7 - Documentação, guards e fechamento da dívida | Concluida |
 
 > **Manutenção deste plano:** ao concluir as tarefas de uma fase, marque cada tarefa com `- [x]`,
 > troque o **Estado** da fase para `Concluida` na tabela acima e atualize a barra de progresso
@@ -928,19 +928,19 @@ suíte completa.
 
 **Tarefas:**
 
-- [ ] Marcar `Localization` como concluída em `redesign-todo.md` e apontar para este plano.
-- [ ] Atualizar `product.md`, `tech.md`, `structure.md` e `AGENTS.md` com options, precedência, resources e
+- [x] Marcar `Localization` como concluída em `redesign-todo.md` e apontar para este plano.
+- [x] Atualizar `product.md`, `tech.md`, `structure.md` e `AGENTS.md` com options, precedência, resources e
   limites de localização.
-- [ ] Registrar em `tech.md` que last-known-good protege somente consumidores de `IConfigurationSnapshot`,
+- [x] Registrar em `tech.md` que last-known-good protege somente consumidores de `IConfigurationSnapshot`,
   enquanto realm discovery continua lendo o store assíncrono ao vivo; não apresentar validators de snapshot
   como gate universal de requests.
-- [ ] Atualizar roadmap movendo este plano para concluídos e preservando a dependência do futuro Admin.
-- [ ] Atualizar backlog do Admin para reutilizar infraestrutura e localizar `RuleId` sem persistir findings.
-- [ ] Registrar explicitamente que overrides por realm, claims localizados e conteúdo multilíngue do tenant
+- [x] Atualizar roadmap movendo este plano para concluídos e preservando a dependência do futuro Admin.
+- [x] Atualizar backlog do Admin para reutilizar infraestrutura e localizar `RuleId` sem persistir findings.
+- [x] Registrar explicitamente que overrides por realm, claims localizados e conteúdo multilíngue do tenant
   permanecem diferidos.
-- [ ] Executar guards contra os três `[Redesign]`, mensagens removidas e strings fixas não permitidas.
-- [ ] Executar suíte completa e registrar comandos/resultados no `Resultado da Fase`.
-- [ ] Atualizar status, barra, tabela e matriz deste plano para concluído somente com todos os gates verdes.
+- [x] Executar guards contra os três `[Redesign]`, mensagens removidas e strings fixas não permitidas.
+- [x] Executar suíte completa e registrar comandos/resultados no `Resultado da Fase`.
+- [x] Atualizar status, barra, tabela e matriz deste plano para concluído somente com todos os gates verdes.
 
 **Critérios de aceite:** `redesign-todo.md` não contém dívida ativa de Localization; foundations descrevem o
 runtime real; nenhum símbolo removido reaparece; diferidos têm destino; todos os testes obrigatórios estão
@@ -957,7 +957,19 @@ dotnet test RoyalIdentity.sln
 
 ### Resultado da Fase 7
 
-*a preencher*
+Fase concluída em 2026-08-07. `redesign-todo.md` passou a registrar Localization como dívida encerrada e a
+baseline foi consolidada em `product.md`, `tech.md`, `structure.md`, `AGENTS.md`, `CLAUDE.md`, READMEs dos hosts,
+roadmap e backlog. A documentação diferencia explicitamente a validação/last-known-good do
+`IConfigurationSnapshot` da resolução viva de realms por `IStorage`, sem prometer um gate universal que o runtime
+não possui. O backlog do Admin reutiliza o catálogo e localiza `RuleId` na apresentação, sem persistir texto
+traduzido em assessment/finding; overrides por realm, claims localizados e conteúdo multilíngue do tenant seguem
+diferidos nominalmente.
+
+O guard negativo não encontrou `InvalidCredentialsErrorMessage`, `InactiveUserErrorMessage`,
+`BlockedUserErrorMessage` nem `Usar Resource` em produção/testes, e a busca positiva confirmou
+`IStringLocalizer`, `Internationalization`, `ui_locales_supported` e `RequestLocalization` nas camadas esperadas.
+`dotnet build RoyalIdentity.sln` terminou com 0 erros (51 warnings preexistentes); `dotnet test RoyalIdentity.sln
+--no-build` terminou com 1.645 aprovados, 51 ignorados opt-in e 0 falhas. `git diff --check` permaneceu limpo.
 
 ---
 
@@ -1021,20 +1033,20 @@ dotnet test RoyalIdentity.sln
 
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
-| Middleware executa antes do realm | cultura é escolhida sem `CurrentRealm` | config global/vazamento entre realms | ordem DF9 + teste arquitetural/HTTP | Aberto |
-| `ui_locales` armazenado é perdido | login por handle cai no header/default | RP não controla idioma esperado | usar `IAuthorizationContextResolver` e cobrir inline/store | Aberto |
-| Cookie cruza realms | path/nome amplo demais | preferência de um tenant afeta outro | path realm-scoped + dois realms no mesmo client | Aberto |
-| Metadata anuncia catálogo ausente | locale configurado sem `.resx` | discovery mente e UI cai em inglês | catálogo efetivo + validator antes de publish | Aberto |
-| Refresh publica config inválida | validator roda só no startup | runtime incoerente após alteração | validar `ConfigurationSnapshotData` em todo refresh | Aberto |
-| Chave/placeholder diverge | tradução omite/renomeia `{0}` | erro em runtime ou texto incorreto | teste estrutural de paridade/placeholders | Aberto |
-| Texto do core reaparece | service retorna frase por conveniência | boundary volta a misturar domínio/UI | códigos tipados + guards de source | Aberto |
-| Tradução revela estado da conta | chaves diferentes por motivo | enumeração de usuário | um código/recurso para três motivos + testes | Aberto |
-| Culture afeta protocolo | formatter/comparer usa cultura corrente | interoperabilidade ou vulnerabilidade | comparações ordinais/invariant + regressão protocolar | Aberto |
-| Payload executado fora de ordem | predecessor funcional não foi concluído ou serializer não está em v1 | shape inconsistente | dependência explícita + gate de ambos em `CurrentVersion == 1` | Aberto |
+| Middleware executa antes do realm | cultura é escolhida sem `CurrentRealm` | config global/vazamento entre realms | ordem DF9 + teste arquitetural/HTTP | Fechado na Fase 3 |
+| `ui_locales` armazenado é perdido | login por handle cai no header/default | RP não controla idioma esperado | usar `IAuthorizationContextResolver` e cobrir inline/store | Fechado na Fase 3 |
+| Cookie cruza realms | path/nome amplo demais | preferência de um tenant afeta outro | path realm-scoped + dois realms no mesmo client | Fechado nas Fases 3 e 6 |
+| Metadata anuncia catálogo ausente | locale configurado sem `.resx` | discovery mente e UI cai em inglês | catálogo efetivo + validator antes de publish | Fechado nas Fases 2 e 6 |
+| Refresh publica config inválida | validator roda só no startup | runtime incoerente após alteração | validar `ConfigurationSnapshotData` em todo refresh; documentar que requests ainda leem o store vivo | Mitigado nas Fases 2, 6 e 7 |
+| Chave/placeholder diverge | tradução omite/renomeia `{0}` | erro em runtime ou texto incorreto | teste estrutural de paridade/placeholders | Fechado na Fase 2 |
+| Texto do core reaparece | service retorna frase por conveniência | boundary volta a misturar domínio/UI | códigos tipados + guards de source | Fechado nas Fases 4 e 7 |
+| Tradução revela estado da conta | chaves diferentes por motivo | enumeração de usuário | um código/recurso para três motivos + testes | Fechado na Fase 4 |
+| Culture afeta protocolo | formatter/comparer usa cultura corrente | interoperabilidade ou vulnerabilidade | comparações ordinais/invariant + regressão protocolar | Mitigado nas Fases 3 e 6 |
+| Payload executado fora de ordem | predecessor funcional não foi concluído ou serializer não está em v1 | shape inconsistente | dependência explícita + gate de ambos em `CurrentVersion == 1` | Fechado na Fase 1 |
 | Coleção perde ordem/canonicalização | `HashSet` ou sort implícito reaparece | metadata e preferência ficam instáveis | DF22 + roundtrip/ordem/duplicata por casing | Fechado na Fase 1 |
-| Filtro executa zero testes | classe planejada não existe ou projeto está fora da solution | fase fecha em falso verde | DF23 + classes/arquivos nomeados | Aberto |
+| Filtro executa zero testes | classe planejada não existe ou projeto está fora da solution | fase fecha em falso verde | DF23 + classes/arquivos nomeados | Fechado nas Fases 1-6 |
 | Validação SSR fica em inglês | apenas component text usa localizer | experiência parcialmente localizada | boundary localizado + POST SSR real nas culturas traduzidas | Fechado na Fase 5 |
-| Scan de hardcodes tem falsos positivos | nomes técnicos/test data em inglês | guard frágil | allowlist restrita + regressões sintéticas do scanner | Mitigado na Fase 5 |
+| Scan de hardcodes tem falsos positivos | nomes técnicos/test data em inglês | guard frágil | allowlist restrita + regressões sintéticas do scanner | Fechado na Fase 5 |
 
 ---
 

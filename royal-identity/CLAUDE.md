@@ -51,9 +51,10 @@ Active plans (check status before modifying affected areas):
 - [.ai/plans/plan-refactoring-debt-closure.md](.ai/plans/plan-refactoring-debt-closure.md) — COMPLETED (5/5;
   inactive protocol/refactoring surfaces closed, Configuration payloads kept at pre-release v1, ordered
   `acr_values`, and deferred capabilities assigned to nominal owners).
-- [.ai/plans/plan-localization.md](.ai/plans/plan-localization.md) — EM EXECUÇÃO; Fases 1-6 concluídas; Fase 7 é a próxima. `RealmOptions.Internationalization` é a política realm-scoped de localization (ativa por padrão;
-  `SupportedLocales` é `List<string>` ordenada e distinta por casing, normalizada e validada antes da publicação
-  do snapshot).
+- [.ai/plans/plan-localization.md](.ai/plans/plan-localization.md) — COMPLETED (7/7). `RealmOptions.Internationalization`
+  is the realm-scoped localization policy; the account UI ships RESX catalogs for `en`, `pt-BR` and `es-419`,
+  request culture uses the documented realm-scoped precedence, and discovery advertises only the effective UI
+  catalog. Runtime translation overrides, localized claims and multilingual tenant content remain deferred.
 
 The resources/scopes domain redesign is complete; only persistence of its realm-scoped
 `ConfigurationResourceBridgeOptions` catalog remains deferred to a future dedicated plan. `Tests.Host` is

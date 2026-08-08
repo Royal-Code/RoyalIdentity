@@ -69,10 +69,11 @@ in that plan and in `plan-rfc9700-security-hardening.md` DF19.
 `.ai/plans/plan-refactoring-debt-closure.md` is **completed (5/5 phases)** — obsolete markers and inactive
 protocol surfaces were removed, extension grants route only through their provider, Configuration payloads remain
 at pre-release v1, `acr_values` is an ordered preference without fabricated policy/claim/metadata, and all
-deferred capabilities have nominal backlog/plan owners. `.ai/plans/plan-localization.md` is the active
-implementation plan; Fases 1-6 are complete and Fase 7 is next. `RealmOptions.Internationalization` is now the
-realm-scoped localization policy — active by default, with `SupportedLocales` an ordered, case-insensitively
-distinct `List<string>` normalized and validated before the configuration snapshot is published.
+deferred capabilities have nominal backlog/plan owners. `.ai/plans/plan-localization.md` is **completed (7/7
+phases)** — `RealmOptions.Internationalization` is the realm-scoped localization policy, active by default, with
+`SupportedLocales` an ordered, case-insensitively distinct `List<string>` normalized and validated before the
+configuration snapshot is published. The account UI ships RESX catalogs for `en`, `pt-BR` and `es-419`, request
+culture follows the documented realm-scoped precedence, and discovery publishes only the effective UI catalog.
 The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
 `ConfigurationResourceBridgeOptions` per baseline DF22 until a dedicated persistence plan is authorized. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
@@ -280,11 +281,11 @@ Current status:
   of the realm-scoped catalog remains deferred; do not add it outside a future
   `plan-data-resource-catalog-storage.md`.
 - Realm-specific options and CORS were completed by `.ai/plans/plan-realm-options-redesign.md`.
-- Localization is being implemented by `.ai/plans/plan-localization.md`. Its Phase 4 removed the former
-  configurable UI messages and their `[Redesign("Usar Resource")]` markers from `AccountOptions`; do not
-  reintroduce presentable text as core configuration. Request-culture preference and full account-UI
-  localization/validation, truthful discovery metadata and multi-realm acceptances are complete; remaining plan
-  work is the documentation/guard closure in Phase 7.
+- Localization was completed by `.ai/plans/plan-localization.md`. Its Phase 4 removed the former configurable UI
+  messages and their `[Redesign("Usar Resource")]` markers from `AccountOptions`; do not reintroduce presentable
+  text as core configuration. Request-culture preference, full account-UI localization/validation, truthful
+  discovery metadata and multi-realm acceptances are the implemented baseline. Runtime translation overrides,
+  localized claims and multilingual tenant content remain explicitly deferred.
 
 ## External RoyalCode Libraries (`UserAccounts` module family only)
 
