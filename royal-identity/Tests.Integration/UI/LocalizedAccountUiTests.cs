@@ -1,5 +1,7 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using HtmlAgilityPack;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Tests.Integration.Prepare;
 
@@ -75,6 +77,42 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
         Assert.NotEqual(english, portuguese);
     }
 
+    [Theory]
+    [InlineData("en", "The Username field is required.")]
+    [InlineData("pt-BR", "O campo Usuário é obrigatório.")]
+    [InlineData("es-419", "El campo Usuario es obligatorio.")]
+    public async Task ARequiredField_RendersTheLocalizedMessageBesideTheField(
+        string culture,
+        string expected)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue(culture));
+        var page = await client.GetAsync($"/{factory.Handles.Demo.Path}/account/login");
+        var document = new HtmlDocument();
+        document.LoadHtml(await page.Content.ReadAsStringAsync());
+        var form = document.DocumentNode.SelectSingleNode("//main//form");
+
+        var response = await new FormAction(client, form)
+            .SetValue("Input.Username", "")
+            .SetValue("Input.Password", "present-for-validation")
+            .SetValue("Input.ReturnUrl", $"/{factory.Handles.Demo.Path}/account/login")
+            .SubmitAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var responseHtml = await response.Content.ReadAsStringAsync();
+        var responseDocument = new HtmlDocument();
+        responseDocument.LoadHtml(responseHtml);
+        var fieldMessage = responseDocument.DocumentNode.SelectSingleNode(
+            "//input[@name='Input.Username']/following-sibling::div[contains(concat(' ', normalize-space(@class), ' '), ' validation-message ')][1]");
+
+        Assert.NotNull(fieldMessage);
+        Assert.Equal(expected, WebUtility.HtmlDecode(fieldMessage.InnerText).Trim());
+        Assert.DoesNotContain(
+            "Validation_Required",
+            responseHtml,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task NoAccountComponent_KeepsAPresentableLiteralOutsideTheReviewedAllowlist()
     {
@@ -88,6 +126,21 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
             .ToArray();
 
         Assert.Empty(offenders);
+    }
+
+    [Theory]
+    [InlineData("<div title=\"Welcome back friend\"></div>", "title='Welcome back friend'")]
+    [InlineData("<p>@L[\"Greeting\"] and welcome aboard.</p>", "'and welcome aboard.'")]
+    [InlineData("<button>Continue</button>", "'Continue'")]
+    [InlineData("<p>Loading...</p>", "'Loading...'")]
+    public void PresentableLiteralScanner_DetectsEveryPreviouslyMissedShape(
+        string razor,
+        string expected)
+    {
+        var offenders = FindPresentableLiterals("Mutation.razor", razor).ToArray();
+        var offender = Assert.Single(offenders);
+
+        Assert.Contains(expected, offender, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -120,11 +173,16 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
     {
         var name = Path.GetFileName(path);
 
+        return FindPresentableLiterals(name, File.ReadAllText(path));
+    }
+
+    private static IEnumerable<string> FindPresentableLiterals(string name, string source)
+    {
         // Razor directives and C# comments are declarations and prose about the code, not rendered text;
         // both would otherwise register as product strings.
         var text = string.Join(
             "\n",
-            File.ReadAllLines(path).Where(line =>
+            source.ReplaceLineEndings("\n").Split('\n').Where(line =>
                 !Regex.IsMatch(
                     line.TrimStart(),
                     @"^(@(using|inject|page|layout|attribute|inherits|implements|typeparam|namespace|rendermode|preservewhitespace)|//|\*)")));
@@ -163,6 +221,13 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
             return false;
         }
 
+        // A single word is product text too: a button reading "Continue" or a state reading "Loading..." was
+        // invisible to the previous version. Test it before rejecting dotted identifiers, because the final
+        // punctuation in "Loading..." is not a namespace separator.
+        var isWord = Regex.IsMatch(candidate, @"^[A-Za-z][A-Za-z']{2,}[.!?…]*$", RegexOptions.CultureInvariant);
+        if (isWord)
+            return true;
+
         // A dotted token with no spaces is an identifier or a namespace, never a sentence.
         if (!candidate.Contains(' ', StringComparison.Ordinal) && candidate.Contains('.', StringComparison.Ordinal))
             return false;
@@ -174,11 +239,7 @@ public class LocalizedAccountUiTests : IClassFixture<PersistentStorageAppFactory
             @"^[A-Za-z][A-Za-z]*(?: [A-Za-z][A-Za-z,']*)+[.!?…]*$",
             RegexOptions.CultureInvariant);
 
-        // A single word is product text too: a button reading "Continue" or a state reading "Loading..." was
-        // invisible to the previous version, which demanded either several words or exactly one final mark.
-        var isWord = Regex.IsMatch(candidate, @"^[A-Za-z][A-Za-z']{2,}[.!?…]*$", RegexOptions.CultureInvariant);
-
-        return isSentence || isWord;
+        return isSentence;
     }
 
     private Task<string> GetAsync(string relativePath, string culture)

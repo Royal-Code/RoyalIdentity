@@ -1,10 +1,10 @@
 # Plan: Localization realm-scoped da UI (`plan-localization`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; 4 de 7 fases concluídas (1-4); Fase 5 em andamento
+## Status: EM EXECUÇÃO - decisões fechadas; 5 de 7 fases concluídas (1-5); Fase 6 é a próxima
 
 ## Progresso
 
-`████░░░` **57%** - 4 de 7 fases concluídas
+`█████░░` **71%** - 5 de 7 fases concluídas
 
 | Fase | Estado |
 |---|---|
@@ -12,7 +12,7 @@
 | Fase 2 - Catálogos RESX e infraestrutura de localização | Concluida |
 | Fase 3 - Seleção de cultura por request e preferência do usuário | Concluida |
 | Fase 4 - Códigos de apresentação e remoção de textos do core | Concluida |
-| Fase 5 - Localização integral da UI de conta | Em andamento |
+| Fase 5 - Localização integral da UI de conta | Concluida |
 | Fase 6 - Discovery e aceites multi-realm ponta a ponta | Pendente |
 | Fase 7 - Documentação, guards e fechamento da dívida | Pendente |
 
@@ -787,13 +787,16 @@ atributos não visuais; derivar semântica cultural do documento.
   signed-in, perfil e loading.
 - [x] Localizar `PageTitle`, headings, labels, botões, placeholders, ajuda e mensagens de validação/erro.
 - [x] Localizar `title`, `alt`, `aria-label` e demais textos de acessibilidade.
-- [ ] Migrar validações DataAnnotations dos input models para `ValidationResources` pelo pipeline do .NET 10.
+- [x] Localizar validações DataAnnotations dos input models por chaves de `ValidationResources`, resolvidas no
+  boundary SSR sem classe designer gerada.
 - [x] Manter markup nos components e somente texto/placeholders nos `.resx`.
 - [x] Manter nomes/descrições de client, scopes e resources como conteúdo do tenant, com encoding normal.
 - [x] Exibir o seletor somente com mais de um locale efetivo e preservar return URL/realm.
 - [x] Substituir `lang="en"` por cultura efetiva em Server, Demo e Tests.Host.
 - [x] Derivar `dir="ltr|rtl"` de `TextInfo.IsRightToLeft`.
 - [x] Criar teste/allowlist que falha para nova string apresentável fixa em inglês na UI do produto.
+- [x] Fixar o próprio scanner com regressões sintéticas para atributos, texto misto com Razor, palavra isolada
+  e palavra com pontuação final.
 - [x] Criar `Tests.Integration/UI/LocalizedAccountUiTests.cs` para a matriz completa das três culturas.
 
 **Critérios de aceite:** cada superfície listada renderiza inglês, `pt-BR` e `es-419`; validação client/server
@@ -811,7 +814,7 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~LocalizedAccountUiTes
 
 ### Resultado da Fase 5
 
-**EM ANDAMENTO — não concluída em 2026-08-06.** Registro o estado real em vez de fechar a fase.
+**Concluída em 2026-08-07 após as revisões externas.**
 
 **Entregue e verde:** as 15 superfícies visíveis foram substituídas por `IStringLocalizer<AccountResources>` —
 login, domain, login externo, signed-in, consentimento, consentido, os três ecrãs de End Session, erro, perfil,
@@ -822,21 +825,22 @@ chave com o nome do client como argumento, conforme o inventário exige.
 
 A allowlist de strings fixas está implementada e **verde**, e encontrou dois resíduos reais que eu havia
 perdido: `Loading...` em `AccountLayout` e `Protected resources` em `ResourceServerConsent`. Ambos localizados.
-O scanner ignora o bloco `@code`, senão comentários e identificadores C# entrariam como texto de produto.
+O scanner percorre o arquivo Razor inteiro, filtra diretivas/comentários, cobre atributos apresentáveis e separa
+texto misto com expressões Razor.
 
-A validação SSR usa chaves nos atributos DataAnnotations mais `LocalizedValidationSummary`, porque
-`ErrorMessageResourceType` exigiria classe designer gerada — que a DF3 proíbe. A composição da frase acontece
-inteira dentro de uma cultura, sem juntar fragmentos traduzidos.
+A validação SSR usa chaves nos atributos DataAnnotations mais `LocalizedValidationSummary` e
+`LocalizedValidationMessage`, porque `ErrorMessageResourceType` exigiria classe designer gerada — que a DF3
+proíbe. A composição da frase acontece inteira dentro de uma cultura, sem juntar fragmentos traduzidos. Um POST
+SSR real com antiforgery prova em `en`, `pt-BR` e `es-419` que a mensagem ao lado de `Input.Username` é a frase
+traduzida e que `Validation_Required` não vaza no HTML.
 
-**Pendente e vermelho (4 testes):** `LocalizedAccountUiTests.TheLoginScreen_RendersInTheNegotiatedCulture`
-falha para `pt-BR` e `es-419`, e `TheDomainScreen_RendersInTheNegotiatedCulture` falha nas três culturas. O
-inglês renderiza; as traduções não. Não é catálogo ausente — `LocalizationCatalogTests` resolve as 62 chaves nas
-três culturas e o `IUiLocaleCatalog` do host composto lista `en`/`pt-BR`/`es-419` — nem cultura não negociada,
-porque `lang="pt-BR"` sai correto no mesmo documento. A hipótese a investigar é a cultura em vigor no momento
-do render dos components SSR versus a do middleware. **A fase não deve ser fechada antes disso.**
+As sondas manuais do scanner viraram quatro regressões permanentes. A primeira execução encontrou uma falha
+real: `Loading...` ainda era descartado como identificador pontuado antes da regra de palavra isolada. A ordem da
+classificação foi corrigida e agora atributos, fragmentos depois de `@L[...]`, palavras isoladas e palavras com
+pontuação final são exercitados diretamente.
 
-Estado da suíte: 1.603 aprovados, 51 ignorados opt-in, **4 falhas** — todas na fixture nova desta fase; nenhuma
-regressão fora dela.
+Filtros obrigatórios: `LoginPageTests` 2/2, `LoginConsentUIFlowTests` 5/5 e `LocalizedAccountUiTests` 18/18.
+Suíte integral 1.637 aprovados, 51 ignorados opt-in, 0 falhas. `git diff --check` limpo.
 
 ---
 
@@ -1010,8 +1014,8 @@ dotnet test RoyalIdentity.sln
 | Payload executado fora de ordem | predecessor funcional não foi concluído ou serializer não está em v1 | shape inconsistente | dependência explícita + gate de ambos em `CurrentVersion == 1` | Aberto |
 | Coleção perde ordem/canonicalização | `HashSet` ou sort implícito reaparece | metadata e preferência ficam instáveis | DF22 + roundtrip/ordem/duplicata por casing | Fechado na Fase 1 |
 | Filtro executa zero testes | classe planejada não existe ou projeto está fora da solution | fase fecha em falso verde | DF23 + classes/arquivos nomeados | Aberto |
-| Validação SSR fica em inglês | apenas component text usa localizer | experiência parcialmente localizada | API .NET 10 + testes client/server | Aberto |
-| Scan de hardcodes tem falsos positivos | nomes técnicos/test data em inglês | guard frágil | allowlist pequena, revisada e restrita ao produto UI | Aberto |
+| Validação SSR fica em inglês | apenas component text usa localizer | experiência parcialmente localizada | boundary localizado + POST SSR real nas culturas traduzidas | Fechado na Fase 5 |
+| Scan de hardcodes tem falsos positivos | nomes técnicos/test data em inglês | guard frágil | allowlist restrita + regressões sintéticas do scanner | Mitigado na Fase 5 |
 
 ---
 
@@ -1229,12 +1233,20 @@ campo; e promoção das mutações do scanner a regressões permanentes.
 
 As três pendências da Fase 3 listadas nas revisões acima foram encerradas com regressões executáveis: seletor no
 `AccountLayout` convivendo com o form nomeado de login, recuperação não destrutiva de `ui_locales` pelo handle
-de parâmetros armazenados e fallback após cancelamento do resolver. Permanecem abertas somente as duas
-pendências próprias da Fase 5: regressão SSR de validação por campo e transformação das sondas de mutação do
-scanner em regressões permanentes.
+de parâmetros armazenados e fallback após cancelamento do resolver. Naquele momento permaneciam abertas somente
+as duas pendências próprias da Fase 5: regressão SSR de validação por campo e transformação das sondas de mutação
+do scanner em regressões permanentes.
 
 O diagnóstico histórico de que um segundo form desviava `_handler` estava incorreto. Os dez `400 BadRequest`
 eram fabricados por `FormAction`: o XPath absoluto `//input | //textarea | //select` partia da raiz e misturava
 os controles de forms irmãos, enviando inclusive dois tokens antiforgery no POST de login/consentimento — algo
 que o navegador não faz. O XPath relativo `.//...` alinha o helper à semântica real de submissão sem reduzir as
 regressões do endpoint, que continuam cobrindo ausência de token e pareamento token/cookie inválido.
+
+### Fechamento das pendências da Fase 5 — 2026-08-07
+
+As duas pendências finais foram encerradas. Um POST SSR real cobre `en`, `pt-BR` e `es-419`, inspeciona a
+mensagem ao lado do campo obrigatório e proíbe que a chave `Validation_Required` apareça no HTML. As quatro
+sondas de mutação do scanner viraram casos permanentes; o caso `Loading...` inicialmente falhou e expôs que a
+regra de identificador pontuado rodava antes da regra de palavra isolada. A classificação foi corrigida e os
+gates da Fase 5 e a suíte integral passaram.
