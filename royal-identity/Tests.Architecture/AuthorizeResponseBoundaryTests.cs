@@ -1,4 +1,5 @@
 using System.Reflection;
+using RoyalIdentity.Handlers;
 using RoyalIdentity.Responses;
 
 namespace Tests.Architecture;
@@ -39,6 +40,25 @@ public class AuthorizeResponseBoundaryTests
     {
         Assert.Empty(typeof(AuthorizeResponse).GetConstructors(BindingFlags.Public | BindingFlags.Instance));
         Assert.Empty(typeof(AuthorizeErrorResponse).GetConstructors(BindingFlags.Public | BindingFlags.Instance));
+    }
+
+    [Fact]
+    public void AuthorizationResponseBoundary_CannotIssueFrontChannelTokens()
+    {
+        var responseProperties = typeof(AuthorizeResponse)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .ToArray();
+        var handlerConstructorParameters = Assert.Single(typeof(AuthorizeHandler).GetConstructors())
+            .GetParameters()
+            .Select(parameter => parameter.ParameterType.Name)
+            .ToArray();
+
+        Assert.DoesNotContain("Token", responseProperties);
+        Assert.DoesNotContain("IdentityToken", responseProperties);
+        Assert.DoesNotContain("TokenType", responseProperties);
+        Assert.DoesNotContain("AccessTokenLifetime", responseProperties);
+        Assert.DoesNotContain("ITokenFactory", handlerConstructorParameters);
     }
 
     [Fact]

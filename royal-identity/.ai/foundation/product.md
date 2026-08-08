@@ -56,12 +56,14 @@ A middleware (`RealmDiscoveryMiddleware`) identifies the realm from the route be
 
 ### Flows Implemented
 
-- Authorization Code Flow (with mandatory PKCE by default — `RequirePkce = true`)
-- Implicit Flow (token, id_token)
-- Hybrid Flow
+- Authorization Code Flow (the only interactive flow, with mandatory PKCE by default — `RequirePkce = true`)
 - Client Credentials Flow
 - Refresh Token Flow
 - Extension Grants (custom via `IExtensionGrant` + `IExtensionsGrantsProvider`)
+
+Implicit and hybrid response types are neither executable nor advertised. Authorization responses contain a
+realm-aware `iss` parameter and discovery publishes `authorization_response_iss_parameter_supported=true` in
+accordance with RFC 9207.
 
 ### PKCE Rules (Client Defaults)
 

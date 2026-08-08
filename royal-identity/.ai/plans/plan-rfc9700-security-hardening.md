@@ -1,16 +1,16 @@
 # Plan: Aderência e hardening de segurança OAuth 2.0 conforme RFC 9700 (`plan-rfc9700-security-hardening`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; Fases 1-2 concluídas; Fase 3 é a próxima
+## Status: EM EXECUÇÃO - decisões fechadas; Fases 1-3 concluídas; Fase 4 é a próxima
 
 ## Progresso
 
-`██░░░░` **33%** - 2 de 6 fases concluídas
+`███░░░` **50%** - 3 de 6 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Assessment determinístico e catálogo de regras | Concluida |
 | Fase 2 - Validação configurável e segura de redirect URIs | Concluida |
-| Fase 3 - Authorization Code, PKCE e remoção do front-channel legado | Pendente |
+| Fase 3 - Authorization Code, PKCE e remoção do front-channel legado | Concluida |
 | Fase 4 - Rotação e detecção de replay de refresh tokens | Pendente |
 | Fase 5 - Segurança HTTP, metadata, client authentication e logs | Pendente |
 | Fase 6 - Handoff administrativo, aceites e fechamento | Pendente |
@@ -606,23 +606,23 @@ emissão/anúncio de tokens no front-channel sem opção legada.
 
 **Tarefas:**
 
-- [ ] Consumir a regressão entregue por `plan-oauth21-token-error-responses.md` para token request com
+- [x] Consumir a regressão entregue por `plan-oauth21-token-error-responses.md` para token request com
   `code_verifier` e code sem `code_challenge`; não reimplementar a classificação nem os helpers de erro nesta
   fase.
-- [ ] Consumir a taxonomia e o writer entregues pelo plano OAuth 2.1 sem reintroduzir helpers paralelos.
-- [ ] Preservar rejeição de verifier ausente/incorreto e comparação em tempo constante.
-- [ ] Manter `S256` obrigatório e `plain` anunciado enquanto a option/path runtime existirem; tratar a metadata
+- [x] Consumir a taxonomia e o writer entregues pelo plano OAuth 2.1 sem reintroduzir helpers paralelos.
+- [x] Preservar rejeição de verifier ausente/incorreto e comparação em tempo constante.
+- [x] Manter `S256` obrigatório e `plain` anunciado enquanto a option/path runtime existirem; tratar a metadata
   como capacidade, não preferência, e gerar finding para client com `AllowPlainTextPkce=true` conforme DF22.
-- [ ] Remover `token`, `id_token` e combinações implicit/hybrid do discovery e da validação global.
-- [ ] Remover branches de emissão de access/identity token da `AuthorizeResponseFactory`, do
+- [x] Remover `token`, `id_token` e combinações implicit/hybrid do discovery e da validação global.
+- [x] Remover branches de emissão de access/identity token da `AuthorizeResponseFactory`, do
   `AuthorizeHandler` e dos response results ainda envolvidos; preservar na factory o caminho de authorization
   code e a decoração de `session_state` entregue pelo predecessor.
-- [ ] Remover response modes/resultados exclusivos do fluxo legado quando não houver consumidor remanescente.
-- [ ] Garantir que `AllowedResponseTypes` legado não reabilita suporte removido.
-- [ ] Adicionar regression test que prova a ausência do password grant.
-- [ ] Emitir e anunciar `iss` na authorization response conforme RFC 9207, com testes realm-aware.
-- [ ] Atualizar assessment para refletir comportamento removido e dados de configuração residuais.
-- [ ] Reutilizar `Tests.Integration/Endpoints/PkceTokenTests.cs` — onde a Fase 3 do plano de erros entregou as
+- [x] Remover response modes/resultados exclusivos do fluxo legado quando não houver consumidor remanescente.
+- [x] Garantir que `AllowedResponseTypes` legado não reabilita suporte removido.
+- [x] Adicionar regression test que prova a ausência do password grant.
+- [x] Emitir e anunciar `iss` na authorization response conforme RFC 9207, com testes realm-aware.
+- [x] Atualizar assessment para refletir comportamento removido e dados de configuração residuais.
+- [x] Reutilizar `Tests.Integration/Endpoints/PkceTokenTests.cs` — onde a Fase 3 do plano de erros entregou as
   linhas de PKCE, inclusive o downgrade — e `Tests.Integration/Endpoints/TokenErrorTests.cs`, e criar
   `Tests.Integration/Endpoints/AuthorizationCodeOnlyTests.cs` para runtime, metadata, password grant e `iss`;
   manter `Tests.Integration/Endpoints/CodeSingleUseTests.cs` como regressão do consumo.
@@ -638,11 +638,40 @@ client/redirect; password grant retorna grant não suportado; cada filtro obriga
 dotnet test Tests.Integration --filter "FullyQualifiedName~TokenErrorTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~AuthorizationCodeOnlyTests"
 dotnet test Tests.Integration --filter "FullyQualifiedName~CodeSingleUseTests"
+dotnet test Tests.Integration --filter "FullyQualifiedName~PkceTokenTests"
+dotnet test Tests.Identity --filter "FullyQualifiedName~ClientSecurityAssessmentTests"
+dotnet test Tests.Architecture --filter "FullyQualifiedName~AuthorizeResponseBoundaryTests"
+dotnet test Tests.Storage --filter "FullyQualifiedName~ConfigurationModelPayloadTests|FullyQualifiedName~OperationalPayloadTests|FullyQualifiedName~SqliteOperationalAuthorizationCodeTests"
 ```
 
 ### Resultado da Fase 3
 
-*a preencher*
+A authorization response passou a ter uma única emissão possível: `AuthorizeHandler` cria somente o code,
+`AuthorizeResponseFactory` preserva `session_state` e acrescenta o issuer realm-aware, e os response objects não
+possuem mais campos ou dependências capazes de carregar access token/ID token. Discovery anuncia exclusivamente
+`response_types_supported=["code"]` e `authorization_response_iss_parameter_supported=true`; respostas de
+sucesso e erro carregam o mesmo `iss` publicado como `issuer`, conforme RFC 9207. A lista global configurável de
+response types foi removida, portanto `AllowedResponseTypes` residual no client não reabilita implicit/hybrid.
+
+A auditoria dos resíduos removeu `AuthorizationResourcesValidator`, cujos quatro ramos eram exclusivos de
+implicit/hybrid, e toda a cadeia `StateHash`/`s_hash` — decorator, context, authorization code, payload Operational,
+request de ID token, serializer e constantes. `ResponseToFragmentResult` e `ResponseToFormPostResult` foram
+preservados: ambos continuam sendo response modes válidos e explicitamente suportados para code, logo não eram
+resultados exclusivos do fluxo removido. As antigas coleções configuráveis de response types, response modes e
+métodos PKCE também saíram: metadata e validators agora compartilham somente as capacidades realmente
+implementadas (`code`; `query`/`fragment`/`form_post`; `plain`/`S256`). Payloads continuam em v1 conforme ADR-020
+e dados de desenvolvimento anteriores devem ser reprovisionados.
+
+A baseline OAuth 2.1 foi consumida sem alteração: nenhum helper/writer paralelo foi criado, os 19 casos de
+`PkceTokenTests` continuam provando downgrade, sintaxe e comparação em tempo constante, e `TokenErrorTests`
+mantém a taxonomia. O assessment continua tornando configuração residual de access token visível e agora deixa
+explícito que o runtime já a rejeita. O password grant permanece sem handler mesmo quando um client residual o
+lista.
+
+Gates da fase: `TokenErrorTests` 58/58, `AuthorizationCodeOnlyTests` 9/9,
+`CodeSingleUseTests` 6/6, `PkceTokenTests` 19/19 e regressões focadas de payload/code Operational 112/112. A
+suíte integral terminou com 1.732 aprovados, 51 ignorados opt-in e 0 falhas; build sem erros e
+`git diff --check` limpo.
 
 ---
 
@@ -901,17 +930,17 @@ dotnet test RoyalIdentity.sln
 |---|---|---|---|---|
 | Assessment promete mais que consegue provar | UI chama `Compliant` de “deployment certificado” | falsa segurança | DF6; texto explícito e diagnóstico de host separado | Mitigado na Fase 1 |
 | Relaxamento de redirect vira open redirect | wildcard amplo ou ignore-case habilitado | exfiltração de code | validação de pattern, escaping integral do regex, finding alto e default seguro | Mitigado na Fase 2 |
-| Remoção de implicit/hybrid deixa código morto | response handlers/constants sem consumers | superfície confusa e manutenção incorreta | busca de callers + architecture/integration tests | Aberto |
+| Remoção de implicit/hybrid deixa código morto | response handlers/constants sem consumers | superfície confusa e manutenção incorreta | busca de callers + architecture/integration tests | Fechado na Fase 3 |
 | Retry de refresh cria dois sucessores | duas requests vencem operações separadas | família bifurcada e replay aceito | decisão transacional única + contract concorrente | Aberto |
 | Revogação perde corrida com sucessor | replay e rotação chegam juntos | token da família permanece ativo | estado de família verificado/movido na mesma transação | Aberto |
 | Mudança de factory persiste token antes de vencer | token factory grava durante construção | credencial órfã/emitida ao perdedor | separar construção e persistência; teste de falha | Aberto |
 | RuleId muda após integração Admin | rename sem coordenação | localização/UX quebradas | constantes estáveis + documentação + testes de unicidade | Mitigado na Fase 1 |
 | Hardening duplica replay protection concluída | novo cache/check-add contorna `IReplayProtectionStore` | duas semânticas de replay e backing inconsistente | DF17 + guards existentes do plano concluído | Aberto |
-| Fase 3 duplica a taxonomia OAuth 2.1 | helpers/códigos são recriados no hardening | contratos divergentes para o mesmo erro | DF18; consumir o plano de erros concluído | Aberto |
+| Fase 3 duplica a taxonomia OAuth 2.1 | helpers/códigos são recriados no hardening | contratos divergentes para o mesmo erro | DF18; consumir o plano de erros concluído | Fechado na Fase 3 |
 | Hardening bloqueia o OP iframe | regra global trata todo resultado browser-facing igualmente | Session Management anunciado deixa de funcionar | DF19 + regressão `CheckSessionEndpointTests` | Aberto |
 | Payload pré-release parte da baseline errada | executor ignora Debt Closure/Localization ou ADR-020 | perda de options ou bump indevido | DF20 + gate Server/Realm v1 | Aberto |
 | Filtro amplo mascara teste ausente | OR ou nome incidental seleciona outra fixture | fase fecha sem provar o hardening | DF21 + classes/comandos separados | Mitigado na Fase 1; revalidar por fase |
-| Metadata omite capacidade PKCE ativa | `plain` continua runtime, mas some de discovery | metadata deixa de representar o servidor | DF22 + teste exato de metadata/runtime | Aberto |
+| Metadata omite capacidade PKCE ativa | `plain` continua runtime, mas some de discovery | metadata deixa de representar o servidor | DF22 + teste exato de metadata/runtime | Fechado na Fase 3 |
 
 ---
 

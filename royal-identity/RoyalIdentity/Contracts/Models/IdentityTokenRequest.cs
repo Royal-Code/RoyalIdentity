@@ -25,8 +25,6 @@ public class IdentityTokenRequest
 
     public string? AuthorizationCodeToHash { get; init; }
 
-    public string? StateHash { get; init; }
-
     /// <summary>
     /// <para>
     ///     When set, the identity claims come from here instead of from the claims/profile provider. It is the

@@ -229,7 +229,6 @@ public class SqliteOperationalAuthorizationCodeTests
         await using var harness = await SqliteOperationalStorageHarness.CreateConcreteAsync();
         var code = NewCode(harness.RealmA);
         code.Nonce = "nonce-value";
-        code.StateHash = "state-hash";
         code.CodeChallenge = "challenge";
         code.CodeChallengeMethod = "S256";
         code.Properties = new Dictionary<string, string> { ["custom"] = "value" };
@@ -240,7 +239,6 @@ public class SqliteOperationalAuthorizationCodeTests
 
         Assert.NotNull(consumed);
         Assert.Equal("nonce-value", consumed.Nonce);
-        Assert.Equal("state-hash", consumed.StateHash);
         Assert.Equal("challenge", consumed.CodeChallenge);
         Assert.Equal("S256", consumed.CodeChallengeMethod);
         Assert.Equal("session-a", consumed.SessionId);

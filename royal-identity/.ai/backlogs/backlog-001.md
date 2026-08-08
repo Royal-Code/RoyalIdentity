@@ -30,7 +30,9 @@ derivado de IS4/IdentityModel.
 
 **Área:** OAuth2/OIDC / Segurança / Clients / Admin
 
-**Status:** Em execução; Fases 1-2/6 concluídas, com a Fase 3 como próxima.
+**Status:** Em execução; Fases 1-3/6 concluídas, com a Fase 4 como próxima. Authorization code + PKCE é o único
+fluxo interativo, implicit/hybrid não é mais executável nem anunciado e authorization responses carregam `iss`
+conforme RFC 9207.
 
 **Plano:** [plan-rfc9700-security-hardening.md](../plans/plan-rfc9700-security-hardening.md).
 

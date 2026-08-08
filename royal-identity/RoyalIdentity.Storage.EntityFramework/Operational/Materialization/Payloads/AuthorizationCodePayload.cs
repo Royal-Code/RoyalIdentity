@@ -16,8 +16,6 @@ public sealed class AuthorizationCodePayload
 {
     public string? Nonce { get; set; }
 
-    public string? StateHash { get; set; }
-
     public string? CodeChallenge { get; set; }
 
     public string? CodeChallengeMethod { get; set; }

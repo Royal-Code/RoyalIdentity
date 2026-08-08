@@ -185,6 +185,20 @@ public class ClientSecurityAssessmentTests
         Assert.Contains("current runtime", finding.Remediation, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void ResidualFrontChannelAccessTokenConfiguration_RemainsVisibleAfterRuntimeRemoval()
+    {
+        var (client, options) = CreateSecureConfiguration();
+        client.AllowedResponseTypes.Add(Constants.Oidc.ResponseTypes.Token);
+
+        var assessment = ClientSecurityAssessment.Create(client, options);
+
+        var finding = Assert.Single(assessment.Findings,
+            finding => finding.RuleId == ClientSecurityRuleIds.NoFrontChannelAccessToken);
+        Assert.Contains("runtime now rejects", finding.Description, StringComparison.Ordinal);
+        Assert.Contains("keep only code", finding.Remediation, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(RedirectUriComparison.OrdinalIgnoreCase, false)]
     [InlineData(RedirectUriComparison.Ordinal, true)]

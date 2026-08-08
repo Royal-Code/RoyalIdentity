@@ -28,7 +28,6 @@ public sealed class AuthorizationCodePayloadSerializer
         var payload = new AuthorizationCodePayload
         {
             Nonce = code.Nonce,
-            StateHash = code.StateHash,
             CodeChallenge = code.CodeChallenge,
             CodeChallengeMethod = code.CodeChallengeMethod,
             Properties = code.Properties is null ? null : new Dictionary<string, string>(code.Properties),
@@ -60,7 +59,6 @@ public sealed class AuthorizationCodePayloadSerializer
             RealmId = identity.RealmId,
             SessionId = identity.SessionId,
             Nonce = payload.Nonce,
-            StateHash = payload.StateHash,
             CodeChallenge = payload.CodeChallenge,
             CodeChallengeMethod = payload.CodeChallengeMethod,
             Properties = payload.Properties is null ? null : new Dictionary<string, string>(payload.Properties),

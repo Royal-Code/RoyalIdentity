@@ -71,7 +71,8 @@ public class PkceValidator : IValidator<IWithCodeChallenge>
             codeChallengeMethod = Oidc.CodeChallenge.Methods.Plain;
         }
 
-        if (!context.Options.Discovery.CodeChallengeMethodIsSupported(codeChallengeMethod))
+        if (codeChallengeMethod is not Oidc.CodeChallenge.Methods.Plain
+            and not Oidc.CodeChallenge.Methods.Sha256)
         {
             logger.LogError(context, "Unsupported code_challenge_method", codeChallengeMethod);
             context.Error(

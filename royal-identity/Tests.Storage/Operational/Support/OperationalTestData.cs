@@ -176,7 +176,6 @@ internal static class OperationalTestData
         {
             RealmId = "realm-a",
             Nonce = "nonce-value",
-            StateHash = "state-hash",
             SessionId = "session-one",
             CodeChallenge = "challenge",
             CodeChallengeMethod = "S256",

@@ -1,5 +1,6 @@
 using RoyalIdentity.Contexts;
 using RoyalIdentity.Contracts;
+using RoyalIdentity.Extensions;
 
 namespace RoyalIdentity.Responses;
 
@@ -15,9 +16,7 @@ internal static class AuthorizeResponseFactory
     public static AuthorizeResponse Success(
         ISessionStateGenerator sessionStateGenerator,
         AuthorizeContext context,
-        string? code,
-        string? identityToken = null,
-        string? accessToken = null)
+        string code)
     {
         AssertTrustedRedirect(context);
 
@@ -25,8 +24,7 @@ internal static class AuthorizeResponseFactory
             context,
             code,
             sessionStateGenerator.GenerateSessionStateValue(context),
-            identityToken,
-            accessToken);
+            GetIssuer(context));
     }
 
     public static AuthorizeErrorResponse CreateError(
@@ -41,7 +39,8 @@ internal static class AuthorizeResponseFactory
             context,
             error,
             errorDescription,
-            sessionStateGenerator.GenerateSessionStateValue(context));
+            sessionStateGenerator.GenerateSessionStateValue(context),
+            GetIssuer(context));
     }
 
     public static AuthorizeErrorResponse Interaction(
@@ -66,6 +65,9 @@ internal static class AuthorizeResponseFactory
         context.ClientParameters.AssertHasClient();
         context.AssertHasRedirectUri();
     }
+
+    private static string GetIssuer(AuthorizeContext context)
+        => context.HttpContext.GetServerIssuerUri(context.Options);
 }
 
 internal enum AuthorizeInteractionKind

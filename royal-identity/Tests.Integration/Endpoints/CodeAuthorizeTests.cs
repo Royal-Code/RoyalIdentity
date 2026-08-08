@@ -379,7 +379,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
     }
 
     [Fact]
-    public async Task Get_WithImplicitResourceIndicatorAndNoApiScope_ShouldReturnAccessToken()
+    public async Task Get_WithTokenResponseTypeAndResourceIndicator_ShouldReturnUnsupportedResponseType()
     {
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"implicit-resource-client-{suffix}";
@@ -417,18 +417,14 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("redirect_uri", "https://localhost:5000/callback");
 
         var response = await client.GetAsync(path);
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
-        Assert.Contains("access_token", body);
-        Assert.DoesNotContain("invalid_scope", body);
+        await response.AssertErrorAsync(Oidc.Authorize.Errors.UnsupportedResponseType);
     }
 
     [Fact]
-    public async Task Get_WithIdTokenOnlyResponseTypeAndResourceIndicator_ShouldReturnInvalidScope()
+    public async Task Get_WithIdTokenOnlyResponseTypeAndResourceIndicator_ShouldReturnUnsupportedResponseType()
     {
-        // ADR-012 (l.91): id_token-only requests are restricted to identity scopes. A resource indicator
-        // pulls in a resource server, which is not allowed for response_type=id_token only.
+        // Authorization code is the only interactive response type. Client-side residual configuration and a
+        // resource indicator must not re-enable the former id_token-only branch.
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"id-token-resource-client-{suffix}";
         await factory.SaveClientAsync(
@@ -463,7 +459,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
 
         var response = await client.GetAsync(path);
 
-        await response.AssertErrorAsync(Oidc.Authorize.Errors.InvalidScope);
+        await response.AssertErrorAsync(Oidc.Authorize.Errors.UnsupportedResponseType);
     }
 
     [Fact]

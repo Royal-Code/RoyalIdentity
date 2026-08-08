@@ -16,29 +16,22 @@ namespace RoyalIdentity.Responses;
 
 public class AuthorizeResponse : IResponseHandler
 {
-    internal AuthorizeResponse(AuthorizeContext context, string? code, string? sessionState,
-        string? identityToken = null, string? token = null)
+    internal AuthorizeResponse(AuthorizeContext context, string code, string? sessionState, string issuer)
     {
         Context = context;
         Code = code;
         SessionState = sessionState;
-        IdentityToken = identityToken;
-        Token = token;
+        Issuer = issuer;
     }
 
     public AuthorizeContext Context { get; }
 
-    public string? Code { get; }
+    public string Code { get; }
 
     public string? SessionState { get; }
 
-    public string? IdentityToken { get; }
-
-    public string? Token { get; }
-
-    public string? TokenType { get; }
-
-    public int? AccessTokenLifetime { get; }
+    /// <summary>Gets the issuer identifier included according to RFC 9207.</summary>
+    public string Issuer { get; }
 
     public string? Scope => Context.Scope;
 
@@ -80,20 +73,7 @@ public class AuthorizeResponse : IResponseHandler
     {
         var collection = new NameValueCollection();
 
-        if (Code.IsPresent())
-            collection.Add(Oidc.Authorize.Response.Code, Code);
-
-        if (Token.IsPresent())
-            collection.Add(Oidc.Authorize.Response.AccessToken, Token);
-
-        if (TokenType.IsPresent())
-            collection.Add(Oidc.Authorize.Response.TokenType, TokenType);
-
-        if (AccessTokenLifetime.HasValue)
-            collection.Add(Oidc.Authorize.Response.ExpiresIn, AccessTokenLifetime.Value.ToString());
-
-        if (IdentityToken.IsPresent())
-            collection.Add(Oidc.Authorize.Response.IdentityToken, IdentityToken);
+        collection.Add(Oidc.Authorize.Response.Code, Code);
 
         if (Scope.IsPresent())
             collection.Add(Oidc.Authorize.Response.Scope, Scope);
@@ -103,6 +83,8 @@ public class AuthorizeResponse : IResponseHandler
 
         if (SessionState.IsPresent())
             collection.Add(Oidc.Authorize.Response.SessionState, SessionState);
+
+        collection.Add(Oidc.Authorize.Response.Issuer, Issuer);
 
         return collection;
     }

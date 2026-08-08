@@ -31,12 +31,14 @@ public class AuthorizeErrorResponse : IResponseHandler
         AuthorizeContext context,
         string error,
         string? errorDescription,
-        string? sessionState)
+        string? sessionState,
+        string issuer)
     {
         Context = context;
         Error = error;
         ErrorDescription = errorDescription;
         SessionState = sessionState;
+        Issuer = issuer;
     }
 
     /// <summary>
@@ -58,6 +60,9 @@ public class AuthorizeErrorResponse : IResponseHandler
     /// Gets the opaque OP browser-session state, when this is an eligible OIDC response.
     /// </summary>
     public string? SessionState { get; }
+
+    /// <summary>Gets the issuer identifier included according to RFC 9207.</summary>
+    public string Issuer { get; }
 
     /// <summary>
     /// Gets the state value from the original authorize request.
@@ -113,6 +118,8 @@ public class AuthorizeErrorResponse : IResponseHandler
 
         if (SessionState.IsPresent())
             collection.Add(Oidc.Authorize.Response.SessionState, SessionState);
+
+        collection.Add(Oidc.Authorize.Response.Issuer, Issuer);
 
         return collection;
     }

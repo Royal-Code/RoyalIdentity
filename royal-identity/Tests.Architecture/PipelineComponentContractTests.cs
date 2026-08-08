@@ -20,7 +20,6 @@ public class PipelineComponentContractTests
         { typeof(LoadClient), typeof(IDecorator<IWithClient>) },
         { typeof(ResourcesDecorator), typeof(IDecorator<IWithResources>) },
         { typeof(AuthorizeMainValidator), typeof(IValidator<IAuthorizationContextBase>) },
-        { typeof(AuthorizationResourcesValidator), typeof(IValidator<IAuthorizationContextBase>) },
         { typeof(PkceValidator), typeof(IValidator<IWithCodeChallenge>) },
         { typeof(RedirectUriValidator), typeof(IValidator<IWithRedirectUri>) },
         { typeof(ResourcesValidator), typeof(IValidator<IWithResources>) },

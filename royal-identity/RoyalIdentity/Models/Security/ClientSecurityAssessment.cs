@@ -148,8 +148,8 @@ public sealed class ClientSecurityAssessment
             SecurityRequirementLevel.ShouldNot,
             SecurityAssessmentStatus.Warning,
             SecurityFindingSeverity.High,
-            "The client permits a response type that issues an access token in the authorization response.",
-            "Use the code response type and obtain access tokens from the token endpoint."));
+            "The client retains a response type that requests an access token in the authorization response, although the runtime now rejects it.",
+            "Remove the residual response type, keep only code and obtain access tokens from the token endpoint."));
     }
 
     private static void EvaluatePasswordGrant(Client client, List<ClientSecurityFinding> findings)

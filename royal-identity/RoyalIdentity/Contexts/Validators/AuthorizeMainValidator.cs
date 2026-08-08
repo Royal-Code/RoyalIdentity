@@ -36,7 +36,7 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
             return ValueTask.CompletedTask;
         }
 
-        if (!context.Options.Discovery.ResponseTypesIsSupported(responseTypes))
+        if (responseTypes.Count is not 1 || !responseTypes.Contains(Oidc.ResponseTypes.Code))
         {
             logger.LogError(context, "Response type not supported", responseTypes.ToSpaceSeparatedString());
             context.Error(Oidc.Authorize.Errors.UnsupportedResponseType, "Response type not supported");
@@ -64,33 +64,17 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
         var responseMode = context.ResponseMode;
         if (responseMode.IsPresent())
         {
-            if (!context.Options.Discovery.ResponseModeIsSupported(responseMode))
+            if (!IsSupportedResponseMode(responseMode))
             {
                 logger.LogError(context, "Unsupported response_mode", responseMode);
                 context.Error(Oidc.Authorize.Errors.UnsupportedResponseMode, "Response mode not supported");
                 return ValueTask.CompletedTask;
             }
 
-            // when a token is required, the response mode should be form_post
-            if (responseMode != Oidc.ResponseModes.FormPost && responseTypes.Any(t => t != Oidc.ResponseTypes.Code))
-            {
-                logger.LogError(
-                    context,
-                    "Invalid response_mode for response_type",
-                    $"{responseMode} - {responseTypes.ToSpaceSeparatedString()}");
-
-                context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid response_mode for response_type");
-
-                return ValueTask.CompletedTask;
-            }            
         }
         else
         {
-            // set default response_mode
-            if (responseTypes.Contains(Oidc.ResponseTypes.Token) || responseTypes.Contains(Oidc.ResponseTypes.IdToken))
-                context.ResponseMode = Oidc.ResponseModes.FormPost;
-            else
-                context.ResponseMode = Oidc.ResponseModes.Query;
+            context.ResponseMode = Oidc.ResponseModes.Query;
         }
 
 
@@ -124,15 +108,6 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
                 return ValueTask.CompletedTask;
             }
         }
-        else if (context.Scopes.IsOpenId && 
-            context.ResponseTypes.Contains(Oidc.ResponseTypes.Token))
-        {
-            logger.LogError(context, "Nonce required for implicit flow with openid scope");
-            context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid nonce: required");
-            return ValueTask.CompletedTask;
-        }
-
-
         //////////////////////////////////////////////////////////
         // check prompt
         //////////////////////////////////////////////////////////
@@ -196,4 +171,9 @@ public class AuthorizeMainValidator : IValidator<IAuthorizationContextBase>
 
         return ValueTask.CompletedTask;
     }
+
+    private static bool IsSupportedResponseMode(string responseMode)
+        => responseMode is Oidc.ResponseModes.Query
+            or Oidc.ResponseModes.Fragment
+            or Oidc.ResponseModes.FormPost;
 }

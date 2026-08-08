@@ -35,24 +35,6 @@ public class DiscoveryOptions
             entry => CloneJsonValue(entry.Value)!,
             StringComparer.Ordinal);
 
-        SupportedResponseTypes.Clear();
-        foreach (var value in other.SupportedResponseTypes)
-        {
-            SupportedResponseTypes.Add(value);
-        }
-
-        CodeChallengeMethodsSupported.Clear();
-        foreach (var value in other.CodeChallengeMethodsSupported)
-        {
-            CodeChallengeMethodsSupported.Add(value);
-        }
-
-        SupportedResponseModes.Clear();
-        foreach (var value in other.SupportedResponseModes)
-        {
-            SupportedResponseModes.Add(value);
-        }
-
         SupportedSubjectTypes.Clear();
         foreach (var value in other.SupportedSubjectTypes)
         {
@@ -152,29 +134,6 @@ public class DiscoveryOptions
     /// </summary>
     public Dictionary<string, object> CustomEntries { get; set; } = new();
 
-    /// <summary>
-    /// Gets or sets the supported response types.
-    /// </summary>
-    public HashSet<string> SupportedResponseTypes { get; } =
-    [
-        Oidc.ResponseTypes.Code,
-        Oidc.ResponseTypes.Token,
-        Oidc.ResponseTypes.IdToken
-    ];
-
-    public HashSet<string> CodeChallengeMethodsSupported { get; } =
-    [
-        Oidc.CodeChallenge.Methods.Plain,
-        Oidc.CodeChallenge.Methods.Sha256
-    ];
-
-    public HashSet<string> SupportedResponseModes { get; } =
-    [
-        Oidc.ResponseModes.FormPost,
-        Oidc.ResponseModes.Fragment,
-        Oidc.ResponseModes.Query
-    ];
-
     public HashSet<string> SupportedSubjectTypes { get; } =
     [
         Oidc.SubjectTypes.Public
@@ -201,21 +160,6 @@ public class DiscoveryOptions
         Oidc.TokenTypeHints.RefreshToken,
         Oidc.TokenTypeHints.AccessToken
     ];
-
-    public bool ResponseTypesIsSupported(ICollection<string> responseTypes)
-    {
-        return responseTypes.All(SupportedResponseTypes.Contains);
-    }
-
-    public bool CodeChallengeMethodIsSupported(string codeChallengeMethod)
-    {
-        return CodeChallengeMethodsSupported.Contains(codeChallengeMethod);
-    }
-
-    public bool ResponseModeIsSupported(string responseMode)
-    {
-        return SupportedResponseModes.Contains(responseMode);
-    }
 
     public bool SubjectTypeIsSupported(string subjectType)
     {

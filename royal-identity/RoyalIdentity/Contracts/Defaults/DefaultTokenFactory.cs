@@ -177,11 +177,6 @@ public class DefaultTokenFactory : ITokenFactory
         }
 
         // add s_hash claim
-        if (request.StateHash.IsPresent())
-        {
-            claims.Add(new Claim(Jwt.ClaimTypes.StateHash, request.StateHash));
-        }
-
         // add sid
         var sid = request.User.GetSessionId();
         claims.Add(new Claim(JwtRegisteredClaimNames.Sid, sid));
@@ -339,6 +334,5 @@ public class DefaultTokenFactory : ITokenFactory
             or JwtRegisteredClaimNames.Iss
             or JwtRegisteredClaimNames.AtHash
             or JwtRegisteredClaimNames.CHash
-            or JwtRegisteredClaimNames.Nonce
-            or Jwt.ClaimTypes.StateHash;
+            or JwtRegisteredClaimNames.Nonce;
 }

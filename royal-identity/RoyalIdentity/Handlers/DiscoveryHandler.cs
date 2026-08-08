@@ -175,13 +175,18 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         // response types
         if (options.Discovery.ShowResponseTypes)
         {
-            entries.Add(Oidc.Discovery.ResponseTypesSupported, options.Discovery.SupportedResponseTypes.ToArray());
+            entries.Add(Oidc.Discovery.ResponseTypesSupported, new[] { Oidc.ResponseTypes.Code });
         }
 
         // response modes
         if (options.Discovery.ShowResponseModes)
         {
-            entries.Add(Oidc.Discovery.ResponseModesSupported, options.Discovery.SupportedResponseModes.ToArray());
+            entries.Add(Oidc.Discovery.ResponseModesSupported, new[]
+            {
+                Oidc.ResponseModes.Query,
+                Oidc.ResponseModes.Fragment,
+                Oidc.ResponseModes.FormPost,
+            });
         }
 
         // misc
@@ -205,12 +210,17 @@ public class DiscoveryHandler : IHandler<DiscoveryContext>
         }
 
         entries.Add(Oidc.Discovery.SubjectTypesSupported, options.Discovery.SupportedSubjectTypes.ToArray());
-        entries.Add(Oidc.Discovery.CodeChallengeMethodsSupported, options.Discovery.CodeChallengeMethodsSupported.ToArray());
+        entries.Add(Oidc.Discovery.CodeChallengeMethodsSupported, new[]
+        {
+            Oidc.CodeChallenge.Methods.Plain,
+            Oidc.CodeChallenge.Methods.Sha256,
+        });
 
         AddUiLocalesSupported(entries, options.Internationalization);
 
         if (options.Endpoints.EnableAuthorizeEndpoint)
         {
+            entries.Add(Oidc.Discovery.AuthorizationResponseIssParameterSupported, true);
             entries.Add(Oidc.Discovery.RequestParameterSupported, true);
 
             if (options.Endpoints.EnableJwtRequestUri)

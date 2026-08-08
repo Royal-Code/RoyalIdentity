@@ -163,6 +163,9 @@ public class ConfigurationModelPayloadTests
     [InlineData("{\"Endpoints\":{\"Enable" + "DeviceAuthorizationEndpoint\":true}}")]
     [InlineData("{\"InputLengthRestrictions\":{\"DeviceCode\":100}}")]
     [InlineData("{\"Logging\":{\"UseLog" + "Service\":true}}")]
+    [InlineData("{\"Discovery\":{\"Supported" + "ResponseTypes\":[\"token\"]}}")]
+    [InlineData("{\"Discovery\":{\"Supported" + "ResponseModes\":[\"custom\"]}}")]
+    [InlineData("{\"Discovery\":{\"CodeChallengeMethods" + "Supported\":[\"custom\"]}}")]
     public void ServerOptions_PreviousPreReleaseShapeAtVersionOne_FailsClosed(string json)
     {
         Assert.Throws<ConfigurationPayloadException>(
@@ -446,6 +449,9 @@ public class ConfigurationModelPayloadTests
     [InlineData("{\"Endpoints\":{\"Enable" + "DeviceAuthorizationEndpoint\":true}}")]
     [InlineData("{\"InputLengthRestrictions\":{\"DeviceCode\":100}}")]
     [InlineData("{\"Logging\":{\"UseLog" + "Service\":true}}")]
+    [InlineData("{\"Discovery\":{\"Supported" + "ResponseTypes\":[\"token\"]}}")]
+    [InlineData("{\"Discovery\":{\"Supported" + "ResponseModes\":[\"custom\"]}}")]
+    [InlineData("{\"Discovery\":{\"CodeChallengeMethods" + "Supported\":[\"custom\"]}}")]
     public void RealmOptions_PreviousPreReleaseShapeAtVersionOne_FailsClosed(string json)
     {
         Assert.Throws<ConfigurationPayloadException>(
@@ -506,5 +512,8 @@ public class ConfigurationModelPayloadTests
         Assert.DoesNotContain("Enable" + "DeviceAuthorizationEndpoint", json, StringComparison.Ordinal);
         Assert.DoesNotContain("\"DeviceCode\"", json, StringComparison.Ordinal);
         Assert.DoesNotContain("UseLog" + "Service", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Supported" + "ResponseTypes", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Supported" + "ResponseModes", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("CodeChallengeMethods" + "Supported", json, StringComparison.Ordinal);
     }
 }

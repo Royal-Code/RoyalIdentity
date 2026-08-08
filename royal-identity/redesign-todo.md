@@ -102,12 +102,13 @@ UI composta realmente entrega. Overrides por tenant, claims localizados, conteú
 tenant e a futura UI administrativa permanecem capacidades distintas, rastreadas no plano/roadmap e não como
 dívida deste redesign.
 
-## RFC 9700 (EM EXECUÇÃO — 2/6)
+## RFC 9700 (EM EXECUÇÃO — 3/6)
 
 Avaliar se a implementação atual está de acordo com **rfc9700**.
 
 **Estado atual:** `.ai/plans/plan-rfc9700-security-hardening.md` está em execução. A Fase 1 entregou o
 `ClientSecurityAssessment` puro e os `RuleId` estáveis; a Fase 2 entregou redirects HTTPS exatos por default,
 com ignore-case/wildcard somente por opt-in realm-scoped e enforcement compartilhado por authorize, code e
-end-session. A Fase 3 é a próxima. A Q1 foi fechada pela opção A: a Fase 4 aplicará tolerância default de 30
-segundos ao retry de refresh token.
+end-session. A Fase 3 removeu implicit/hybrid e a emissão de tokens no front-channel, preservou PKCE e passou a
+emitir/anunciar `iss` conforme RFC 9207. A Fase 4 é a próxima. A Q1 foi fechada pela opção A: ela aplicará
+tolerância default de 30 segundos ao retry de refresh token.

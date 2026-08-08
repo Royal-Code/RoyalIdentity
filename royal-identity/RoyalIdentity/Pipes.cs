@@ -60,11 +60,9 @@ public static class Pipes
                 .UseValidator<ResourcesValidator>()
                 .UseValidator<AuthorizeMainValidator>()
                 .UseValidator<PkceValidator>()
-                .UseValidator<AuthorizationResourcesValidator>()
                 .UseDecorator<PromptNoneInteractionDecorator>()
                 .UseDecorator<PromptLoginDecorator>()
-                .UseDecorator<ConsentDecorator>()
-                .UseDecorator<StateHashDecorator>();
+                .UseDecorator<ConsentDecorator>();
 
             options.CustomizeAuthorizeContext?.Invoke(authorizeContextPipe);
 
@@ -80,8 +78,7 @@ public static class Pipes
                 .UseValidator<RedirectUriValidator>()
                 .UseValidator<AuthorizeMainValidator>()
                 .UseDecorator<ResourcesDecorator>()
-                .UseValidator<ResourcesValidator>()
-                .UseValidator<AuthorizationResourcesValidator>();
+                .UseValidator<ResourcesValidator>();
 
             options.CustomizeAuthorizeValidateContext?.Invoke(authorizeValidateContextPipe);
 

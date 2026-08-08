@@ -284,7 +284,6 @@ public class OperationalPayloadTests
         Assert.Equal(code.Lifetime, restored.Lifetime);
         Assert.Equal(code.RealmId, restored.RealmId);
         Assert.Equal(code.Nonce, restored.Nonce);
-        Assert.Equal(code.StateHash, restored.StateHash);
         Assert.Equal(code.SessionId, restored.SessionId);
         Assert.Equal(code.CodeChallenge, restored.CodeChallenge);
         Assert.Equal(code.CodeChallengeMethod, restored.CodeChallengeMethod);

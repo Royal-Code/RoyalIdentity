@@ -31,13 +31,6 @@ public static partial class Constants
 
         public static readonly TimeSpan DefaultCacheDuration = TimeSpan.FromMinutes(10);
 
-        public static readonly IReadOnlyCollection<string> SupportedResponseTypes =
-        [
-            Oidc.ResponseTypes.Code,
-            Oidc.ResponseTypes.Token,
-            Oidc.ResponseTypes.IdToken
-        ];
-
         public static class Realms
         {
             public const string ServerRealm = "server";
@@ -449,11 +442,6 @@ public static partial class Constants
             {
                 public const string Scope = "scope";
                 public const string Code = "code";
-                public const string AccessToken = "access_token";
-                public const string ExpiresIn = "expires_in";
-                public const string TokenType = "token_type";
-                public const string RefreshToken = "refresh_token";
-                public const string IdentityToken = "id_token";
                 public const string State = "state";
                 public const string SessionState = "session_state";
                 public const string Issuer = "iss";
@@ -1033,7 +1021,6 @@ public static partial class Constants
             // OAuth2/OIDC extensions (not in JwtRegisteredClaimNames)
             public const string Scope = "scope";
             public const string Confirmation = "cnf";
-            public const string StateHash = "s_hash";
             public const string Events = "events";
             public const string ClientId = "client_id";
             public const string Actor = "act";

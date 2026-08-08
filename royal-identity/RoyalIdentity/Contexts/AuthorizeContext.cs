@@ -95,14 +95,6 @@ public class AuthorizeContext : EndpointContextBase, IAuthorizationContextBase, 
     public string? State { get; set; }
 
     /// <summary>
-    /// Gets or sets the state hash.
-    /// </summary>
-    /// <value>
-    /// The hash of the <see cref="State"/>.
-    /// </value>
-    public string? StateHash { get; set; }
-
-    /// <summary>
     /// Gets or sets a value indicating whether the resource owner denied consent on the consent screen.
     /// When <c>true</c>, the pipeline emits an <c>access_denied</c> error back to the client.
     /// </summary>

@@ -107,8 +107,6 @@ public class AuthorizationCode
     /// <value>
     /// The hashed state.
     /// </value>
-    public string? StateHash { get; set; }
-
     /// <summary>
     /// Gets or sets the session identifier.
     /// </summary>

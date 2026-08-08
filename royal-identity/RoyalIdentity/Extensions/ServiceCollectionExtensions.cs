@@ -121,11 +121,9 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ProcessRequestObject>();
         services.AddTransient<PromptLoginDecorator>();
         services.AddTransient<ResourcesDecorator>();
-        services.AddTransient<StateHashDecorator>();
 
         // Validators
         services.AddTransient<ActiveUserValidator>();
-        services.AddTransient<AuthorizationResourcesValidator>();
         services.AddTransient<AuthorizeMainValidator>();
         services.AddTransient<EndSessionValidator>();
         services.AddTransient<GrantTypeValidator>();

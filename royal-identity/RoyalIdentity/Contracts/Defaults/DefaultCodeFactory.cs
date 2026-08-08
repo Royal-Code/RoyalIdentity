@@ -44,7 +44,6 @@ public class DefaultCodeFactory : ICodeFactory
             CodeChallenge = PkceHelper.HashCodeChallengeForStorage(context.CodeChallenge),
             CodeChallengeMethod = context.CodeChallengeMethod,
             Nonce = context.Nonce,
-            StateHash = context.StateHash,
             RealmId = context.Realm.Id,
         };
 

@@ -74,13 +74,14 @@ phases)** — `RealmOptions.Internationalization` is the realm-scoped localizati
 `SupportedLocales` an ordered, case-insensitively distinct `List<string>` normalized and validated before the
 configuration snapshot is published. The account UI ships RESX catalogs for `en`, `pt-BR` and `es-419`, request
 culture follows the documented realm-scoped precedence, and discovery publishes only the effective UI catalog.
-`.ai/plans/plan-rfc9700-security-hardening.md` is the active plan (2/6 phases complete). Fase 1 introduced the
+`.ai/plans/plan-rfc9700-security-hardening.md` is the active plan (3/6 phases complete). Fase 1 introduced the
 pure, ephemeral `ClientSecurityAssessment.Create(Client, RealmOptions)` and stable `RuleId` findings under
 `RoyalIdentity.Models.Security`; the assessment is never persisted, registered in DI or used as a runtime
 authorization gate. Fase 2 added realm-scoped secure redirect validation: exact ordinal HTTPS by default,
 case-insensitive comparison and bounded wildcard matching only by explicit opt-in, shared by authorize, code
-redemption and end-session. Q1 is closed with a 30-second default refresh-token retry tolerance to be applied in
-Fase 4.
+redemption and end-session. Fase 3 made authorization code + PKCE the only interactive flow, removed
+implicit/hybrid and front-channel token issuance, and emits/advertises realm-aware `iss` per RFC 9207. Q1 is
+closed with a 30-second default refresh-token retry tolerance to be applied in Fase 4, which is next.
 The resources/scopes domain redesign is complete, while its realm-scoped catalog remains on the volatile
 `ConfigurationResourceBridgeOptions` per baseline DF22 until a dedicated persistence plan is authorized. The production
 `RoyalIdentity.Server` is PostgreSQL-only and externally provisioned by `RoyalIdentity.Migrations`; it never
