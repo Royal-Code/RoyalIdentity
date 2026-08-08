@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Extensions;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Models;
@@ -32,7 +32,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
             client.AllowedResponseTypes.Add("code");
             client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
-            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.RedirectUris.UnionWith(["https://localhost:5000/callback", "https://localhost:5001/callback"]);
         });
 
         var client = factory.CreateClient();
@@ -78,7 +78,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
             client.AllowedResponseTypes.Add("code");
             client.AllowedGrantTypes.Add("authorization_code");
-            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.RedirectUris.UnionWith(["https://localhost:5000/callback", "https://localhost:5001/callback"]);
         });
 
         var client = factory.CreateClient();
@@ -124,7 +124,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
             client.AllowedResponseTypes.Add("code");
             client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
-            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.RedirectUris.UnionWith(["https://localhost:5000/callback", "https://localhost:5001/callback"]);
             client.Secrets.Add(new ClientSecret(secretHash));
         });
 
@@ -168,7 +168,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
             client.AllowedResponseTypes.Add("code");
             client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
-            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.RedirectUris.UnionWith(["https://localhost:5000/callback", "https://localhost:5001/callback"]);
             client.Secrets.Add(new ClientSecret(secretHash));
         });
 
@@ -383,7 +383,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowedGrantTypes.UnionWith(["authorization_code", "refresh_token"]);
             client.AllowedIdentityScopes.Add("openid");
             client.AllowedResponseTypes.Add("code");
-            client.RedirectUris.Add("http://localhost:5000/**");
+            client.RedirectUris.Add("https://localhost:5000/callback");
             client.AllowedResourceServers.UnionWith(allowedResourceServers);
         });
 
@@ -401,7 +401,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
                 DateTime.UtcNow,
                 300,
                 resources,
-                "http://localhost:5000/callback");
+                "https://localhost:5000/callback");
 
             await storage.GetAuthorizationCodeStore(realm)
                 .StoreAuthorizationCodeAsync(authorizationCode, default);
@@ -417,7 +417,7 @@ public class RefreshTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback"
+                    ["redirect_uri"] = "https://localhost:5000/callback"
                 }));
 
         var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();

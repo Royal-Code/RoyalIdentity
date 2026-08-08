@@ -8,11 +8,11 @@ public static class WildcardExtensions
 {
     private static readonly WildcardDefinition[] wildcards =
     [
-        new WildcardDefinition("://*.", "://wildcard.", DomainRegexPattern),
-        new WildcardDefinition("/**", "/wildcard/wildcard", AnyRegexPattern),
-        new WildcardDefinition("/*", "/wildcard/", PathRegexPattern),
-        new WildcardDefinition(":*", ":5000", PortRegexPattern),
-        new WildcardDefinition("*:/", "scheme:", SchemeRegexPattern),
+        new WildcardDefinition("://*.", "://wildcard.", "://(?:[a-zA-Z0-9-]+\\.)+"),
+        new WildcardDefinition("/**", "/wildcard/wildcard", "/.*"),
+        new WildcardDefinition("/*", "/wildcard/", "/[a-zA-Z0-9-]*"),
+        new WildcardDefinition(":*", ":5000", ":[0-9]+"),
+        new WildcardDefinition("*:/", "scheme:", "(?:[a-zA-Z][a-zA-Z0-9+.-]*):/"),
     ];
 
     private static readonly ConcurrentDictionary<string, string> regexPatternsCache = new();
@@ -40,78 +40,49 @@ public static class WildcardExtensions
         return value;
     }
 
-    public static bool MatchWildcard(this string value, string toMatch)
+    public static bool MatchWildcard(this string value, string toMatch, StringComparison comparison)
     {
         var pattern = regexPatternsCache.GetOrAdd(value, createPattern);
-        var match = Regex.Match(toMatch, pattern);
+        var options = comparison switch
+        {
+            StringComparison.Ordinal => RegexOptions.CultureInvariant,
+            StringComparison.OrdinalIgnoreCase => RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
+            _ => throw new ArgumentOutOfRangeException(nameof(comparison), comparison, null),
+        };
+        var match = Regex.Match(toMatch, pattern, options);
 
         return match.Success;
     }
 
     public static string CreatePattern(string value)
     {
-        var pattern = value.PrepareRegexPattern();
+        var pattern = Regex.Escape(value);
 
         foreach (var wc in wildcards)
         {
-            var rwc = wc.RegexWildcard;
-            if (pattern.Contains(rwc))
-            {
-                pattern = string.Join(wc.RegexPattern(rwc), pattern.Split(rwc));
-            }
+            pattern = pattern.Replace(
+                Regex.Escape(wc.Key),
+                wc.RegexPattern,
+                StringComparison.Ordinal);
         }
 
         return $"^{pattern}$";
     }
 
-    private static string PrepareRegexPattern(this string value)
-    {
-        var result = value.Replace("/", "\\/").Replace("?", "\\?").Replace(".", "\\.");
-        return result;
-    }
-
-    private static string AnyRegexPattern(this string wildcard)
-    {
-        return $"({wildcard.Replace("**", ".*")})";
-    }
-
-    private static string DomainRegexPattern(this string wildcard)
-    {
-        return $"({wildcard.Replace("*", "[a-zA-Z0-9\\-\\.]*")})";
-    }
-
-    private static string PortRegexPattern(this string wildcard)
-    {
-        return $"({wildcard.Replace("*", "[0-9]*")})";
-    }
-
-    private static string PathRegexPattern(this string wildcard)
-    {
-        return $"({wildcard.Replace("*", "[a-zA-Z0-9\\-]*")})";
-    }
-
-    private static string SchemeRegexPattern(this string wildcard)
-    {
-        return $"({wildcard.Replace("*", "[a-zA-Z0-9\\-\\.]*")})";
-    }
-
     private sealed class WildcardDefinition
     {
-        public WildcardDefinition(string key, string replacement, Func<string, string> apply)
+        public WildcardDefinition(string key, string replacement, string regexPattern)
         {
             Key = key;
             Replacement = replacement;
-            RegexPattern = apply;
-            RegexWildcard = key.PrepareRegexPattern();
+            RegexPattern = regexPattern;
         }
 
         public string Key { get; }
 
         public string Replacement { get; }
 
-        public string RegexWildcard { get; }
-
-        public Func<string, string> RegexPattern { get; }
+        public string RegexPattern { get; }
     }
 }
 

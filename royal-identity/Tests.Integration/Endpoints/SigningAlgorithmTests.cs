@@ -115,7 +115,7 @@ public class SigningAlgorithmTests : IClassFixture<PersistentStorageAppFactory>
                 client.RequireClientSecret = false;
                 client.AllowedGrantTypes.Add("authorization_code");
                 client.AllowedResponseTypes.Add("code");
-                client.RedirectUris.Add("http://localhost:5000/**");
+                client.RedirectUris.Add("https://localhost:5000/callback");
                 client.AllowedIdentityTokenSigningAlgorithms.Add(SecurityAlgorithms.EcdsaSha256);
             });
         await SeedAliceAsync(realm);
@@ -136,7 +136,7 @@ public class SigningAlgorithmTests : IClassFixture<PersistentStorageAppFactory>
             DateTime.UtcNow,
             300,
             resources,
-            "http://localhost:5000/callback");
+            "https://localhost:5000/callback");
 
         await storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
 
@@ -148,7 +148,7 @@ public class SigningAlgorithmTests : IClassFixture<PersistentStorageAppFactory>
                 [Oidc.Token.Request.GrantType] = "authorization_code",
                 [Oidc.Token.Request.Code] = code.Code,
                 [Oidc.Token.Request.ClientId] = clientId,
-                [Oidc.Token.Request.RedirectUri] = "http://localhost:5000/callback"
+                [Oidc.Token.Request.RedirectUri] = "https://localhost:5000/callback"
             }));
 
         var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();

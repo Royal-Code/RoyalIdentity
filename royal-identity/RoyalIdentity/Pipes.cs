@@ -160,7 +160,8 @@ public static class Pipes
             //////////////////////////////
             var endSessionContextPipe = builder.For<EndSessionContext>()
                 .UseDecorator<LoadClient>()
-                .UseDecorator<EndSessionDecorator>();
+                .UseDecorator<EndSessionDecorator>()
+                .UseValidator<EndSessionValidator>();
 
             options.CustomizeEndSessionContext?.Invoke(endSessionContextPipe);
 

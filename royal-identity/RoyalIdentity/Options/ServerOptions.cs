@@ -31,6 +31,7 @@ public class ServerOptions
         Endpoints = new EndpointsOptions(other.Endpoints);
         Csp = new CspOptions(other.Csp);
         Cors = new CorsOptions(other.Cors);
+        RedirectUriValidation = new RedirectUriValidationOptions(other.RedirectUriValidation);
         MutualTls = new MutualTlsOptions(other.MutualTls);
         Keys = new KeyOptions(other.Keys);
         IssuerUri = other.IssuerUri;
@@ -91,6 +92,9 @@ public class ServerOptions
     /// Gets or sets the CORS defaults for new realms.
     /// </summary>
     public CorsOptions Cors { get; set; } = new();
+
+    /// <summary>Gets or sets the redirect URI validation defaults for new realms.</summary>
+    public RedirectUriValidationOptions RedirectUriValidation { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the mutual TLS options.

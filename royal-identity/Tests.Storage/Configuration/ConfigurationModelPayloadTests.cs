@@ -34,6 +34,8 @@ public class ConfigurationModelPayloadTests
         options.Keys.MainSigningCredentialsAlgorithm = "RS512";
         options.Cors.AllowedOrigins.Add("https://a.example");
         options.Authentication.CheckSessionCookieName = ".custom.check-session";
+        options.RedirectUriValidation.Comparison = RedirectUriComparison.OrdinalIgnoreCase;
+        options.RedirectUriValidation.AllowWildcard = true;
 
         var (version, json) = serverSerializer.Serialize(options);
         var restored = serverSerializer.Deserialize(version, json);
@@ -52,8 +54,51 @@ public class ConfigurationModelPayloadTests
         Assert.Equal("RS512", restored.Keys.MainSigningCredentialsAlgorithm);
         Assert.Contains("https://a.example", restored.Cors.AllowedOrigins);
         Assert.Equal(".custom.check-session", restored.Authentication.CheckSessionCookieName);
+        Assert.Equal(RedirectUriComparison.OrdinalIgnoreCase, restored.RedirectUriValidation.Comparison);
+        Assert.True(restored.RedirectUriValidation.AllowWildcard);
         // The case-insensitive CORS comparer survives because the get-only collection is repopulated in place.
         Assert.Contains("HTTPS://A.EXAMPLE", restored.Cors.AllowedOrigins);
+    }
+
+    [Fact]
+    public void RedirectUriPolicy_RoundTripsAtVersionOneAndRealmCopyIsIndependent()
+    {
+        var serverOptions = new ServerOptions();
+        serverOptions.RedirectUriValidation.Comparison = RedirectUriComparison.OrdinalIgnoreCase;
+        serverOptions.RedirectUriValidation.AllowWildcard = true;
+        var realmOptions = new RealmOptions(serverOptions);
+        realmOptions.RedirectUriValidation.Comparison = RedirectUriComparison.Ordinal;
+
+        var (serverVersion, serverJson) = serverSerializer.Serialize(serverOptions);
+        var restoredServer = serverSerializer.Deserialize(serverVersion, serverJson);
+        var (realmVersion, realmJson) = realmSerializer.Serialize(realmOptions);
+        var restoredRealm = realmSerializer.Deserialize(realmVersion, realmJson, restoredServer);
+        var copiedRealm = new RealmOptions(restoredRealm);
+        copiedRealm.RedirectUriValidation.AllowWildcard = false;
+
+        Assert.Equal(1, serverVersion);
+        Assert.Equal(1, realmVersion);
+        Assert.Contains(nameof(ServerOptions.RedirectUriValidation), serverJson, StringComparison.Ordinal);
+        Assert.Contains(nameof(RealmOptions.RedirectUriValidation), realmJson, StringComparison.Ordinal);
+        Assert.Equal(RedirectUriComparison.OrdinalIgnoreCase, restoredServer.RedirectUriValidation.Comparison);
+        Assert.True(restoredServer.RedirectUriValidation.AllowWildcard);
+        Assert.Equal(RedirectUriComparison.Ordinal, restoredRealm.RedirectUriValidation.Comparison);
+        Assert.True(restoredRealm.RedirectUriValidation.AllowWildcard);
+        Assert.NotSame(restoredRealm.RedirectUriValidation, copiedRealm.RedirectUriValidation);
+        Assert.True(restoredRealm.RedirectUriValidation.AllowWildcard);
+        Assert.False(copiedRealm.RedirectUriValidation.AllowWildcard);
+    }
+
+    [Fact]
+    public void RedirectUriPolicy_InvalidComparisonSurvivesPayloadOnlyToBeRejectedByValidation()
+    {
+        const string json = """{"RedirectUriValidation":{"Comparison":42,"AllowWildcard":false}}""";
+
+        var restoredServer = serverSerializer.Deserialize(1, json);
+        var restoredRealm = realmSerializer.Deserialize(1, json, new ServerOptions());
+
+        Assert.Single(restoredServer.RedirectUriValidation.Validate());
+        Assert.Single(restoredRealm.RedirectUriValidation.Validate());
     }
 
     [Fact]

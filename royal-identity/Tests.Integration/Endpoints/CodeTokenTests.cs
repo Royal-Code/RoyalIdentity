@@ -1,4 +1,4 @@
-﻿// Ignore Spelling: Pkce
+// Ignore Spelling: Pkce
 
 using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Models;
@@ -48,7 +48,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
             DateTime.UtcNow,
             300,
             resources,
-            "http://localhost:5000/callback");
+            "https://localhost:5000/callback");
         configure?.Invoke(code);
         await storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
         return code;
@@ -71,7 +71,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                 configured.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
                 configured.AllowedResponseTypes.Add("code");
                 configured.RedirectUris.UnionWith(
-                    ["http://localhost:5000/**", "https://localhost:5001/**"]);
+                    ["https://localhost:5000/callback", "https://localhost:5001/callback"]);
                 if (clientSecret is not null)
                     configured.Secrets.Add(new ClientSecret(clientSecret.Sha512()));
                 configure?.Invoke(configured);
@@ -95,7 +95,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = factory.Handles.DemoClient.ClientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback"
+                    ["redirect_uri"] = "https://localhost:5000/callback"
                 }));
 
         var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
@@ -139,7 +139,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = factory.Handles.DemoClient.ClientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["redirect_uri"] = "https://localhost:5000/callback",
                     ["code_verifier"] = codeVerifier
                 }));
 
@@ -183,7 +183,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = CryptoRandom.CreateUniqueId(),
                     ["client_id"] = factory.Handles.DemoClient.ClientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["redirect_uri"] = "https://localhost:5000/callback",
                     ["code_verifier"] = codeVerifier
                 }));
 
@@ -208,7 +208,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = CryptoRandom.CreateUniqueId(),
                     ["client_id"] = factory.Handles.DemoClient.ClientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["redirect_uri"] = "https://localhost:5000/callback",
                 }));
 
         // Assert
@@ -236,7 +236,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
                     ["client_secret"] = clientSecret,
-                    ["redirect_uri"] = "http://localhost:5000/callback"
+                    ["redirect_uri"] = "https://localhost:5000/callback"
                 }));
 
         // Assert
@@ -273,7 +273,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback"
+                    ["redirect_uri"] = "https://localhost:5000/callback"
                 }));
 
         // Assert
@@ -303,7 +303,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback"
+                    ["redirect_uri"] = "https://localhost:5000/callback"
                 }));
 
         var content = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
@@ -357,7 +357,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["redirect_uri"] = "https://localhost:5000/callback",
                     ["resource"] = ordersResource
                 }));
 
@@ -417,7 +417,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["redirect_uri"] = "https://localhost:5000/callback",
                     ["resource"] = ordersResource
                 }));
 
@@ -487,7 +487,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["redirect_uri"] = "https://localhost:5000/callback",
                     ["resource"] = ordersResource
                 }));
 
@@ -535,7 +535,7 @@ public class CodeTokenTests : IClassFixture<PersistentStorageAppFactory>
                     ["grant_type"] = "authorization_code",
                     ["code"] = code.Code,
                     ["client_id"] = clientId,
-                    ["redirect_uri"] = "http://localhost:5000/callback",
+                    ["redirect_uri"] = "https://localhost:5000/callback",
                     ["resource"] = "https://unknown.example.test/resource"
                 }));
 

@@ -299,7 +299,13 @@ public sealed class ConfigurationSeed(
             AllowedGrantTypes = { "authorization_code", "refresh_token" },
             AllowedIdentityScopes = { "openid", "profile", "email" },
             AllowedResponseTypes = { "code" },
-            RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" },
+            RedirectUris =
+            {
+                "https://localhost/callback",
+                "https://localhost:5000/callback",
+                "https://localhost:5000/other-callback",
+                "https://localhost:5001/callback",
+            },
         };
         yield return new Client
         {
@@ -313,7 +319,13 @@ public sealed class ConfigurationSeed(
             AllowedResourceServers = { "apiserver" },
             AllowedResponseTypes = { "code" },
             RequireConsent = true,
-            RedirectUris = { "http://localhost/callback", "http://localhost:5000/**", "https://localhost:5001/**" },
+            RedirectUris =
+            {
+                "https://localhost/callback",
+                "https://localhost:5000/callback",
+                "https://localhost:5000/other-callback",
+                "https://localhost:5001/callback",
+            },
         };
     }
 

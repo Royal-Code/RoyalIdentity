@@ -117,7 +117,7 @@ public class IssuerUriTests : IClassFixture<PersistentStorageAppFactory>
     {
         var codeVerifier = CryptoRandom.CreateUniqueId();
         var codeChallenge = Base64Url.Encode(Encoding.ASCII.GetBytes(codeVerifier).Sha256());
-        var redirectUri = $"{client.BaseAddress}callback";
+        const string redirectUri = "https://localhost/callback";
 
         var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", "demo_client")

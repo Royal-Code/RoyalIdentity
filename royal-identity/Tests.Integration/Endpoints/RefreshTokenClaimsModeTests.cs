@@ -42,7 +42,7 @@ public class RefreshTokenClaimsModeTests : IClassFixture<PersistentStorageAppFac
                 client.AllowedScopes.Add("api");
                 client.AllowedResponseTypes.Add("code");
             client.AllowedGrantTypes.UnionWith(["code", "refresh_token"]);
-            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.RedirectUris.UnionWith(["https://localhost:5000/callback", "https://localhost:5001/callback"]);
             configure?.Invoke(client);
         });
 

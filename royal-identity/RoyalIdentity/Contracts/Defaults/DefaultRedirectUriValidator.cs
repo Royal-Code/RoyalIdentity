@@ -1,29 +1,45 @@
 ﻿using RoyalIdentity.Extensions;
 using RoyalIdentity.Models;
+using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts.Defaults;
 
 public class DefaultRedirectUriValidator : IRedirectUriValidator
 {
     /// <summary>
-    /// Checks if a given URI string is in a collection of strings (using ordinal ignore case comparison).
-    /// Wildcards is allowed for the uris.
+    /// Checks whether a safe URI is in a collection using the effective realm policy.
     /// </summary>
     /// <param name="uris">The uris.</param>
     /// <param name="requestedUri">The requested URI.</param>
     /// <returns>
     ///     True if requested uri is in the collection; false otherwise.
     /// </returns>
-    public static bool MatchRedirectUri(IEnumerable<string> uris, string requestedUri)
+    public static bool MatchRedirectUri(
+        IEnumerable<string>? uris,
+        string requestedUri,
+        RedirectUriValidationOptions options)
     {
-        if (uris is null)
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (uris is null || !IsSafeRequestedUri(requestedUri))
             return false;
 
-        foreach (var s in uris)
+        var comparison = options.Comparison switch
         {
-            // if has wildcard, try to match, if not, compare normally
-            if ((s.HasWildcard() && s.MatchWildcard(requestedUri))
-                || s.Equals(requestedUri, StringComparison.OrdinalIgnoreCase))
+            RedirectUriComparison.Ordinal => StringComparison.Ordinal,
+            RedirectUriComparison.OrdinalIgnoreCase => StringComparison.OrdinalIgnoreCase,
+            _ => throw new ArgumentOutOfRangeException(nameof(options), options.Comparison, null),
+        };
+
+        foreach (var registeredUri in uris)
+        {
+            if (options.ValidateRegisteredUri(registeredUri).Count is not 0)
+                continue;
+
+            if ((options.AllowWildcard
+                    && registeredUri.HasWildcard()
+                    && registeredUri.MatchWildcard(requestedUri, comparison))
+                || registeredUri.Equals(requestedUri, comparison))
             {
                 return true;
             }
@@ -39,9 +55,14 @@ public class DefaultRedirectUriValidator : IRedirectUriValidator
     /// <returns>
     ///   <c>true</c> is the URI is valid; <c>false</c> otherwise.
     /// </returns>
-    public virtual ValueTask<bool> IsRedirectUriValidAsync(string requestedUri, Client client)
+    public virtual ValueTask<bool> IsRedirectUriValidAsync(
+        string requestedUri,
+        Client client,
+        RedirectUriValidationOptions options,
+        CancellationToken ct)
     {
-        return ValueTask.FromResult(MatchRedirectUri(client.RedirectUris, requestedUri));
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(MatchRedirectUri(client.RedirectUris, requestedUri, options));
     }
 
     /// <summary>
@@ -52,8 +73,20 @@ public class DefaultRedirectUriValidator : IRedirectUriValidator
     /// <returns>
     ///   <c>true</c> is the URI is valid; <c>false</c> otherwise.
     /// </returns>
-    public virtual ValueTask<bool> IsPostLogoutRedirectUriValidAsync(string requestedUri, Client client)
+    public virtual ValueTask<bool> IsPostLogoutRedirectUriValidAsync(
+        string requestedUri,
+        Client client,
+        RedirectUriValidationOptions options,
+        CancellationToken ct)
     {
-        return ValueTask.FromResult(MatchRedirectUri(client.PostLogoutRedirectUris, requestedUri));
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(MatchRedirectUri(client.PostLogoutRedirectUris, requestedUri, options));
     }
+
+    private static bool IsSafeRequestedUri(string? requestedUri)
+        => !string.IsNullOrWhiteSpace(requestedUri)
+            && !requestedUri.Contains('*', StringComparison.Ordinal)
+            && Uri.TryCreate(requestedUri, UriKind.Absolute, out var uri)
+            && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(uri.Fragment);
 }

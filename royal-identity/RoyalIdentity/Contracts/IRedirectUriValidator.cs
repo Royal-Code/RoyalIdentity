@@ -4,6 +4,7 @@
 // Modified by RoyalIdentity contributors for the RoyalIdentity rearchitecture.
 //
 using RoyalIdentity.Models;
+using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Contracts;
 
@@ -14,14 +15,26 @@ public interface IRedirectUriValidator
     /// </summary>
     /// <param name="requestedUri">The requested URI.</param>
     /// <param name="client">The client.</param>
+    /// <param name="options">The effective realm policy.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns><c>true</c> is the URI is valid; <c>false</c> otherwise.</returns>
-    ValueTask<bool> IsRedirectUriValidAsync(string requestedUri, Client client);
+    ValueTask<bool> IsRedirectUriValidAsync(
+        string requestedUri,
+        Client client,
+        RedirectUriValidationOptions options,
+        CancellationToken ct);
 
     /// <summary>
     /// Determines whether a post logout URI is valid for a client.
     /// </summary>
     /// <param name="requestedUri">The requested URI.</param>
     /// <param name="client">The client.</param>
+    /// <param name="options">The effective realm policy.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns><c>true</c> is the URI is valid; <c>false</c> otherwise.</returns>
-    ValueTask<bool> IsPostLogoutRedirectUriValidAsync(string requestedUri, Client client);
+    ValueTask<bool> IsPostLogoutRedirectUriValidAsync(
+        string requestedUri,
+        Client client,
+        RedirectUriValidationOptions options,
+        CancellationToken ct);
 }

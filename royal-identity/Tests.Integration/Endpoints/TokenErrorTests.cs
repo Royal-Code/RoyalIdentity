@@ -50,7 +50,7 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
                 configured.AllowedScopes.Add("api");
                 configured.AllowedResourceServers.Add("apiserver");
                 configured.AllowedResponseTypes.Add("code");
-                configured.RedirectUris.Add("http://localhost:5000/callback");
+                configured.RedirectUris.Add("https://localhost:5000/callback");
             });
     }
 
@@ -630,7 +630,7 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
         var response = await PostAsync(Authenticated(
             Field("grant_type", "authorization_code"),
             Field("code", "code-that-was-never-issued"),
-            Field("redirect_uri", "http://localhost:5000/callback")));
+            Field("redirect_uri", "https://localhost:5000/callback")));
 
         await response.AssertErrorAsync(Oidc.Token.Errors.InvalidGrant);
     }
@@ -645,11 +645,11 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
         await SeedClientAsync();
 
         KeyValuePair<string, string>[] extra = code is null
-            ? [Field("grant_type", "authorization_code"), Field("redirect_uri", "http://localhost:5000/callback")]
+            ? [Field("grant_type", "authorization_code"), Field("redirect_uri", "https://localhost:5000/callback")]
             : [
                 Field("grant_type", "authorization_code"),
                 Field("code", code),
-                Field("redirect_uri", "http://localhost:5000/callback")
+                Field("redirect_uri", "https://localhost:5000/callback")
             ];
 
         var response = await PostAsync(Authenticated(extra));
@@ -665,7 +665,7 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
         var response = await PostAsync(Authenticated(
             Field("grant_type", "authorization_code"),
             Field("code", new string('c', 1024)),
-            Field("redirect_uri", "http://localhost:5000/callback")));
+            Field("redirect_uri", "https://localhost:5000/callback")));
 
         await response.AssertErrorAsync(Oidc.Token.Errors.InvalidRequest);
     }
@@ -679,7 +679,7 @@ public class TokenErrorTests : IClassFixture<PersistentStorageAppFactory>
 
         var missingCode = await (await PostAsync(Authenticated(
             Field("grant_type", "authorization_code"),
-            Field("redirect_uri", "http://localhost:5000/callback")))).ReadErrorAsync();
+            Field("redirect_uri", "https://localhost:5000/callback")))).ReadErrorAsync();
 
         var missingRefresh = await (await PostAsync(Authenticated(
             Field("grant_type", "refresh_token")))).ReadErrorAsync();

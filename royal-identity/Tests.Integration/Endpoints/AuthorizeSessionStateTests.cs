@@ -45,7 +45,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
             configured.AllowedGrantTypes.Add("authorization_code");
             configured.AllowedResourceServers.Add("apiserver");
             configured.AllowedResponseTypes.Add("code");
-            configured.RedirectUris.Add("http://localhost:5000/callback");
+            configured.RedirectUris.Add("https://localhost:5000/callback");
         });
         var client = CreateClient();
         await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
@@ -87,7 +87,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
         var document = new HtmlDocument();
         document.LoadHtml(await response.Content.ReadAsStringAsync());
         var form = Assert.Single(document.DocumentNode.SelectNodes("//form"));
-        Assert.Equal("http://localhost:5000/callback", form.GetAttributeValue("action", ""));
+        Assert.Equal("https://localhost:5000/callback", form.GetAttributeValue("action", ""));
         var inputs = form.SelectNodes(".//input")
             .ToDictionary(
                 input => input.GetAttributeValue("name", ""),
@@ -128,7 +128,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
             [Oidc.Authorize.Request.ResponseType] = Oidc.ResponseTypes.Code,
             [Oidc.Authorize.Request.ResponseMode] = Oidc.ResponseModes.Query,
             [Oidc.Authorize.Request.Scope] = "openid profile",
-            [Oidc.Authorize.Request.RedirectUri] = "http://localhost:5000/callback",
+            [Oidc.Authorize.Request.RedirectUri] = "https://localhost:5000/callback",
             [Oidc.Authorize.Request.Prompt] = "none login",
         };
 
@@ -151,7 +151,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
     [Theory]
     [InlineData("demo_client", "https://attacker.example/callback")]
     [InlineData("demo_client", "http://localhost:5999/callback")]
-    [InlineData("unknown-client", "http://localhost:5000/callback")]
+    [InlineData("unknown-client", "https://localhost:5000/callback")]
     public async Task PromptNone_WithUntrustedClientOrRedirect_DoesNotRedirect(
         string clientId,
         string redirectUri)
@@ -198,7 +198,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
             configured.AllowedGrantTypes.Add("authorization_code");
             configured.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
             configured.AllowedResponseTypes.Add("code");
-            configured.RedirectUris.Add("http://localhost:5000/callback");
+            configured.RedirectUris.Add("https://localhost:5000/callback");
         });
         var client = CreateClient();
         await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
@@ -247,7 +247,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
         var context = new AuthorizeContext(httpContext, raw);
         context.Load(NullLogger.Instance);
         context.ClientParameters.SetClient(client);
-        context.RedirectUri = "http://localhost:5000/callback";
+        context.RedirectUri = "https://localhost:5000/callback";
         context.RedirectUriValidated();
 
         var decorator = scope.ServiceProvider.GetRequiredService<PromptNoneInteractionDecorator>();
@@ -301,7 +301,7 @@ public class AuthorizeSessionStateTests : IClassFixture<ControlledTimeAppFactory
         string clientId,
         string scope,
         params (string Key, string Value)[] extra)
-        => BuildAuthorizeUrlCore(clientId, scope, "http://localhost:5000/callback", extra);
+        => BuildAuthorizeUrlCore(clientId, scope, "https://localhost:5000/callback", extra);
 
     private string BuildAuthorizeUrlWithBinding(
         string clientId,

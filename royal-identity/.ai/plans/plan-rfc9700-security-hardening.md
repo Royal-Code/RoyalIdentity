@@ -1,15 +1,15 @@
 # Plan: Aderência e hardening de segurança OAuth 2.0 conforme RFC 9700 (`plan-rfc9700-security-hardening`)
 
-## Status: EM EXECUÇÃO - decisões fechadas; Fase 1 concluída; Fase 2 é a próxima
+## Status: EM EXECUÇÃO - decisões fechadas; Fases 1-2 concluídas; Fase 3 é a próxima
 
 ## Progresso
 
-`█░░░░░` **17%** - 1 de 6 fases concluída
+`██░░░░` **33%** - 2 de 6 fases concluídas
 
 | Fase | Estado |
 |---|---|
 | Fase 1 - Assessment determinístico e catálogo de regras | Concluida |
-| Fase 2 - Validação configurável e segura de redirect URIs | Pendente |
+| Fase 2 - Validação configurável e segura de redirect URIs | Concluida |
 | Fase 3 - Authorization Code, PKCE e remoção do front-channel legado | Pendente |
 | Fase 4 - Rotação e detecção de replay de refresh tokens | Pendente |
 | Fase 5 - Segurança HTTP, metadata, client authentication e logs | Pendente |
@@ -531,22 +531,22 @@ diagnosticados.
 
 **Tarefas:**
 
-- [ ] Criar `RedirectUriComparison` fechado em `Ordinal` e `OrdinalIgnoreCase`.
-- [ ] Criar `RedirectUriValidationOptions`, copy constructor e `Validate()`.
-- [ ] Adicionar a option a `ServerOptions` e `RealmOptions`, incluindo todos os copy constructors.
-- [ ] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 1` ou
+- [x] Criar `RedirectUriComparison` fechado em `Ordinal` e `OrdinalIgnoreCase`.
+- [x] Criar `RedirectUriValidationOptions`, copy constructor e `Validate()`.
+- [x] Adicionar a option a `ServerOptions` e `RealmOptions`, incluindo todos os copy constructors.
+- [x] Falhar antes de editar se `ServerOptionsPayloadSerializer.CurrentVersion != 1` ou
   `RealmOptionsPayloadSerializer.CurrentVersion != 1`.
-- [ ] Preservar Server/Realm Options v1, mantendo leitura fail-closed de outras versões e reprovisionando
+- [x] Preservar Server/Realm Options v1, mantendo leitura fail-closed de outras versões e reprovisionando
   seeds/fixtures do shape anterior sem migration relacional/JSON.
-- [ ] Evoluir `IRedirectUriValidator` para receber options efetivas e `CancellationToken`.
-- [ ] Reescrever o default validator para não inspecionar wildcard quando a flag estiver desligada.
-- [ ] Aplicar a mesma política a authorize, code redemption e post-logout redirect.
-- [ ] Recusar URI não absoluta, fragment, HTTP e esquema não HTTPS no authorization redirect.
-- [ ] Validar patterns wildcard no carregamento/publicação de configuração para impedir patterns vazios ou
+- [x] Evoluir `IRedirectUriValidator` para receber options efetivas e `CancellationToken`.
+- [x] Reescrever o default validator para não inspecionar wildcard quando a flag estiver desligada.
+- [x] Aplicar a mesma política a authorize, code redemption e post-logout redirect.
+- [x] Recusar URI não absoluta, fragment, HTTP e esquema não HTTPS no authorization redirect.
+- [x] Validar patterns wildcard no carregamento/publicação de configuração para impedir patterns vazios ou
   equivalentes a open redirect.
-- [ ] Atualizar seeds/fixtures para URIs HTTPS e defaults seguros; localhost HTTP deixa de ser aceito neste corte.
-- [ ] Adicionar testes de case, wildcard, fragment, esquema, open redirect, cópia e isolamento entre realms.
-- [ ] Criar `Tests.Identity/Validators/RedirectUriValidationTests.cs` e
+- [x] Atualizar seeds/fixtures para URIs HTTPS e defaults seguros; localhost HTTP deixa de ser aceito neste corte.
+- [x] Adicionar testes de case, wildcard, fragment, esquema, open redirect, cópia e isolamento entre realms.
+- [x] Criar `Tests.Identity/Validators/RedirectUriValidationTests.cs` e
   `Tests.Integration/Endpoints/RedirectUriPolicyTests.cs`; estender
   `Tests.Storage/Configuration/ConfigurationModelPayloadTests.cs` para Server/Realm v1.
 
@@ -565,7 +565,29 @@ dotnet test Tests.Integration --filter "FullyQualifiedName~RedirectUriPolicyTest
 
 ### Resultado da Fase 2
 
-*a preencher*
+Fase concluída em 2026-08-08. `RedirectUriValidationOptions` passou a integrar `ServerOptions` e
+`RealmOptions` por cópias independentes, com defaults `Ordinal`, wildcard desligado, URI absoluta HTTPS e sem
+fragment. Os únicos relaxamentos permanecem explícitos por realm: `OrdinalIgnoreCase` e `AllowWildcard`. Patterns
+wildcard são validados antes da publicação/materialização, não podem abrir scheme/host e o matcher escapa como
+literal todo caractere que não seja um token wildcard suportado.
+
+`IRedirectUriValidator` recebe a policy efetiva e `CancellationToken`. Authorize e authorization-code redemption
+consomem a mesma policy pelo `RedirectUriValidator`; post-logout usa o mesmo contrato. A implementação encontrou
+e fechou um open redirect preexistente: `EndSessionValidator` existia e estava registrado no DI, mas não fazia
+parte do pipe, enquanto o `post_logout_redirect_uri` bruto atravessava `EndSessionHandler`, as mensagens protegidas
+de logout e `EndSessionPageService` até se tornar o destino do link final em `LoggingOutPage`. Agora o validator
+executa depois de `LoadClient`/`EndSessionDecorator`, antes de qualquer mensagem de logout ser criada, e a regressão
+HTTP prova que um destino não registrado recebe `400` sem `Location`.
+
+Server/Realm payloads continuam em v1 conforme ADR-020. Snapshot, readers/stores EF e `ClientMaterializer` falham
+fechados para policy inválida ou redirect registrado inseguro, tanto na escrita quanto na leitura. Nenhuma
+migration relacional/JSON foi criada. Seeds e fixtures foram reprovisionados com callbacks HTTPS exatos; custom
+schemes e HTTP loopback continuam fora do produto neste corte. O assessment passou a diagnosticar comparison
+ignore-case e wildcard habilitado como não aderentes.
+
+Gates da fase: `RedirectUriValidationTests` 26/26, `ConfigurationModelPayloadTests` 36/36 e demais regressões de
+snapshot/materialização verdes, e `RedirectUriPolicyTests` 9/9. A suíte integral terminou com 1.716 aprovados,
+51 ignorados opt-in e 0 falhas; `git diff --check` ficou limpo.
 
 ---
 
@@ -783,7 +805,9 @@ estável e documentado.
 - [ ] Executar assessment sobre todos os clients de seeds/fixtures e corrigir findings não intencionais.
 - [ ] Documentar cada `RuleId`, requisito RFC, severidade, condição e remediação.
 - [ ] Documentar para o futuro Admin: calcular em leitura/após edição, localizar por `RuleId`, agrupar
-  `Compliant`/`Warning`/`NonCompliant` e nunca persistir o resultado.
+  `Compliant`/`Warning`/`NonCompliant`, nunca persistir o resultado e distinguir findings causados pela policy do
+  realm — como `AllowWildcard`/`OrdinalIgnoreCase`, que afetam todos os clients — daqueles remediáveis somente no
+  client.
 - [ ] Atualizar roadmap e backlog para marcar a entrega do core e manter somente a apresentação UI no plano Admin.
 - [ ] Atualizar a matriz de storage com contratos/migrations finais de refresh.
 - [ ] Confirmar Server/Realm Options v1 e que nenhum plano posterior recriou uma cadeia numérica pré-release.
@@ -876,7 +900,7 @@ dotnet test RoyalIdentity.sln
 | Risco | Gatilho | Impacto | Mitigação | Estado |
 |---|---|---|---|---|
 | Assessment promete mais que consegue provar | UI chama `Compliant` de “deployment certificado” | falsa segurança | DF6; texto explícito e diagnóstico de host separado | Mitigado na Fase 1 |
-| Relaxamento de redirect vira open redirect | wildcard amplo ou ignore-case habilitado | exfiltração de code | validação de pattern, finding alto e default seguro | Aberto |
+| Relaxamento de redirect vira open redirect | wildcard amplo ou ignore-case habilitado | exfiltração de code | validação de pattern, escaping integral do regex, finding alto e default seguro | Mitigado na Fase 2 |
 | Remoção de implicit/hybrid deixa código morto | response handlers/constants sem consumers | superfície confusa e manutenção incorreta | busca de callers + architecture/integration tests | Aberto |
 | Retry de refresh cria dois sucessores | duas requests vencem operações separadas | família bifurcada e replay aceito | decisão transacional única + contract concorrente | Aberto |
 | Revogação perde corrida com sucessor | replay e rotação chegam juntos | token da família permanece ativo | estado de família verificado/movido na mesma transação | Aberto |

@@ -35,7 +35,7 @@ public class SqliteDemoTests
 
             var codeVerifier = CryptoRandom.CreateUniqueId();
             var codeChallenge = Base64Url.Encode(Encoding.ASCII.GetBytes(codeVerifier).Sha256());
-            const string redirectUri = "http://localhost/callback";
+            const string redirectUri = "https://localhost/callback";
             var authorizeUrl = Oidc.Routes.BuildAuthorizeUrl(DemoConstants.RealmPath)
                 .AddQueryString("client_id", DemoConstants.ClientId)
                 .AddQueryString("response_type", "code")

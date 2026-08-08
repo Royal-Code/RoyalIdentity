@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using RoyalIdentity.Data.Configuration.Entities;
 using RoyalIdentity.Models;
+using RoyalIdentity.Options;
 
 namespace RoyalIdentity.Storage.EntityFramework.Configuration.Materialization;
 
@@ -42,6 +43,7 @@ public sealed class ClientMaterializer
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(client.Realm);
+        ValidateRedirectUris(client, client.Realm.Options.RedirectUriValidation);
 
         var realmId = client.Realm.Id;
         var clientId = client.Id;
@@ -201,6 +203,7 @@ public sealed class ClientMaterializer
         Fill(client.AllowedCorsOrigins, valuesByKind, ClientStringValueKinds.AllowedCorsOrigin);
         Fill(client.FrontChannelLogoutUri, valuesByKind, ClientStringValueKinds.FrontChannelLogoutUri);
         Fill(client.BackChannelLogoutUri, valuesByKind, ClientStringValueKinds.BackChannelLogoutUri);
+        ValidateRedirectUris(client, realm.Options.RedirectUriValidation);
 
         client.Claims.Clear();
         foreach (var claim in claimRows.OrderBy(c => c.Ordinal))
@@ -271,6 +274,17 @@ public sealed class ClientMaterializer
         {
             foreach (var value in values)
                 target.Add(value);
+        }
+    }
+
+    private static void ValidateRedirectUris(Client client, RedirectUriValidationOptions? options)
+    {
+        if (options is null
+            || options.Validate().Count is not 0
+            || client.RedirectUris.Any(uri => options.ValidateRegisteredUri(uri).Count is not 0)
+            || client.PostLogoutRedirectUris.Any(uri => options.ValidateRegisteredUri(uri).Count is not 0))
+        {
+            throw ConfigurationMaterializationException.InvalidRedirectUri();
         }
     }
 }

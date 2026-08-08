@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using RoyalIdentity.Contracts.Models.Messages;
 using RoyalIdentity.Contracts.Storage;
 using RoyalIdentity.Extensions;
@@ -116,9 +116,9 @@ public class EndSessionTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowOfflineAccess = true;
             client.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
             client.AllowedResponseTypes.Add("code");
-            client.RedirectUris.UnionWith(["http://localhost:5000/**", "https://localhost:5001/**"]);
+            client.RedirectUris.UnionWith(["https://localhost:5000/callback", "https://localhost:5001/callback"]);
             client.PostLogoutRedirectUris.UnionWith(
-                ["http://localhost:5000/**", "https://localhost:5001/**"]);
+                ["https://localhost:5000/callback", "https://localhost:5001/signout-callback"]);
         });
 
         var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions()

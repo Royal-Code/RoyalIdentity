@@ -1,5 +1,8 @@
 namespace RoyalIdentity.Migrations;
 
+using RoyalIdentity.Options;
+using RoyalIdentity.Extensions;
+
 /// <summary>Environment-specific inputs required by the Configuration product seed.</summary>
 public sealed class ConfigurationProductSeedOptions
 {
@@ -15,13 +18,14 @@ public sealed class ConfigurationProductSeedOptions
         }
 
         var unique = new HashSet<string>(StringComparer.Ordinal);
+        var policy = new RedirectUriValidationOptions();
         foreach (var redirectUri in ServerAdminRedirectUris)
         {
-            if (string.IsNullOrWhiteSpace(redirectUri)
-                || !Uri.TryCreate(redirectUri, UriKind.Absolute, out _))
+            if (redirectUri.HasWildcard()
+                || policy.ValidateRegisteredUri(redirectUri).Count is not 0)
             {
                 throw new InvalidOperationException(
-                    "Every server_admin redirect URI must be a non-empty absolute URI.");
+                    "Every server_admin redirect URI must be a safe absolute HTTPS URI without a fragment.");
             }
 
             if (!unique.Add(redirectUri))

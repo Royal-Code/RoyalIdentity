@@ -54,7 +54,7 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
             registered.AllowedGrantTypes.Add("authorization_code");
             registered.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
             registered.AllowedResponseTypes.Add("code");
-            registered.RedirectUris.Add("http://localhost:5000/**");
+            registered.RedirectUris.Add("https://localhost:5000/callback");
             registered.BackChannelLogoutUris.Add("https://client.example/backchannel-logout");
         });
 
@@ -93,7 +93,7 @@ public class BackChannelLogoutCharacterizationTests : IClassFixture<BackChannelC
             registered.AllowedGrantTypes.Add("authorization_code");
             registered.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
             registered.AllowedResponseTypes.Add("code");
-            registered.RedirectUris.Add("http://localhost:5000/**");
+            registered.RedirectUris.Add("https://localhost:5000/callback");
             registered.FrontChannelLogoutUris.Add(frontChannelUri);
         });
 

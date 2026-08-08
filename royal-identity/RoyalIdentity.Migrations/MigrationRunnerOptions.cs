@@ -1,5 +1,8 @@
 namespace RoyalIdentity.Migrations;
 
+using RoyalIdentity.Options;
+using RoyalIdentity.Extensions;
+
 public enum ConfigurationDatabaseProvider
 {
     Sqlite,
@@ -429,12 +432,14 @@ public sealed class MigrationRunnerOptions
     private static void ValidateServerAdminRedirectUris(IReadOnlyList<string> redirectUris)
     {
         var unique = new HashSet<string>(StringComparer.Ordinal);
+        var policy = new RedirectUriValidationOptions();
         foreach (var redirectUri in redirectUris)
         {
-            if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out _))
+            if (redirectUri.HasWildcard()
+                || policy.ValidateRegisteredUri(redirectUri).Count is not 0)
             {
                 throw new MigrationRunnerUsageException(
-                    "--server-admin-redirect-uri must contain an absolute URI.");
+                    "--server-admin-redirect-uri must contain a safe absolute HTTPS URI without a fragment.");
             }
             if (!unique.Add(redirectUri))
             {

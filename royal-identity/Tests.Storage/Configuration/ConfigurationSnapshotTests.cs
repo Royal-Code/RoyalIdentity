@@ -109,6 +109,36 @@ public class ConfigurationSnapshotTests
     }
 
     [Fact]
+    public async Task Refresh_WithAnInvalidServerRedirectPolicy_FailsBeforePublication()
+    {
+        using var harness = new SnapshotTestHarness();
+        var options = new ServerOptions();
+        options.RedirectUriValidation.Comparison = (RedirectUriComparison)42;
+        harness.Source.Data = SnapshotTestHarness.BuildData(options, "alpha");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("RedirectUriValidation", exception.Message, StringComparison.Ordinal);
+        Assert.False(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
+    public async Task Refresh_WithAnInvalidRealmRedirectPolicy_FailsBeforePublication()
+    {
+        using var harness = new SnapshotTestHarness();
+        var data = SnapshotTestHarness.BuildData(new ServerOptions(), "alpha");
+        data.Realms.Single().Options.RedirectUriValidation.Comparison = (RedirectUriComparison)42;
+        harness.Source.Data = data;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Refresher.RefreshAsync());
+
+        Assert.Contains("Realm 'alpha' has invalid redirect URI validation", exception.Message, StringComparison.Ordinal);
+        Assert.False(harness.Snapshot.IsLoaded);
+    }
+
+    [Fact]
     public async Task Refresh_WhenAValidatorRejectsTheData_NothingIsPublished()
     {
         using var harness = new SnapshotTestHarness(
@@ -203,6 +233,7 @@ public class ConfigurationSnapshotTests
         var realm = harness.Snapshot.FindRealmByPath("alpha")!;
         realm.DisplayName = "mutated";
         realm.Options.Authentication.CookieName = ".mutated";
+        realm.Options.RedirectUriValidation.AllowWildcard = true;
         realm.Options.ServerOptions.IssuerUri = "https://mutated-through-realm.test";
 
         var customEntries = harness.Snapshot.ServerOptions.Discovery.CustomEntries;
@@ -218,6 +249,7 @@ public class ConfigurationSnapshotTests
         Assert.Equal("Realm alpha", harness.Snapshot.FindRealmByPath("alpha")!.DisplayName);
         Assert.NotEqual(".mutated", harness.Snapshot.FindRealmByPath("alpha")!.Options.Authentication.CookieName);
         Assert.NotEqual(".source-mutated", harness.Snapshot.FindRealmByPath("alpha")!.Options.Authentication.CookieName);
+        Assert.False(harness.Snapshot.FindRealmByPath("alpha")!.Options.RedirectUriValidation.AllowWildcard);
         var persistedNested = Assert.IsType<Dictionary<string, object?>>(
             harness.Snapshot.ServerOptions.Discovery.CustomEntries["nested"]);
         Assert.Equal("original", persistedNested["value"]);

@@ -25,7 +25,7 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
     /// <summary>Another registered client, so a binding mismatch is not confused with a failed authentication.</summary>
     private const string OtherClientId = "demo_consent_client";
 
-    private const string RedirectUri = "http://localhost:5000/callback";
+    private const string RedirectUri = "https://localhost:5000/callback";
 
     private readonly PersistentStorageAppFactory factory;
 
@@ -99,7 +99,7 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
     // authenticate fine — the point is the binding of the code, not client authentication.
     [Theory]
     [InlineData(OtherClientId, RedirectUri)]
-    [InlineData(ClientId, "http://localhost:5000/other-callback")]
+    [InlineData(ClientId, "https://localhost:5000/other-callback")]
     public async Task AMismatchedBinding_DoesNotConsumeTheCode(string clientId, string redirectUri)
     {
         var code = await SeedCodeAsync();
@@ -126,7 +126,7 @@ public class CodeSingleUseTests : IClassFixture<PersistentStorageAppFactory>
         var alreadyConsumed = await (await ExchangeAsync(consumed.Code)).ReadErrorAsync();
         var clientMismatch = await (await ExchangeAsync(bound.Code, clientId: OtherClientId)).ReadErrorAsync();
         var redirectMismatch = await (
-            await ExchangeAsync(bound.Code, redirectUri: "http://localhost:5000/other-callback")).ReadErrorAsync();
+            await ExchangeAsync(bound.Code, redirectUri: "https://localhost:5000/other-callback")).ReadErrorAsync();
 
         Assert.Equal(Oidc.Token.Errors.InvalidGrant, unknownCode.Error);
         Assert.Equal(unknownCode.Answer, alreadyConsumed.Answer);

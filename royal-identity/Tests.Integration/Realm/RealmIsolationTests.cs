@@ -114,7 +114,7 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
         await SaveClientAsync(realmB, "demo_client", configure: client =>
         {
             client.Name = "Demo Client in Realm B";
-            client.RedirectUris.Add("http://realm-b.example.com/callback");
+            client.RedirectUris.Add("https://realm-b.example.com/callback");
         });
         var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
         using var storageScope = factory.CreateStorageScope();
@@ -126,8 +126,8 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
         Assert.NotNull(clientA);
         Assert.NotNull(clientB);
         Assert.NotEqual(clientA.Realm.Id, clientB.Realm.Id);
-        Assert.DoesNotContain(clientA.RedirectUris, u => u == "http://realm-b.example.com/callback");
-        Assert.Contains(clientB.RedirectUris, u => u == "http://realm-b.example.com/callback");
+        Assert.DoesNotContain(clientA.RedirectUris, u => u == "https://realm-b.example.com/callback");
+        Assert.Contains(clientB.RedirectUris, u => u == "https://realm-b.example.com/callback");
     }
 
     // ─── §8.2 Session Isolation ───────────────────────────────────────────────
@@ -226,7 +226,7 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
             DateTime.UtcNow,
             300,
             resources,
-            "http://localhost:5000/callback")
+            "https://localhost:5000/callback")
         {
             RealmId = factory.Handles.Demo.Id
         };
@@ -324,7 +324,7 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowedGrantTypes.Add("authorization_code");
             client.AllowedIdentityScopes.Add("openid");
             client.AllowOfflineAccess = true;
-            client.RedirectUris.Add("http://localhost:5000/callback");
+            client.RedirectUris.Add("https://localhost:5000/callback");
         });
         var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
 
@@ -357,7 +357,7 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
             client.AllowedGrantTypes.Clear();
             client.AllowedGrantTypes.Add("authorization_code");
             client.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
-            client.RedirectUris.Add("http://localhost:5000/callback");
+            client.RedirectUris.Add("https://localhost:5000/callback");
         });
 
         var demoRealm = await factory.LoadRealmAsync(factory.Handles.Demo);
@@ -372,7 +372,7 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
             DateTime.UtcNow,
             300,
             resources,
-            "http://localhost:5000/callback")
+            "https://localhost:5000/callback")
         {
             RealmId = factory.Handles.Demo.Id
         };
@@ -385,7 +385,7 @@ public class RealmIsolationTests : IClassFixture<PersistentStorageAppFactory>
             ["grant_type"] = "authorization_code",
             ["code"] = code.Code,
             ["client_id"] = "demo_client",
-            ["redirect_uri"] = "http://localhost:5000/callback"
+            ["redirect_uri"] = "https://localhost:5000/callback"
         }));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

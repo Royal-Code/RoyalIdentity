@@ -156,7 +156,7 @@ public class RequestCultureTests : IClassFixture<PersistentStorageAppFactory>
             [Oidc.Authorize.Request.ResponseType] = Oidc.ResponseTypes.Code,
             [Oidc.Authorize.Request.ResponseMode] = Oidc.ResponseModes.Query,
             [Oidc.Authorize.Request.Scope] = Server.StandardScopes.OpenId,
-            [Oidc.Authorize.Request.RedirectUri] = "http://localhost/callback",
+            [Oidc.Authorize.Request.RedirectUri] = "https://localhost/callback",
             [Oidc.Authorize.Request.State] = "localization-state",
             [Oidc.Authorize.Request.CodeChallenge] = challenge,
             [Oidc.Authorize.Request.CodeChallengeMethod] = Oidc.CodeChallenge.Methods.Sha256,

@@ -38,7 +38,7 @@ public class PersistentStorageOidcFlowTests : IClassFixture<PersistentStorageApp
 
         var codeVerifier = CryptoRandom.CreateUniqueId();
         var codeChallenge = Base64Url.Encode(Encoding.ASCII.GetBytes(codeVerifier).Sha256());
-        var redirectUri = $"{client.BaseAddress}callback";
+        const string redirectUri = "https://localhost/callback";
         var demo = factory.Handles.Demo;
         var demoClient = factory.Handles.DemoClient;
         var alice = factory.Handles.Alice;

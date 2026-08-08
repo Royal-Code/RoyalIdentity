@@ -54,7 +54,7 @@ public class CheckSessionCookieLifecycleTests : IClassFixture<LogCapturingAppFac
         var client = CreateRawClient();
         var login = await PostLoginAsync(client, factory.Handles.Demo, factory.Handles.Alice);
         var userAgentState = RequireCookie(login, CheckSessionCookieName(factory.Handles.Demo)).Value.ToString();
-        const string redirectUri = "http://localhost:5000/callback";
+        const string redirectUri = "https://localhost:5000/callback";
         var authorizePath = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")

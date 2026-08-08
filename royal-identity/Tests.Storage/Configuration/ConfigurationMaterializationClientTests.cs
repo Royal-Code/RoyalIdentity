@@ -203,6 +203,31 @@ public class ConfigurationMaterializationClientTests
             () => materializer.ToClient(set.Root, set.StringValues, set.Claims, set.Secrets, realm));
     }
 
+    [Theory]
+    [InlineData("http://client.example/callback")]
+    [InlineData("https://client.example/callback#fragment")]
+    [InlineData("https://*.com/callback")]
+    public void Materializer_RejectsUnsafeRedirectUrisBeforePersistence(string redirectUri)
+    {
+        var realm = ConfigurationTestData.BuildRealm("realm-a");
+        var client = ConfigurationTestData.BuildFullyPopulatedClient(realm, "client-a");
+        client.RedirectUris.Add(redirectUri);
+
+        Assert.Throws<ConfigurationMaterializationException>(() => materializer.ToEntitySet(client));
+    }
+
+    [Fact]
+    public void Materializer_RejectsAnUnsafeRedirectUriReadFromPersistence()
+    {
+        var realm = ConfigurationTestData.BuildRealm("realm-a");
+        var set = materializer.ToEntitySet(ConfigurationTestData.BuildFullyPopulatedClient(realm, "client-a"));
+        var redirectUri = set.StringValues.Single(value => value.Value == "https://client.example/cb");
+        redirectUri.Value = "http://client.example/cb";
+
+        Assert.Throws<ConfigurationMaterializationException>(
+            () => materializer.ToClient(set.Root, set.StringValues, set.Claims, set.Secrets, realm));
+    }
+
     private async Task SeedAsync(SqliteConfigurationDatabase database, IEnumerable<RoyalIdentity.Data.Configuration.Entities.RealmEntity> realms, IEnumerable<Client> clients)
     {
         await using var context = database.NewContext();

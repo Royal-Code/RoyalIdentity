@@ -1,18 +1,19 @@
 ﻿using RoyalIdentity.Extensions;
 using RoyalIdentity.Pipelines.Abstractions;
+using RoyalIdentity.Contracts;
 
 namespace RoyalIdentity.Contexts.Validators;
 
-public class EndSessionValidator : IValidator<EndSessionContext>
+public class EndSessionValidator(IRedirectUriValidator redirectUriValidator) : IValidator<EndSessionContext>
 {
-    public ValueTask Validate(EndSessionContext context, CancellationToken ct)
+    public async ValueTask Validate(EndSessionContext context, CancellationToken ct)
     {
         // validate subject of IdToken and subject of authenticated user
         if (context.IdToken is not null && context.IsAuthenticated && 
             context.IdToken.Principal.GetSubjectId() != context.Principal.GetSubjectId())
         {
             context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid subject in id_token_hint.");
-            return default;
+            return;
         }
 
         // validate client_id in IdToken and client_id in request
@@ -20,7 +21,7 @@ public class EndSessionValidator : IValidator<EndSessionContext>
             context.IdToken.Client.Id != context.ClientParameters.Client.Id)
         {
             context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid client_id in id_token_hint.");
-            return default;
+            return;
         }
 
         // validate post_logout_redirect_uri
@@ -30,14 +31,18 @@ public class EndSessionValidator : IValidator<EndSessionContext>
             if (context.ClientParameters.Client is null)
             {
                 context.Error(Oidc.Authorize.Errors.InvalidRequest, "Client is not informed.");
-                return default;
+                return;
             }
 
             // if post_logout_redirect_uri is not in client's list of post_logout_redirect_uris, then the request is invalid
-            if (!context.ClientParameters.Client.PostLogoutRedirectUris.Contains(context.PostLogoutRedirectUri))
+            if (!await redirectUriValidator.IsPostLogoutRedirectUriValidAsync(
+                context.PostLogoutRedirectUri,
+                context.ClientParameters.Client,
+                context.Options.RedirectUriValidation,
+                ct))
             {
                 context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid post_logout_redirect_uri.");
-                return default;
+                return;
             }
         }
 
@@ -45,9 +50,8 @@ public class EndSessionValidator : IValidator<EndSessionContext>
         if (context.LogoutHint.IsPresent() && context.LogoutHint != context.Principal.GetSubjectId())
         {
             context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid logout_hint.");
-            return default;
+            return;
         }
 
-        return default;
     }
 }

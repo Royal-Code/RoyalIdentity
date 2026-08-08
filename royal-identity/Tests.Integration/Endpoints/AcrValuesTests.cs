@@ -103,7 +103,7 @@ public class AcrValuesTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString(Oidc.Authorize.Request.ResponseType, Oidc.ResponseTypes.Code)
             .AddQueryString(Oidc.Authorize.Request.ResponseMode, Oidc.ResponseModes.Query)
             .AddQueryString(Oidc.Authorize.Request.Scope, "openid profile")
-            .AddQueryString(Oidc.Authorize.Request.RedirectUri, "http://localhost:5000/callback")
+            .AddQueryString(Oidc.Authorize.Request.RedirectUri, "https://localhost:5000/callback")
             .AddQueryString(Oidc.Authorize.Request.AcrValues, "urn:unknown:acr idp:partner")
             .AddQueryString(Oidc.Authorize.Request.CodeChallenge, PkceHelper.GenerateS256CodeChallenge(verifier))
             .AddQueryString(Oidc.Authorize.Request.CodeChallengeMethod, Oidc.CodeChallenge.Methods.Sha256);
@@ -122,7 +122,7 @@ public class AcrValuesTests : IClassFixture<PersistentStorageAppFactory>
                 [Oidc.Token.Request.GrantType] = OpenIdConnectGrantTypes.AuthorizationCode,
                 [Oidc.Token.Request.Code] = code,
                 [Oidc.Token.Request.ClientId] = factory.Handles.DemoClient.ClientId,
-                [Oidc.Token.Request.RedirectUri] = "http://localhost:5000/callback",
+                [Oidc.Token.Request.RedirectUri] = "https://localhost:5000/callback",
                 [Oidc.Token.Request.CodeVerifier] = verifier,
             }));
 
@@ -177,7 +177,7 @@ public class AcrValuesTests : IClassFixture<PersistentStorageAppFactory>
             [Oidc.Authorize.Request.ResponseType] = Oidc.ResponseTypes.Code,
             [Oidc.Authorize.Request.ResponseMode] = Oidc.ResponseModes.Query,
             [Oidc.Authorize.Request.Scope] = "openid profile",
-            [Oidc.Authorize.Request.RedirectUri] = "http://localhost:5000/callback",
+            [Oidc.Authorize.Request.RedirectUri] = "https://localhost:5000/callback",
             [Oidc.Authorize.Request.AcrValues] = rawAcrValues,
             [Oidc.Authorize.Request.CodeChallenge] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             [Oidc.Authorize.Request.CodeChallengeMethod] = Oidc.CodeChallenge.Methods.Sha256,

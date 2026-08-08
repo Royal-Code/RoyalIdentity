@@ -24,6 +24,7 @@ internal sealed class PublishedConfigurationSnapshot
         // Take ownership of a fully independent graph. A source may retain its returned objects, but mutating
         // them after publication must never alter the current snapshot.
         ValidateCheckSessionCookie("ServerOptions", data.ServerOptions.Authentication);
+        ValidateRedirectUriPolicy("ServerOptions", data.ServerOptions.RedirectUriValidation);
         serverOptions = new ServerOptions(data.ServerOptions);
         realmsByPath = data.Realms
             .Select(realm => Clone(realm, serverOptions))
@@ -51,6 +52,7 @@ internal sealed class PublishedConfigurationSnapshot
         };
 
         ValidateCheckSessionCookie($"Realm '{clone.Path}'", clone.Options.Authentication);
+        ValidateRedirectUriPolicy($"Realm '{clone.Path}'", clone.Options.RedirectUriValidation);
         _ = CheckSessionStateManager.GetCookieName(clone.Options.Authentication, clone);
         _ = CheckSessionStateManager.GetCookiePath(clone);
         NormalizeInternationalization($"Realm '{clone.Path}'", clone.Options.Internationalization);
@@ -82,6 +84,19 @@ internal sealed class PublishedConfigurationSnapshot
         {
             throw new InvalidOperationException(
                 $"{owner} has invalid authentication options: {string.Join(" ", errors)}");
+        }
+    }
+
+    private static void ValidateRedirectUriPolicy(string owner, RedirectUriValidationOptions? options)
+    {
+        if (options is null)
+            throw new InvalidOperationException($"{owner} has no redirect URI validation options.");
+
+        var errors = options.Validate();
+        if (errors.Count is not 0)
+        {
+            throw new InvalidOperationException(
+                $"{owner} has invalid redirect URI validation options: {string.Join(" ", errors)}");
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿// Ignore Spelling: Pkce
+// Ignore Spelling: Pkce
 
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.IdentityModel.Tokens;
@@ -35,7 +35,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -63,7 +63,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -82,54 +82,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
         var code = parameters["code"];
 
         Assert.NotNull(code);
-    }
-
-    [Theory]
-    [InlineData("http://localhost:5180/callback", true)]
-    [InlineData("com.example.app://callback", false)]
-    [InlineData("urn:ietf:wg:oauth:2.0:oob", false)]
-    public async Task Get_Signed_WithAValidatedRedirectWithoutBrowserOrigin_EmitsCodeWithoutSessionState(
-        string redirectUri,
-        bool expectsSessionState)
-    {
-        var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
-        var clientId = $"redirect-origin-client-{suffix}";
-        await factory.SaveClientAsync(
-            factory.Handles.Demo,
-            clientId,
-            configured =>
-            {
-                configured.Name = "Redirect Origin Client";
-                configured.RequireClientSecret = false;
-                configured.RequirePkce = false;
-                configured.AllowedGrantTypes.Clear();
-                configured.AllowedGrantTypes.Add("authorization_code");
-                configured.AllowedIdentityScopes.Add("openid");
-                configured.AllowedResponseTypes.Clear();
-                configured.AllowedResponseTypes.Add("code");
-                configured.RedirectUris.Add(redirectUri);
-            });
-
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.LoginAsync(factory.Handles.Demo, factory.Handles.Alice);
-
-        var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
-            .AddQueryString("client_id", clientId)
-            .AddQueryString("response_type", "code")
-            .AddQueryString("response_mode", "query")
-            .AddQueryString("scope", "openid")
-            .AddQueryString("redirect_uri", redirectUri);
-
-        var response = await client.GetAsync(path);
-
-        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
-        var location = Assert.IsType<Uri>(response.Headers.Location);
-        var parameters = HttpUtility.ParseQueryString(location.Query);
-        Assert.NotNull(parameters["code"]);
-        if (expectsSessionState)
-            Assert.False(string.IsNullOrEmpty(parameters["session_state"]));
-        else
-            Assert.Null(parameters["session_state"]);
+        Assert.False(string.IsNullOrEmpty(parameters["session_state"]));
     }
 
     [Fact]
@@ -163,7 +116,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
                 configured.AllowedIdentityScopes.UnionWith(["openid", "profile", "email"]);
                 configured.AllowedResponseTypes.Add("code");
                 configured.RedirectUris.UnionWith(
-                    ["http://localhost:5000/**", "https://localhost:5001/**"]);
+                    ["https://localhost:5000/callback", "https://localhost:5001/callback"]);
                 configured.Secrets.Add(new ClientSecret("secret"));
             });
 
@@ -174,7 +127,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
         var client = factory.CreateClient(options);
         var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", clientId)
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("response_type", "code")
             .AddQueryString("scope", "openid");
 
@@ -192,7 +145,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
         var client = factory.CreateClient();
         var path = Oidc.Routes.BuildAuthorizeUrl(factory.Handles.Demo.Path)
             .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("response_type", "code")
             .AddQueryString("scope", "openid");
 
@@ -212,7 +165,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -233,7 +186,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -275,7 +228,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -297,7 +250,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
@@ -318,7 +271,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge_method", "S256");
 
@@ -339,7 +292,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state");
 
         // Act
@@ -363,7 +316,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_type", "code")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -389,7 +342,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
 
@@ -414,7 +367,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", Oidc.CodeChallenge.Methods.Plain);
 
@@ -444,7 +397,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
                 configured.AllowedResourceServers.Add("apiserver");
                 configured.AllowedResponseTypes.Clear();
                 configured.AllowedResponseTypes.Add("token");
-                configured.RedirectUris.Add("http://localhost:5000/**");
+                configured.RedirectUris.Add("https://localhost:5000/callback");
             });
 
         var options = new WebApplicationFactoryClientOptions()
@@ -461,7 +414,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("scope", "openid")
             .AddQueryString("resource", "https://api.demo.local/apiserver")
             .AddQueryString("nonce", "implicit-resource-nonce")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback");
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback");
 
         var response = await client.GetAsync(path);
         var body = await response.Content.ReadAsStringAsync();
@@ -492,7 +445,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
                 configured.AllowedResourceServers.Add("apiserver");
                 configured.AllowedResponseTypes.Clear();
                 configured.AllowedResponseTypes.Add("id_token");
-                configured.RedirectUris.Add("http://localhost:5000/**");
+                configured.RedirectUris.Add("https://localhost:5000/callback");
             });
 
         var options = new WebApplicationFactoryClientOptions() { AllowAutoRedirect = false };
@@ -506,7 +459,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("scope", "openid")
             .AddQueryString("resource", "https://api.demo.local/apiserver")
             .AddQueryString("nonce", "id-token-resource-nonce")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback");
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback");
 
         var response = await client.GetAsync(path);
 
@@ -553,7 +506,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
                 configured.AllowedGrantTypes.Add("authorization_code");
                 configured.AllowedResourceServers.UnionWith([firstServer, secondServer]);
                 configured.AllowedResponseTypes.Add("code");
-                configured.RedirectUris.Add("http://localhost:5000/**");
+                configured.RedirectUris.Add("https://localhost:5000/callback");
             });
 
         var client = factory.CreateClient();
@@ -562,7 +515,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", $"{firstScope} {secondScope}")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback");
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback");
 
         var response = await client.GetAsync(path);
 
@@ -586,7 +539,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("client_id", factory.Handles.DemoClient.ClientId)
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -606,7 +559,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "no-such-response-mode")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -628,7 +581,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -649,7 +602,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state");
 
         var response = await client.GetAsync(path);
@@ -666,7 +619,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", $"openid no-such-scope-{CryptoRandom.CreateUniqueId(4, OutputFormat.Hex)}")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
@@ -687,7 +640,7 @@ public class CodeAuthorizeTests : IClassFixture<PersistentStorageAppFactory>
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
             .AddQueryString("resource", "https://unknown.example/api")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");

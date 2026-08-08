@@ -33,7 +33,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
 
@@ -117,7 +117,7 @@ public class PromptInteractionCharacterizationTests : IClassFixture<ControlledTi
             registered.AllowedGrantTypes.Add("authorization_code");
             registered.AllowedIdentityScopes.UnionWith(["openid", "profile"]);
             registered.AllowedResponseTypes.Add("code");
-            registered.RedirectUris.Add("http://localhost:5000/**");
+            registered.RedirectUris.Add("https://localhost:5000/callback");
         });
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

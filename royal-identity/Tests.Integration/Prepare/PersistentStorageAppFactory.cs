@@ -353,7 +353,7 @@ public class PersistentStorageAppFactory : AppFactoryBase
     /// <summary>The product seed every variant applies, so the seeded realms and client stay identical.</summary>
     protected static ConfigurationProductSeedOptions ProductSeedOptions => new()
     {
-        ServerAdminRedirectUris = ["http://localhost/server-admin/callback"],
+        ServerAdminRedirectUris = ["https://localhost/server-admin/callback"],
     };
 
     private void Provision()

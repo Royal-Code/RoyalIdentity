@@ -160,7 +160,9 @@ try {
 
     $serverPort = Get-DynamicTcpPort
     $serverBaseAddress = "http://127.0.0.1:$serverPort"
-    $redirectUri = "$serverBaseAddress/callback"
+    # The redirect is a registered RP callback; this acceptance never follows it, so it remains HTTPS even
+    # though the IdP itself is bound to an ephemeral HTTP loopback listener for the test harness.
+    $redirectUri = "https://127.0.0.1:$serverPort/callback"
     $connection = "Host=127.0.0.1;Port=$postgreSqlPort;Database=royalidentity;Username=royalidentity;Password=$databasePassword;Pooling=false"
 
     [Environment]::SetEnvironmentVariable("RI_SERVER_TEST_CONFIGURATION", $connection, "Process")

@@ -46,7 +46,9 @@ var migrations = builder
         "--operational-connection-env", "ROYALIDENTITY_OPERATIONAL_DB",
         "--user-accounts-connection-env", "ROYALIDENTITY_USER_ACCOUNTS_DB",
         "--seed", "product",
-        "--server-admin-redirect-uri", $"http://localhost:{ServerHttpPort}/server-admin/callback",
+        // No server-admin RP exists yet. This is an HTTPS registration placeholder only; the Server endpoint
+        // below is HTTP and does not serve this callback. Replace it with the real Admin RP URI when that app lands.
+        "--server-admin-redirect-uri", $"https://localhost:{ServerHttpPort}/server-admin/callback",
         "--key-protector", "data-protection",
         "--data-protection-key-ring", keyRingPath,
         "--data-protection-app-name", DataProtectionApplicationName)

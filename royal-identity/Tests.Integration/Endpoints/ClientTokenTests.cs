@@ -53,7 +53,7 @@ public class ClientTokenTests : IClassFixture<PersistentStorageAppFactory>
             configured.AllowedScopes.Add("api");
             configured.AllowedResponseTypes.Add("code");
             configured.RedirectUris.UnionWith(
-                ["http://localhost:5000/**", "https://localhost:5001/**"]);
+                ["https://localhost:5000/callback", "https://localhost:5001/callback"]);
         });
 
         var client = factory.CreateClient();

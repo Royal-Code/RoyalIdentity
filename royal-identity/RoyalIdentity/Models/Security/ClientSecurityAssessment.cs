@@ -44,7 +44,7 @@ public sealed class ClientSecurityAssessment
 
         var findings = new List<ClientSecurityFinding>();
 
-        EvaluateRedirectUris(client, findings);
+        EvaluateRedirectUris(client, realmOptions, findings);
         EvaluatePkce(client, findings);
         EvaluateFrontChannelTokens(client, findings);
         EvaluatePasswordGrant(client, findings);
@@ -55,17 +55,22 @@ public sealed class ClientSecurityAssessment
         return new ClientSecurityAssessment(findings);
     }
 
-    private static void EvaluateRedirectUris(Client client, List<ClientSecurityFinding> findings)
+    private static void EvaluateRedirectUris(
+        Client client,
+        RealmOptions realmOptions,
+        List<ClientSecurityFinding> findings)
     {
-        if (client.RedirectUris.Any(uri => uri?.Contains('*', StringComparison.Ordinal) is true))
+        if (realmOptions.RedirectUriValidation.Comparison is RedirectUriComparison.OrdinalIgnoreCase
+            || realmOptions.RedirectUriValidation.AllowWildcard
+            || client.RedirectUris.Any(uri => uri?.Contains('*', StringComparison.Ordinal) is true))
         {
             findings.Add(new ClientSecurityFinding(
                 ClientSecurityRuleIds.RedirectExactMatch,
                 SecurityRequirementLevel.Must,
                 SecurityAssessmentStatus.NonCompliant,
                 SecurityFindingSeverity.Critical,
-                "The client registers a wildcard authorization redirect URI, so matching is not exact.",
-                "Register every authorization redirect URI explicitly and use exact ordinal matching."));
+                "The effective realm policy permits non-ordinal redirect matching, or the client retains wildcard redirect registrations.",
+                "Use ordinal comparison, disable wildcard matching and register every authorization redirect URI explicitly."));
         }
 
         if (client.RedirectUris.Any(IsNonAbsoluteAuthorizationRedirect))

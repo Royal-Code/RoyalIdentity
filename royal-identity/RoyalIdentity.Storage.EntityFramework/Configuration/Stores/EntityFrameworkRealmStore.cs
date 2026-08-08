@@ -52,6 +52,13 @@ internal sealed class EntityFrameworkRealmStore(
     {
         ArgumentNullException.ThrowIfNull(realm);
         EnsureCanonicalDomain(realm.Domain);
+        var redirectErrors = realm.Options.RedirectUriValidation?.Validate()
+            ?? ["RedirectUriValidation must not be null."];
+        if (redirectErrors.Count is not 0)
+        {
+            throw new InvalidOperationException(
+                $"Realm redirect URI validation options are invalid: {string.Join(" ", redirectErrors)}");
+        }
 
         var db = accessor.DbContext;
         var row = await db.Set<RealmEntity>()

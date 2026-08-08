@@ -75,7 +75,7 @@ internal static class LoginExtensions
         this HttpClient client,
         string clientId = "demo_client",
         string scope = "openid profile offline_access",
-        string redirectUri = "http://localhost:5000/callback",
+        string redirectUri = "https://localhost:5000/callback",
         string reaml = "demo")
     {
         var path = Oidc.Routes.BuildAuthorizeUrl(reaml)
@@ -103,6 +103,6 @@ internal static class LoginExtensions
         TestRealmHandle realm,
         TestClientHandle clientHandle,
         string scope = "openid profile offline_access",
-        string redirectUri = "http://localhost:5000/callback")
+        string redirectUri = "https://localhost:5000/callback")
         => GetAuthorizeAsync(client, clientHandle.ClientId, scope, redirectUri, realm.Path);
 }

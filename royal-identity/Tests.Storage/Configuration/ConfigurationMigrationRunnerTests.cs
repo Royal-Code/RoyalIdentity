@@ -149,6 +149,8 @@ public class ConfigurationMigrationRunnerTests
         Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
             [.. baseArguments, "--server-admin-redirect-uri", "relative/callback"]));
         Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
+            [.. baseArguments, "--server-admin-redirect-uri", "https://admin.example.test/**"]));
+        Assert.Throws<MigrationRunnerUsageException>(() => MigrationRunnerOptions.Parse(
             [
                 .. baseArguments,
                 "--server-admin-redirect-uri", ProductRedirectUris[0],

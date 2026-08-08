@@ -18,6 +18,13 @@ public sealed class RealmMaterializer(RealmOptionsPayloadSerializer realmOptions
         ArgumentNullException.ThrowIfNull(serverOptions);
 
         var options = realmOptionsSerializer.Deserialize(entity.OptionsVersion, entity.OptionsJson, serverOptions);
+        var redirectErrors = options.RedirectUriValidation?.Validate()
+            ?? ["RedirectUriValidation must not be null."];
+        if (redirectErrors.Count is not 0)
+        {
+            throw new InvalidOperationException(
+                $"The persisted realm has invalid redirect URI validation options: {string.Join(" ", redirectErrors)}");
+        }
 
         return new Realm(entity.Id, entity.Domain, entity.Path, entity.DisplayName, entity.Internal, options)
         {

@@ -22,6 +22,9 @@ public sealed class ConfigurationMaterializationException : Exception
     internal static ConfigurationMaterializationException InvalidEnum(string property)
         => new($"The persisted client contains an invalid {property} value.");
 
+    internal static ConfigurationMaterializationException InvalidRedirectUri()
+        => new("The persisted client contains an invalid redirect URI or wildcard pattern.");
+
     internal static ConfigurationMaterializationException InvalidSigningKeyEnum(string property)
         => new($"The persisted signing key contains an invalid {property} value.");
 }

@@ -185,6 +185,23 @@ public class ClientSecurityAssessmentTests
         Assert.Contains("current runtime", finding.Remediation, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(RedirectUriComparison.OrdinalIgnoreCase, false)]
+    [InlineData(RedirectUriComparison.Ordinal, true)]
+    public void RealmRedirectRelaxation_IsReportedEvenWhenThisClientUsesALiteralUri(
+        RedirectUriComparison comparison,
+        bool allowWildcard)
+    {
+        var (client, options) = CreateSecureConfiguration();
+        options.RedirectUriValidation.Comparison = comparison;
+        options.RedirectUriValidation.AllowWildcard = allowWildcard;
+
+        var assessment = ClientSecurityAssessment.Create(client, options);
+
+        Assert.Contains(assessment.Findings,
+            finding => finding.RuleId == ClientSecurityRuleIds.RedirectExactMatch);
+    }
+
     [Fact]
     public void PublicContract_HasNoClockOrEvaluatorMetadata()
     {

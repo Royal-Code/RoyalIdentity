@@ -54,7 +54,11 @@ public class RedirectUriValidator : IValidator<IWithRedirectUri>
         //////////////////////////////////////////////////////////
         // check if redirect_uri is valid
         //////////////////////////////////////////////////////////
-        if (!await uriValidator.IsRedirectUriValidAsync(context.RedirectUri, client))
+        if (!await uriValidator.IsRedirectUriValidAsync(
+            context.RedirectUri,
+            client,
+            context.Options.RedirectUriValidation,
+            ct))
         {
             logger.LogError(context, "Invalid redirect_uri", context.RedirectUri);
             context.Error(Oidc.Authorize.Errors.InvalidRequest, "Invalid redirect_uri");

@@ -56,9 +56,11 @@ Active plans (check status before modifying affected areas):
   request culture uses the documented realm-scoped precedence, and discovery advertises only the effective UI
   catalog. Runtime translation overrides, localized claims and multilingual tenant content remain deferred.
 - [.ai/plans/plan-rfc9700-security-hardening.md](.ai/plans/plan-rfc9700-security-hardening.md) — IN PROGRESS
-  (1/6; Fase 2 next). Fase 1 introduced pure ephemeral `ClientSecurityAssessment.Create(Client, RealmOptions)`
-  with stable `RuleId` findings and no DI/persistence/runtime-gate role. Q1 is closed at a 30-second default
-  refresh-token retry tolerance for Fase 4.
+  (2/6; Fase 3 next). Fase 1 introduced pure ephemeral `ClientSecurityAssessment.Create(Client, RealmOptions)`
+  with stable `RuleId` findings and no DI/persistence/runtime-gate role. Fase 2 added exact ordinal HTTPS redirect
+  validation by default, with case-insensitive comparison and bounded wildcard matching as explicit realm opt-ins,
+  shared by authorize, code redemption and end-session. Q1 is closed at a 30-second default refresh-token retry
+  tolerance for Fase 4.
 
 The resources/scopes domain redesign is complete; only persistence of its realm-scoped
 `ConfigurationResourceBridgeOptions` catalog remains deferred to a future dedicated plan. `Tests.Host` is

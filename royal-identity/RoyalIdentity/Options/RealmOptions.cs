@@ -17,6 +17,7 @@ public class RealmOptions
         Authentication = new AuthenticationOptions(serverOptions.Authentication);
         Csp = new CspOptions(serverOptions.Csp);
         Cors = new CorsOptions(serverOptions.Cors);
+        RedirectUriValidation = new RedirectUriValidationOptions(serverOptions.RedirectUriValidation);
         Discovery = new DiscoveryOptions(serverOptions.Discovery);
         Endpoints = new EndpointsOptions(serverOptions.Endpoints);
         MutualTls = new MutualTlsOptions(serverOptions.MutualTls);
@@ -54,6 +55,7 @@ public class RealmOptions
         Authentication = new AuthenticationOptions(other.Authentication);
         Csp = new CspOptions(other.Csp);
         Cors = new CorsOptions(other.Cors);
+        RedirectUriValidation = new RedirectUriValidationOptions(other.RedirectUriValidation);
         Logging = new LoggingOptions(other.Logging);
         InputLengthRestrictions = new InputLengthRestrictions(other.InputLengthRestrictions);
         Endpoints = new EndpointsOptions(other.Endpoints);
@@ -104,6 +106,9 @@ public class RealmOptions
     /// Gets or sets the CORS options.
     /// </summary>
     public CorsOptions Cors { get; set; }
+
+    /// <summary>Gets or sets this realm's redirect URI validation policy.</summary>
+    public RedirectUriValidationOptions RedirectUriValidation { get; set; }
 
     /// <summary>
     /// Gets or sets the logging options.

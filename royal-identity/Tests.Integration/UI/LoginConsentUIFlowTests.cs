@@ -37,7 +37,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile email offline_access")
-            .AddQueryString("redirect_uri", $"{client.BaseAddress}callback")
+            .AddQueryString("redirect_uri", "https://localhost/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", codeChallenge)
             .AddQueryString("code_challenge_method", "S256");
@@ -76,7 +76,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
                     ["grant_type"] = "authorization_code",
                     ["code"] = callbackData["code"],
                     ["client_id"] = "demo_client",
-                    ["redirect_uri"] = $"{client.BaseAddress}callback",
+                    ["redirect_uri"] = "https://localhost/callback",
                     ["code_verifier"] = codeVerifier
                 });
 
@@ -107,7 +107,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
         var client = factory.CreateClient();
         var suffix = CryptoRandom.CreateUniqueId(4, OutputFormat.Hex);
         var clientId = $"plain-pkce-client-{suffix}";
-        var redirectUri = $"{client.BaseAddress}callback";
+        const string redirectUri = "https://localhost/callback";
 
         await factory.SaveClientAsync(factory.Handles.Demo, clientId, registered =>
         {
@@ -188,7 +188,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile email api api:read api:write offline_access")
-            .AddQueryString("redirect_uri", $"{client.BaseAddress}callback")
+            .AddQueryString("redirect_uri", "https://localhost/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", codeChallenge)
             .AddQueryString("code_challenge_method", "S256");
@@ -262,7 +262,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
                     ["grant_type"] = "authorization_code",
                     ["code"] = callbackData["code"],
                     ["client_id"] = "demo_consent_client",
-                    ["redirect_uri"] = $"{client.BaseAddress}callback",
+                    ["redirect_uri"] = "https://localhost/callback",
                     ["code_verifier"] = codeVerifier
                 });
 
@@ -306,7 +306,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile email api api:read api:write offline_access")
             .AddQueryString("resource", "https://api.demo.local/apiserver")
-            .AddQueryString("redirect_uri", $"{client.BaseAddress}callback")
+            .AddQueryString("redirect_uri", "https://localhost/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", codeChallenge)
             .AddQueryString("code_challenge_method", "S256");
@@ -356,7 +356,7 @@ public class LoginConsentUIFlowTests : IClassFixture<PersistentStorageAppFactory
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile email api api:read api:write offline_access")
-            .AddQueryString("redirect_uri", $"{client.BaseAddress}callback")
+            .AddQueryString("redirect_uri", "https://localhost/callback")
             .AddQueryString("state", "state")
             .AddQueryString("code_challenge", codeChallenge)
             .AddQueryString("code_challenge_method", "S256");

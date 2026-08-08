@@ -25,7 +25,7 @@ public class PkceTokenTests : IClassFixture<LogCapturingAppFactory>
     private static readonly string[] ScopeNames = ["openid", "profile"];
 
     private const string ClientId = "demo_client";
-    private const string RedirectUri = "http://localhost:5000/callback";
+    private const string RedirectUri = "https://localhost:5000/callback";
 
     private readonly LogCapturingAppFactory factory;
 

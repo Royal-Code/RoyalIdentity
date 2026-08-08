@@ -39,7 +39,7 @@ public class ActiveRuleCharacterizationTests : IClassFixture<PersistentStorageAp
             DateTime.UtcNow,
             300,
             resources,
-            "http://localhost:5000/callback");
+            "https://localhost:5000/callback");
         await storage.GetAuthorizationCodeStore(realm).StoreAuthorizationCodeAsync(code, default);
 
         var client = factory.CreateClient();
@@ -50,7 +50,7 @@ public class ActiveRuleCharacterizationTests : IClassFixture<PersistentStorageAp
                 ["grant_type"] = "authorization_code",
                 ["code"] = code.Code,
                 ["client_id"] = factory.Handles.DemoClient.ClientId,
-                ["redirect_uri"] = "http://localhost:5000/callback",
+                ["redirect_uri"] = "https://localhost:5000/callback",
             }));
 
         // account is active, but the session is absent ⇒ not active ⇒ invalid_grant
@@ -85,7 +85,7 @@ public class ActiveRuleCharacterizationTests : IClassFixture<PersistentStorageAp
             .AddQueryString("response_type", "code")
             .AddQueryString("response_mode", "query")
             .AddQueryString("scope", "openid profile")
-            .AddQueryString("redirect_uri", "http://localhost:5000/callback")
+            .AddQueryString("redirect_uri", "https://localhost:5000/callback")
             .AddQueryString("code_challenge", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             .AddQueryString("code_challenge_method", "S256");
 
